@@ -47,41 +47,41 @@ _9 zmian oczekiwanych: hosty, które o tej porze zwykle nie odpowiadają albo od
 
 ### Panel administracyjny: Jenkins (10.66.3.17:8080)
 
-waga: **informacja** · ciekawość **89**/100 · `http://10.66.3.17:8080/` · nowa w tym przebiegu · także: narzędzie deweloperskie, nagłówki ujawniają szczegóły oprogramowania, nowa ekspozycja
+waga: **informacja** · ciekawość **85**/100 · `http://10.66.3.17:8080/` · nowa w tym przebiegu · także: narzędzie deweloperskie, nowa ekspozycja, nagłówki HTTP
 
 - `header:X-Jenkins`: 2.440.1
 - `title`: Dashboard \[Jenkins\]
 - `header:Server`: Jetty(10.0.20)
 
+### Baza danych dostępna z sieci: Redis key-value store 7.2.4 (10.66.3.90:6379)
+
+waga: **niska** · ciekawość **80**/100 · `10.66.3.90:6379` · nowa w tym przebiegu · także: nowa ekspozycja
+
+- `port:6379/tcp`: Redis key-value store 7.2.4
+
+### Przeterminowany certyfikat TLS: poczta.kampus.example (10.66.1.30:443)
+
+waga: **niska** · ciekawość **70**/100 · `https://poczta.kampus.example/`
+
+- `tls:certificate`: CN=poczta.kampus.example; wystawca=R11, Let's Encrypt; ważny do 2026-11-03; sha256=77a0d3e1b6c2f945
+
 ### Urządzenie IoT: HP LaserJet (10.66.3.40:80)
 
-waga: **informacja** · ciekawość **44**/100 · `http://10.66.3.40/` · nowa w tym przebiegu · także: nowa ekspozycja
+waga: **informacja** · ciekawość **55**/100 · `http://10.66.3.40/` · nowa w tym przebiegu · także: nowa ekspozycja
 
 - `header:Server`: HP HTTP Server; HP LaserJet Pro M404dn
 - `title`: HP LaserJet Pro M404dn
 
-### Baza danych dostępna z sieci: Redis key-value store 7.2.4 (10.66.3.90:6379)
-
-waga: **niska** · ciekawość **40**/100 · `10.66.3.90:6379` · nowa w tym przebiegu · także: nowa ekspozycja
-
-- `port:6379/tcp`: Redis key-value store 7.2.4
-
 ### Logowanie przez nieszyfrowane HTTP: Dziekanat – logowanie (10.66.1.20:80)
 
-waga: **niska** · ciekawość **35**/100 · `http://dziekanat.kampus.example/` · także: nagłówki ujawniają szczegóły oprogramowania
+waga: **niska** · ciekawość **50**/100 · `http://dziekanat.kampus.example/` · także: nagłówki HTTP
 
 - `title`: Dziekanat – logowanie
 - `header:Server`: Apache/2.4.62 (Debian)
 
-### Przeterminowany certyfikat TLS: poczta.kampus.example (10.66.1.30:443)
-
-waga: **niska** · ciekawość **30**/100 · `https://poczta.kampus.example/`
-
-- `tls:certificate`: CN=poczta.kampus.example; wystawca=R11, Let's Encrypt; ważny do 2026-11-03; sha256=77a0d3e1b6c2f945
-
 ### Środowisko testowe lub staging: Portal studenta 2.0 (test) (10.66.1.60:443)
 
-waga: **informacja** · ciekawość **20**/100 · `https://staging.kampus.example/`
+waga: **informacja** · ciekawość **45**/100 · `https://staging.kampus.example/`
 
 - `hostname`: staging.kampus.example
 - `title`: Portal studenta 2.0 (test)

@@ -327,12 +327,21 @@ Ocena odpowiada na pytanie „na co analityk powinien spojrzeć najpierw". Jest 
 
 Reguły dodatkowe:
 
-- Dopasowana sygnatura dodaje `round(waga × pewność)` punktów, najwyżej 40 za jedną sygnaturę.
+- Dopasowana sygnatura dodaje `round(waga × pewność)` punktów, najwyżej 40 za jedną sygnaturę i najwyżej 40 za wszystkie sygnatury usługi razem (`MaxSignatureTotal`).
+- **Słabe sygnały razem dają najwyżej 20 punktów** (`WeakSignalsCap`): `sensitive-header`, `missing-security-headers`, `interesting-cookie`, `default-page`, `cert-expiring`, `hostname-mismatch`, `remote-access` (SSH) oraz sygnatury kategorii nagłówek i ciasteczko. Cztery słabe sygnały nie robią z usługi celu numer jeden.
+- Sygnatura nagłówka albo ciasteczka, której klasy są już policzone przez powód klasy (na przykład „formularz logowania po nieszyfrowanym HTTP" przy powodzie `login-plain-http`), nie dodaje punktów drugi raz.
 - Krytyczność zakresu 4 dodaje 5 punktów, krytyczność 5 dodaje 10.
 - „Rzadka technologia": grupa najwyżej 2 usług w sieci z co najmniej 20 usługami.
 - „Certyfikat wkrótce wygaśnie": mniej niż 30 dni.
 - „Przestarzała wersja" zależy od tagów sygnatur (`outdated`, `eol`). Analiza sama nie ocenia numerów wersji.
 - Ocena hosta to najwyższa ocena jego usług, plus 5 punktów dla nowego hosta, najwyżej 100.
+
+Przykład z laboratorium: strona logowania DefectDojo pod `http://127.0.0.1:18080` (nginx, Django, ciasteczko `csrftoken`, bez CSP, tylko HTTP). Test `TestDojoLoginCalibration` na prawdziwym wyniku `fpprobe`:
+
+| | Przed kalibracją | Po kalibracji |
+| --- | --- | --- |
+| ocena usługi | 100 = sygnatura DefectDojo 40 + sygnatura „logowanie po HTTP" 40 + `login-plain-http` 25 + brak CSP 11 + ciasteczko 4, obcięte do 100 | 80 = sygnatura DefectDojo 40 + `login-plain-http` 25 + słabe sygnały 15 (brak CSP 11, ciasteczko 4) |
+| obserwacje | 5, każda z oceną 100: logowanie po HTTP, nagłówek „logowanie po HTTP", nagłówek „brak CSP", ciasteczko `csrftoken`, ciasteczko „sesja frameworka" | 3: logowanie po HTTP **50** (z dowodami obu źródeł), nagłówki HTTP **11**, ciasteczka **10** |
 
 Przykład z raportu przykładowego: nowa usługa Jenkins na porcie 8080 ma 89 punktów = panel administracyjny (30) + narzędzie deweloperskie (20) + sygnatura Jenkins (19) + nowa ekspozycja (15) + nagłówek ujawniający wersję (5).
 
@@ -368,6 +377,38 @@ Rozmiar grupy zasila regułę „rzadka technologia" w ocenie ciekawości.
 ```
 
 Ponowny skan tej samej rzeczy daje ten sam klucz. Baza aktualizuje więc obserwację zamiast tworzyć nową. Ten sam klucz jest identyfikatorem `unique_id_from_tool` w DefectDojo (patrz `docs/INTEGRACJE.md`).
+
+**Ocena ciekawości obserwacji** wynika z jej typu i dowodów, nie z oceny usługi (`FindingBaseInterest`, `findingBuilder.interest`). Dzięki temu góra listy to to, co analityk powinien otworzyć najpierw.
+
+| Typ obserwacji | Ocena | Uwagi |
+| --- | --- | --- |
+| `admin-panel` | 75 | |
+| `debug-page` | 75 | |
+| `database-exposed` | 70 | |
+| `remote-access-exposed` | 20 | telnet, rlogin: 70; RDP, VNC: 50; SSH: 20 |
+| `expired-cert` | 40 | na stronie logowania: 70 |
+| `dev-tool` | 60 | |
+| `directory-listing` | 55 | |
+| `login-plain-http` | 50 | |
+| `staging` | 45 | |
+| `iot-device` | 45 | |
+| `new-exposure` | 40 | |
+| `signature` | `round(waga × pewność)` w przedziale 10–60 | |
+| `self-signed-cert` | 25 | na stronie logowania: 40 |
+| `hostname-mismatch`, `cert-expiring` | 20 | |
+| `interesting-header` | 15 | z sygnatury: `round(waga × pewność)` w przedziale 5–25 |
+| `default-page` | 15 | |
+| `interesting-cookie` | 10 | ciasteczko sesyjne bez flag: 25; wartość JWT: 20; z sygnatury: 5–25 |
+
+Modyfikatory: krytyczność zakresu 4 dodaje 5, krytyczność 5 dodaje 10 (`FindingInput.ScopeCriticality`); usługa nowa od poprzedniego przebiegu dodaje 10. Wynik jest obcięty do 100.
+
+**Bliskie duplikaty na jednej usłudze** łączą się w jedną obserwację z kilkoma wierszami dowodów:
+
+- wszystkie obserwacje nagłówków jednej usługi → jedna `interesting-header` (klucz bez tematu, tytuł „Nagłówki HTTP: …");
+- wszystkie obserwacje ciasteczek jednej usługi → jedna `interesting-cookie` („Ciasteczka: …");
+- sygnatura nagłówka albo ciasteczka z klasą, która już dała obserwację (na przykład „formularz logowania po nieszyfrowanym HTTP" i `login-plain-http`), dopisuje swoje dowody do tej obserwacji.
+
+Połączona obserwacja ma najwyższą ocenę z części. Uwaga przy aktualizacji: obserwacje nagłówków i ciasteczek z sygnatur miały dotąd klucze z tematem (`interesting-header/<ip>/tcp-<port>/<sygnatura>`). Po zmianie powstaje jedna obserwacja z kluczem bez tematu, a stare, nietknięte przez analityka, analiza po przebiegu oznacza jako `resolved`.
 
 Obserwacje są informacyjne. Waga domyślna to „informacja". Wagę „niska" mają: logowanie przez nieszyfrowane HTTP, baza danych dostępna z sieci, strona diagnostyczna, listing katalogu, przeterminowany certyfikat oraz telnet i rlogin. Wartości ciasteczek nigdy nie trafiają do dowodów.
 

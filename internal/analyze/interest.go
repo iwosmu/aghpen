@@ -20,8 +20,32 @@ const (
 	RareMinServices = 20
 )
 
-// MaxSignaturePoints caps the points one signature match can add.
-const MaxSignaturePoints = 40
+// MaxSignaturePoints caps the points one signature match can add, and
+// MaxSignatureTotal the points of all signature matches of one service.
+const (
+	MaxSignaturePoints = 40
+	MaxSignatureTotal  = 40
+)
+
+// WeakSignalsCap caps the points of the weak signals of one service taken
+// together: revealing headers, missing security headers, cookie flags,
+// default page, certificate expiring or not matching the name, SSH, and
+// signature matches of the header and cookie categories. Four weak
+// signals do not make a service interesting; they add at most this much.
+const WeakSignalsCap = 20
+
+// weakReasons are the reason codes of the weak signals.
+var weakReasons = map[string]bool{
+	ReasonMissingHeaders: true, ReasonSensitiveHeader: true, ReasonCookie: true, ReasonDefaultPage: true,
+	ReasonCertExpiring: true, ReasonHostMismatch: true, ReasonRemoteAccess: true,
+}
+
+// classReason maps a class to the reason codes that already count it.
+var classReason = map[string][]string{
+	model.ClassAdminPanel: {ReasonAdminPanel}, model.ClassLogin: {ReasonLogin, ReasonLoginPlainHTTP},
+	model.ClassStaging: {ReasonStaging}, model.ClassIoT: {ReasonIoT}, model.ClassDevTool: {ReasonDevTool},
+	model.ClassDatabase: {ReasonDatabase}, model.ClassDirListing: {ReasonDirListing}, model.ClassDefaultPage: {ReasonDefaultPage},
+}
 
 // Interest reason codes.
 const (
@@ -214,9 +238,17 @@ func Interest(in InterestInput) (int, []model.InterestReason) {
 			add(ReasonCookie, strings.Join(cs, ", "))
 		}
 	}
+	counted := map[string]bool{}
+	for _, r := range why {
+		counted[r.Code] = true
+	}
 	for _, m := range s.Matches {
 		if m.Interest <= 0 {
 			continue
+		}
+		weak := m.Category == model.CatHeader || m.Category == model.CatCookie
+		if weak && repeatsClass(m, counted) {
+			continue // "login form over plain HTTP" is the login-plain-http reason again
 		}
 		conf := m.Confidence
 		if conf <= 0 || conf > 1 {
@@ -227,7 +259,11 @@ func Interest(in InterestInput) (int, []model.InterestReason) {
 			pts = MaxSignaturePoints
 		}
 		if pts > 0 {
-			why = append(why, model.InterestReason{Code: ReasonSignature, Points: pts, Text: "Sygnatura: " + firstNonEmpty(m.Name, m.Signature)})
+			code := ReasonSignature
+			if weak {
+				code = reasonWeakSignature
+			}
+			why = append(why, model.InterestReason{Code: code, Points: pts, Text: "Sygnatura: " + firstNonEmpty(m.Name, m.Signature)})
 		}
 	}
 	switch {
@@ -239,14 +275,58 @@ func Interest(in InterestInput) (int, []model.InterestReason) {
 	}
 
 	sort.SliceStable(why, func(i, j int) bool { return why[i].Points > why[j].Points })
+	// Caps: the weak signals together, the signature matches together.
+	weakLeft, sigLeft := WeakSignalsCap, MaxSignatureTotal
+	for i := range why {
+		r := &why[i]
+		switch {
+		case weakReasons[r.Code] || r.Code == reasonWeakSignature:
+			r.Points = min(r.Points, weakLeft)
+			weakLeft -= r.Points
+			if r.Code == reasonWeakSignature {
+				r.Code = ReasonSignature
+			}
+		case r.Code == ReasonSignature:
+			r.Points = min(r.Points, sigLeft)
+			sigLeft -= r.Points
+		}
+	}
+	kept := why[:0]
 	score := 0
 	for _, r := range why {
-		score += r.Points
+		if r.Points > 0 {
+			kept = append(kept, r)
+			score += r.Points
+		}
 	}
 	if score > 100 {
 		score = 100
 	}
-	return score, why
+	return score, kept
+}
+
+// reasonWeakSignature marks a header or cookie signature match while the
+// caps are applied; it is reported as ReasonSignature.
+const reasonWeakSignature = "signature-weak"
+
+// repeatsClass reports whether every class of a signature match is already
+// counted by a class reason.
+func repeatsClass(m model.SigMatch, counted map[string]bool) bool {
+	if len(m.Classes) == 0 {
+		return false
+	}
+	for _, c := range m.Classes {
+		hit := false
+		for _, code := range classReason[c] {
+			if counted[code] {
+				hit = true
+			}
+		}
+		if !hit {
+			return false
+		}
+	}
+	return true
 }
 
 // HostInterest is the interest of a host: the highest score of its services,

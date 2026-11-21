@@ -1,0 +1,528 @@
+{
+ "port": 18080,
+ "proto": "tcp",
+ "state": "open",
+ "name": "http",
+ "product": "nginx",
+ "http": {
+  "scheme": "http",
+  "url": "http://127.0.0.1:18080/",
+  "final_url": "http://127.0.0.1:18080/login?next=/",
+  "host": "127.0.0.1",
+  "status": 200,
+  "title": "DefectDojo",
+  "headers": {
+   "Cache-Control": [
+    "max-age=0, no-cache, no-store, must-revalidate, private"
+   ],
+   "Connection": [
+    "keep-alive"
+   ],
+   "Content-Encoding": [
+    "gzip"
+   ],
+   "Content-Language": [
+    "en"
+   ],
+   "Content-Type": [
+    "text/html; charset=utf-8"
+   ],
+   "Cross-Origin-Opener-Policy": [
+    "same-origin"
+   ],
+   "Date": [
+    "Sat, 21 Nov 2026 13:24:03 GMT"
+   ],
+   "Expires": [
+    "Sat, 21 Nov 2026 13:24:03 GMT"
+   ],
+   "Permissions-Policy": [
+    "accelerometer=(), ambient-light-sensor=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), interest-cohort=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=()"
+   ],
+   "Referrer-Policy": [
+    "same-origin"
+   ],
+   "Server": [
+    "nginx"
+   ],
+   "Set-Cookie": [
+    "csrftoken=[masked len=32]; expires=Sat, 20 Nov 2027 13:24:03 GMT; HttpOnly; Max-Age=31449600; Path=/; SameSite=Lax"
+   ],
+   "Vary": [
+    "Cookie, Accept-Language"
+   ],
+   "X-Content-Type-Options": [
+    "nosniff"
+   ],
+   "X-Frame-Options": [
+    "DENY"
+   ]
+  },
+  "cookies": [
+   {
+    "name": "csrftoken",
+    "domain": "",
+    "path": "/",
+    "secure": false,
+    "http_only": true,
+    "same_site": "Lax",
+    "value_len": 32,
+    "value_hash": "4f4de080d147c601"
+   }
+  ],
+  "redirects": [
+   {
+    "from": "http://127.0.0.1:18080/",
+    "to": "http://127.0.0.1:18080/login?next=/",
+    "status": 302
+   }
+  ],
+  "server": "nginx",
+  "powered_by": "",
+  "meta_generator": "",
+  "body_length": 19394,
+  "body_sha256": "30eb9300ce3ed2d904b683f2c37ae2ba59764e3efe74076506390b5e8b3ea353",
+  "body_simhash": "58f8d0b7a5b1e345",
+  "body_excerpt": "\n\n\n\n\n\n\n<!DOCTYPE html>\n<html lang=\"en\" dir=\"ltr\">\n    <head>\n        <meta charset=\"utf-8\">\n        <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n        <meta name=\"description\" content=\"\">\n        <meta name=\"auth… [19394 bytes]",
+  "favicon_mmh3": -1933568138,
+  "favicon_sha256": "2749b87cbc48ee8d71d6f73932f32e004b1c1c313a87314b01d21017e930c1ca",
+  "paths": [
+   {
+    "path": "/actuator",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/actuator"
+   },
+   {
+    "path": "/version",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/version"
+   },
+   {
+    "path": "/v2/",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/v2/"
+   },
+   {
+    "path": "/manager/html",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/manager/html"
+   },
+   {
+    "path": "/status.php",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/status.php"
+   },
+   {
+    "path": "/wp-login.php",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/wp-login.php"
+   },
+   {
+    "path": "/_profiler/",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/_profiler/"
+   },
+   {
+    "path": "/debug/pprof/",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/debug/pprof/"
+   },
+   {
+    "path": "/info.php",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/info.php"
+   },
+   {
+    "path": "/phpinfo.php",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/phpinfo.php"
+   },
+   {
+    "path": "/xmldata?item=all",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/xmldata%3Fitem%3Dall"
+   },
+   {
+    "path": "/redfish/v1/",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/redfish/v1/"
+   },
+   {
+    "path": "/v1/sys/health",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/v1/sys/health"
+   },
+   {
+    "path": "/remote/login",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/remote/login"
+   },
+   {
+    "path": "/server-status",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/server-status"
+   },
+   {
+    "path": "/shelly",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/shelly"
+   },
+   {
+    "path": "/adminer.php",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/adminer.php"
+   },
+   {
+    "path": "/phpmyadmin/",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/phpmyadmin/"
+   },
+   {
+    "path": "/pma/",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/pma/"
+   },
+   {
+    "path": "/robots.txt",
+    "status": 302,
+    "title": "",
+    "length": 0,
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "excerpt": "",
+    "headers": null,
+    "location": "/login?next=/robots.txt"
+   }
+  ],
+  "response_ms": 5,
+  "error": ""
+ },
+ "tls": null,
+ "matches": [
+  {
+   "signature": "defectdojo",
+   "name": "DefectDojo",
+   "category": "security",
+   "version": "",
+   "confidence": 0.94,
+   "interest": 60,
+   "classes": [
+    "login"
+   ],
+   "tags": [
+    "python",
+    "bezpieczenstwo"
+   ],
+   "evidence": [
+    {
+     "matcher": "title",
+     "where": "title",
+     "snippet": "DefectDojo"
+    },
+    {
+     "matcher": "body",
+     "where": "body",
+     "snippet": "DefectDojo"
+    }
+   ]
+  },
+  {
+   "signature": "django",
+   "name": "Django",
+   "category": "framework",
+   "version": "",
+   "confidence": 0.92,
+   "interest": 0,
+   "classes": [],
+   "tags": [
+    "python"
+   ],
+   "evidence": [
+    {
+     "matcher": "cookie",
+     "where": "cookie:csrftoken",
+     "snippet": "csrftoken (32 B; Secure=false; HttpOnly=true; SameSite=Lax)"
+    },
+    {
+     "matcher": "body",
+     "where": "body",
+     "snippet": "name=\"csrfmiddlewaretoken\""
+    }
+   ]
+  },
+  {
+   "signature": "nginx",
+   "name": "nginx",
+   "category": "web-server",
+   "version": "",
+   "confidence": 0.9,
+   "interest": 0,
+   "classes": [],
+   "tags": [],
+   "evidence": [
+    {
+     "matcher": "header",
+     "where": "header:Server",
+     "snippet": "nginx"
+    }
+   ]
+  },
+  {
+   "signature": "header-login-over-http",
+   "name": "Formularz logowania po nieszyfrowanym HTTP",
+   "category": "header",
+   "version": "",
+   "confidence": 0.88,
+   "interest": 55,
+   "classes": [
+    "login"
+   ],
+   "tags": [],
+   "evidence": [
+    {
+     "matcher": "url",
+     "where": "url",
+     "snippet": "http://127.0.0.1:18080/login?next=/"
+    },
+    {
+     "matcher": "body",
+     "where": "body",
+     "snippet": "<input type=\"password"
+    }
+   ]
+  },
+  {
+   "signature": "bootstrap",
+   "name": "Bootstrap",
+   "category": "library",
+   "version": "",
+   "confidence": 0.8,
+   "interest": 0,
+   "classes": [],
+   "tags": [],
+   "evidence": [
+    {
+     "matcher": "body",
+     "where": "body",
+     "snippet": "bootstrap.min.css"
+    }
+   ]
+  },
+  {
+   "signature": "cookie-language-framework",
+   "name": "Ciasteczko sesji frameworka",
+   "category": "cookie",
+   "version": "",
+   "confidence": 0.8,
+   "interest": 5,
+   "classes": [],
+   "tags": [],
+   "evidence": [
+    {
+     "matcher": "cookie",
+     "where": "cookie:csrftoken",
+     "snippet": "csrftoken (32 B; Secure=false; HttpOnly=true; SameSite=Lax)"
+    }
+   ]
+  },
+  {
+   "signature": "jquery",
+   "name": "jQuery",
+   "category": "library",
+   "version": "",
+   "confidence": 0.8,
+   "interest": 0,
+   "classes": [],
+   "tags": [],
+   "evidence": [
+    {
+     "matcher": "body",
+     "where": "body",
+     "snippet": "/jquery.min.js"
+    }
+   ]
+  },
+  {
+   "signature": "header-login-no-csp",
+   "name": "Strona logowania bez Content-Security-Policy",
+   "category": "header",
+   "version": "",
+   "confidence": 0.75,
+   "interest": 15,
+   "classes": [],
+   "tags": [],
+   "evidence": [
+    {
+     "matcher": "body",
+     "where": "body",
+     "snippet": "<input type=\"password"
+    },
+    {
+     "matcher": "header",
+     "where": "header:Content-Security-Policy",
+     "snippet": "brak"
+    }
+   ]
+  }
+ ],
+ "technologies": [
+  {
+   "name": "Django",
+   "category": "environment",
+   "version": "",
+   "confidence": 0.988,
+   "sources": [
+    "django",
+    "implied:defectdojo"
+   ],
+   "cpe": "cpe:2.3:a:djangoproject:django"
+  },
+  {
+   "name": "DefectDojo",
+   "category": "security",
+   "version": "",
+   "confidence": 0.94,
+   "sources": [
+    "defectdojo"
+   ],
+   "cpe": ""
+  },
+  {
+   "name": "nginx",
+   "category": "environment",
+   "version": "",
+   "confidence": 0.9,
+   "sources": [
+    "nginx"
+   ],
+   "cpe": "cpe:2.3:a:f5:nginx"
+  },
+  {
+   "name": "Python",
+   "category": "language",
+   "version": "",
+   "confidence": 0.828,
+   "sources": [
+    "implied:django"
+   ],
+   "cpe": "cpe:2.3:a:python:python"
+  },
+  {
+   "name": "Bootstrap",
+   "category": "library",
+   "version": "",
+   "confidence": 0.8,
+   "sources": [
+    "bootstrap"
+   ],
+   "cpe": "cpe:2.3:a:getbootstrap:bootstrap"
+  },
+  {
+   "name": "jQuery",
+   "category": "library",
+   "version": "",
+   "confidence": 0.8,
+   "sources": [
+    "jquery"
+   ],
+   "cpe": "cpe:2.3:a:jquery:jquery"
+  }
+ ],
+ "classes": [
+  "login"
+ ]
+}

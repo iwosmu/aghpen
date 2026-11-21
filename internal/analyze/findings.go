@@ -44,7 +44,8 @@ type FindingService struct {
 	ServiceID *int64
 	// New: first seen in this run, and this run is not the first one.
 	New bool
-	// Interest is the interest score of the service, copied to its findings.
+	// Interest is the interest score of the service. Findings no longer
+	// copy it: each finding has its own interest (FindingInterest).
 	Interest int
 }
 
@@ -56,6 +57,9 @@ type FindingInput struct {
 	Services  []FindingService
 	RunID     int64
 	At        time.Time
+	// ScopeCriticality is the highest criticality (1..5) of the host's
+	// scopes; 0 means unknown. It raises the interest of every finding.
+	ScopeCriticality int
 }
 
 // FindingKey builds the stable key of a finding: type, host, port and
@@ -105,8 +109,9 @@ func DeriveFindings(in FindingInput) []model.Finding {
 		if !isOpen(s) {
 			continue
 		}
-		b := findingBuilder{in: &in, fs: fs, s: s}
+		b := findingBuilder{in: &in, fs: fs, s: s, sigPoints: -1}
 		b.derive()
+		b.merge()
 		out = append(out, b.out...)
 	}
 	return out
@@ -117,6 +122,9 @@ type findingBuilder struct {
 	fs  *FindingService
 	s   *model.ServiceResult
 	out []model.Finding
+	// sigPoints is the weighted interest of the signature match being
+	// added (header, cookie and signature findings); -1 when none.
+	sigPoints int
 }
 
 func (b *findingBuilder) add(typ, subject, title, desc string, ev []model.Evidence, signature string, extraTags ...string) {
@@ -142,7 +150,7 @@ func (b *findingBuilder) add(typ, subject, title, desc string, ev []model.Eviden
 	b.out = append(b.out, model.Finding{
 		Key: FindingKey(typ, b.in.IP, s.Port, s.Proto, subject), Type: typ,
 		Title:       title + " (" + addr(b.in.IP, s.Port) + ")",
-		Description: desc, Severity: sev, Status: model.FindingNew, Interest: b.fs.Interest,
+		Description: desc, Severity: sev, Status: model.FindingNew, Interest: b.interest(typ, ev),
 		HostID: b.in.HostID, IP: b.in.IP, ServiceID: b.fs.ServiceID, Port: s.Port, URL: u,
 		Signature: signature, Evidence: ev, Tags: dedupSorted(sortedCopy(tags)),
 		FirstSeen: b.in.At, LastSeen: b.in.At, FirstRunID: b.in.RunID, LastRunID: b.in.RunID,
@@ -315,6 +323,10 @@ func (b *findingBuilder) derive() {
 			}
 		}
 		name := firstNonEmpty(m.Name, m.Signature)
+		b.sigPoints = sigPoints(m)
+		if (m.Category == model.CatHeader || m.Category == model.CatCookie) && b.attachToClassFinding(m) {
+			continue // the same observation as a class finding of this service
+		}
 		switch {
 		case m.Category == model.CatHeader:
 			b.add(FindingHeader, m.Signature, "Interesujący nagłówek: "+name,
@@ -332,6 +344,7 @@ func (b *findingBuilder) derive() {
 		}
 	}
 
+	b.sigPoints = -1
 	if b.fs.New {
 		b.add(FindingNewExposure, "", "Nowa ekspozycja: "+firstNonEmpty(what(""), "port "+fmt.Sprint(s.Port)),
 			"Usługa nie była widoczna w poprzednich skanach. Sprawdź, czy jej wystawienie jest zamierzone.",
@@ -398,4 +411,226 @@ func cookieEvidence(cs []model.Cookie, tls bool) []model.Evidence {
 	}
 	sort.SliceStable(ev, func(i, j int) bool { return ev[i].Where < ev[j].Where })
 	return ev
+}
+
+// ---------- interest of one finding ----------
+
+// FindingBaseInterest is the interest (0..100) of each finding type, from
+// its own type and evidence. It answers "what should an analyst open
+// first": an exposed admin panel, a debug page or a database open to the
+// network on top; a revealing header or a framework cookie at the bottom.
+// Modifiers (FindingInterest): signature weight for header, cookie and
+// signature findings; login context for certificate findings; scope
+// criticality 4 adds 5, 5 adds 10; a service new since the previous run
+// adds 10. The result is capped at 100.
+var FindingBaseInterest = map[string]int{
+	FindingAdminPanel:     75,
+	FindingDebugPage:      75,
+	FindingDatabase:       70,
+	FindingDevTool:        60,
+	FindingDirListing:     55,
+	FindingLoginPlainHTTP: 50,
+	FindingStaging:        45,
+	FindingIoT:            45,
+	FindingExpiredCert:    40, // 70 on a login page
+	FindingNewExposure:    40,
+	FindingRemoteAccess:   20, // telnet/rlogin 70, RDP/VNC 50
+	FindingSelfSigned:     25, // 40 on a login page
+	FindingHostMismatch:   20,
+	FindingCertExpiring:   20,
+	FindingHeader:         15, // signature header findings: weight clamped to 5..25
+	FindingDefaultPage:    15,
+	FindingCookie:         10, // 25 for a session cookie without flags, 20 for a JWT
+	FindingSignature:      30, // weight clamped to 10..60
+}
+
+// Bounds of the signature weight for each finding type.
+const (
+	WeakFindingMin = 5
+	WeakFindingMax = 25
+	SigFindingMin  = 10
+	SigFindingMax  = 60
+)
+
+func sigPoints(m model.SigMatch) int {
+	conf := m.Confidence
+	if conf <= 0 || conf > 1 {
+		conf = 1
+	}
+	return int(float64(m.Interest)*conf + 0.5)
+}
+
+func clampInt(v, lo, hi int) int {
+	return max(lo, min(hi, v))
+}
+
+// interest computes the interest of a finding of type typ on this service.
+func (b *findingBuilder) interest(typ string, ev []model.Evidence) int {
+	s := b.s
+	login := hasClass(EffectiveClasses(s, b.in.Hostnames), model.ClassLogin)
+	p := FindingBaseInterest[typ]
+	switch typ {
+	case FindingHeader:
+		if b.sigPoints >= 0 {
+			p = clampInt(b.sigPoints, WeakFindingMin, WeakFindingMax)
+		}
+	case FindingCookie:
+		if b.sigPoints >= 0 {
+			p = clampInt(b.sigPoints, WeakFindingMin, WeakFindingMax)
+		} else {
+			for _, e := range ev {
+				switch {
+				case strings.Contains(e.Snippet, "brak flagi"):
+					p = max(p, 25)
+				case strings.Contains(e.Snippet, "JWT"):
+					p = max(p, 20)
+				}
+			}
+		}
+	case FindingSignature:
+		if b.sigPoints >= 0 {
+			p = clampInt(b.sigPoints, SigFindingMin, SigFindingMax)
+		}
+	case FindingExpiredCert:
+		if login {
+			p = 70
+		}
+	case FindingSelfSigned:
+		if login {
+			p = 40
+		}
+	case FindingRemoteAccess:
+		switch strings.ToLower(s.Name) {
+		case "telnet", "rlogin", "login", "shell", "exec":
+			p = 70
+		case "ms-wbt-server", "rdp", "vnc", "vnc-http", "x11", "teamviewer":
+			p = 50
+		}
+	}
+	switch {
+	case b.in.ScopeCriticality >= 5:
+		p += 10
+	case b.in.ScopeCriticality == 4:
+		p += 5
+	}
+	if b.fs.New && typ != FindingNewExposure {
+		p += 10
+	}
+	return min(p, 100)
+}
+
+// ---------- near-duplicates on one service ----------
+
+// classFinding maps a service class to the finding type it produces.
+var classFinding = map[string]string{
+	model.ClassAdminPanel: FindingAdminPanel, model.ClassLogin: FindingLoginPlainHTTP, model.ClassStaging: FindingStaging,
+	model.ClassIoT: FindingIoT, model.ClassDevTool: FindingDevTool, model.ClassDatabase: FindingDatabase,
+	model.ClassRemoteAccess: FindingRemoteAccess, model.ClassDirListing: FindingDirListing, model.ClassDefaultPage: FindingDefaultPage,
+}
+
+// attachToClassFinding adds the evidence of a header or cookie signature
+// that carries a class to the finding that class already produced on this
+// service (for example the signature "login form over plain HTTP" and the
+// finding login-plain-http). It reports whether it did.
+func (b *findingBuilder) attachToClassFinding(m model.SigMatch) bool {
+	for _, c := range m.Classes {
+		typ, ok := classFinding[c]
+		if !ok {
+			continue
+		}
+		for i := range b.out {
+			if b.out[i].Type == typ {
+				b.out[i].Evidence = mergeEvidence(b.out[i].Evidence, m.Evidence)
+				if b.out[i].Signature == "" {
+					b.out[i].Signature = m.Signature
+				}
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// merge joins the header findings of one service into one finding, and the
+// cookie findings into one: they describe the same thing (what the
+// response headers or cookies reveal) with several evidence lines. The
+// merged finding keeps the highest interest and the key without a subject.
+func (b *findingBuilder) merge() {
+	var out []model.Finding
+	at := map[string]int{}
+	for _, f := range b.out {
+		if f.Type != FindingHeader && f.Type != FindingCookie {
+			out = append(out, f)
+			continue
+		}
+		i, ok := at[f.Type]
+		if !ok {
+			at[f.Type] = len(out)
+			f.Key = FindingKey(f.Type, b.in.IP, b.s.Port, b.s.Proto, "")
+			f.Title = mergedTitle(f.Type, []string{subjectOf(f.Title)}) + " (" + addr(b.in.IP, b.s.Port) + ")"
+			out = append(out, f)
+			continue
+		}
+		m := &out[i]
+		parts := strings.Split(strings.TrimPrefix(strings.TrimSuffix(m.Title, " ("+addr(b.in.IP, b.s.Port)+")"), mergedPrefix(f.Type)), "; ")
+		parts = append(parts, subjectOf(f.Title))
+		m.Title = mergedTitle(f.Type, parts) + " (" + addr(b.in.IP, b.s.Port) + ")"
+		m.Evidence = mergeEvidence(m.Evidence, f.Evidence)
+		m.Interest = max(m.Interest, f.Interest)
+		m.Tags = dedupSorted(sortedCopy(append(append([]string{}, m.Tags...), f.Tags...)))
+		if m.Signature == "" {
+			m.Signature = f.Signature
+		}
+		if !strings.Contains(m.Description, f.Description) {
+			m.Description += " " + f.Description
+		}
+	}
+	b.out = out
+}
+
+func mergedPrefix(typ string) string {
+	if typ == FindingCookie {
+		return "Ciasteczka: "
+	}
+	return "Nagłówki HTTP: "
+}
+
+func mergedTitle(typ string, parts []string) string {
+	seen := map[string]bool{}
+	var keep []string
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" && !seen[p] {
+			seen[p] = true
+			keep = append(keep, p)
+		}
+	}
+	return mergedPrefix(typ) + strings.Join(keep, "; ")
+}
+
+// subjectOf returns the part of a finding title after the first ": " and
+// before the address in brackets.
+func subjectOf(title string) string {
+	if i := strings.LastIndex(title, " ("); i > 0 {
+		title = title[:i]
+	}
+	if _, after, ok := strings.Cut(title, ": "); ok {
+		return after
+	}
+	return title
+}
+
+func mergeEvidence(a, b []model.Evidence) []model.Evidence {
+	seen := map[string]bool{}
+	out := make([]model.Evidence, 0, len(a)+len(b))
+	for _, e := range append(append([]model.Evidence{}, a...), b...) {
+		k := e.Matcher + "|" + e.Where + "|" + e.Snippet
+		if !seen[k] {
+			seen[k] = true
+			out = append(out, e)
+		}
+	}
+	if len(out) > 12 {
+		out = out[:12]
+	}
+	return out
 }
