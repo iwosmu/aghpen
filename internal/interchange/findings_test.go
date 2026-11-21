@@ -2,6 +2,7 @@ package interchange
 
 import (
 	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"os"
 	"sort"
@@ -118,6 +119,33 @@ func TestDojoGenericCSVRoundTrip(t *testing.T) {
 		if f.Key != w.Key || f.IP != w.IP || f.Port != w.Port || f.Status != w.Status || f.Severity != w.Severity {
 			t.Errorf("round trip %d: got %+v", i, f)
 		}
+	}
+}
+
+// L4 of the security review: findings.dojo.csv has a formula guard like
+// the other CSV writers, and the import undoes it.
+func TestDojoGenericCSVFormulaGuard(t *testing.T) {
+	in := sampleFindings()[:1]
+	in[0].Title = "=HYPERLINK(\"http://evil.example/\",\"klik\")"
+	in[0].Description = "+cmd|' /C calc'!A0"
+	var buf bytes.Buffer
+	if err := WriteDojoGenericCSV(&buf, in); err != nil {
+		t.Fatal(err)
+	}
+	recs, err := csv.NewReader(bytes.NewReader(buf.Bytes())).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rec := range recs[1:] {
+		for i, cell := range rec {
+			if cell != "" && strings.ContainsRune("=+-@\t\r", rune(cell[0])) {
+				t.Fatalf("column %s starts with a formula character: %q", recs[0][i], cell)
+			}
+		}
+	}
+	out, _, err := ImportFindings(bytes.NewReader(buf.Bytes()), FindingsOptions{})
+	if err != nil || len(out) != 1 || out[0].Title != in[0].Title || !strings.HasPrefix(out[0].Description, "+cmd") {
+		t.Fatalf("round trip: %v %+v", err, out)
 	}
 }
 
