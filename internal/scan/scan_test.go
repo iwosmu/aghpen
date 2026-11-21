@@ -32,6 +32,7 @@ type fakeNet struct {
 	maxRate     int
 	discovered  [][]string
 	failAll     bool
+	portMiss    map[string]int // ip → port-scan calls that get no answer at all
 }
 
 func (f *fakeNet) Name() string     { return "fake" }
@@ -96,6 +97,12 @@ func (f *fakeNet) PortScan(ctx context.Context, req probe.PortScanRequest) (*pro
 	for _, ip := range req.Hosts {
 		h := probe.Host{IP: ip, Up: true}
 		ports, ok := f.hosts[ip]
+		f.mu.Lock()
+		if f.portMiss[ip] > 0 {
+			f.portMiss[ip]--
+			ok, ports = false, nil
+		}
+		f.mu.Unlock()
 		h.Responded = ok
 		for _, p := range ports {
 			if req.Ports.Has(p) {
@@ -704,5 +711,27 @@ func TestParallelismAndBudget(t *testing.T) {
 	}
 	if netw.maxRate != 600 {
 		t.Errorf("rate in flight = %d, want exactly the 600 pps budget (3 x 200)", netw.maxRate)
+	}
+}
+
+// A host that discovery found but that gave the port scan no answer is
+// scanned once more; its ports are not lost.
+func TestSilentHostGetsASecondPortScan(t *testing.T) {
+	net := &fakeNet{
+		hosts:    map[string][]int{"10.0.0.10": {80}, "10.0.0.11": {22}},
+		portMiss: map[string]int{"10.0.0.11": 1},
+	}
+	e := New(Deps{Prober: net, Logger: quiet})
+	sink := newSink()
+	out := e.Run(context.Background(), basePlan("10.0.0.0/24"), sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	h := sink.host("10.0.0.11")
+	if h == nil || len(h.Services) != 1 || h.Services[0].Port != 22 {
+		t.Fatalf("host 10.0.0.11 = %+v, want port 22 from the second port scan", h)
+	}
+	if out.Stats.Retried < 1 {
+		t.Errorf("retried = %d, want the silent host counted", out.Stats.Retried)
 	}
 }

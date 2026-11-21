@@ -36,6 +36,13 @@ type DiscoverRequest struct {
 	MaxRetries  int // 0 or less: the default (1)
 	HostTimeout time.Duration
 	IPv6        bool
+	// ARPOnly asks for an ARP sweep alone (nmap -PR). The engine sets it when
+	// every target is on a directly connected network and ARP is enabled:
+	// every live host answers ARP, also one that drops all IP traffic.
+	// Measured in the lab (docker bridge, 4 /24 blocks, 17 live hosts, 2 runs
+	// each): -PR alone found 17 and 17; ARP mixed with -PE -PS -PA at the same
+	// pinned rate found 8, 10, 4 and 7.
+	ARPOnly bool
 }
 
 // PortScanRequest is the input of the port-scan stage.

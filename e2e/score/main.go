@@ -44,6 +44,25 @@ func loadExport(path string) ([]model.HostResult, error) {
 	return hosts, nil
 }
 
+// loadProductChanges reads a Page<model.Change> or a bare []model.Change.
+func loadProductChanges(path string) ([]model.Change, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var list []model.Change
+	if err := json.Unmarshal(raw, &list); err == nil {
+		return list, nil
+	}
+	var page struct {
+		Items []model.Change `json:"items"`
+	}
+	if err := json.Unmarshal(raw, &page); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	return page.Items, nil
+}
+
 func fail(err error) {
 	fmt.Fprintln(os.Stderr, "score:", err)
 	os.Exit(1)
@@ -56,6 +75,7 @@ func main() {
 	truthFrom := flag.String("truth-from", "", "change mode: ground truth of the first state")
 	fromPath := flag.String("from", "", "change mode: export of the first scan")
 	toPath := flag.String("to", "", "change mode: export of the second scan")
+	productChanges := flag.String("product-changes", "", "change mode: score the product's own change list of the second run (GET /changes?run_id=N) instead of the diff of the exports")
 	strict := flag.Bool("strict", false, "count the documented hard cases as ordinary misses")
 	minConf := flag.Float64("min-confidence", 0, "ignore technologies under this confidence")
 	asJSON := flag.Bool("json", false, "print the report as JSON")
@@ -101,7 +121,18 @@ func main() {
 		if err != nil {
 			fail(err)
 		}
-		rep := CompareChanges(cf, before, after, from, to)
+		var observed []truth.Change
+		if *productChanges != "" {
+			list, err := loadProductChanges(*productChanges)
+			if err != nil {
+				fail(err)
+			}
+			observed = ProductChanges(list)
+			if observed == nil {
+				observed = []truth.Change{}
+			}
+		}
+		rep := CompareChangeList(cf, before, after, from, to, observed)
 		if *asJSON {
 			printJSON(rep)
 		} else {
@@ -211,7 +242,7 @@ func printReport(w io.Writer, r *Report, max int) {
 }
 
 func printChangeReport(w io.Writer, r *ChangeReport, max int) {
-	fmt.Fprintf(w, "Expected changes %s -> %s\n\n", r.From, r.To)
+	fmt.Fprintf(w, "Expected changes %s -> %s (observed: %s)\n\n", r.From, r.To, r.Source)
 	printMetricTable(w, []Metric{r.Metric})
 	fmt.Fprintln(w)
 	printList(w, "matched", r.Matched, max)

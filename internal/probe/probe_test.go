@@ -405,3 +405,17 @@ func TestNormalizeDiscovery(t *testing.T) {
 		t.Errorf("explicit options must stay: %+v", o)
 	}
 }
+
+func TestDiscoverArgsARPOnly(t *testing.T) {
+	priv := &Nmap{privileged: true, euid: 10001}
+	args := strings.Join(priv.DiscoverArgs(DiscoverRequest{MaxRate: 250, MaxRetries: 2, ARPOnly: true,
+		Opts: model.DiscoveryOpts{ICMPEcho: true, TCPSynPorts: []int{80}, ARP: true}}), " ")
+	if !strings.Contains(args, "-PR") || strings.Contains(args, "-PE") || strings.Contains(args, "-PS") || strings.Contains(args, "--disable-arp-ping") {
+		t.Errorf("ARP-only args = %q", args)
+	}
+	// without raw sockets ARP is impossible: the TCP-connect ping stays
+	unpriv := &Nmap{}
+	if args := strings.Join(unpriv.DiscoverArgs(DiscoverRequest{ARPOnly: true}), " "); strings.Contains(args, "-PR") {
+		t.Errorf("unprivileged ARP-only args = %q", args)
+	}
+}

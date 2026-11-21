@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# Measures Czujka on the 70-host lab, through the REST API only.
+#
+#   e2e/lab-run.sh                     t0, t1, t2 with the profile the product seeds
+#   LR_STATES="t0" e2e/lab-run.sh      one state only
+#   LR_PROFILE='{"ports":"top-1000"}' LR_NAME=top1000 e2e/lab-run.sh
+#                                      the seeded profile with these fields replaced
+#
+# Steps: lab/lab.sh up (when the lab is not running) and lab/scenario.sh per state;
+# the product from deploy/docker-compose.yml joins the lab network czujka-lab at
+# $LR_IP; login; safety policy (Czujka's own address and the gateway excluded);
+# scope with 10.66.0.0/16 and the 73 lab domain names; the custom signature
+# lab/custom-signatures/infokiosk.yaml; a profile; then for each state: scan,
+# export (/export/runs/{id}.json), the product's change list (/changes), and
+# e2e/score against lab/ground-truth. From the second state on it also scores
+# the changes twice: the diff of the two exports and the product's own change list.
+#
+# It scans only 10.66.0.0/16 (the lab). Output: $LR_OUT (default e2e/out/lab-run-<name>-<time>).
+# Environment: LR_PROJECT (czacc), LR_PORT (18520), LR_IP (10.66.0.30), LR_STATES ("t0 t1 t2"),
+# LR_PROFILE (JSON merged into the seeded profile), LR_NAME, LR_SKIP_BUILD=1, LR_KEEP=1 (keep the product),
+# LR_FINAL_STATE (state to leave the lab in, default t0), LR_FRESH=0 (reuse the running product and its database).
+set -uo pipefail
+cd "$(dirname "$0")/.."
+PROJECT=${LR_PROJECT:-czacc}
+PORT=${LR_PORT:-18520}
+LR_IP=${LR_IP:-10.66.0.30}
+STATES=${LR_STATES:-t0 t1 t2}
+NAME=${LR_NAME:-default}
+OUT=${LR_OUT:-e2e/out/lab-run-$NAME-$(date +%Y%m%d-%H%M%S)}
+BASE=http://127.0.0.1:$PORT
+API=$BASE/api/v1
+ADMIN=admin@czujka.local
+PWFILE=e2e/out/.lab-run-$PROJECT.pw
+mkdir -p "$OUT" e2e/out
+if [ "${LR_FRESH:-1}" = 0 ] && [ -f "$PWFILE" ]; then ADMIN_PW=$(cat "$PWFILE"); else ADMIN_PW="Lab-$(date +%s)-$RANDOM$RANDOM"; fi
+JAR=$OUT/.jar
+CSRF=
+export LR_IP CZUJKA_PORT=$PORT CZUJKA_VERSION=${CZUJKA_VERSION:-acc} CZUJKA_ADMIN_EMAIL=$ADMIN CZUJKA_ADMIN_PASSWORD=$ADMIN_PW
+export CZUJKA_SCHED_INTERVAL=10s CZUJKA_SCAN_NETWORK=czujka-lab CZUJKA_TZ=Europe/Warsaw
+DC="docker compose -p $PROJECT -f deploy/docker-compose.yml -f deploy/docker-compose.scan-network.yml -f e2e/lab-run.compose.yml"
+CZ=$PROJECT-czujka-1
+
+log() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$OUT/run.log"; }
+api() { # method path [json]; prints the body; returns 1 on an HTTP error
+  local out code
+  if [ $# -ge 3 ]; then
+    out=$(curl -sS -b "$JAR" -c "$JAR" -X "$1" -H "X-CSRF-Token: $CSRF" -H "Content-Type: application/json" -d "$3" -w "\n%{http_code}" "$API$2")
+  else
+    out=$(curl -sS -b "$JAR" -c "$JAR" -X "$1" -H "X-CSRF-Token: $CSRF" -w "\n%{http_code}" "$API$2")
+  fi
+  code=${out##*$'\n'}
+  if [ "$code" -ge 400 ]; then echo "HTTP $code for $1 $2: ${out%$'\n'*}" >&2; return 1; fi
+  printf "%s" "${out%$'\n'*}"
+}
+mem_sampler() { # memory of the Czujka container every 2 s while $OUT/.mem.on exists
+  touch "$OUT/.mem.on"
+  ( while [ -f "$OUT/.mem.on" ]; do
+      echo "$(date +%s) $(docker stats --no-stream --format '{{.MemUsage}}' "$CZ" 2>/dev/null | awk '{print $1}')" >> "$OUT/mem.txt"; sleep 2
+    done ) &
+}
+mem_max() {
+  awk '{v=$2; u=v; gsub(/[0-9.]/,"",u); gsub(/[^0-9.]/,"",v); if(u=="GiB")v*=1024; if(u=="KiB")v/=1024; if(u=="B")v/=1048576; if(v>m)m=v} END{printf "%.1f", m}' "$OUT/mem.txt"
+}
+txp() { docker exec "$CZ" sh -c "cat /sys/class/net/\$(ip -o -4 addr | awk '/ 10\\.66\\./ {print \$2}')/statistics/tx_packets"; }
+
+# ---- lab ----
+if [ "$(docker ps -q --filter name=czujka-lab-kiosk-1 | wc -l)" -eq 0 ]; then
+  log "lab is not running: lab/lab.sh up"
+  lab/lab.sh up 2>&1 | tail -2
+fi
+
+# ---- product ----
+if [ "${LR_FRESH:-1}" != 0 ] || ! curl -fsS "$BASE/healthz" >/dev/null 2>&1; then
+  log "starting the product (project $PROJECT, port $PORT, lab address $LR_IP)"
+  echo "$ADMIN_PW" > "$PWFILE"
+  $DC down -v --remove-orphans >/dev/null 2>&1 || true
+  if [ "${LR_SKIP_BUILD:-0}" = 1 ]; then $DC up -d --wait >"$OUT/compose.log" 2>&1
+  else $DC up -d --build --wait >"$OUT/compose.log" 2>&1; fi || { tail -30 "$OUT/compose.log"; exit 1; }
+fi
+curl -sS "$BASE/healthz" | jq -c '{status, version, engine, probe}' | tee -a "$OUT/run.log"
+LOGIN=$(curl -sS -c "$JAR" -H "Content-Type: application/json" -d "{\"email\":\"$ADMIN\",\"password\":\"$ADMIN_PW\"}" $API/auth/login)
+CSRF=$(echo "$LOGIN" | jq -r .csrf_token)
+[ -n "$CSRF" ] && [ "$CSRF" != null ] || { echo "login failed: $LOGIN"; exit 1; }
+
+# ---- policy, scope, signature, profile ----
+POL=$(api GET /settings/safety | jq -c --arg ip "$LR_IP" '.exclusions = ([$ip, "10.66.0.1"] + .exclusions | unique)')
+api PUT /settings/safety "$POL" | jq -c '{max_pps, max_http_rps, max_per_host_rps, exclusions}' | tee -a "$OUT/run.log"
+SCOPE=$(api GET "/scopes?limit=100" | jq -r '[.items[] | select(.name == "Laboratorium (lab-run)")][0].id // empty')
+if [ -z "$SCOPE" ]; then
+  SCOPE=$(api POST /scopes '{"name":"Laboratorium (lab-run)","description":"sieć czujka-lab 10.66.0.0/16 i nazwy z lab/ground-truth/targets-domains.txt","criticality":3}' | jq -r .id)
+  TEXT=$(cat lab/ground-truth/targets-cidr.txt lab/ground-truth/targets-domains.txt)
+  api POST /scopes/$SCOPE/targets "$(jq -nc --arg t "$TEXT" '{text: $t}')" | jq -c '{saved: (.valid | length), address_count, excluded, invalid: (.invalid | length)}' | tee -a "$OUT/run.log"
+fi
+if ! api GET "/signatures?q=lab-infokiosk" | jq -e '.items | length > 0' >/dev/null; then
+  api POST /signatures "$(jq -nc --rawfile y lab/custom-signatures/infokiosk.yaml '{yaml: $y, enabled: true}')" | jq -c '{id, slug, enabled}' | tee -a "$OUT/run.log"
+fi
+DEF=$(api GET "/profiles?limit=100" | jq -c '[(.items // .)[] | select(.name | startswith("Domyślny"))][0]')
+[ -n "$DEF" ] && [ "$DEF" != null ] || { echo "no seeded default profile"; exit 1; }
+OVER=${LR_PROFILE:-}
+[ -n "$OVER" ] || OVER='{}'
+PJSON=$(echo "$DEF" | jq -c --argjson s "$SCOPE" --argjson over "$OVER" --arg n "lab-run: $NAME $(date +%H%M%S)" \
+  'del(.id, .created_at, .updated_at, .next_run_at, .last_run_id) | .name = $n | .scope_ids = [$s] | .schedule.enabled = false | . * $over')
+echo "$PJSON" | jq . > "$OUT/profile.json"
+PROFILE=$(api POST /profiles "$PJSON" | jq -r .id)
+case "$PROFILE" in ''|null) echo "the profile could not be created"; exit 1 ;; esac
+log "profile $PROFILE: $(echo "$PJSON" | jq -c '{ports, discovery, udp, version_intensity, rate, retry}')"
+api POST /profiles/$PROFILE/estimate | jq -c . | tee -a "$OUT/run.log"
+
+# ---- runs ----
+mem_sampler
+trap 'rm -f "$OUT/.mem.on"' EXIT
+PREV=""
+for st in $STATES; do
+  log "=== state $st ==="
+  lab/scenario.sh "$st" 2>&1 | tail -1 | tee -a "$OUT/run.log"
+  P0=$(txp)
+  T0=$(date +%s)
+  RUN=$(api POST /runs "{\"profile_id\":$PROFILE}" | jq -r .id)
+  log "run $RUN started"
+  while :; do
+    R=$(api GET /runs/$RUN)
+    case "$(echo "$R" | jq -r .status)" in completed|failed|cancelled) break ;; esac
+    sleep 3
+  done
+  WALL=$(( $(date +%s) - T0 ))
+  P1=$(txp)
+  echo "$R" | jq . > "$OUT/run-$st.json"
+  log "run $RUN $(echo "$R" | jq -r .status) in $WALL s; tx packets on the lab interface: $((P1 - P0)); $(echo "$R" | jq -c '{hosts_up: .stats.hosts_up, services: .stats.services_open, packets: .stats.packets_sent, avg_pps: (.stats.avg_pps|floor), peak_pps: .stats.peak_pps, http_requests: .stats.http_requests, elapsed: .stats.elapsed_sec}')"
+  echo "$st run=$RUN wall=$WALL tx=$((P1 - P0))" >> "$OUT/runs.txt"
+  curl -sS -b "$JAR" -o "$OUT/export-$st.json" "$API/export/runs/$RUN.json"
+  api GET "/changes?run_id=$RUN&limit=1000" > "$OUT/changes-$st.json"
+  go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$st.json" -ignore "$LR_IP" -max-list 0 > "$OUT/score-$st.txt"
+  go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$st.json" -ignore "$LR_IP" -json > "$OUT/score-$st.json"
+  sed -n '1,12p' "$OUT/score-$st.txt" | tee -a "$OUT/run.log"
+  if [ -n "$PREV" ] && [ -f "lab/ground-truth/changes-$PREV-$st.json" ]; then
+    go run ./e2e/score -changes lab/ground-truth/changes-$PREV-$st.json -truth-from lab/ground-truth/$PREV.json -truth lab/ground-truth/$st.json \
+      -from "$OUT/export-$PREV.json" -to "$OUT/export-$st.json" -ignore "$LR_IP" -max-list 0 > "$OUT/changes-score-$PREV-$st.txt"
+    go run ./e2e/score -changes lab/ground-truth/changes-$PREV-$st.json -truth-from lab/ground-truth/$PREV.json -truth lab/ground-truth/$st.json \
+      -from "$OUT/export-$PREV.json" -to "$OUT/export-$st.json" -product-changes "$OUT/changes-$st.json" -ignore "$LR_IP" -max-list 0 > "$OUT/product-changes-score-$PREV-$st.txt"
+    log "changes $PREV -> $st (export diff):     $(sed -n 4p "$OUT/changes-score-$PREV-$st.txt")"
+    log "changes $PREV -> $st (product changes): $(sed -n 4p "$OUT/product-changes-score-$PREV-$st.txt")"
+  fi
+  PREV=$st
+done
+rm -f "$OUT/.mem.on"; sleep 2
+log "memory of the Czujka container: max $(mem_max) MiB ($(wc -l < "$OUT/mem.txt" | tr -d ' ') samples)"
+log "database size: $(docker exec $PROJECT-db-1 psql -U czujka -d czujka -tAc "select pg_size_pretty(pg_database_size('czujka'))")"
+FINAL=${LR_FINAL_STATE-t0}
+if [ -n "$FINAL" ]; then lab/scenario.sh "$FINAL" 2>&1 | tail -1 | tee -a "$OUT/run.log"; fi
+if [ "${LR_KEEP:-0}" != 1 ]; then $DC down -v --remove-orphans >/dev/null 2>&1; log "product stopped (LR_KEEP=1 keeps it)"; fi
+log "output: $OUT"

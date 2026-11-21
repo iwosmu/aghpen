@@ -161,7 +161,7 @@ func (s *Server) checkProfile(r *http.Request, p *model.ScanProfile) error {
 	return nil
 }
 
-var profileFields = []string{"name", "description", "scope_ids", "ports", "discovery", "service_detection", "version_intensity", "http", "rate",
+var profileFields = []string{"name", "description", "scope_ids", "ports", "discovery", "service_detection", "version_intensity", "http", "udp", "rate",
 	"chunking", "retry", "schedule", "enabled"}
 
 func (s *Server) createProfile(w http.ResponseWriter, r *http.Request) {
