@@ -61,16 +61,16 @@ export function changeKindInfo(kind: ChangeKind | string): { tone: Tone; glyph: 
     case 'host_back': return { tone: 'new', glyph: 'back', label: t('host wrócił', 'host is back'), group: 'new' };
     case 'service_new': return { tone: 'new', glyph: 'plus', label: t('nowa usługa', 'new service'), group: 'new' };
     case 'tech_new': return { tone: 'new', glyph: 'plus', label: t('nowa technologia', 'new technology'), group: 'new' };
-    case 'host_gone': return { tone: 'gone', glyph: 'minus', label: t('host nieaktywny', 'host inactive'), group: 'gone' };
+    case 'host_gone': return { tone: 'gone', glyph: 'minus', label: t('host nieaktywny', 'host down'), group: 'gone' };
     case 'service_gone': return { tone: 'gone', glyph: 'minus', label: t('usługa zniknęła', 'service gone'), group: 'gone' };
     case 'service_returned': return { tone: 'new', glyph: 'returned', label: t('usługa wróciła', 'service is back'), group: 'new' };
-    case 'response_slower': return { tone: 'changed', glyph: 'slow', label: t('odpowiada wolniej', 'responds slower'), group: 'changed' };
-    case 'response_recovered': return { tone: 'new', glyph: 'slow', label: t('czas odpowiedzi wrócił do normy', 'response time back to normal'), group: 'changed' };
+    case 'response_slower': return { tone: 'changed', glyph: 'slow', label: t('usługa odpowiada wolniej', 'service responds slower'), group: 'changed' };
+    case 'response_recovered': return { tone: 'new', glyph: 'slow', label: t('usługa znów szybka', 'service fast again'), group: 'changed' };
     case 'tech_gone': return { tone: 'gone', glyph: 'minus', label: t('technologia zniknęła', 'technology gone'), group: 'gone' };
     case 'host_unstable': return { tone: 'unstable', glyph: 'wave', label: t('host niestabilny', 'host unstable'), group: 'unstable' };
     // Silent in this run, answered in the previous one; not reported inactive yet. Its services are unknown, not gone.
-    case 'host_missing': return { tone: 'changed', glyph: 'half', label: t('Nie odpowiada (niepotwierdzone)', 'Not answering (unconfirmed)'), group: 'gone' };
-    case 'service_unreachable': return { tone: 'changed', glyph: 'half', label: t('Usługa nie odpowiada (niepotwierdzone)', 'Service not answering (unconfirmed)'), group: 'gone' };
+    case 'host_missing': return { tone: 'changed', glyph: 'half', label: t('host nie odpowiada (niepotwierdzone)', 'host not responding (unconfirmed)'), group: 'gone' };
+    case 'service_unreachable': return { tone: 'changed', glyph: 'half', label: t('usługa nie odpowiada (niepotwierdzone)', 'service not responding (unconfirmed)'), group: 'gone' };
     case 'service_changed': return { tone: 'changed', glyph: 'delta', label: t('usługa zmieniona', 'service changed'), group: 'changed' };
     case 'tech_version': return { tone: 'changed', glyph: 'delta', label: t('zmiana wersji', 'version changed'), group: 'changed' };
     case 'title_changed': return { tone: 'changed', glyph: 'delta', label: t('zmiana tytułu', 'title changed'), group: 'changed' };
@@ -95,7 +95,7 @@ export const CHANGE_KINDS: ChangeKind[] = [
 export function ChangeMark({ kind, expected }: { kind: ChangeKind | string; expected?: boolean }) {
   const i = changeKindInfo(kind);
   if (expected) {
-    return <Mark glyph="dashring" tone="expected" title={t('Zmiana zgodna z profilem dostępności hosta', 'The availability profile of the host explains this change')}><span className="text-ink-3">{i.label} · {t('oczekiwana', 'expected')}</span></Mark>;
+    return <Mark glyph="dashring" tone="expected" title={t('Zmiana zgodna ze wzorcem dostępności hosta', 'The change fits the host availability pattern')}><span className="text-ink-3">{i.label} · {t('oczekiwana', 'expected')}</span></Mark>;
   }
   return <Mark glyph={i.glyph} tone={i.tone}>{i.label}</Mark>;
 }
@@ -105,8 +105,8 @@ export function hostStatusInfo(s: HostStatus | string): { tone: Tone; glyph: Gly
   switch (s) {
     case 'up': return { tone: 'neutral', glyph: 'dot', label: t('aktywny', 'up') };
     case 'unstable': return { tone: 'unstable', glyph: 'wave', label: t('niestabilny', 'unstable') };
-    case 'down': return { tone: 'gone', glyph: 'minus', label: t('nieaktywny', 'inactive') };
-    case 'expected-offline': return { tone: 'expected', glyph: 'dashring', label: t('offline zgodnie z profilem', 'offline as expected') };
+    case 'down': return { tone: 'gone', glyph: 'minus', label: t('nieaktywny', 'down') };
+    case 'expected-offline': return { tone: 'expected', glyph: 'dashring', label: t('poza godzinami', 'outside usual hours') };
     default: return { tone: 'expected', glyph: 'ring', label: t('nieznany', 'unknown') };
   }
 }
@@ -153,7 +153,7 @@ export function RunStatusMark({ status, pauseReason }: { status: RunStatus | str
 export function chunkStatusInfo(s: ChunkStatus | string): { tone: Tone; glyph: GlyphName; label: string } {
   switch (s) {
     case 'pending': return { tone: 'expected', glyph: 'ring', label: t('oczekuje', 'pending') };
-    case 'running': return { tone: 'accent', glyph: 'run', label: t('skanowany', 'running') };
+    case 'running': return { tone: 'accent', glyph: 'run', label: t('w toku', 'running') };
     case 'done': return { tone: 'neutral', glyph: 'check', label: t('gotowy', 'done') };
     case 'deferred': return { tone: 'changed', glyph: 'hatch', label: t('odroczony', 'deferred') };
     case 'failed': return { tone: 'danger', glyph: 'x', label: t('błąd', 'failed') };
@@ -192,11 +192,11 @@ export function Sev({ level, compact }: { level: Severity | string; compact?: bo
 }
 
 // ---------- Finding status ----------
-export const FINDING_STATUSES: FindingStatus[] = ['new', 'triaged', 'accepted', 'false_positive', 'resolved'];
+export const FINDING_STATUSES: FindingStatus[] = ['new', 'in analysis', 'accepted', 'false_positive', 'resolved'];
 export function findingStatusInfo(s: FindingStatus | string): { tone: Tone; glyph: GlyphName; label: string } {
   switch (s) {
     case 'new': return { tone: 'accent', glyph: 'dot', label: t('nowe', 'new') };
-    case 'triaged': return { tone: 'neutral', glyph: 'half', label: t('w analizie', 'triaged') };
+    case 'in analysis': return { tone: 'neutral', glyph: 'half', label: t('w analizie', 'in analysis') };
     case 'accepted': return { tone: 'neutral', glyph: 'check', label: t('zaakceptowane', 'accepted') };
     case 'false_positive': return { tone: 'expected', glyph: 'x', label: t('fałszywy alarm', 'false positive') };
     case 'resolved': return { tone: 'expected', glyph: 'ring', label: t('rozwiązane', 'resolved') };
@@ -212,7 +212,7 @@ export function FindingStatusMark({ status }: { status: FindingStatus | string }
 export function classLabel(c: string): string {
   const m: Record<string, [string, string]> = {
     'admin-panel': ['panel administracyjny', 'admin panel'], login: ['strona logowania', 'login page'],
-    staging: ['środowisko testowe', 'staging / test'], iot: ['urządzenie IoT', 'IoT device'],
+    staging: ['środowisko testowe', 'staging'], iot: ['urządzenie IoT', 'IoT device'],
     'default-page': ['strona domyślna', 'default page'], api: ['API', 'API'], 'dev-tool': ['narzędzie deweloperskie', 'dev tool'],
     database: ['baza danych', 'database'], 'remote-access': ['zdalny dostęp', 'remote access'],
     'directory-listing': ['listing katalogu', 'directory listing'], 'error-page': ['strona błędu', 'error page'],
