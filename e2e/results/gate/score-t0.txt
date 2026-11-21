@@ -1,0 +1,48 @@
+Ground truth state t0 (hard cases excused)
+
+category                  TP    FP    FN  precision   recall       F1
+hosts                     67     0     0      1.000    1.000    1.000
+ports                    154     0     1      1.000    0.994    0.997
+service names            150     0     1      1.000    0.993    0.997
+technologies             102     1     2      0.990    0.981    0.986
+classes                   51     1     1      0.981    0.981    0.981
+
+check (recall only)                              right   share
+service versions                                30/32    0.938
+technology versions                             55/56    0.982
+page titles                                    122/122   1.000
+interesting headers and cookies: collected      68/68    1.000
+interesting headers and cookies: flagged        68/68    1.000
+cookie flags                                    24/24    1.000
+TLS: self-signed and expired                    12/12    1.000
+favicon hash                                    14/14    1.000
+custom signatures                                2/2     1.000
+
+PORTS
+  missed (1):
+    10.66.70.11:18443/tcp http (stealth-high)
+SERVICE NAMES
+  missed (1):
+    10.66.70.11:18443/tcp http (stealth-high)
+TECHNOLOGIES
+  missed (2):
+    10.66.0.53:53/udp dnsmasq
+    10.66.70.11:18443/tcp nginx
+  false positives (1):
+    10.66.10.40:8000/tcp Nagios NSCA
+CLASSES
+  missed (1):
+    10.66.70.11:18443/tcp login
+  false positives (1):
+    10.66.60.10:80/tcp staging
+SERVICE VERSIONS
+  wrong or missing (2):
+    10.66.0.53:53/udp dnsmasq: want 2.92rel2, got ""
+    10.66.20.41:123/udp NTP: want v4, got ""
+TECHNOLOGY VERSIONS
+  wrong or missing (1):
+    10.66.0.53:53/tcp dnsmasq: want 2.92, got "2.92rel2"
+UNSTABLE HOSTS (not in the metrics)
+    10.66.70.20    flapper      seen up=true  availability model says up=true at 2026-11-21T20:52:58Z
+    10.66.70.21    tod-office   seen up=true  availability model says up=false at 2026-11-21T20:52:58Z
+    10.66.70.22    tod-night    seen up=true  availability model says up=false at 2026-11-21T20:52:58Z
