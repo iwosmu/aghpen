@@ -189,7 +189,8 @@ func (n *Nmap) ServiceArgs(ports []int, intensity, maxRate int, hostTimeout time
 }
 
 func (n *Nmap) Discover(ctx context.Context, req DiscoverRequest) (*Result, error) {
-	if req.MaxRetries == 0 {
+	if req.MaxRetries <= 0 {
+		// never 0: nmap then sends only the first ping probe type to each host
 		req.MaxRetries = 1
 	}
 	res, err := n.run(ctx, "discover", n.DiscoverArgs(req), req.Targets)

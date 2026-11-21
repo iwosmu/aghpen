@@ -177,7 +177,24 @@ type DiscoveryOpts struct {
 	TCPAckPorts   []int `json:"tcp_ack_ports"`
 	ARP           bool  `json:"arp"`
 	SkipDiscovery bool  `json:"skip_discovery"` // treat every address as up (-Pn); slow, off by default
+	// Mode trades sweep time against completeness on sparse address space:
+	// "fast", "balanced" (default when empty) or "thorough". See the constants.
+	Mode string `json:"mode"`
 }
+
+// Discovery modes. The probes above are the full probe set.
+const (
+	// DiscoveryFast sends a cheap first pass (ICMP echo and TCP SYN to the web
+	// ports, one retry) to every address and the rest of the probe set only
+	// to hosts the inventory already knows.
+	DiscoveryFast = "fast"
+	// DiscoveryBalanced sends the same first pass to every address, then the
+	// rest of the probe set to the silent addresses of every /24 block where
+	// a host answered or the inventory knows a host.
+	DiscoveryBalanced = "balanced"
+	// DiscoveryThorough sends the full probe set to every address.
+	DiscoveryThorough = "thorough"
+)
 
 type HTTPOpts struct {
 	Enabled        bool `json:"enabled"`
@@ -259,6 +276,7 @@ type ScanEstimate struct {
 	WindowSec        int64   `json:"window_sec"`
 	BasedOnHistory   bool    `json:"based_on_history"` // true when earlier runs gave a measured speed
 	ExpectedLiveRate float64 `json:"expected_live_rate"`
+	DiscoveryMode    string  `json:"discovery_mode"` // fast | balanced | thorough: the mode the numbers assume
 }
 
 // ---------- Scan runs ----------

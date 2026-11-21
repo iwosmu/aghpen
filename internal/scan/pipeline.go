@@ -87,15 +87,10 @@ func (r *run) scanGroup(ctx context.Context, g *group, rate int, gs *groupStats)
 			})
 		}
 	} else {
-		t0 := r.e.now()
-		res, err := r.prober.Discover(ctx, probe.DiscoverRequest{
-			Targets: tgts, Opts: r.disc, MaxRate: rate, MaxRetries: 1, HostTimeout: discoveryHostTimeout, IPv6: g.v6,
-		})
-		r.account(gs, res, t0)
-		if err != nil {
-			return fmt.Errorf("host discovery: %w", err)
+		var err error
+		if live, err = r.discover(ctx, g, tgts, rate, gs); err != nil {
+			return err
 		}
-		live = res.Hosts
 	}
 	if err := r.deepScan(ctx, g, live, 1, rate, gs, found); err != nil {
 		return err

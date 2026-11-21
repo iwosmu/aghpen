@@ -205,6 +205,7 @@ func main() {
 		fixed       = flag.Bool("fixed-chunks", false, "turn the adaptive sizing off")
 		noSV        = flag.Bool("no-sv", false, "skip service and version detection")
 		intensity   = flag.Int("intensity", 5, "nmap --version-intensity (0..9)")
+		discMode    = flag.String("discovery", "balanced", "discovery mode: fast | balanced | thorough")
 		noARP       = flag.Bool("no-arp", false, "do not use ARP on local networks (use ICMP and TCP probes)")
 		skipDisc    = flag.Bool("skip-discovery", false, "treat every address as up (-Pn)")
 		hintsFlag   = flag.String("hints", "", "known hosts: ip[:port/port],ip ... (density-first order and retries)")
@@ -279,7 +280,7 @@ func main() {
 		Profile: model.ScanProfile{
 			Name:             "scanprobe",
 			Ports:            *ports,
-			Discovery:        model.DiscoveryOpts{ICMPEcho: true, ICMPTimestamp: true, TCPSynPorts: []int{22, 80, 443, 3389, 8080}, TCPAckPorts: []int{80, 443}, ARP: !*noARP, SkipDiscovery: *skipDisc},
+			Discovery:        model.DiscoveryOpts{ICMPEcho: true, ICMPTimestamp: true, TCPSynPorts: []int{22, 80, 443, 3389, 8080}, TCPAckPorts: []int{80, 443}, ARP: !*noARP, SkipDiscovery: *skipDisc, Mode: *discMode},
 			ServiceDetection: !*noSV,
 			VersionIntensity: *intensity,
 			Rate:             model.RateLimits{MaxPPS: *pps, MaxParallelChunks: *parallel},
@@ -318,8 +319,8 @@ func main() {
 	engine := scan.New(deps)
 
 	est := engine.Estimate(plan)
-	fmt.Fprintf(os.Stderr, "estimate: %d addresses, %d chunks, about %d packets, about %ds at %d pps\n",
-		est.Addresses, est.Chunks, est.EstPackets, est.EstDurationSec, est.EffectivePPS)
+	fmt.Fprintf(os.Stderr, "estimate: %d addresses, %d chunks, about %d packets, about %ds at %d pps, discovery mode %s\n",
+		est.Addresses, est.Chunks, est.EstPackets, est.EstDurationSec, est.EffectivePPS, est.DiscoveryMode)
 	if *estimate {
 		_ = json.NewEncoder(os.Stdout).Encode(est)
 		return

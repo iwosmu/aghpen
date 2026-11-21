@@ -217,7 +217,9 @@ func basePlan(vals ...string) model.ScanPlan {
 		RunID:   7,
 		Targets: tgt(vals...),
 		Profile: model.ScanProfile{
-			Ports: "22,80,443,8080", ServiceDetection: true,
+			// the general tests use one discovery pass; discovery_test.go covers the two-pass modes
+			Discovery: model.DiscoveryOpts{Mode: model.DiscoveryThorough},
+			Ports:     "22,80,443,8080", ServiceDetection: true,
 			Rate:     model.RateLimits{MaxPPS: 400, MaxParallelChunks: 2},
 			Chunking: model.ChunkingOpts{Adaptive: true, InitialSize: 256, MinSize: 256, MaxSize: 1024, TargetSeconds: 1},
 			Retry:    model.RetryOpts{UnstableRetries: 2, BackoffMs: 5},

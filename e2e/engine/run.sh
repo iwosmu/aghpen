@@ -60,8 +60,9 @@ check() { "$BIN/verify" -in "$OUT/$1.jsonl" "${@:2}" || FAILED=1; }
 scan A-local l2 -targets 10.77.0.0/22 -exclude "$EXCL" -ports "$PORTS" -pps 500 -measure-iface eth0 -quiet
 check A-local -expect lab
 
-# B. Full sweep through the router: ICMP echo, ICMP timestamp, TCP SYN and
-#    TCP ACK probes. 10.77.3.60 drops ICMP and must be found by a TCP probe.
+# B. Full sweep through the router, default discovery mode (balanced): ICMP
+#    echo and TCP SYN to the web ports first, the other probes in the blocks
+#    with live hosts. 10.77.3.60 drops ICMP and must be found by a TCP probe.
 scan B-routed routed -targets 10.77.0.0/22 -exclude "$EXCL" -ports "$PORTS" -pps 500 -measure-iface eth0 -quiet
 check B-routed -expect lab
 echo "discovery reason of the host that drops ICMP: $(grep '"ip":"10.77.3.60"' "$OUT/B-routed.jsonl" | sed -E 's/.*"reason":"([^"]+)".*/\1/')"
@@ -110,6 +111,15 @@ check G-unprivileged -expect none
 #    at 2000 pps. The groups start at 256 addresses and grow with the speed.
 scan I-adaptive routed -targets 10.79.0.0/20 -exclude 10.79.0.1,10.79.15.254 -ports "$PORTS" -pps 2000 -measure-iface eth0 -quiet
 check I-adaptive -expect none
+
+# K. Discovery modes on sparse address space: the lab /22 plus the empty /20
+#    (5115 addresses, live hosts in 4 of 20 blocks) at 2000 pps. Every mode
+#    must find all 7 hosts, also the one that drops ICMP.
+SPARSE_EXCL="$EXCL,10.79.0.1,10.79.15.254"
+for mode in thorough balanced fast; do
+  scan "K-$mode" routed -targets 10.77.0.0/22,10.79.0.0/20 -exclude "$SPARSE_EXCL" -ports "$PORTS" -pps 2000 -discovery "$mode" -no-sv -measure-iface eth0 -quiet
+  check "K-$mode" -expect lab-ports
+done
 
 # J. Real applications, real fingerprints: one engine run with the HTTP/TLS
 #    collector and the built-in signature library. The check compares

@@ -279,8 +279,9 @@ func CheckRate(s *Summary) (fails []string) {
 		fails = append(fails, fmt.Sprintf("a group got a share of %d pps, over the limit %d", sum, s.LimitPPS))
 	}
 	// Independent measurement: packets that left the interface in each
-	// second. 2% tolerance for the jitter of the one-second counter read.
-	if s.Iface != "" && float64(s.IfaceTxPeak) > float64(s.LimitPPS)*1.02 {
+	// second. 3% tolerance: the counter is read by a one-second ticker, and
+	// a read that comes 20 ms late adds 2% to that sample.
+	if s.Iface != "" && float64(s.IfaceTxPeak) > float64(s.LimitPPS)*1.03 {
 		fails = append(fails, fmt.Sprintf("interface %s sent %d packets in one second, limit %d", s.Iface, s.IfaceTxPeak, s.LimitPPS))
 	}
 	return fails
