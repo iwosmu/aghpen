@@ -48,9 +48,9 @@ export default function Login() {
   };
 
   const numbers: [string, string][] = [
-    ['154/155', t('otwartych portów znalezionych', 'open ports found')],
-    ['17 min', t('skan sieci\u00a0/16', 'scan of a\u00a0/16')],
-    ['0', t('fałszywych zmian w powtórnym skanie', 'false changes in a repeat scan')],
+    ['154/155', t('portów', 'ports')],
+    ['17 min', t('sieć\u00a0/16', 'a\u00a0/16 network')],
+    ['0', t('fałszywych zmian', 'false changes')],
   ];
 
   return (
@@ -65,20 +65,11 @@ export default function Login() {
         <div className="flex flex-1 flex-col justify-center gap-10 py-8 lg:gap-12 lg:py-6 2xl:gap-20">
         <main className="grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-center lg:gap-14 2xl:gap-24">
           <div>
-            <p className="mono flex items-center gap-3 text-2xs uppercase tracking-[0.2em] text-accent">
-              <span className="h-px w-8 flex-none bg-accent" aria-hidden="true" />
-              {t('Attack surface intelligence · CBI AGH · HackNation 2026', 'Attack surface intelligence · CBI AGH · HackNation 2026')}
-            </p>
-            <p className="font-display mt-5 text-[clamp(44px,5vw,100px)] leading-[0.98] tracking-[-0.012em] text-ink">
-              {lang === 'pl'
-                ? <><span className="block">Adres milczy o&nbsp;3&nbsp;w&nbsp;nocy.</span><span className="block max-w-[13ch] text-ink-2">Wyłączony na noc czy <em className="text-[#f2907f]">zniknął</em>?</span></>
-                : <><span className="block">An address is silent at&nbsp;3&nbsp;a.m.</span><span className="block max-w-[15ch] text-ink-2">Switched off for the night, or <em className="text-[#f2907f]">gone</em>?</span></>}
-            </p>
-            <p className="mt-5 max-w-[50ch] text-base text-ink-2">
-              {t('Czujka zna rytm każdego hosta w sieci. Cisza zgodna z rytmem nie budzi alarmu; cisza poza nim jest sprawdzana ponownie i zgłaszana.', 'Czujka knows the rhythm of every host on the network. A silence that fits it raises no alarm; a silence outside it is checked again and reported.')}
+            <p className="font-display max-w-[12ch] text-[clamp(56px,7.4vw,148px)] leading-[0.92] tracking-[-0.015em] text-ink">
+              {lang === 'pl' ? <>Co zmieniło się w&nbsp;<em className="text-ink-2">sieci</em>.</> : <>What changed on the <em className="text-ink-2">network</em>.</>}
             </p>
 
-            <section className="login-glass mt-8 w-full max-w-[420px] p-6 sm:p-7" aria-labelledby="login-title">
+            <section className="login-glass mt-10 w-full lg:mt-12 max-w-[420px] p-6 sm:p-7" aria-labelledby="login-title">
               <h1 id="login-title" className="sr-only">{t('Logowanie', 'Sign in')}</h1>
               <form onSubmit={submit} className="grid gap-4" noValidate>
                 <label className="grid gap-2">
@@ -125,7 +116,7 @@ export default function Login() {
 
           <div className="lg:pl-2">
             <div>
-              <RhythmFigure compact={false} />
+              <RhythmFigure />
             </div>
           </div>
         </main>
