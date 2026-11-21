@@ -81,7 +81,8 @@ func values(ts []model.Target) []string {
 // of them the exclusions remove. It sends nothing: a domain counts as one
 // address. A /8 is counted in constant time.
 func Count(ts []model.Target, exclusions []string) (total, excluded int64) {
-	st := Build(values(ts))
+	vals, _ := mapValues(values(ts))
+	st := Build(vals)
 	ex := Build(exclusions)
 	total = st.V4.Count() + int64(len(st.V6)) + int64(len(st.Domains))
 	left := st.V4.Subtract(ex.V4).Count()
@@ -148,9 +149,14 @@ func Expand(ctx context.Context, ts []model.Target, exclusions []string, res Res
 	if timeout <= 0 {
 		timeout = 3 * time.Second
 	}
-	st := Build(values(ts))
+	vals, mapped := mapValues(values(ts))
+	st := Build(vals)
 	ex := Build(exclusions)
 	out := Expanded{Hostnames: map[string][]string{}, Unresolved: map[string]string{}}
+	if mapped {
+		// The docker host keeps the name the operator typed.
+		out.Hostnames[HostGateway().String()] = []string{LocalhostName}
+	}
 
 	exDomain := map[string]bool{}
 	for _, d := range ex.Domains {

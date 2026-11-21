@@ -59,6 +59,11 @@ services:
       CZUJKA_TZ: ${CZUJKA_TZ:-Europe/Warsaw}
       CZUJKA_SCHED_INTERVAL: ${CZUJKA_SCHED_INTERVAL:-20s}
       CZUJKA_LOG_FORMAT: ${CZUJKA_LOG_FORMAT:-json}
+      # localhost, 127.x and ::1 as targets mean the docker host (host.docker.internal), not this container.
+      # "off" keeps loopback as loopback; an IPv4 address overrides.
+      CZUJKA_HOST_GATEWAY: ${CZUJKA_HOST_GATEWAY:-}
+      # The port the docker host publishes the UI on: that service of the docker host is Czujka itself (tag "czujka").
+      CZUJKA_PUBLISHED_PORT: ${CZUJKA_PORT:-8080}
     ports:
       - "${CZUJKA_BIND:-127.0.0.1}:${CZUJKA_PORT:-8080}:8080"
     volumes:

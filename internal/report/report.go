@@ -258,6 +258,7 @@ var kindPL = map[model.ChangeKind]string{
 	model.ChangeTechVersion: "Zmiana wersji", model.ChangeTitle: "Zmiana tytułu", model.ChangeHTTPStatus: "Zmiana statusu HTTP",
 	model.ChangeCert: "Zmiana certyfikatu", model.ChangeHeaders: "Zmiana nagłówków", model.ChangeCookies: "Zmiana ciasteczek",
 	model.ChangeContent: "Zmiana treści", model.ChangeRedirect: "Zmiana przekierowania", model.ChangeClass: "Zmiana klasy usługi",
+	model.ChangeServiceReturned: "Usługa wróciła", model.ChangeResponseSlower: "Wolniejsza odpowiedź", model.ChangeResponseRecovered: "Odpowiedź w normie",
 }
 
 var dayPL = [7]string{"nd", "pn", "wt", "śr", "cz", "pt", "sb"}
@@ -320,7 +321,7 @@ func (in *Input) stamp(t time.Time) string { return t.In(in.loc()).Format("02.01
 
 func changeGroup(k model.ChangeKind) int {
 	switch k {
-	case model.ChangeHostNew, model.ChangeHostBack, model.ChangeServiceNew:
+	case model.ChangeHostNew, model.ChangeHostBack, model.ChangeServiceNew, model.ChangeServiceReturned:
 		return 0
 	case model.ChangeHostGone, model.ChangeServiceGone, model.ChangeHostMissing:
 		return 1

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/iwosmu/aghpen/internal/model"
+	"github.com/iwosmu/aghpen/internal/targets"
 )
 
 // LookupFunc resolves a host name to its addresses.
@@ -63,6 +64,10 @@ func addrAllowed(a netip.Addr, nets []netip.Prefix) bool {
 func TargetAllowed(ctx context.Context, t model.Target, nets []netip.Prefix, lookup LookupFunc) (ok bool, reason string) {
 	if len(nets) == 0 {
 		return true, ""
+	}
+	if m := targets.MapsTo(t.Value); m != "" {
+		// A loopback target is scanned as the docker host: check that address.
+		t = model.Target{Kind: model.TargetIP, Value: m}
 	}
 	outside := "poza dozwolonymi sieciami polityki bezpieczeństwa"
 	switch t.Kind {

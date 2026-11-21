@@ -225,7 +225,9 @@ func (s *Store) AvailabilityBuckets(ctx context.Context, hostIDs []int64) (map[i
 const serviceCols = `s.id, s.host_id, host(s.ip) AS ip, s.hostname, s.port, s.proto, s.state, s.name, s.product, s.version, s.banner,
   s.confidence, s.tls, s.title, s.http_status, s.url, s.technologies, s.classes, s.interest, s.interest_why, s.group_key,
   (CASE WHEN s.group_key = '' THEN 0 ELSE (SELECT count(*) FROM services g WHERE g.group_key = s.group_key) END) AS group_size,
-  s.note_enc AS note, s.tags, s.first_seen, s.last_seen, s.last_changed, s.overrides`
+  s.note_enc AS note, s.tags, s.first_seen, s.last_seen, s.last_changed, s.overrides,
+  (SELECT NULLIF(` + responseExpr + `, -1) FROM service_observations o WHERE o.service_id = s.id ORDER BY o.at DESC, o.id DESC LIMIT 1) AS response_ms,
+  s.response_slow`
 
 var serviceSort = map[string]string{"id": "s.id", "ip": "s.ip", "port": "s.port", "state": "s.state", "name": "s.name", "product": "s.product",
 	"version": "s.version", "interest": serviceLiveInterest, "title": "s.title", "http_status": "s.http_status", "first_seen": "s.first_seen",

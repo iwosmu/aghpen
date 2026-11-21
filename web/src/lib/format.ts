@@ -105,3 +105,10 @@ export const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export function weekday(i: number): string { return t(WEEKDAYS_PL[i], WEEKDAYS_EN[i]); }
 /** Monday-first display order of weekday indexes (0 = Sunday on the wire). */
 export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+/** A response time: "540 ms", "1,2 s". */
+export function fmtMs(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined || !Number.isFinite(ms)) return '–';
+  if (ms < 1000) return Math.round(ms) + ' ms';
+  return (ms / 1000).toLocaleString(locale(), { maximumFractionDigits: 1 }) + ' s';
+}

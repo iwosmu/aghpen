@@ -9,6 +9,7 @@ import { Icon } from '../ui/Icon';
 import { Glyph, Sev, changeKindInfo, type GlyphName, type Tone } from '../ui/marks';
 import { BeforeAfter } from './Changes';
 import { isFullRun, lastFullPair } from '../lib/headline';
+import { StoryList } from '../ui/RunStory';
 
 function RunCard({ run, side }: { run: ScanRun; side: string }) {
   return (
@@ -92,6 +93,7 @@ export default function Compare() {
               </div>
               <RunCard run={d.to} side={t('Po', 'After')} />
             </div>
+            <StoryList changes={all} className="space-y-1 border border-rule bg-panel px-3 py-2.5" testId="compare-story" />
             <div className="flex flex-col text-sm text-ink-2">
               {all.length === 0 ? t('Między tymi skanami nie zapisano żadnej zmiany.', 'No change was recorded between these runs.') : (
                 <span><span className="num text-ink">{all.filter((c) => !c.expected).length}</span> {plural(all.filter((c) => !c.expected).length, ['zmiana wymaga', 'zmiany wymagają', 'zmian wymaga'], ['change needs', 'changes need'])} {t('przeglądu', 'review')}, <span className="num text-ink">{all.filter((c) => c.expected).length}</span> {t('oczekiwanych', 'expected')}. {t('Nowych znalezisk:', 'New findings:')} <span className="num text-ink">{d.summary.findings_new}</span>.</span>

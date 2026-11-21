@@ -485,6 +485,8 @@ type ServiceAnalysis struct {
 	InterestWhy []model.InterestReason `json:"interest_why"`
 	GroupKey    string                 `json:"group_key"`
 	Classes     []string               `json:"classes"` // effective classes; nil keeps the stored ones; an analyst override always wins
+	// ResponseSlow: the HTTP response of this run is slow against the service's baseline.
+	ResponseSlow bool `json:"response_slow"`
 }
 
 // UpdateServiceAnalysis stores interest and grouping for many services in one statement.
@@ -496,8 +498,8 @@ func (s *Store) UpdateServiceAnalysis(ctx context.Context, rows []ServiceAnalysi
 		rows[i].InterestWhy = nonNil(rows[i].InterestWhy)
 	}
 	_, err := s.db.Exec(ctx, `UPDATE services s SET interest = d.interest, interest_why = d.interest_why, group_key = d.group_key,
-			classes = CASE WHEN s.overrides ? 'classes' OR d.classes IS NULL THEN s.classes ELSE d.classes END
-		FROM jsonb_to_recordset($1::jsonb) AS d(id bigint, interest int, interest_why jsonb, group_key text, classes text[]) WHERE s.id = d.id`, js(rows))
+			classes = CASE WHEN s.overrides ? 'classes' OR d.classes IS NULL THEN s.classes ELSE d.classes END, response_slow = d.response_slow
+		FROM jsonb_to_recordset($1::jsonb) AS d(id bigint, interest int, interest_why jsonb, group_key text, classes text[], response_slow boolean) WHERE s.id = d.id`, js(rows))
 	return mapErr(err)
 }
 

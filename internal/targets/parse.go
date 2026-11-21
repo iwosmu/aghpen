@@ -178,6 +178,7 @@ func (c *collector) add(line int, raw, note string, tags []string) {
 	}
 	c.seen[p.Value] = true
 	t := p.target(c.source)
+	t.MapsTo = MapsTo(p.Value)
 	t.Note = strings.TrimSpace(note)
 	if len(tags) > 0 {
 		t.Tags = tags

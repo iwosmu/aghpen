@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/iwosmu/aghpen/internal/model"
+	"github.com/iwosmu/aghpen/internal/targets"
 )
 
 func TestAllowedNetworks(t *testing.T) {
@@ -117,5 +118,20 @@ func TestAdHocTargets(t *testing.T) {
 	}
 	if _, err := AdHocTargets(nil); err == nil {
 		t.Error("an empty list must be refused")
+	}
+}
+
+func TestLoopbackTargetCheckedAsDockerHost(t *testing.T) {
+	targets.SetHostGateway(netip.MustParseAddr("172.17.0.1"))
+	defer targets.SetHostGateway(netip.Addr{})
+	lock := []netip.Prefix{netip.MustParsePrefix("172.16.0.0/12")}
+	for _, tg := range []model.Target{{Kind: model.TargetDomain, Value: "localhost"}, {Kind: model.TargetIP, Value: "127.0.0.1"}} {
+		if ok, why := TargetAllowed(context.Background(), tg, lock, nil); !ok {
+			t.Errorf("%s maps to 172.17.0.1 inside the lock, refused: %s", tg.Value, why)
+		}
+	}
+	other := []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}
+	if ok, _ := TargetAllowed(context.Background(), model.Target{Kind: model.TargetDomain, Value: "localhost"}, other, nil); ok {
+		t.Error("localhost maps to 172.17.0.1, outside 10.0.0.0/8: must be refused")
 	}
 }

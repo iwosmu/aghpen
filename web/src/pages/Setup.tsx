@@ -12,7 +12,8 @@ import { Glyph } from '../ui/marks';
 import { Icon } from '../ui/Icon';
 import { useDebounced } from '../ui/edit';
 import { useSession } from '../session';
-import { OperatorLockNote, PreviewReport } from './Targets';
+import { LoopbackNote, OperatorLockNote, PreviewReport, ThisComputerChip } from './Targets';
+import { THIS_COMPUTER, THIS_COMPUTER_SCOPE, startThisComputer } from '../lib/thisComputer';
 import { EstimateBox } from './ProfileEdit';
 
 export const SETUP_DONE_KEY = 'czujka.setup.done';
@@ -153,6 +154,15 @@ export default function Setup() {
     invalidate(qc, '/runs', '/dashboard', '/profiles');
     navigate('/runs/' + run.id, { replace: true });
   });
+  // Quick start: this computer in two clicks (choose, start), without the five steps.
+  const [quick, setQuick] = useState(false);
+  const quickPreview = useQuery<TargetPreview>({ queryKey: ['/targets/preview', THIS_COMPUTER], queryFn: () => post<TargetPreview>('/targets/preview', { text: THIS_COMPUTER }), enabled: quick });
+  const startQuick = () => go(async () => {
+    const id = await startThisComputer();
+    try { localStorage.setItem(SETUP_DONE_KEY, String(Math.round((Date.now() - startedAt) / 1000))); } catch { /* ignore */ }
+    invalidate(qc, '/runs', '/dashboard', '/profiles', '/scopes');
+    navigate('/runs/' + id, { replace: true });
+  });
   const skip = () => { try { localStorage.setItem(SETUP_DONE_KEY, 'skipped'); } catch { /* ignore */ } navigate('/', { replace: true }); };
 
   const pwError = pw && pw.length < 12 ? t('Hasło musi mieć co najmniej 12 znaków.', 'The password needs at least 12 characters.') : pw2 && pw !== pw2 ? t('Hasła się różnią.', 'The passwords differ.') : '';
@@ -170,6 +180,28 @@ export default function Setup() {
         </div>
         <button type="button" className="link text-sm" onClick={skip}>{t('Pomiń kreator', 'Skip the wizard')}</button>
       </div>
+      <section className="mx-4 mb-4 border border-rule bg-panel px-4 py-3 sm:mx-6" data-testid="setup-quick">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 max-w-[60ch]">
+            <h2 className="text-sm font-semibold">{t('Najszybciej: zeskanuj ten komputer', 'Fastest: scan this computer')}</h2>
+            <p className="mt-0.5 text-sm text-ink-2">{t('Usługi na portach tego komputera, także kontenery Dockera z opublikowanymi portami. Czujka utworzy zakres „Ten komputer”, kopię profilu domyślnego i od razu uruchomi skan.', 'The services on the ports of this computer, Docker containers with published ports included. Czujka creates the scope "This computer", a copy of the default profile, and starts the scan at once.')}</p>
+          </div>
+          <button type="button" aria-pressed={quick} onClick={() => setQuick(!quick)} data-testid="setup-this-computer"
+            className={cx('inline-flex h-[30px] flex-none items-center gap-2 border px-3 text-sm', quick ? 'border-accent bg-accent-wash text-ink' : 'border-rule-strong hover:border-accent')}>
+            <Icon name={quick ? 'check' : 'hosts'} size={14} />{t('Ten komputer', 'This computer')} <span className="mono text-ink-3">(localhost)</span>
+          </button>
+        </div>
+        {quick ? (
+          <div className="mt-3 border-t border-rule pt-3">
+            <LoopbackNote targets={quickPreview.data?.valid ?? [{ value: THIS_COMPUTER }]} />
+            <p className="mt-1 text-xs text-ink-3">{t('Zakres', 'Scope')} „{THIS_COMPUTER_SCOPE()}” · {t('cel', 'target')} <span className="mono">{THIS_COMPUTER}</span> · {t('profil domyślny (kopia), bez harmonogramu', 'the default profile (a copy), no schedule')} · {t('tylko GET i HEAD', 'GET and HEAD only')}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button variant="primary" icon="play" busy={busy} onClick={startQuick} data-testid="setup-quick-start">{t('Uruchom skan', 'Start the scan')}</Button>
+              <span className="text-xs text-ink-3">{t('Hasło, limity i harmonogram ustawisz później w konfiguracji.', 'Set the password, limits and schedule later in the configuration.')}</span>
+            </div>
+          </div>
+        ) : null}
+      </section>
       <div className="border-t border-rule">
         <Step n={1} title={t('Zmień wygenerowane hasło administratora', 'Change the generated administrator password')} done={pwDone} active={step === 1} summary={t('hasło zmienione', 'password changed')}>
           <p className="mb-3 text-sm text-ink-2">{t('Hasło z logu instalacji widział każdy, kto ma dostęp do logów kontenera. Ustaw własne.', 'Anyone with access to the container logs has seen the password from the install log. Set your own.')} <span className="mono text-xs text-ink-3">{session.user.email}</span></p>
@@ -186,6 +218,7 @@ export default function Setup() {
         <Step n={2} title={t('Nazwij sieć i wklej jej zakresy', 'Name the network and paste its ranges')} done={Boolean(scope)} active={step === 2} summary={scope ? scope.name + ' · ' + fmtInt(p?.address_count ?? 0) + ' ' + t('adresów', 'addresses') : ''}>
           <div className="grid gap-3">
             <Field label={t('Nazwa sieci', 'Network name')} hint={t('np. Kampus główny, Akademiki, DMZ', 'for example Main campus, Dormitories, DMZ')}><input className="field" value={netName} onChange={(e) => setNetName(e.target.value)} data-testid="setup-net-name" /></Field>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-ink-3"><span>{t('Gotowe cele:', 'Ready targets:')}</span><ThisComputerChip text={ranges} onChange={(v) => { setRanges(v); if (!netName.trim()) setNetName(THIS_COMPUTER_SCOPE()); }} /></div>
             <Field label={t('Zakresy: jeden w wierszu (IP, CIDR, zakres od-do, domena)', 'Ranges: one per line (IP, CIDR, from-to range, domain)')}>
               <textarea className="field mono min-h-[110px] py-2" value={ranges} onChange={(e) => setRanges(e.target.value)} placeholder={(policyQ.data?.operator_networks?.[0] ?? '10.0.0.0/16') + '\n192.168.10.1-192.168.10.50\nportal.example.edu'} data-testid="setup-ranges" />
             </Field>
