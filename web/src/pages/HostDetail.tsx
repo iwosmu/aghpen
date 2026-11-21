@@ -3,7 +3,7 @@ import { useAction, useItem, usePage } from '../api/hooks';
 import { patch } from '../api/client';
 import type { AvailabilityProfile, Change, Host, Scope, Service } from '../api/types';
 import { t, plural } from '../i18n';
-import { fmtDateTime, fmtRelative } from '../lib/format';
+import { fmtDateTime, fmtDec, fmtRelative } from '../lib/format';
 import { ErrorState, KV, PageHeader, Panel, Select, SkeletonRows, TagInput, Tags, useTip } from '../ui/kit';
 import { DataTable, type Col } from '../ui/table';
 import { ChangeMark, ClassChips, Crit, HostStatusMark, InterestScore, ServiceStateMark, Sev } from '../ui/marks';
@@ -54,7 +54,7 @@ function ModelOutput({ h, a, compact }: { h: Host; a: AvailabilityProfile; compa
     <div className="space-y-3">
       <dl className="border-t border-rule">
         <div className="grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-3 border-b border-rule py-1.5">
-          <dt className="num text-lg font-semibold">{a.p_alive.toFixed(2)}</dt>
+          <dt className="num text-lg font-semibold">{fmtDec(a.p_alive)}</dt>
           <dd className="text-sm text-ink-2">{t('prawdopodobieństwo, że host nadal istnieje', 'probability that the host still exists')} <span className="mono text-xs text-ink-3">p_alive</span></dd>
         </div>
         <div className="grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-3 border-b border-rule py-1.5">
@@ -84,7 +84,7 @@ function ModelOutput({ h, a, compact }: { h: Host; a: AvailabilityProfile; compa
           <div className="flex flex-wrap gap-[3px]">
             {recent.map((o, i) => (
               <span key={i} tabIndex={0}
-                onPointerEnter={(e) => tip.show(e, <div><div className="num text-ink">#{o.run_id} · {fmtDateTime(o.at)}</div><div className="text-ink-2">{o.up ? t('odpowiedź', 'answered') + (o.rtt_ms ? ', ' + o.rtt_ms.toFixed(1) + ' ms' : '') : t('brak odpowiedzi', 'no answer')} · {o.attempts} {plural(o.attempts, ['próba', 'próby', 'prób'], ['attempt', 'attempts'])}{o.reason ? ' · ' + o.reason : ''}</div></div>)}
+                onPointerEnter={(e) => tip.show(e, <div><div className="num text-ink">#{o.run_id} · {fmtDateTime(o.at)}</div><div className="text-ink-2">{o.up ? t('odpowiedź', 'answered') + (o.rtt_ms ? ', ' + fmtDec(o.rtt_ms, 1) + ' ms' : '') : t('brak odpowiedzi', 'no answer')} · {o.attempts} {plural(o.attempts, ['próba', 'próby', 'prób'], ['attempt', 'attempts'])}{o.reason ? ' · ' + o.reason : ''}</div></div>)}
                 onPointerLeave={tip.hide} onFocus={(e) => tip.showAt(e.currentTarget, <span className="num">#{o.run_id} · {o.up ? t('odpowiedź', 'answered') : t('brak odpowiedzi', 'no answer')}</span>)} onBlur={tip.hide}
                 className="block h-[14px] w-[10px]" style={o.up ? { background: 'var(--seq-4)' } : { boxShadow: 'inset 0 0 0 1px var(--rule-strong)' }}
                 aria-label={'#' + o.run_id + ' ' + (o.up ? t('odpowiedź', 'answered') : t('brak odpowiedzi', 'no answer'))} />
@@ -124,7 +124,7 @@ export default function HostDetail() {
     <div>
       <PageHeader
         back={{ to: '/hosts', label: t('Hosty', 'Hosts') }}
-        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono">{h.ip}</span><span className="text-base font-normal"><HostStatusMark status={h.status} /></span></span>}
+        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono text-[26px] font-medium tracking-[-0.01em] sm:text-[30px]">{h.ip}</span><span className="font-sans text-base font-normal"><HostStatusMark status={h.status} /></span></span>}
         sub={<>{h.label ? <span className="text-ink">{h.label} · </span> : null}<span className="mono">{(h.hostnames ?? []).join(', ') || t('bez nazwy DNS', 'no DNS name')}</span></>}
         readOnly={!canEdit}
         actions={<span className="flex items-center gap-2 text-sm text-ink-2">{t('Ciekawość', 'Interest')} <InterestScore value={h.interest} /></span>}
@@ -159,7 +159,7 @@ export default function HostDetail() {
               <KV k={t('Pierwszy raz', 'First seen')}><span className="num">{fmtDateTime(h.first_seen)}</span></KV>
               <KV k={t('Ostatnio widziany', 'Last seen')}><span className="num">{fmtDateTime(h.last_seen)}</span> <span className="text-ink-3">{fmtRelative(h.last_seen)}</span></KV>
               <KV k={t('Ostatnia odpowiedź', 'Last answer')}><span className="num">{h.last_up ? fmtDateTime(h.last_up) : '–'}</span></KV>
-              <KV k={t('Stabilność', 'Stability')}><span className="num">{h.stability.toFixed(2)}</span> <span className="text-xs text-ink-3">{t('udział prób z odpowiedzią', 'share of probes answered')}</span></KV>
+              <KV k={t('Stabilność', 'Stability')}><span className="num">{fmtDec(h.stability)}</span> <span className="text-xs text-ink-3">{t('udział prób z odpowiedzią', 'share of probes answered')}</span></KV>
               <KV k={t('Źródło', 'Source')}>{h.source === 'import' ? t('import pliku', 'file import') : t('skan', 'scan')}</KV>
             </dl>
           </Panel>

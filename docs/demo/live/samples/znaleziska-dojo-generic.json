@@ -1,0 +1,36 @@
+{
+  "findings": [
+    {
+      "title": "Test ręczny: brak nagłówka Content-Security-Policy na stronie domyślnej",
+      "severity": "Medium",
+      "description": "Wynik ręcznego testu zespołu bezpieczeństwa (plik z narzędzia zewnętrznego). Strona domyślna nginx odpowiada bez nagłówka CSP.",
+      "mitigation": "Wyłącz nieużywany serwer albo skonfiguruj witrynę z nagłówkami bezpieczeństwa.",
+      "date": "2026-11-21",
+      "unique_id_from_tool": "pentest-2026-11-csp-8787",
+      "vuln_id_from_tool": "PT-CSP-01",
+      "endpoints": [
+        {
+          "host": "172.18.0.1",
+          "port": 8787,
+          "protocol": "http"
+        }
+      ]
+    },
+    {
+      "title": "Test ręczny: RabbitMQ Management dostępny z sieci studenckiej",
+      "severity": "High",
+      "description": "Panel RabbitMQ Management na porcie 15673 odpowiada z sieci, która nie jest siecią zarządzania.",
+      "mitigation": "Ogranicz dostęp do panelu do sieci zarządzania.",
+      "date": "2026-11-21",
+      "unique_id_from_tool": "pentest-2026-11-rabbitmq-15673",
+      "vuln_id_from_tool": "PT-ADM-02",
+      "endpoints": [
+        {
+          "host": "172.18.0.1",
+          "port": 15673,
+          "protocol": "http"
+        }
+      ]
+    }
+  ]
+}

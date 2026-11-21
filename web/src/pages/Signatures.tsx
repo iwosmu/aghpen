@@ -6,7 +6,7 @@ import type { Signature, SignatureImportReport } from '../api/types';
 import { t } from '../i18n';
 import { fmtInt, fmtRelative } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
-import { Button, Dialog, Empty, InlineError, LinkButton, PageHeader, Select, Tags } from '../ui/kit';
+import { Button, Dialog, Empty, InlineError, LinkButton, PageHeader, Select, Tags, FileInput } from '../ui/kit';
 import { DataTable, FilterBar, FilterField, Pager, SearchField, type Col } from '../ui/table';
 import { Glyph, TECH_CATEGORIES, categoryLabel } from '../ui/marks';
 import { useDraft } from '../ui/edit';
@@ -18,8 +18,8 @@ export function Switch({ checked, onChange, label, disabled }: { checked: boolea
   return (
     <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled}
       onClick={(e) => { e.stopPropagation(); e.preventDefault(); onChange(!checked); }}
-      className={'relative inline-flex h-[18px] w-[32px] flex-none items-center border transition-colors disabled:opacity-50 ' + (checked ? 'border-accent bg-accent' : 'border-rule-strong bg-raised')}>
-      <span className={'block h-[12px] w-[12px] transition-transform ' + (checked ? 'translate-x-[16px] bg-accent-ink' : 'translate-x-[2px] bg-ink-3')} />
+      className={'relative inline-flex h-[20px] w-[36px] flex-none items-center rounded-full border transition-colors disabled:opacity-50 ' + (checked ? 'border-primary bg-primary' : 'border-rule-strong bg-sunk')}>
+      <span className={'block h-[14px] w-[14px] rounded-full transition-transform duration-150 ' + (checked ? 'translate-x-[18px] bg-primary-ink' : 'translate-x-[2px] bg-ink-3')} />
     </button>
   );
 }
@@ -50,7 +50,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
           <p className="text-sm text-ink-2">{t('Przyjmowane formaty: plik sygnatur Czujki (YAML), lista YAML lub JSON, mapa nazwa → sygnatura, pasywne szablony nuclei. Każda sygnatura przechodzi walidację bezpieczeństwa; odrzucona nie jest zapisywana. Sygnatur wbudowanych import nie zastępuje.', 'Accepted formats: a Czujka signature file (YAML), a YAML or JSON list, a name → signature map, passive nuclei templates. Every signature goes through the safety validation; a rejected one is not stored. The import never replaces built-in signatures.')}</p>
           <label className="block">
             <span className="label mb-1 block">{t('Plik', 'File')}</span>
-            <input type="file" accept=".yaml,.yml,.json,.txt" className="field py-1" data-testid="sig-import-file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <FileInput testId="sig-import-file" accept=".yaml,.yml,.json,.txt" file={file} onFile={setFile} />
           </label>
           <InlineError error={run.error} />
         </div>
