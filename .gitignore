@@ -1,0 +1,20 @@
+# build
+/bin/
+/dist/
+web/node_modules/
+web/dist/
+*.test
+*.out
+coverage*
+# local
+.env
+.env.*
+!.env.example
+*.key
+/data/
+/tmp/
+.DS_Store
+.idea/
+.vscode/
+# worktrees of workers
+/.orca/
