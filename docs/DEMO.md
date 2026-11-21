@@ -5,188 +5,68 @@ Wszystko działa lokalnie na laptopie: produkt, laboratorium i DefectDojo. Inter
 
 | Część | Co zawiera |
 | --- | --- |
-| [1. Nagranie](#1-nagranie-2-minuty) | 10 ujęć z kodem czasu, ekranem, kliknięciami, tekstem lektora i napisami |
-| [2. Pokaz na scenie](#2-pokaz-na-scenie-5-minut) | kto mówi co, minuta po minucie; plan na awarię sieci |
+| [1. Nagranie](#1-nagranie-około-2-minut) | 7 ujęć nagrywanych skryptem z prawdziwego interfejsu, napisy, tekst lektora |
+| [2. Pokaz na scenie](#2-pokaz-na-scenie-5-minut) | kto mówi co; notatki do każdego slajdu; plan na awarię sieci |
 | [3. Przygotowanie](#3-przygotowanie-stanowiska) | polecenia od zera do stanu startowego demo i reset |
 | [4. Pytania jury](#4-pytania-jury) | 19 pytań z odpowiedziami i wskazaniem pliku albo ekranu |
 
-Liczby w tekście lektora pochodzą z repozytorium: 19,9 s kreatora (`web/REPORT-LAB.md` §5), 0,06 s wywołania stopu awaryjnego i brak procesu nmap sekundę później (`e2e/full/transcript.txt` krok 17, dowód z procesów), 65 535 adresów /16 (`web/screenshots/lab/47-run-completed-pl-dark-1440.png`).
-Liczby pakietów z `e2e/full/transcript.txt` (średnie tempo, „0 pakietów” po stopie i przy retro-huncie) są niepotwierdzone: przechwytywanie `tcpdump -Q out` nie widzi pakietów, które nmap wysyła przez surowe gniazdo. Demo ich nie cytuje, dopóki pomiar nie zostanie powtórzony.
+Liczby w notatkach do slajdów pochodzą z repozytorium; źródło każdej jest w komentarzu w `docs/slides/czujka.src.html`.
+Liczby pakietów z `e2e/full/transcript.txt` (średnie tempo, „0 pakietów” po stopie i przy retro-huncie) są niepotwierdzone: przechwytywanie `tcpdump -Q out` nie widzi pakietów, które nmap wysyła przez surowe gniazdo. Demo ich nie cytuje, dopóki pomiar nie zostanie powtórzony; na slajdzie 8 czeka na nie oznaczone miejsce.
 
-## 1. Nagranie (2 minuty)
+## 1. Nagranie (około 2 minut)
 
-Ekran 1920 × 1080, interfejs po polsku, motyw ciemny, powiększenie przeglądarki 125 %. Lektor po polsku, spokojnym tempem. Napisy wtopione w obraz, dół ekranu, biały tekst na półprzezroczystym czarnym pasku.
+Film nagrywa skrypt, nie człowiek: `docs/demo/record.mjs` (Playwright) prowadzi prawdziwy interfejs przez ujęcia poniżej, a Chromium zapisuje każdą klatkę ekranu. Potem ffmpeg tnie ujęcia, nakłada napisy i składa `docs/demo/czujka-demo.mp4` (1920 × 1080, 30 kl./s, bez dźwięku). Interfejs po polsku, motyw ciemny, tryb prezentacji (`?present=1`). Kursor jest widoczny, kliknięcia mają kółko, tekst wpisuje się w tempie czytania.
 
-Tekst lektora: **197 słów**, czyli **85,7 s** przy 2,3 słowa na sekundę. Ujęcia trwają razem 120 s; reszta to pauzy na obraz.
+Ponowne nagranie to jedno polecenie (szczegóły w `docs/demo/README.md`):
 
-Stan wyjściowy: rozdział 3. Ujęcia 1–2 nagrywa się na świeżej instalacji (`czwiz`), ujęcia 3–10 na instalacji z historią (`czdemo`).
+```sh
+CZ_URL=http://127.0.0.1:18640 CZ_PASSWORD=<hasło> docs/demo/record.sh
+```
 
-### Ujęcie 1 · 0:00–0:10 (10 s)
+Skrypt nagrywa też plik napisów `docs/demo/czujka-demo.pl.srt` i tekst lektora z kodami czasu `docs/demo/lektor.txt`. Głos nagrywa się osobno, na gotowy film. Tekst lektora ma **136 słów**, około **59 s** przy 2,3 słowa na sekundę; resztę czasu zajmuje obraz.
 
-| | |
-| --- | --- |
-| Ekran | Terminal na czarnym tle, czcionka 20 pt. Potem ekran logowania Czujki. |
-| Kliknięcia | Wpisz `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.scan-network.yml up -d --wait` (obrazy zbudowane wcześniej). Przyspiesz oczekiwanie 4×. Otwórz `http://127.0.0.1:8080`, wklej hasło z logu, „Zaloguj”. |
-| Lektor | „Czujka staje jednym poleceniem: binarka Go i PostgreSQL w Docker Compose. Kubernetes nie jest potrzebny.” |
-| Długość | 16 słów, 7,0 s przy 2,3 słowa/s (zapas 3,0 s) |
+| # | Ujęcie | Ekran i kliknięcia | Napis (do 6 słów) |
+| --- | --- | --- | --- |
+| 1 | Instalacja i kreator | Świeża instalacja: logowanie hasłem z logu, w kreatorze nowe hasło, nazwa sieci „Kampus AGH”, zakres `10.66.0.0/16`, podgląd liczby adresów, krok 3 z limitami. | Jedno polecenie, potem kreator |
+| 2 | Skan /16 na żywo | „Przebiegi skanów” → „Uruchom skan” → profil „Laboratorium /16: pełny przegląd” → „Uruchom”. Ekran przebiegu: mapa 256 bloków /24 wypełnia się. Dwie minuty skanu pokazane w ×8, ze znakiem „×8” w rogu. | Skan całej sieci /16 |
+| 3 | Zmiana między skanami | „Porównanie dwóch skanów” dla dwóch ostatnich pełnych przebiegów: nowe, zniknięte, zmienione. | Co się zmieniło między skanami |
+| 4 | Host niestabilny | Szczegóły hosta `10.66.70.20`: mapa cieplna tygodnia, `p_alive`, potem „Plan ponownych sprawdzeń”. | Rytm hosta i ponowne sprawdzenia |
+| 5 | Wehikuł czasu | „Wehikuł czasu”: strzałka w lewo przebieg po przebiegu, potem z powrotem. | Wehikuł czasu |
+| 6 | Reguła i sygnatura z przykładu | „Reguły ekspozycji”: reguła „Panel administracyjny poza siecią zarządzania” i jej naruszenia; potem usługa `10.66.1.10:80` → „Zaproponuj sygnaturę”. | Reguła i sygnatura z przykładu |
+| 7 | Stop awaryjny | Przycisk „Stop awaryjny” w górnym pasku, potwierdzenie; trwający skan staje. Po nagraniu skrypt zwalnia stop i anuluje ten przebieg. | Stop awaryjny |
+| 8 | Plansza końcowa | Ikona, „Czujka”, `czujka.dev`. | (bez napisu) |
 
-Napisy (jedna plansza na wiersz, ⏎ = nowa linia, najwyżej 42 znaki w linii):
+Zasady montażu, które skrypt pilnuje sam: przyspieszony jest tylko fragment skanu i tylko z widocznym „×8”; pozostałe ujęcia idą w czasie rzeczywistym; żaden ekran nie jest makietą.
 
-- Czujka staje jednym poleceniem: binarka Go ⏎ i PostgreSQL w Docker Compose.
-- Kubernetes nie jest potrzebny.
-
-### Ujęcie 2 · 0:10–0:24 (14 s)
-
-| | |
-| --- | --- |
-| Ekran | Kreator „Od logowania do pierwszego skanu w pięciu krokach” (zrzuty `20`–`25`). |
-| Kliknięcia | Krok 1: nowe hasło. Krok 2: nazwa „Laboratorium CBI”, zakres `10.66.0.0/16`. Krok 3: limit 2000 pps. Krok 4: harmonogram „ręcznie”. Krok 5: „Uruchom”. Nagrywaj w czasie rzeczywistym; w montażu przytnij do 14 s i pokaż licznik czasu w rogu. |
-| Lektor | „Kreator prowadzi przez pięć kroków: hasło, zakresy, limity od właściciela sieci, harmonogram i budżet ruchu. Od logowania do skanu mija dwadzieścia sekund.” |
-| Długość | 22 słów, 9,6 s przy 2,3 słowa/s (zapas 4,4 s) |
-
-Napisy (jedna plansza na wiersz, ⏎ = nowa linia, najwyżej 42 znaki w linii):
-
-- Kreator prowadzi przez pięć kroków: hasło, ⏎ zakresy, limity od właściciela sieci,
-- harmonogram i budżet ruchu.
-- Od logowania do skanu mija 20 sekund.
-
-### Ujęcie 3 · 0:24–0:38 (14 s)
-
-| | |
-| --- | --- |
-| Ekran | Strona przebiegu: mapa 256 bloków /24, tabela podgrup, wskaźnik tempa (zrzuty `03`, `47`). |
-| Kliknięcia | Kliknij numer przebiegu na górnym pasku. Najedź na jedną grupę roboczą w tabeli: blok podświetla się na mapie. Przyspiesz 8×, aż mapa się wypełni. |
-| Lektor | „Skanujemy całe laboratorium: sześćdziesiąt pięć tysięcy adresów. Każdy kwadrat to blok slash dwadzieścia cztery. Tempo nie przekracza limitu z polityki bezpieczeństwa.” |
-| Długość | 21 słów, 9,1 s przy 2,3 słowa/s (zapas 4,9 s) |
-
-Napisy (jedna plansza na wiersz, ⏎ = nowa linia, najwyżej 42 znaki w linii):
-
-- Skanujemy całe laboratorium: 65 tysięcy ⏎ adresów.
-- Każdy kwadrat to blok /24.
-- Tempo nie przekracza limitu z polityki ⏎ bezpieczeństwa.
-
-### Ujęcie 4 · 0:38–0:50 (12 s)
-
-| | |
-| --- | --- |
-| Ekran | „Zmiany” po drugim przebiegu (stan laboratorium `t1`), potem „Porównaj dwa skany”. |
-| Kliknięcia | Menu „Zmiany”. Filtr „Skan” = ostatni. Kliknij wiersz `10.66.1.11` (WordPress 5.8.3 → 6.9.4), potem `10.66.2.30` (strona staje się panelem). |
-| Lektor | „Drugi przebieg. Czujka pokazuje, co przybyło, co zniknęło i co się zmieniło: nowy host, nowszy WordPress, strona, która stała się panelem.” |
-| Długość | 21 słów, 9,1 s przy 2,3 słowa/s (zapas 2,9 s) |
-
-Napisy (jedna plansza na wiersz, ⏎ = nowa linia, najwyżej 42 znaki w linii):
-
-- Drugi przebieg.
-- Czujka pokazuje, co przybyło, co zniknęło ⏎ i co się zmieniło: nowy host, nowszy
-- WordPress, strona, która stała się ⏎ panelem.
-
-### Ujęcie 5 · 0:50–1:04 (14 s)
-
-| | |
-| --- | --- |
-| Ekran | Szczegóły hosta niestabilnego (`10.66.70.21`, `tod-office`): mapa cieplna tygodnia, `p_alive`, pasma życia hosta, plan ponownych sprawdzeń. |
-| Kliknięcia | Menu „Hosty”, filtr stanu „niestabilny”, kliknij `10.66.70.21`. Najedź na komórkę mapy cieplnej. Przewiń do „Plan ponownych sprawdzeń”. |
-| Lektor | „Ten host pracuje we własnym rytmie. Czujka go zna, więc cisza w zwykłej porze nie jest alarmem. Gdy host milknie w nietypowej porze, Czujka sprawdza go ponownie.” |
-| Długość | 27 słów, 11,7 s przy 2,3 słowa/s (zapas 2,3 s) |
-
-Napisy (jedna plansza na wiersz, ⏎ = nowa linia, najwyżej 42 znaki w linii):
-
-- Ten host pracuje we własnym rytmie.
-- Czujka go zna, więc cisza w zwykłej porze ⏎ nie jest alarmem.
-- Gdy host milknie w nietypowej porze, ⏎ Czujka sprawdza go ponownie.
-
-### Ujęcie 6 · 1:04–1:14 (10 s)
-
-| | |
-| --- | --- |
-| Ekran | „Wehikuł czasu” (`/time`): suwak przebiegów, liczby z różnicą do dziś, mapa adresów z tamtej chwili. |
-| Kliknięcia | Menu „Wehikuł czasu”. Przeciągnij suwak na przebieg 1, potem strzałką → na przebieg 2. |
-| Lektor | „Wehikuł czasu. Przesuwam suwak i widzę sieć taką, jaka była w dowolnym wcześniejszym przebiegu.” |
-| Długość | 19 słów, 8,3 s przy 2,3 słowa/s (zapas 1,7 s) |
-
-Napisy (jedna plansza na wiersz, ⏎ = nowa linia, najwyżej 42 znaki w linii):
-
-- Wehikuł czasu.
-- Przesuwam suwak i widzę sieć taką, jaka ⏎ była w dowolnym wcześniejszym przebiegu.
-
-### Ujęcie 7 · 1:14–1:24 (10 s)
-
-| | |
-| --- | --- |
-| Ekran | „Reguły ekspozycji” (`/rules`): reguła `admin-panel-outside-mgmt` z licznikiem naruszeń, potem znalezisko `policy-violation`. |
-| Kliknięcia | Menu „Reguły ekspozycji”. Kliknij regułę `admin-panel-outside-mgmt`. Kliknij naruszenie `10.66.5.5:8080` (Adminer, „shadow IT” ze stanu `t1`). |
-| Lektor | „Reguła mówi, czego w sieci być nie może. Zapomniany panel bazy danych na nowym adresie narusza ją od razu po skanie.” |
-| Długość | 21 słów, 9,1 s przy 2,3 słowa/s (zapas 0,9 s) |
-
-Napisy (jedna plansza na wiersz, ⏎ = nowa linia, najwyżej 42 znaki w linii):
-
-- Reguła mówi, czego w sieci być nie może.
-- Zapomniany panel bazy danych na nowym ⏎ adresie narusza ją od razu po skanie.
-
-### Ujęcie 8 · 1:24–1:40 (16 s)
-
-| | |
-| --- | --- |
-| Ekran | Usługa `10.66.60.12:80` (InfoKiosk): „Zaproponuj sygnaturę”, YAML z objaśnieniami, wynik retro-huntu. |
-| Kliknięcia | Menu „Usługi”, szukaj „kiosk”, kliknij `10.66.60.12:80`. „Zaproponuj sygnaturę”. Pokaż „Wysłano 0 pakietów” i drugi kiosk na liście. „Otwórz w edytorze”, „Zapisz sygnaturę”. |
-| Lektor | „Tego kiosku nie zna żadna publiczna baza sygnatur. Jeden klik: Czujka proponuje sygnaturę z rzadkich cech i sprawdza ją na zapisanej historii, bez wysyłania sond.” |
-| Długość | 25 słów, 10,9 s przy 2,3 słowa/s (zapas 5,1 s) |
-
-Napisy (jedna plansza na wiersz, ⏎ = nowa linia, najwyżej 42 znaki w linii):
-
-- Tego kiosku nie zna żadna publiczna baza ⏎ sygnatur.
-- Jeden klik: Czujka proponuje sygnaturę z ⏎ rzadkich cech i sprawdza ją na zapisanej
-- historii, bez wysyłania sond.
-
-### Ujęcie 9 · 1:40–1:50 (10 s)
-
-| | |
-| --- | --- |
-| Ekran | Trwający skan, czerwony przycisk „Stop awaryjny”, pasek „Stop awaryjny jest aktywny” (zrzuty `11`–`13`). |
-| Kliknięcia | Uruchom profil „Laboratorium /16” z pulpitu. Po 5 s kliknij „Stop awaryjny” na górnym pasku, potwierdź. Pokaż wskaźnik tempa: 0 pps. |
-| Lektor | „Stop awaryjny zatrzymuje każdy skan. Wywołanie trwało sześć setnych sekundy, a po sekundzie nie działał już żaden proces nmap.” |
-| Długość | 14 słów, 6,1 s przy 2,3 słowa/s (zapas 3,9 s) |
-
-Napisy (jedna plansza na wiersz, ⏎ = nowa linia, najwyżej 42 znaki w linii):
-
-- Stop awaryjny zatrzymuje każdy skan.
-- Wywołanie trwało 0,06 s, a po sekundzie ⏎ nie działał już żaden proces nmap.
-
-### Ujęcie 10 · 1:50–2:00 (10 s)
-
-| | |
-| --- | --- |
-| Ekran | „Znaleziska” → „Eksport do DefectDojo”, potem lista findings w lokalnym DefectDojo (`http://127.0.0.1:18080`). Na końcu plansza: logo Czujki i zdanie tezy. |
-| Kliknięcia | Menu „Znaleziska”, zaznacz pięć pierwszych, „Eksport do DefectDojo”. Przełącz kartę na DefectDojo, odśwież test. |
-| Lektor | „Znaleziska trafiają do DefectDojo bez duplikatów. Czujka: skaner, który rozumie czas.” |
-| Długość | 11 słów, 4,8 s przy 2,3 słowa/s (zapas 5,2 s) |
-
-Napisy (jedna plansza na wiersz, ⏎ = nowa linia, najwyżej 42 znaki w linii):
-
-- Znaleziska trafiają do DefectDojo bez ⏎ duplikatów.
-- Czujka: skaner, który rozumie czas.
-
-### Montaż
-
-- Ujęcia 1 i 3: przyspieszenie zaznaczone napisem „×4” albo „×8” w prawym górnym rogu. Nie przyspieszaj ujęć 8 i 9: wynik retro-huntu i wskaźnik „0 pps” muszą być widoczne w czasie rzeczywistym.
-- Kursor powiększony, kliknięcia zaznaczone kołem.
-- Na końcu plansza 3 s: ikona Czujki, „Czujka: skaner, który rozumie czas”, adres repozytorium.
+Pierwsza wersja (21.11.2026) powstała na lokalnym stosie `czpitch` z dwoma pełnymi skanami laboratorium i profilem co 2 minuty na hostach niestabilnych (`docs/demo/seed.sh`). Wersję końcową nagrywa się rano 22.11 na danych z całej nocy, tym samym poleceniem.
 
 ## 2. Pokaz na scenie (5 minut)
 
-Role: **A** = Iwo Smura (mówi, prowadzi slajdy), **B** = Iwo Wojtakajtis (laptop z demo). Dwa ekrany: slajdy (`docs/slides/czujka.pdf`) i przeglądarka z Czujką. Przełączanie: Cmd+Tab na laptopie B; A ma pilota do slajdów.
+Role: **A** = Iwo Smura (mówi, prowadzi slajdy), **B** = Iwo Wojtakajtis (laptop z demo). Główną częścią pokazu jest film albo żywe demo według tych samych ujęć; slajdy tylko otwierają i zamykają.
 
-| Czas | Kto | Ekran | Co mówi i robi |
+| Czas | Kto | Ekran | Co się dzieje |
 | --- | --- | --- | --- |
-| 0:00–0:30 | A | slajd 1 | „Wasze pytanie z treści zadania: adres milczy o trzeciej w nocy. Wyłączony czy zniknął? Zbudowaliśmy narzędzie, które umie na nie odpowiedzieć.” |
-| 0:30–1:10 | A | slajd 2 | Teza: rytm 168 godzin, dwa przypadki z testu: 16 braków w weekend bez alarmu, 2 braki w poniedziałek z alarmem. |
-| 1:10–1:40 | B | Czujka: pulpit, potem „Zmiany” | „To laboratorium /16 po drugim skanie.” Pokazuje zdanie na górze pulpitu i trzy zmiany ze stanu `t1`. |
-| 1:40–2:10 | B | host `10.66.70.21`, „Wehikuł czasu” | Mapa cieplna, `p_alive`, plan ponownych sprawdzeń; suwak wehikułu na przebieg 1. |
-| 2:10–2:40 | B | usługa `10.66.60.12:80` | „Zaproponuj sygnaturę” na żywo; retro-hunt czyta zapisaną historię, bez sond. |
-| 2:40–3:00 | B | pulpit | Start skanu, po 5 s „Stop awaryjny”. A: „Sześć setnych sekundy. Sekundę później nie działa żaden proces nmap.” |
-| 3:00–3:40 | A | slajdy 8 i 9 | Bezpieczeństwo i role; jedno polecenie wobec Kubernetesa i Helm w SecureCodeBox. |
-| 3:40–4:30 | A | slajd 10 | Wyniki zmierzone; plan na pierwsze dwa tygodnie w CBI. |
-| 4:30–5:00 | A i B | slajd 10 | „Czujka: skaner, który rozumie czas. Pytania?” B zostawia otwarty pulpit. |
+| 0:00–0:20 | A | slajd 1 | Pytanie. Nic więcej. |
+| 0:20–2:30 | B, A mówi | film `czujka-demo.mp4` albo żywe demo według ujęć z rozdziału 1 | A czyta tekst lektora z `docs/demo/lektor.txt` (gdy film ma już nagrany głos, A milczy). |
+| 2:30–4:30 | A | slajdy 2–10 | Po jednym zdaniu na slajd, według notatek poniżej. |
+| 4:30–5:00 | A i B | slajd 10 | „Czujka. Działa na czujka.dev. Pytania?” B zostawia otwarty pulpit. |
+
+### Notatki do slajdów
+
+Na slajdzie jest tylko obraz i podpis. Szczegóły mówi prowadzący; źródło każdej liczby jest w komentarzu w `docs/slides/czujka.src.html` i w `docs/ZGODNOSC.md`.
+
+| Slajd | Tytuł | Co powiedzieć |
+| --- | --- | --- |
+| 1 | Czujka | Adres milczy o trzeciej w nocy. Wyłączony na noc czy zniknął? Na to pytanie odpowiada Czujka. |
+| 2 | Skaner, który rozumie czas. | Każdy host ma rytm 168 godzin tygodnia; model Bayesa liczy z niego p_alive. W teście stacja robocza nie odpowiada 16 razy w weekend i alarmu nie ma; dwa braki w poniedziałek w godzinach pracy zgłaszają ją jako nieaktywną. Serwer, który zawsze odpowiadał, jest zgłaszany po 2 brakach, host losowy po medianie 5 (`docs/ALGORYTMY.md` §2.6). |
+| 3 | Cała sieć /16 w jednym przebiegu. | 65 535 adresów laboratorium w 7 min 24 s: 66 hostów, 71 usług, średnio 1 091 pakietów na sekundę przy limicie polityki 2 000. Planista dzieli sieć na bloki /24 i łączy puste w większe grupy, a rozmiar grupy idzie za zmierzonym tempem. |
+| 4 | Wie, co działa pod adresem. | 386 sygnatur w YAML rozpoznaje panele, CMS, urządzenia, frameworki i środowiska testowe; pewność łączy wszystkie dowody. Ocena ciekawości 0–100 zawsze pokazuje swoje powody, tu siedem powodów dla WordPressa z formularzem logowania przez HTTP. |
+| 5 | Milczy? Sprawdza ponownie tylko ten adres. | Host, który zamilkł poza swoim rytmem, dostaje trzy krótkie sprawdzenia jednego adresu: po 10, 30 i 90 minutach, najwyżej 200 adresów na godzinę i tylko w oknie skanu. Gdy dalej milczy, Czujka zgłasza go jako zniknięty; gdy odpowie, wraca bez alarmu. |
+| 6 | Wehikuł czasu: sieć z dowolnego przebiegu. | Suwak cofa się przebieg po przebiegu i pokazuje hosty, usługi i znaleziska z tamtej chwili. Obok jest różnica do dziś: co zniknęło i co zmieniło produkt, wersję albo tytuł. |
+| 7 | Reguła: czego w sieci być nie może. | Reguły w YAML mówią, czego w sieci być nie może albo co musi być; Czujka sprawdza je po każdym skanie i imporcie, bez wysyłania pakietów. Pakiet startowy ma 14 reguł; ta jedna znajduje w laboratorium 11 paneli administracyjnych poza siecią zarządzania. |
+| 8 | Bezpieczny z konstrukcji: tylko GET i HEAD. | Skaner nigdy się nie loguje i nie wysyła ładunków; walidator odrzuca sygnaturę z inną metodą, treścią albo hasłem, a limity polityki zawsze wygrywają z profilem. Wywołanie stopu awaryjnego trwało 0,06 s i sekundę później nie działał żaden proces nmap; liczbę pakietów po stopie mierzymy jeszcze raz. Dane: pg_tde szyfruje tabele i WAL, AES-256-GCM pola wrażliwe, cztery role i 22 uprawnienia. |
+| 9 | Jedno polecenie, dwa kontenery. | Produkt to binarka Go z interfejsem i nmapem oraz PostgreSQL z pg_tde; uruchamia go `docker compose` w katalogu `deploy/`. SecureCodeBox wymaga klastra Kubernetes i Helm, osobnego chartu na każdy skaner i magazynu S3. Kreator prowadzi od logowania do pierwszego skanu w 19,9 s. |
+| 10 | Zmierzone. Działa na czujka.dev. | Pełny test produktu przechodzi 52 z 52 kontroli przez REST API na prawdziwych usługach. Instancja publiczna czujka.dev wstała w 46 s na 4 vCPU; jury ma tam konto do odczytu (dane logowania w zgłoszeniu). Precyzję i czułość na 70 hostach wpiszemy z `docs/WYNIKI.md`. |
 
 Jeśli jury poprosi o konkretny przypadek: B ma gotowe zakładki przeglądarki: ręczne dodanie hosta (`Hosty` → „Dodaj host”), import pliku CSV z celami, eksport CSV, rola „Obserwator” w drugim oknie prywatnym (konto `viewer@czujka.local` utworzone w rozdziale 3).
 

@@ -9,7 +9,8 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 | [`README.md`](../README.md) | polski | każdy: czym jest Czujka, szybki start |
 | [`docs/ZGODNOSC.md`](ZGODNOSC.md) | polski | jury: wymagania zadania, stan i dowody |
 | [`docs/slides/czujka.pdf`](slides/czujka.pdf) | polski | jury: prezentacja, 10 slajdów |
-| [`docs/DEMO.md`](DEMO.md) | polski | jury, zespół: nagranie, pokaz, przygotowanie, pytania |
+| [`docs/DEMO.md`](DEMO.md) | polski | jury, zespół: lista ujęć, pokaz, notatki do slajdów, przygotowanie, pytania |
+| [`docs/demo/README.md`](demo/README.md) | polski | zespół: nagrywanie filmu demo jednym poleceniem |
 | `docs/WYNIKI.md` (w przygotowaniu) | polski | jury: pomiary na laboratorium 70 hostów |
 | [`docs/WDROZENIE.md`](WDROZENIE.md) | polski | administrator |
 | [`docs/BEZPIECZENSTWO.md`](BEZPIECZENSTWO.md) | polski | jury, administrator, zespół bezpieczeństwa |
@@ -25,9 +26,11 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 
 **[ZGODNOSC.md](ZGODNOSC.md): zgodność z treścią zadania.** Każde wymaganie z rozdziału 2, akapity o sygnaturach i oknach, zakres minimalny i dodatkowy, wymagania formalne, 12 punktów weryfikacji i 6 kryteriów oceny. Dla każdej pozycji: co robi Czujka, gdzie to zobaczyć (ekran albo polecenie), dowód i status: udowodnione, gotowe, częściowe albo brak. Na górze trzy najsłabsze miejsca. To jedyny dokument, który mówi o stanie na konkretny dzień.
 
-**[slides/](slides/): prezentacja.** Dziesięć slajdów po polsku, PDF i jeden plik HTML; źródło z komentarzem przy każdej liczbie i skrypt, który buduje PDF i sprawdza slajdy (`docs/slides/README.md`).
+**[slides/](slides/): prezentacja.** Dziesięć slajdów po polsku, PDF i jeden plik HTML. Każdy slajd to jeden obraz z podpisem: tytuł do 8 słów i najwyżej 12 słów poza nim; skrypt budujący PDF pilnuje tego limitu i wypisuje liczbę słów każdego slajdu (`docs/slides/README.md`). Źródło każdej liczby jest w komentarzu HTML.
 
-**[DEMO.md](DEMO.md): demo.** Lista ujęć nagrania (do 2 minut) z tekstem lektora i napisami, pokaz na scenie (5 minut) z planem na awarię sieci, polecenia przygotowania stanowiska i resetu, pytania jury z odpowiedziami.
+**[DEMO.md](DEMO.md): demo.** Lista ujęć filmu (około 2 minut), pokaz na scenie (5 minut) z notatkami do każdego slajdu i planem na awarię sieci, polecenia przygotowania stanowiska i resetu, pytania jury z odpowiedziami.
+
+**[demo/](demo/README.md): film.** `record.mjs` nagrywa film z prawdziwego interfejsu (Playwright, każda klatka z Chromium, cięcie w ffmpeg), z napisami i tekstem lektora z kodami czasu; `record.sh` robi to jednym poleceniem.
 
 **WYNIKI.md: wyniki (w przygotowaniu).** Precyzja i czułość wykrycia hostów, usług i technologii na laboratorium 70 hostów, czas skanu /16. Pisze zespół dokładności.
 

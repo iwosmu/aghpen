@@ -1,0 +1,26 @@
+Lektor do filmu czujka-demo.mp4 (czas filmu 2:09, 136 słów ≈ 59 s przy 2,3 słowa/s).
+Nagraj głos na film; kody czasu to początek i koniec ujęcia. Wygenerowane przez record.mjs.
+
+[0:00–0:22] install (21.6 s; 18 słów ≈ 7.8 s przy 2,3 słowa/s)
+Czujka staje jednym poleceniem. Kreator prowadzi od pierwszego logowania do skanu: hasło, zakresy i limity od właściciela sieci.
+
+[0:22–0:46] scan (24.3 s; 19 słów ≈ 8.3 s przy 2,3 słowa/s)
+Skan całej sieci /16. Mapa pokazuje każdy blok dwustu pięćdziesięciu sześciu adresów. Tempo nigdy nie przekracza limitu z polityki.
+
+[0:46–0:58] changes (12.2 s; 14 słów ≈ 6.1 s przy 2,3 słowa/s)
+Drugi skan porównuje się z pierwszym: nowe hosty, zniknięte usługi, zmienione wersje i tytuły.
+
+[0:58–1:17] unstable (18.5 s; 26 słów ≈ 11.3 s przy 2,3 słowa/s)
+Ten host odpowiada nieregularnie. Czujka zna jego rytm tygodnia, więc cisza w zwykłej porze nie jest alarmem. Gdy milknie poza rytmem, sprawdza ponownie tylko ten adres.
+
+[1:17–1:34] time (17.6 s; 20 słów ≈ 8.7 s przy 2,3 słowa/s)
+Wehikuł czasu pokazuje sieć taką, jaka była po dowolnym przebiegu, i to, co od tamtej pory zniknęło albo się zmieniło.
+
+[1:34–1:54] rules (19.9 s; 27 słów ≈ 11.7 s przy 2,3 słowa/s)
+Reguła mówi, czego w sieci być nie może, i sprawdza się po każdym skanie bez pakietów. Z jednej usługi Czujka proponuje sygnaturę i testuje ją na historii.
+
+[1:54–2:04] stop (10.2 s; 8 słów ≈ 3.5 s przy 2,3 słowa/s)
+Stop awaryjny zatrzymuje wszystkie skany w ułamku sekundy.
+
+[2:04–2:09] end (5.0 s; 4 słów ≈ 1.7 s przy 2,3 słowa/s)
+Czujka. Działa na czujka.dev.

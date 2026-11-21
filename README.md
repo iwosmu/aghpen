@@ -13,7 +13,8 @@ Zgłoszenie do zadania „Attack Surface Intelligence” Centrum Bezpieczeństwa
 | Co | Gdzie |
 | --- | --- |
 | Prezentacja (10 slajdów) | [`docs/slides/czujka.pdf`](docs/slides/czujka.pdf) |
-| Scenariusz demo, lista ujęć, pytania | [`docs/DEMO.md`](docs/DEMO.md) |
+| Film demo (około 2 minut, nagrany skryptem z prawdziwego interfejsu) | [`docs/demo/czujka-demo.mp4`](docs/demo/czujka-demo.mp4), tekst lektora [`docs/demo/lektor.txt`](docs/demo/lektor.txt) |
+| Scenariusz pokazu, notatki do slajdów, pytania | [`docs/DEMO.md`](docs/DEMO.md) |
 | Zgodność z treścią zadania: każde wymaganie, 12 punktów weryfikacji, 6 kryteriów, z dowodem | [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md) |
 | Wyniki zmierzone na laboratorium 70 hostów (precyzja, czułość, czas /16) | `docs/WYNIKI.md` (w przygotowaniu) |
 | Działająca instancja z laboratorium 70 hostów | `https://czujka.dev`, konto do odczytu: dane logowania w zgłoszeniu |
@@ -96,7 +97,7 @@ go run ./cmd/scanprobe -targets 127.0.0.1 -ports 8080 -pps 50
 | --- | --- |
 | [`docs/DOKUMENTACJA.md`](docs/DOKUMENTACJA.md) | spis całej dokumentacji |
 | [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md) | wymagania zadania, ich stan i dowody |
-| [`docs/slides/`](docs/slides/), [`docs/DEMO.md`](docs/DEMO.md) | prezentacja, scenariusz demo i pytania jury |
+| [`docs/slides/`](docs/slides/), [`docs/DEMO.md`](docs/DEMO.md), [`docs/demo/`](docs/demo/README.md) | prezentacja, scenariusz pokazu, film i skrypt, który go nagrywa |
 | [`docs/WDROZENIE.md`](docs/WDROZENIE.md) | instalacja, zmienne, kopie, rotacja klucza, sieć, problemy |
 | [`docs/BEZPIECZENSTWO.md`](docs/BEZPIECZENSTWO.md) | model bezpiecznego skanowania i ochrona danych |
 | [`docs/ALGORYTMY.md`](docs/ALGORYTMY.md) | model dostępności, zmiany, ocena ciekawości, grupowanie |

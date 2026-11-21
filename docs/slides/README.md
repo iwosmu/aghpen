@@ -16,6 +16,12 @@ npx playwright install chromium-headless-shell   # raz
 npm run build
 ```
 
-Skrypt kończy się kodem 1, gdy na którymś slajdzie tekst ma mniej niż 24 px, wychodzi poza slajd albo wchodzi na stopkę.
+Skrypt wypisuje liczbę słów każdego slajdu i kończy się kodem 1, gdy na którymś slajdzie:
 
-Miejsca oznaczone `DO UZUPEŁNIENIA` czekają na pomiary (`docs/WYNIKI.md`) i na zrzuty ekranów wehikułu czasu, reguł i „Zaproponuj sygnaturę” z danych laboratorium. Po dodaniu zrzutu do `web/screenshots/lab/` zamień ramkę `slot` na element `shot` (jak na slajdzie 3) i zbuduj ponownie.
+- tytuł ma więcej niż 8 słów albo reszta slajdu więcej niż 12 (liczby też są słowami; numer slajdu się nie liczy; liczba z twardą spacją między grupami cyfr, np. „65 535”, to jedno słowo);
+- jest lista, tabela albo blok kodu dłuższy niż jeden wiersz;
+- tekst ma mniej niż 24 px, wychodzi poza slajd albo wchodzi na stopkę.
+
+Slajd to jeden obraz z podpisem. Szczegóły, które nie mieszczą się w limicie, są w notatkach do slajdów (`docs/DEMO.md` rozdział 2) i w `docs/ZGODNOSC.md`. Źródło każdej liczby jest w komentarzu HTML przy slajdzie, nigdy na slajdzie.
+
+Dwa miejsca oznaczone `DO UZUPEŁNIENIA` (slajd 8: pakiety po stopie awaryjnym; slajd 10: precyzja) czekają na pomiary. Wpisz liczbę w miejsce `?`, usuń klasę `slotnum` i zbuduj ponownie.
