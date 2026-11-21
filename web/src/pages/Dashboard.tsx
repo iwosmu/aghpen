@@ -8,12 +8,13 @@ import { cx, fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtSigned } 
 import { useLiveRun, useNow } from '../lib/hooks';
 import { ErrorState, Panel, SkeletonRows } from '../ui/kit';
 import { Icon } from '../ui/Icon';
-import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, type GlyphName, type Tone } from '../ui/marks';
+import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, changeKindInfo, type GlyphName, type Tone } from '../ui/marks';
 import { AddressMap } from '../viz/AddressMap';
 import { BarList, PacketCount, ProgressBar, RateGauge, TrendRows } from '../viz/charts';
 import { useSession } from '../session';
 import { RunStory } from '../ui/RunStory';
-import { RunPasses } from '../ui/RunPasses';
+import { PartialNote, RunPasses } from '../ui/RunPasses';
+import { useArrivalOrder } from '../ui/arrivalOrder';
 import { SMALL_RUN } from './RunDetail';
 import { serviceName } from '../lib/serviceName';
 import { ReprobePanel } from './Reprobe';
@@ -175,7 +176,8 @@ function Inventory({ d, pair }: { d: Dash; pair?: { full?: ScanRun; prev?: ScanR
 /** The open ports a one-machine run has found so far (polled), instead of the address map. */
 function LivePorts({ runId }: { runId: number }) {
   const q = useItem<Page<Service>>('/services', { run_id: runId, limit: 500 }, { refetchInterval: 3000 });
-  const items = [...(q.data?.items ?? [])].sort((a, b) => a.port - b.port);
+  const byPort = (a: Service, b: Service) => a.port - b.port;
+  const { rows: items } = useArrivalOrder(q.data?.items ?? [], true, byPort, byPort);
   return (
     <div data-testid="live-ports">
       <p className="text-xs text-ink-3">{t('Otwarte porty do tej pory', 'Open ports so far')} <span className="num text-ink-2">{items.length}</span></p>
@@ -209,6 +211,7 @@ function ActiveRun({ initial, d }: { initial: ScanRun; d: Dash }) {
           </div>
           <div className="mt-1.5"><ProgressBar value={s.addresses_done} max={s.addresses_total} active={(map.data?.blocks ?? []).filter((b) => b.status === 'running').reduce((a, b) => a + b.size, 0)} label={t('Postęp skanu', 'Scan progress')} /></div>
           <RunPasses passes={s.passes} className="mt-1.5" />
+          <PartialNote run={run} className="mt-2" />
           <div className="mt-1 flex justify-between text-2xs text-ink-3">
             <span className="num">{fmtInt(s.addresses_done)} / {fmtInt(s.addresses_total)}</span>
             <span>{t('podgrupy', 'chunks')} <span className="num text-ink-2">{s.chunks_done}/{s.chunks_total}</span></span>
@@ -257,7 +260,7 @@ function RecentChanges({ changes }: { changes: Change[] }) {
       <ul>
         {list.map((c) => (
           <Row key={c.id} to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id}>
-            <span className="mt-0.5"><Glyph name={c.expected ? 'dashring' : (c.kind.endsWith('_new') ? 'plus' : c.kind.endsWith('_gone') ? 'minus' : c.kind === 'host_unstable' ? 'wave' : c.kind === 'host_back' ? 'back' : 'delta')} tone={c.expected ? 'expected' : (c.kind.endsWith('_new') || c.kind === 'host_back' ? 'new' : c.kind.endsWith('_gone') ? 'gone' : c.kind === 'host_unstable' ? 'unstable' : 'changed')} /></span>
+            <span className="mt-0.5"><Glyph name={c.expected ? 'dashring' : changeKindInfo(c.kind).glyph} tone={c.expected ? 'expected' : changeKindInfo(c.kind).tone} /></span>
             <span className="min-w-0 flex-1">
               <span className={cx('block text-sm', c.expected ? 'text-ink-2' : 'text-ink')}>{c.summary}</span>
               <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-3">

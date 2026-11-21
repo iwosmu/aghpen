@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Change, ScanProfile } from '../api/types';
+import type { Change, RunPass, ScanProfile, ScanRun } from '../api/types';
 import { setLang } from '../i18n';
 import { awayText, responseDelta, awaySeconds } from './changeText';
 import { defaultProfile, isLoopback, loopbackLine } from './thisComputer';
 import { isSelf, serviceName } from './serviceName';
 import { fieldValue } from './fields';
-import { passState } from '../ui/RunPasses';
+import { partialText, passState } from '../ui/RunPasses';
 
 const ch = (x: Partial<Change>) => ({ id: 1, run_id: 6, prev_run_id: 5, at: '2026-11-21T16:15:12Z', kind: 'service_returned', severity: 'low', host_id: 1, ip: '192.168.65.254', service_id: 3, port: 8787, summary: '', field: 'state', before: null, after: null, expected: false, acked_by: '', acked_at: null, ...x }) as Change;
 
@@ -78,5 +78,26 @@ describe('port passes', () => {
     expect(passState({ name: 'top_ports', state: 'done', hosts: 1, ports_total: 1000, ports_done: 1000 })).toBe('gotowe');
     expect(passState({ name: 'full_range', state: 'running', hosts: 1, ports_total: 65535, ports_done: 21000 })).toMatch(/^32/);
     expect(passState({ name: 'full_range', state: 'pending', hosts: 1, ports_total: 65535, ports_done: 0 })).toBe('czeka');
+  });
+});
+
+
+describe('partialText', () => {
+  const stats = (passes: RunPass[]) => ({ passes } as unknown as ScanRun['stats']);
+  it('says the result is not final while the full range runs', () => {
+    setLang('pl');
+    const s = stats([{ name: 'top_ports', state: 'done', hosts: 1, ports_total: 1000, ports_done: 1000 }, { name: 'full_range', state: 'running', hosts: 1, ports_total: 64535, ports_done: 20651 }]);
+    expect(partialText({ status: 'running', stats: s })).toBe('Skan trwa: sprawdzono najczęstsze porty, pełny zakres 1-65535 w toku (32%). Wynik nie jest jeszcze ostateczny; zmiany i zniknięte usługi pokażą się po końcu skanu.');
+    setLang('en');
+    expect(partialText({ status: 'running', stats: s })).toContain('Scan in progress: top ports checked, full range 1-65535 running (32%)');
+    setLang('pl');
+  });
+  it('is silent before the first pass ends, after the run, and for one pass', () => {
+    const first = stats([{ name: 'top_ports', state: 'running', hosts: 1, ports_total: 1000, ports_done: 10 }, { name: 'full_range', state: 'pending', hosts: 0, ports_total: 0, ports_done: 0 }]);
+    expect(partialText({ status: 'running', stats: first })).toBeNull();
+    const done = stats([{ name: 'top_ports', state: 'done', hosts: 1, ports_total: 1, ports_done: 1 }, { name: 'full_range', state: 'done', hosts: 1, ports_total: 1, ports_done: 1 }]);
+    expect(partialText({ status: 'running', stats: done })).toBeNull();
+    expect(partialText({ status: 'completed', stats: first })).toBeNull();
+    expect(partialText({ status: 'running', stats: stats([]) })).toBeNull();
   });
 });

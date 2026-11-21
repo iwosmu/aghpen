@@ -62,8 +62,40 @@ export function EstimateBox({ profileId, stale }: { profileId: number; stale?: b
           </div>
         ))}
       </dl>
+      <FullRangeNote e={e} ports={profile.data?.ports ?? ''} />
       {capped ? <p className="flex items-start gap-1.5 border-t border-rule px-3 py-2 text-xs text-ink-2"><Icon name="shield" size={14} className="mt-px text-st-new" />{t('Profil prosi o ' + fmtInt(asked) + ' pps. Polityka bezpieczeństwa ogranicza tempo do ' + fmtInt(e.effective_pps) + ' pps.', 'The profile asks for ' + fmtInt(asked) + ' pps. The safety policy holds the rate at ' + fmtInt(e.effective_pps) + ' pps.')}</p> : null}
       {stale ? <p className="border-t border-rule px-3 py-2 text-xs text-ink-3">{t('Budżet dotyczy zapisanej wersji profilu. Zapisz zmiany, aby go przeliczyć.', 'The budget describes the saved profile. Save the changes to recompute it.')}</p> : null}
+    </div>
+  );
+}
+
+/** A ranked port list (top-N) or 1-65535: the engine may add the full range on a small scope. */
+const rankedPorts = (spec: string) => /top-\d+/i.test(spec) || /(^|[\s,])1-65535($|[\s,])/.test(spec);
+
+/**
+ * The automatic full port range, described only from what the estimate says:
+ * full_range_max_hosts (> 0: the run gets it), full_range_max_addresses (the
+ * scope-size trigger), full_range_ports and est_full_range_sec_per_host.
+ * Without a per-host time from the API the note shows no time.
+ */
+function FullRangeNote({ e, ports }: { e: ScanEstimate; ports: string }) {
+  const maxHosts = e.full_range_max_hosts ?? 0;
+  const maxAddr = e.full_range_max_addresses;
+  const perHost = e.est_full_range_sec_per_host;
+  if (maxHosts <= 0) {
+    if (maxAddr && e.addresses > maxAddr && rankedPorts(ports)) {
+      return <p className="border-t border-rule px-3 py-2 text-xs text-ink-2" data-testid="full-range-note">{t('Pełny zakres portów 1-65535 nie obejmie tego zakresu: ma ' + fmtInt(e.addresses) + ' adresów, a działa do ' + fmtInt(maxAddr) + '. Skan sprawdzi tylko porty z listy.', 'The full port range 1-65535 does not apply here: the scope has ' + fmtInt(e.addresses) + ' addresses and it works up to ' + fmtInt(maxAddr) + '. The scan checks only the listed ports.')}</p>;
+    }
+    return null;
+  }
+  const portsText = e.full_range_ports ? t(' (' + fmtInt(e.full_range_ports) + ' portów na host)', ' (' + fmtInt(e.full_range_ports) + ' ports per host)') : '';
+  const scopeText = maxAddr ? t(' Dotyczy zakresów do ' + fmtInt(maxAddr) + ' adresów.', ' It applies to scopes of up to ' + fmtInt(maxAddr) + ' addresses.') : '';
+  return (
+    <div className="border-t border-rule px-3 py-2 text-xs text-ink-2" data-testid="full-range-note">
+      <p><span className="font-medium text-ink">{t('Pełny zakres portów, automatycznie.', 'Full port range, automatic.')}</span> {t('Najpierw porty z listy: ich usługi widać po kilku sekundach. Potem Czujka sprawdza resztę 1-65535' + portsText + ' na aktywnych hostach, najwyżej na ' + fmtInt(maxHosts) + '. Wynik jest ostateczny dopiero po drugim etapie.', 'First the listed ports: their services show within seconds. Then Czujka checks the rest of 1-65535' + portsText + ' on the live hosts, at most ' + fmtInt(maxHosts) + '. The result is final only after the second pass.')}{scopeText}</p>
+      {perHost && perHost > 0 ? (
+        <p className="mt-1">{t('Drugi etap trwa około ', 'The second pass takes about ')}<span className="num text-ink">{fmtDuration(perHost)}</span>{t(' dla 1 hosta i około ', ' for 1 host and about ')}<span className="num text-ink">{fmtDuration(perHost * maxHosts)}</span>{t(' dla ' + fmtInt(maxHosts) + ' hostów, przy tempie ' + fmtInt(e.effective_pps) + ' pps. Czas skanu powyżej już go wlicza.', ' for ' + fmtInt(maxHosts) + ' hosts, at ' + fmtInt(e.effective_pps) + ' pps. The scan time above already counts it.')}</p>
+      ) : null}
     </div>
   );
 }
@@ -192,7 +224,7 @@ export default function ProfileEdit() {
 
         <Section title={t('Porty i wykrywanie', 'Ports and discovery')} hint={t('Wykrywanie hostów działa przed skanem portów. Port spoza listy dozwolonych w polityce jest pomijany.', 'Host discovery runs before the port scan. A port outside the policy allow-list is skipped.')}>
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <Field label={t('Porty (składnia nmap)', 'Ports (nmap syntax)')} hint={t('np. top-1000 albo 22,80,443,8000-8100', 'for example top-1000 or 22,80,443,8000-8100')}>
+            <Field label={t('Porty (składnia nmap)', 'Ports (nmap syntax)')} hint={t('np. top-1000 albo 22,80,443,8000-8100. Lista top-N albo 1-65535 na małym zakresie: najpierw najczęstsze porty, potem reszta 1-65535 na aktywnych hostach (szczegóły w budżecie ruchu). Jawna lista portów jest skanowana dokładnie tak, jak wpisana.', 'for example top-1000 or 22,80,443,8000-8100. A top-N list or 1-65535 on a small scope: the top ports first, then the rest of 1-65535 on the live hosts (details in the traffic budget). An explicit port list is scanned exactly as written.')}>
               <input className="field mono" value={p.ports} onChange={(e) => up((d) => { d.ports = e.target.value; })} />
             </Field>
             <div className="flex items-end gap-1.5 pb-[22px]">
