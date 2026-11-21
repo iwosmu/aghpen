@@ -53,6 +53,7 @@ function UsersTab() {
   const roles = useItem<Role[]>('/roles');
   const [add, setAdd] = useState(false);
   const [confirm, setConfirm] = useState<User | null>(null);
+  const [disableAsk, setDisableAsk] = useState<User | null>(null);
   const update = useAction((v: { id: number; body: Record<string, unknown> }) => patch<User>('/users/' + v.id, v.body), { invalidate: ['/users', '/roles', '/audit'], success: t('Zapisano', 'Saved') });
   const remove = useAction((id: number) => del('/users/' + id), { invalidate: ['/users', '/roles', '/audit'], success: t('Użytkownik usunięty', 'User deleted'), onSuccess: () => setConfirm(null) });
   const me = session.user.id;
@@ -62,7 +63,7 @@ function UsersTab() {
     ) },
     { id: 'role', header: t('Rola', 'Role'), width: 220, cell: (x) => x.id === me ? <span>{roleLabel(x.role_slug, x.role_name)}</span> : <Select label={t('Rola użytkownika ', 'Role of ') + x.email} value={String(x.role_id)} onChange={(v) => update.mutate({ id: x.id, body: { role_id: Number(v) } })} options={(roles.data ?? []).map((r) => ({ value: String(r.id), label: roleLabel(r.slug, r.name) }))} /> },
     { id: 'login', header: t('Ostatnie logowanie', 'Last login'), hide: 'md', cell: (x) => <span className="num text-ink-2" title={fmtDateTime(x.last_login_at)}>{x.last_login_at ? fmtRelative(x.last_login_at) : t('nigdy', 'never')}</span> },
-    { id: 'state', header: t('Konto włączone', 'Account enabled'), cell: (x) => <Switch checked={!x.disabled} disabled={x.id === me || update.isPending} onChange={(v) => update.mutate({ id: x.id, body: { disabled: !v } })} label={t('Konto włączone: ', 'Account enabled: ') + x.email} /> },
+    { id: 'state', header: t('Konto włączone', 'Account enabled'), cell: (x) => <span className="inline-flex" title={x.id === me ? t('Własnego konta nie można wyłączyć.', 'You cannot disable your own account.') : undefined}><Switch checked={!x.disabled} disabled={x.id === me || update.isPending} onChange={(v) => (v ? update.mutate({ id: x.id, body: { disabled: false } }) : setDisableAsk(x))} label={t('Konto włączone: ', 'Account enabled: ') + x.email} /></span> },
     { id: 'del', header: '', align: 'right', width: 44, cell: (x) => x.id === me ? null : <IconButton icon="trash" label={t('Usuń użytkownika ', 'Delete user ') + x.email} onClick={() => setConfirm(x)} /> },
   ];
   return (
@@ -74,6 +75,10 @@ function UsersTab() {
       <DataTable rows={users.data?.items} cols={cols} rowKey={(x) => x.id} loading={users.isPending} error={users.error} retry={() => users.refetch()}
         mobile={(x) => <div><div className="text-sm">{x.name || x.email}</div><div className="text-xs text-ink-3">{x.email} · {roleLabel(x.role_slug, x.role_name)}{x.disabled ? ' · ' + t('wyłączone', 'disabled') : ''}</div></div>} />
       {add && roles.data ? <UserDialog roles={roles.data} onClose={() => setAdd(false)} /> : null}
+      <Dialog open={disableAsk !== null} onClose={() => setDisableAsk(null)} width={420} title={t('Wyłączyć konto?', 'Disable the account?')}
+        footer={<><Button onClick={() => setDisableAsk(null)}>{t('Anuluj', 'Cancel')}</Button><Button variant="dangerSolid" busy={update.isPending} data-testid="user-disable-confirm" onClick={() => { if (disableAsk) update.mutate({ id: disableAsk.id, body: { disabled: true } }, { onSuccess: () => setDisableAsk(null) }); }}>{t('Wyłącz konto', 'Disable account')}</Button></>}>
+        <p className="text-sm"><span className="mono">{disableAsk?.email}</span>{t(' nie zaloguje się, dopóki konto nie zostanie włączone.', ' cannot sign in until the account is enabled again.')}</p>
+      </Dialog>
       <Dialog open={confirm !== null} onClose={() => setConfirm(null)} width={420} title={t('Usunąć użytkownika?', 'Delete user?')}
         footer={<><Button onClick={() => setConfirm(null)}>{t('Anuluj', 'Cancel')}</Button><Button variant="dangerSolid" busy={remove.isPending} onClick={() => confirm && remove.mutate(confirm.id)}>{t('Usuń konto', 'Delete account')}</Button></>}>
         <p className="text-sm"><span className="mono">{confirm?.email}</span>{t('. Konto zostanie usunięte, wpisy w dzienniku audytu zostaną.', '. The account is deleted. Its audit entries stay.')}</p>

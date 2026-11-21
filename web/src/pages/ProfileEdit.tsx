@@ -14,8 +14,11 @@ import { useCan } from '../session';
 
 /** The traffic budget of a saved profile: what a run will send, how long it takes and whether it fits the window. */
 export function EstimateBox({ profileId, stale }: { profileId: number; stale?: boolean }) {
-  const q = useQuery<ScanEstimate>({ queryKey: ['/profiles/' + profileId + '/estimate'], queryFn: () => post<ScanEstimate>('/profiles/' + profileId + '/estimate'), staleTime: 5_000 });
   const profile = useItem<ScanProfile>('/profiles/' + profileId);
+  // Without a scope the server answers 422: ask only when the profile has one.
+  const hasScope = (profile.data?.scope_ids ?? []).length > 0;
+  const q = useQuery<ScanEstimate>({ queryKey: ['/profiles/' + profileId + '/estimate'], queryFn: () => post<ScanEstimate>('/profiles/' + profileId + '/estimate'), staleTime: 5_000, enabled: hasScope });
+  if (profile.data && !hasScope) return null;
   if (q.error) return <InlineError error={q.error} />;
   if (!q.data) return <div className="skeleton h-[120px]" />;
   const e = q.data;
@@ -209,7 +212,7 @@ export default function ProfileEdit() {
             <span className="label block">{t('Zakresy', 'Scopes')}</span>
             {(scopes.data?.items ?? []).map((s) => (
               <Check key={s.id} checked={p.scope_ids.includes(s.id)} disabled={ro} onChange={(v) => up((d) => { d.scope_ids = v ? [...d.scope_ids, s.id] : d.scope_ids.filter((x) => x !== s.id); })}
-                label={<span>{s.name} <span className="num text-xs text-ink-3">{fmtInt(s.address_count)} {t('adresów', 'addresses')}</span></span>} />
+                label={<span>{s.name} <span className="num text-xs text-ink-3">{fmtInt(s.address_count)} {plural(s.address_count, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}</span></span>} />
             ))}
           </div>
           <div className="mt-3"><Check checked={p.enabled} disabled={ro} onChange={(v) => up((d) => { d.enabled = v; })} label={t('Profil włączony', 'Profile enabled')} /></div>
