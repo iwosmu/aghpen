@@ -22,7 +22,11 @@ services:
       - czujka-pgdata:/data/db
       # The pg_tde keyring is on its own volume: a copy of the data volume alone cannot be read.
       - czujka-tde-keys:/tde-keys
-    networks: [internal]
+    networks:
+      internal:
+        # A unique name: when Czujka joins a scanned network that has its own host called "db",
+        # a short name could resolve to that host instead of this database.
+        aliases: [czujka-postgres]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U czujka -d czujka"]
       interval: 5s
@@ -42,7 +46,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      CZUJKA_DB_URL: postgres://czujka:${CZUJKA_DB_PASSWORD:-czujka-internal-network-only}@db:5432/czujka?sslmode=disable
+      CZUJKA_DB_URL: postgres://czujka:${CZUJKA_DB_PASSWORD:-czujka-internal-network-only}@czujka-postgres:5432/czujka?sslmode=disable
       CZUJKA_TDE: ${CZUJKA_TDE:-require}
       CZUJKA_ADMIN_EMAIL: ${CZUJKA_ADMIN_EMAIL:-admin@czujka.local}
       CZUJKA_ADMIN_PASSWORD: ${CZUJKA_ADMIN_PASSWORD:-}
@@ -52,6 +56,8 @@ services:
       CZUJKA_COOKIE_SECURE: ${CZUJKA_COOKIE_SECURE:-auto}
       CZUJKA_TRUST_PROXY: ${CZUJKA_TRUST_PROXY:-false}
       CZUJKA_TZ: ${CZUJKA_TZ:-Europe/Warsaw}
+      CZUJKA_SCHED_INTERVAL: ${CZUJKA_SCHED_INTERVAL:-20s}
+      CZUJKA_LOG_FORMAT: ${CZUJKA_LOG_FORMAT:-json}
     ports:
       - "${CZUJKA_BIND:-127.0.0.1}:${CZUJKA_PORT:-8080}:8080"
     volumes:
