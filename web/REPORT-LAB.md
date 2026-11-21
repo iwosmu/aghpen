@@ -263,3 +263,13 @@ Dind jury machine with the backend of iwosmu/czujka-core 736ff9a, UI of this bra
 - One host 172.30.6.3 (the run page shows its service table only for runs of at most 4 addresses): run #3 full range, run #4 ports `80`: the only row, 47123/tcp, is `carried`.
 
 UI: the run table shows "nie skanowany w tym przebiegu" (EN "not scanned in this run") in place of the state, dims the row, puts it at the end, shows no response time, and the panel count leaves it out ("Usługi znalezione w tym przebiegu 0"). A line under the table says "Nie skanowane w tym przebiegu: 1 (na końcu listy)…". The time machine keeps the state then ("otwarta") with the same text under it and dims the row; :80 of the same run stays normal. Screenshots: `carried-run-pl`, `carried-run-en`, `carried-run-pl-390`, `carried-timemachine-pl/en/pl-390`.
+
+## 18. Run notes and services of a larger run (dind, coordinator branch 7dd6f32)
+
+Dind jury machine, engine 6f39557 with the integrator's 736ff9a, UI of this branch. Lab `czui-lab` 172.30.7.0/24: 17 containers (.10–.26: nginx on :80 or `python -m http.server 80xx`), Czujka at .250; scope 172.30.7.0/24, default profile.
+
+**Run notes** (run #1, 52 s, 19 live hosts with the docker gateway and Czujka). The box above the progress reads "Pełny zakres portów (1-65535) objął 0 z 19 aktywnych hostów; pozostałe: porty z profilu"; EN "The full port range (1-65535) covered 0 of 19 live hosts; the others: the ports of the profile". The API writes the note in Polish; the UI translates this known pattern and shows an unknown note as written. Screenshots: `run-notes-pl`, `run-notes-en`, `run-notes-pl-390`, `run-notes-en-390` (no horizontal scroll at 390 px).
+
+Engine finding (not changed here, `internal/scan/pipeline.go` `claimFullRange`): the full-range budget of 16 hosts is claimed per address group, all or nothing. One /24 with 19 live hosts is one group, so no host gets the full range ("0 z 19"), not 16 of 19. A port outside the profile's list on any of these hosts stays unseen.
+
+**Services of a larger run.** The run page showed its service table only for runs of at most 4 addresses. Now every run shows "Usługi znalezione w tym przebiegu" under the map: all rows of a run of at most 4 addresses (as before), else the 50 most interesting (`sort=-interest`, polled every 5 s while live). When there are more: "Pokazano 50 z 65, najciekawsze najpierw. Wszystkie usługi tego przebiegu" links to `/services?run_id=N&state=all`, where the service list now takes the filter `run_id` (chip "przebieg #N"). Run #1: 11 rows, no link. Run #2 (explicit ports, a 45-port container added at .40): 65 services, 50 rows and the link. Screenshots: `run-cap-pl`, `run-cap-en`, `run-cap-pl-390`, `run-cap-en-390`, `run-cap-services-list-pl`.

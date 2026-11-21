@@ -14,7 +14,7 @@ import { useCan } from '../session';
 import { serviceName, isSelf } from '../lib/serviceName';
 import { ResponseCell, SelfTag } from '../ui/serviceBits';
 
-const FILTERS = ['q', 'state', 'port', 'name', 'tech', 'class', 'tag', 'min_interest', 'tls', 'group_key', 'host_id'];
+const FILTERS = ['q', 'state', 'port', 'name', 'tech', 'class', 'tag', 'min_interest', 'tls', 'group_key', 'host_id', 'run_id'];
 
 export default function Services() {
   const u = useUrlState();
@@ -94,10 +94,11 @@ export default function Services() {
           <Select value={u.get('min_interest')} onChange={(v) => u.set({ min_interest: v })} options={[{ value: '', label: '0' }, { value: '25', label: '25' }, { value: '50', label: '50' }, { value: '75', label: '75' }]} />
         </FilterField>
       </FilterBar>
-      {u.get('group_key') || u.get('host_id') || u.get('tag') ? (
+      {u.get('group_key') || u.get('host_id') || u.get('tag') || u.get('run_id') ? (
         <div className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-1.5 text-xs text-ink-2 sm:px-6">
           {u.get('group_key') ? <Chip tone="accent" onRemove={() => u.set({ group_key: null })}>{t('grupa podobnych', 'group of similar')} <span className="mono">{u.get('group_key').slice(0, 12)}</span></Chip> : null}
           {u.get('host_id') ? <Chip tone="accent" onRemove={() => u.set({ host_id: null })}>{t('host', 'host')} #{u.get('host_id')}</Chip> : null}
+          {u.get('run_id') ? <Chip tone="accent" onRemove={() => u.set({ run_id: null })}>{t('przebieg', 'run')} #{u.get('run_id')}</Chip> : null}
           {u.get('tag') ? <Chip tone="accent" onRemove={() => u.set({ tag: null })}>{t('tag', 'tag')} {u.get('tag')}</Chip> : null}
         </div>
       ) : null}
