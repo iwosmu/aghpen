@@ -331,7 +331,7 @@ func (s *Server) importFindings(w http.ResponseWriter, r *http.Request) {
 		if f.HostID == 0 {
 			out.Skipped++
 			if len(out.Invalid) < interchange.MaxInvalidReported {
-				out.Invalid = append(out.Invalid, model.InvalidLine{Line: i + 1, Value: f.Title, Reason: "obserwacja bez adresu hosta: nie można jej przypisać do inwentarza"})
+				out.Invalid = append(out.Invalid, model.InvalidLine{Line: i + 1, Value: f.Title, Reason: "znalezisko bez adresu hosta"})
 			}
 			continue
 		}
