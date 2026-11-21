@@ -10,6 +10,7 @@ import { Glyph, Sev, changeKindInfo, type GlyphName, type Tone } from '../ui/mar
 import { BeforeAfter } from './Changes';
 import { isFullRun, lastFullPair } from '../lib/headline';
 import { StoryList } from '../ui/RunStory';
+import { changeSummary } from '../lib/changeText';
 
 function RunCard({ run, side }: { run: ScanRun; side: string }) {
   return (
@@ -40,7 +41,7 @@ function Column({ title, glyph, tone, items, showExpected }: { title: string; gl
                 <Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link text-sm">{c.ip}{c.port ? ':' + c.port : ''}</Link>
                 {c.expected ? <span className="inline-flex flex-none items-center gap-1 text-xs text-ink-3"><Glyph name="dashring" tone="expected" size={11} />{t('oczekiwana', 'expected')}</span> : <span className="flex-none"><Sev level={c.severity} /></span>}
               </div>
-              <div className={c.expected ? 'mt-0.5 text-sm text-ink-2' : 'mt-0.5 text-sm'}>{c.summary}</div>
+              <div className={c.expected ? 'mt-0.5 text-sm text-ink-2' : 'mt-0.5 text-sm'}>{changeSummary(c)}</div>
               <div className="text-xs text-ink-3">{changeKindInfo(c.kind).label}</div>
               <BeforeAfter c={c} />
             </li>
@@ -64,9 +65,14 @@ export default function Compare() {
   const showExpected = u.get('expected') === '1';
   const ready = Boolean(from && to && from !== to);
   const diff = useItem<DiffReport>('/diff', { from, to }, { enabled: ready });
+  // Two consecutive runs: the run's own change log knows the history (a service
+  // that comes back is "returned", not new; response times), which a plain
+  // diff of two snapshots cannot see. Other pairs use the diff.
+  const consecutive = ready && toRun?.summary?.prev_run_id === Number(from);
+  const log = usePage<Change>('/changes', { run_id: to, limit: 500 }, consecutive);
   const opts = list.map((r) => ({ value: String(r.id), label: '#' + r.id + ' · ' + fmtDateTime(r.finished_at) + ' · ' + r.profile_name + (isFullRun(r) ? '' : ' · ' + t('częściowy', 'partial')) }));
   const d = diff.data;
-  const all = d?.changes ?? [];
+  const all = consecutive && log.data ? log.data.items : d?.changes ?? [];
   const group = (g: string) => all.filter((c) => changeKindInfo(c.kind).group === g || (g === 'changed' && changeKindInfo(c.kind).group === 'unstable'));
   return (
     <div>

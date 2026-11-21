@@ -30,7 +30,7 @@ function RunServices({ run, live }: { run: ScanRun; live: boolean }) {
   // first pass never moves when a later pass adds more. When the run is over:
   // open services first, then the ones that are gone now; by address and port.
   const byAddr = (a: Service, b: Service) => a.ip.localeCompare(b.ip, undefined, { numeric: true }) || a.port - b.port;
-  const { rows: items, fresh } = useArrivalOrder(q.data?.items ?? [], live, byAddr, (a, b) => Number(a.state !== 'open') - Number(b.state !== 'open') || byAddr(a, b));
+  const { rows: items, fresh } = useArrivalOrder('run-services-' + run.id, q.data?.items ?? [], live, byAddr, (a, b) => Number(a.state !== 'open') - Number(b.state !== 'open') || byAddr(a, b));
   const hosts = [...new Set(items.map((s) => s.host_id))];
   const anyTime = items.some((s) => s.response_ms !== undefined);
   return (

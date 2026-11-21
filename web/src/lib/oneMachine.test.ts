@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Change, RunPass, ScanProfile, ScanRun } from '../api/types';
 import { setLang } from '../i18n';
-import { awayText, responseDelta, awaySeconds } from './changeText';
+import { awayText, responseDelta, awaySeconds, changeSummary } from './changeText';
 import { defaultProfile, isLoopback, loopbackLine } from './thisComputer';
 import { isSelf, serviceName } from './serviceName';
 import { fieldValue } from './fields';
@@ -45,7 +45,7 @@ describe('returned and slower', () => {
     setLang('pl');
     expect(responseDelta(ch({ kind: 'response_slower', field: 'http.response_ms', before: { baseline_ms: 120, ms: 118 }, after: { ms: 640 } }))).toBe('120 ms → 640 ms');
     expect(responseDelta(ch({ kind: 'response_slower', before: { baseline_ms: 120 }, after: { ms: null, error: 'no_answer' } }))).toBe('120 ms → brak odpowiedzi HTTP');
-    expect(responseDelta(ch({ kind: 'response_recovered', before: { baseline_ms: 120, ms: 640 }, after: { ms: 1300 } }))).toBe('120 ms → 1,3 s');
+    expect(responseDelta(ch({ kind: 'response_recovered', before: { baseline_ms: 120, ms: 640 }, after: { ms: 1300 } }))).toBe('640 ms → 1,3 s');
     expect(responseDelta(ch({ before: null, after: null }))).toBe('');
   });
   it('shows change values in words', () => {
@@ -99,5 +99,22 @@ describe('partialText', () => {
     expect(partialText({ status: 'running', stats: done })).toBeNull();
     expect(partialText({ status: 'completed', stats: first })).toBeNull();
     expect(partialText({ status: 'running', stats: stats([]) })).toBeNull();
+  });
+});
+
+describe('recovered and English summaries', () => {
+  const mk = (kind: string, before: unknown, after: unknown) => ({ id: 1, kind, ip: '172.18.0.1', port: 9090, before, after, summary: 'PL', field: 'http.response_ms' } as unknown as Change);
+  it('shows the slow answer it recovers from', () => {
+    setLang('pl');
+    expect(responseDelta(mk('response_recovered', { baseline_ms: 1, ms: 901 }, { ms: 1 }))).toBe('901 ms → 1 ms');
+    expect(responseDelta(mk('response_recovered', { baseline_ms: 0, ms: null }, { ms: 0 }))).toBe('brak odpowiedzi HTTP → 0 ms');
+    expect(fieldValue('http.response_ms', { ms: 901 })).toBe('901 ms');
+  });
+  it('writes English summaries for the new kinds and keeps the Polish one in PL', () => {
+    setLang('en');
+    expect(changeSummary(mk('response_slower', { baseline_ms: 1, ms: 1 }, { ms: 901 }))).toBe('Service 172.18.0.1:9090 responds slower: 901 ms (usually 1 ms)');
+    expect(changeSummary(mk('service_returned', { state: 'gone', away_seconds: 313, runs_away: 1 }, 'open'))).toBe('Service 172.18.0.1:9090 is back after 5 min 13 s (away in 1 scan)');
+    setLang('pl');
+    expect(changeSummary(mk('service_returned', {}, 'open'))).toBe('PL');
   });
 });

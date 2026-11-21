@@ -1,21 +1,25 @@
-import { useRef } from 'react';
+type Seen = { map: Map<number, { n: number; at: number }>; loaded: boolean; live: boolean };
+// Per list key (for example the run id), so a remount of the list during a
+// run keeps the order the rows arrived in.
+const lists = new Map<string, Seen>();
 
 /**
  * Live lists keep the order in which rows arrived, so a row found by the first
  * port pass never moves when a later pass adds more; rows of one poll arrive in
- * the given order. When the list is not live, finalSort orders it. fresh holds
- * the rows that arrived in the last 1.5 s after the first load (for a short
- * entrance), never the rows of the first load.
+ * batchSort order. A list watched live keeps that order after the run ends; a
+ * list opened after the end uses finalSort. fresh holds the rows that arrived
+ * in the last 1.5 s after the first load (for a short entrance).
  */
-export function useArrivalOrder<T extends { id: number }>(items: T[], live: boolean, batchSort: (a: T, b: T) => number, finalSort: (a: T, b: T) => number): { rows: T[]; fresh: Set<number> } {
-  const seen = useRef(new Map<number, { n: number; at: number }>());
-  const loaded = useRef(false);
+export function useArrivalOrder<T extends { id: number }>(key: string, items: T[], live: boolean, batchSort: (a: T, b: T) => number, finalSort: (a: T, b: T) => number): { rows: T[]; fresh: Set<number> } {
+  let s = lists.get(key);
+  if (!s) { s = { map: new Map(), loaded: false, live: false }; lists.set(key, s); }
+  if (live) s.live = true;
   const now = Date.now();
-  const map = seen.current;
-  const newcomers = items.filter((i) => !map.has(i.id)).sort(batchSort);
-  for (const i of newcomers) map.set(i.id, { n: map.size, at: loaded.current ? now : 0 });
-  if (items.length) loaded.current = true;
-  const fresh = new Set(items.filter((i) => now - (map.get(i.id)?.at ?? 0) < 1500).map((i) => i.id));
-  const rows = [...items].sort(live ? (a, b) => (map.get(a.id)?.n ?? 0) - (map.get(b.id)?.n ?? 0) : finalSort);
-  return { rows, fresh: live ? fresh : new Set() };
+  const newcomers = items.filter((i) => !s.map.has(i.id)).sort(batchSort);
+  for (const i of newcomers) s.map.set(i.id, { n: s.map.size, at: s.loaded ? now : 0 });
+  if (items.length) s.loaded = true;
+  const byArrival = (a: T, b: T) => (s.map.get(a.id)?.n ?? 0) - (s.map.get(b.id)?.n ?? 0);
+  const rows = [...items].sort(s.live ? byArrival : finalSort);
+  const fresh = live ? new Set(items.filter((i) => now - (s.map.get(i.id)?.at ?? 0) < 1500).map((i) => i.id)) : new Set<number>();
+  return { rows, fresh };
 }
