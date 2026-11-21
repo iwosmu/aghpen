@@ -74,7 +74,7 @@ export default function Login() {
             <span className="text-lg font-semibold">Czujka</span>
           </div>
           <h1 className="text-lg font-semibold">{t('Logowanie', 'Sign in')}</h1>
-          <p className="mt-1 text-sm text-ink-2">{t('Konsola analityka bezpieczeństwa.', 'Security analyst console.')}</p>
+          <p className="mt-1 text-sm text-ink-2" data-testid="login-about">{t('Czujka mapuje usługi w sieci i pokazuje, co się w niej zmienia. Tylko wykrywa: wysyła żądania GET i HEAD, nigdy nie próbuje się logować.', 'Czujka maps the services on a network and shows what changes. It only detects: it sends GET and HEAD requests and never tries to log in.')}</p>
           {expired && !error ? (
             <p role="status" data-testid="session-expired" className="mt-4 flex items-start gap-2 border border-rule bg-sunk px-3 py-2 text-xs text-ink-2">
               <Icon name="clock" size={14} className="mt-px flex-none text-ink-3" />

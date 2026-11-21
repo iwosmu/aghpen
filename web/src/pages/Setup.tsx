@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router';
+import { Navigate, useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidate, useItem } from '../api/hooks';
 import { patch, post, put, setCsrfToken } from '../api/client';
@@ -55,7 +55,9 @@ function Step({ n, title, done, active, children, summary }: { n: number; title:
 }
 
 export default function Setup() {
-  const { session } = useSession();
+  const { session, can } = useSession();
+  // The wizard creates scopes, profiles and runs: a role without those rights (for example the jury's viewer) goes to the dashboard.
+  const allowed = can('targets:create') && can('scans:configure') && can('scans:run');
   const navigate = useNavigate();
   const qc = useQueryClient();
   const policyQ = useItem<SafetyPolicy>('/settings/safety');
@@ -157,6 +159,7 @@ export default function Setup() {
   const p = preview.data;
   const netOk = netName.trim().length > 0 && Boolean(p && p.valid.length > 0 && p.address_count > 0) && debounced === ranges;
 
+  if (!allowed) return <Navigate to="/" replace />;
   return (
     <div className="mx-auto max-w-[880px]" data-testid="setup">
       <div className="flex flex-wrap items-end justify-between gap-3 px-4 pb-4 pt-6 sm:px-6">

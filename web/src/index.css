@@ -214,3 +214,12 @@
 @layer base {
   .grid > * { min-width: 0; }
 }
+
+/* Progress inside running chunks and a rate above its cap. */
+.bar-active { background: repeating-linear-gradient(-45deg, var(--accent) 0 3px, color-mix(in oklch, var(--accent) 35%, transparent) 3px 6px); background-size: 17px 6px; animation: bar-move 0.9s linear infinite; }
+.bar-over { background: repeating-linear-gradient(-45deg, var(--danger) 0 4px, color-mix(in oklch, var(--danger) 55%, transparent) 4px 8px); }
+@keyframes bar-move { from { background-position: 0 0; } to { background-position: 17px 0; } }
+@media (prefers-reduced-motion: reduce) { .bar-active { animation: none; } }
+
+/* Presentation mode (?present=1 or Shift+P): one step larger for a 1080p recording. */
+html[data-present] { zoom: 1.125; }
