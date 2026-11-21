@@ -3,22 +3,62 @@
 #   cp deploy/.env.example deploy/.env      # then set your own secrets
 #   docker compose -f deploy/docker-compose.yml up -d --build --wait
 #
-# The stack also starts without deploy/.env: the database is reachable only on
-# the internal network, the master key is generated into a volume, and a random
+# The stack also starts without deploy/.env (in the repository root:
+# docker compose up -d, through compose.yaml): the database password and the
+# master key are generated into volumes on the first start, and a random
 # administrator password is printed once in the log of the czujka service.
 name: czujka
 
 services:
+  # Writes the database password into the volume czujka-secrets before the
+  # database starts, so the stack needs no .env and the repository holds no
+  # password. Order: CZUJKA_DB_PASSWORD from .env when set; else the password
+  # already in the volume; else a new random one. A database volume created
+  # before this service existed keeps the password it was created with.
+  secrets:
+    image: alpine:3.22
+    restart: "no"
+    user: "0:0"
+    network_mode: none
+    environment:
+      CZUJKA_DB_PASSWORD: ${CZUJKA_DB_PASSWORD:-}
+    volumes:
+      - czujka-secrets:/secrets
+      - czujka-pgdata:/pgdata:ro
+    command:
+      - sh
+      - -ec
+      - |
+        f=/secrets/db_password
+        if [ -n "$$CZUJKA_DB_PASSWORD" ]; then
+          printf '%s\n' "$$CZUJKA_DB_PASSWORD" > "$$f.tmp" && mv "$$f.tmp" "$$f"
+          echo "secrets: database password from CZUJKA_DB_PASSWORD"
+        elif [ -s "$$f" ]; then
+          echo "secrets: database password kept"
+        elif [ -f /pgdata/PG_VERSION ]; then
+          printf '%s\n' czujka-internal-network-only > "$$f"
+          echo "secrets: existing database from an older version: its password is kept"
+        else
+          head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$$f"
+          echo >> "$$f"
+          echo "secrets: generated a new database password"
+        fi
+        chmod 0444 "$$f"
+
   db:
     build:
       context: ./db
     image: czujka-db:17
     restart: unless-stopped
+    depends_on:
+      secrets:
+        condition: service_completed_successfully
     environment:
       POSTGRES_USER: czujka
-      POSTGRES_PASSWORD: ${CZUJKA_DB_PASSWORD:-czujka-internal-network-only}
+      POSTGRES_PASSWORD_FILE: /run/czujka-secrets/db_password
       POSTGRES_DB: czujka
     volumes:
+      - czujka-secrets:/run/czujka-secrets:ro
       - czujka-pgdata:/data/db
       # The pg_tde keyring is on its own volume: a copy of the data volume alone cannot be read.
       - czujka-tde-keys:/tde-keys
@@ -46,7 +86,8 @@ services:
       db:
         condition: service_healthy
     environment:
-      CZUJKA_DB_URL: postgres://czujka:${CZUJKA_DB_PASSWORD:-czujka-internal-network-only}@czujka-postgres:5432/czujka?sslmode=disable
+      CZUJKA_DB_URL: postgres://czujka@czujka-postgres:5432/czujka?sslmode=disable
+      CZUJKA_DB_PASSWORD_FILE: /run/czujka-secrets/db_password
       CZUJKA_TDE: ${CZUJKA_TDE:-require}
       CZUJKA_ADMIN_EMAIL: ${CZUJKA_ADMIN_EMAIL:-admin@czujka.local}
       CZUJKA_ADMIN_PASSWORD: ${CZUJKA_ADMIN_PASSWORD:-}
@@ -68,6 +109,7 @@ services:
       - "${CZUJKA_BIND:-127.0.0.1}:${CZUJKA_PORT:-8080}:8080"
     volumes:
       - czujka-keys:/var/lib/czujka
+      - czujka-secrets:/run/czujka-secrets:ro
     networks: [internal, scan]
     # A DefectDojo that runs on the docker host (lab/defectdojo) is reachable as http://host.docker.internal:<port>.
     extra_hosts: ["host.docker.internal:host-gateway"]
@@ -89,6 +131,7 @@ networks:
   scan: {}           # the network the scanner reaches its targets through
 
 volumes:
+  czujka-secrets:
   czujka-pgdata:
   czujka-tde-keys:
   czujka-keys:

@@ -1,6 +1,9 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -35,5 +38,25 @@ func TestOverridesAndValidation(t *testing.T) {
 		if _, err := FromEnv(env(map[string]string{k: v})); err == nil {
 			t.Errorf("%s=%s must be rejected", k, v)
 		}
+	}
+}
+
+// The compose stack generates the database password into a volume: the URL
+// in the compose file has no password and CZUJKA_DB_PASSWORD_FILE adds it.
+func TestDBPasswordFile(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "db_password")
+	if err := os.WriteFile(f, []byte("a1b2c3/+@x\n"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	base := "postgres://czujka@czujka-postgres:5432/czujka?sslmode=disable"
+	c, err := FromEnv(env(map[string]string{"CZUJKA_DB_URL": base, "CZUJKA_DB_PASSWORD_FILE": f}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.DBURL != "postgres://czujka:a1b2c3%2F+%40x@czujka-postgres:5432/czujka?sslmode=disable" {
+		t.Fatalf("url = %s", c.DBURL)
+	}
+	if _, err := FromEnv(env(map[string]string{"CZUJKA_DB_URL": base, "CZUJKA_DB_PASSWORD_FILE": f + ".missing"})); err == nil || !strings.Contains(err.Error(), "CZUJKA_DB_PASSWORD_FILE") {
+		t.Fatalf("missing file: %v", err)
 	}
 }

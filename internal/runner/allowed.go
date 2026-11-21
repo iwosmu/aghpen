@@ -112,9 +112,16 @@ func TargetAllowed(ctx context.Context, t model.Target, nets []netip.Prefix, loo
 		if err != nil || len(addrs) == 0 {
 			return false, "nazwa się nie rozwiązuje, więc nie można sprawdzić dozwolonych sieci polityki bezpieczeństwa"
 		}
-		for _, a := range addrs {
+		// The engine scans a name on its IPv4 addresses (A records): those
+		// must be allowed. An AAAA answer is not scanned, so it is not
+		// checked (Docker Desktop answers host.docker.internal with IPv6 first).
+		v4 := IPv4Of(addrs)
+		if len(v4) == 0 {
+			return false, "nazwa nie ma adresu IPv4 (rekordu A); Czujka skanuje nazwy po adresach IPv4"
+		}
+		for _, a := range v4 {
 			if !addrAllowed(a, nets) {
-				return false, fmt.Sprintf("%s (nazwa wskazuje na %s)", outside, a.Unmap())
+				return false, fmt.Sprintf("%s (nazwa wskazuje na %s)", outside, a)
 			}
 		}
 		return true, ""
@@ -173,4 +180,19 @@ func PrefixInside(p netip.Prefix, nets []netip.Prefix) bool {
 		}
 	}
 	return false
+}
+
+// IPv4Of returns the IPv4 addresses of a lookup answer, unmapped, in order,
+// without duplicates.
+func IPv4Of(addrs []netip.Addr) []netip.Addr {
+	var out []netip.Addr
+	seen := map[netip.Addr]bool{}
+	for _, a := range addrs {
+		a = a.Unmap()
+		if a.Is4() && !seen[a] {
+			seen[a] = true
+			out = append(out, a)
+		}
+	}
+	return out
 }
