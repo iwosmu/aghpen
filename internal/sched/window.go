@@ -177,7 +177,9 @@ var ErrNoSchedule = errors.New("schedule has no cron expression and no interval"
 // the start of the previous run (zero when there was none); from is the
 // base for a schedule that never ran. A cron schedule is due at the first
 // cron time after the base. An interval schedule is due interval after the
-// last run, and at once when it never ran.
+// last run. A schedule that never ran is not due on save: an interval
+// schedule is first due one interval after the base, or at the first window
+// start after the base when it has windows.
 func NextRun(s model.Schedule, last, from time.Time) (time.Time, error) {
 	loc, err := Location(s.Timezone)
 	if err != nil {
@@ -200,7 +202,14 @@ func NextRun(s model.Schedule, last, from time.Time) (time.Time, error) {
 		return next, nil
 	case s.IntervalMinutes > 0:
 		if last.IsZero() {
-			return from, nil
+			if len(s.Windows) > 0 {
+				start, ok := NextWindowStart(from, s.Windows, loc)
+				if !ok {
+					return time.Time{}, errors.New("no scan window ever opens")
+				}
+				return start, nil
+			}
+			return from.Add(time.Duration(s.IntervalMinutes) * time.Minute), nil
 		}
 		return last.Add(time.Duration(s.IntervalMinutes) * time.Minute), nil
 	}

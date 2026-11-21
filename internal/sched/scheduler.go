@@ -153,7 +153,16 @@ func (s *Scheduler) Tick(ctx context.Context, now time.Time) Decision {
 		if active {
 			continue
 		}
-		due, err := NextRun(p.Schedule, last, s.started)
+		// A schedule that never ran counts from when the profile was saved, so
+		// saving a profile never starts a run (and a restart does not move it).
+		base := p.UpdatedAt
+		if base.IsZero() {
+			base = p.CreatedAt
+		}
+		if base.IsZero() {
+			base = s.started
+		}
+		due, err := NextRun(p.Schedule, last, base)
 		if err != nil {
 			if !errors.Is(err, ErrNoSchedule) {
 				s.log.Error("scheduler: bad schedule", "profile", p.ID, "error", err.Error())

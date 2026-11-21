@@ -228,6 +228,10 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeErr(w, http.StatusNotImplemented, "not_wired", msg)
 	case errors.Is(err, runner.ErrEmergencyStop):
 		writeErr(w, http.StatusConflict, "emergency_stop", msg)
+	case errors.As(err, new(*runner.ActiveRunError)):
+		var a *runner.ActiveRunError
+		errors.As(err, &a)
+		writeErrDetails(w, http.StatusConflict, "run_active", fmt.Sprintf("Ten profil ma już aktywny przebieg #%d (w kolejce, trwający albo wstrzymany). Wstrzymaj, wznów albo anuluj go, zanim uruchomisz nowy.", a.RunID), map[string]int64{"run_id": a.RunID})
 	case errors.Is(err, auth.ErrLastAdmin), errors.Is(err, store.ErrConflict), errors.Is(err, runner.ErrActiveRun), errors.Is(err, runner.ErrBadState):
 		writeErr(w, http.StatusConflict, "conflict", msg)
 	case errors.Is(err, auth.ErrForbidden), errors.Is(err, auth.ErrBuiltinRole):
