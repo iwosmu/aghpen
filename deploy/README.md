@@ -26,6 +26,30 @@ Interfejs i API: `http://127.0.0.1:8080` (`CZUJKA_BIND`, `CZUJKA_PORT`). Stan: `
 
 nmap dostaje surowe gniazda przez uprawnienia pliku (`setcap`), więc proces nie działa jako root.
 
+## Skanowanie sieci dockera (laboratorium jury, własne laboratorium)
+
+Na macOS (Docker Desktop) host nie ma trasy do adresów kontenerów. Czujka musi więc stać w skanowanej sieci.
+Plik `deploy/docker-compose.scan-network.yml` dołącza kontener `czujka` do istniejącej sieci dockera:
+
+```sh
+CZUJKA_SCAN_NETWORK=czujka-lab \
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.scan-network.yml up -d --wait
+```
+
+Własny adres Czujki leży wtedy w skanowanym zakresie. Dodaj go do wykluczeń polityki bezpieczeństwa (`PUT /settings/safety`, pole `exclusions`).
+Baza ma w sieci wewnętrznej unikalną nazwę `czujka-postgres`, więc host o nazwie `db` w skanowanej sieci jej nie przesłoni.
+
+## Surowe gniazda bez roota
+
+Proces działa jako `czujka` (uid 10001). Uprawnienia plików (`setcap`):
+
+- `nmap`: `cap_net_raw,cap_net_admin+eip`, więc wysyła sondy SYN, ICMP i ARP (`nmap --privileged`);
+- `czujka`: tylko `cap_net_raw+ep`. Przy starcie otwiera jedno surowe gniazdo ICMP, żeby sprawdzić, czy surowe gniazda działają, i wtedy uruchamia nmap w trybie SYN.
+
+Kontener musi mieć `NET_RAW` i `NET_ADMIN` w zbiorze ograniczającym (`cap_add` w `docker-compose.yml`) i nie może mieć `no-new-privileges`, które wyłącza uprawnienia plików.
+`GET /healthz` pokazuje tryb: `probe.mode` = `nmap-raw` (SYN, ICMP, ARP), `nmap-connect` (brak surowych gniazd, `-sT`) albo `native` (brak nmap, połączenia TCP w Go).
+Bez `cap_add` Czujka nadal działa, w trybie `nmap-connect`.
+
 ## Szyfrowanie danych w spoczynku
 
 1. **Warstwa 1: `pg_tde`.** Każda tabela używa metody dostępu `tde_heap`, WAL jest szyfrowany.
@@ -76,7 +100,8 @@ make dev                # baza w dockerze (127.0.0.1:55432) + czujka na 127.0.0.
 make test               # gofmt, build, vet, testy jednostkowe
 make test-integration   # wszystkie testy na prawdziwym PostgreSQL z pg_tde
 make bench              # ingest 10 000 hostów x 3 usługi + czasy API
-make e2e-core           # przepływ end-to-end bez silnika skanowania (patrz niżej)
+make e2e-core           # przepływ end-to-end bez skanu: import, analiza, DefectDojo, eksporty
+make e2e-full           # pełny test: prawdziwe skany laboratorium w dockerze przez REST API (e2e/full)
 ```
 
 ## Test end-to-end rdzenia (`make e2e-core`)

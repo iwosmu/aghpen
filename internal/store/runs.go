@@ -228,7 +228,7 @@ func (s *Store) PrevCompletedRun(ctx context.Context, runID int64) (int64, error
 
 // ---------- chunks ----------
 
-const chunkCols = `c.id, c.run_id, c.seq, c.spec, c.size, c.priority, c.status, c.started_at, c.finished_at, c.duration_ms, c.hosts_up, c.pps, c.error`
+const chunkCols = `c.id, c.run_id, c.seq, c.spec, c.size, c.priority, c.status, c.started_at, c.finished_at, c.duration_ms, c.hosts_up, c.pps, c.error, c.work_group AS "group"`
 
 type chunkIn struct {
 	RunID      int64      `json:"run_id"`
@@ -243,6 +243,7 @@ type chunkIn struct {
 	HostsUp    int        `json:"hosts_up"`
 	PPS        float64    `json:"pps"`
 	Error      string     `json:"error"`
+	Group      int        `json:"work_group"`
 }
 
 func toChunkIn(runID int64, c model.Chunk) chunkIn {
@@ -253,16 +254,16 @@ func toChunkIn(runID int64, c model.Chunk) chunkIn {
 	if c.RunID != 0 {
 		runID = c.RunID
 	}
-	return chunkIn{runID, c.Seq, nonNil(c.Spec), c.Size, c.Priority, st, c.StartedAt, c.FinishedAt, c.DurationMs, c.HostsUp, c.PPS, c.Error}
+	return chunkIn{runID, c.Seq, nonNil(c.Spec), c.Size, c.Priority, st, c.StartedAt, c.FinishedAt, c.DurationMs, c.HostsUp, c.PPS, c.Error, c.Group}
 }
 
-const chunkUpsert = `INSERT INTO chunks (run_id, seq, spec, size, priority, status, started_at, finished_at, duration_ms, hosts_up, pps, error)
-	SELECT d.run_id, d.seq, d.spec, d.size, d.priority, d.status, d.started_at, d.finished_at, d.duration_ms, d.hosts_up, d.pps, d.error
+const chunkUpsert = `INSERT INTO chunks (run_id, seq, spec, size, priority, status, started_at, finished_at, duration_ms, hosts_up, pps, error, work_group)
+	SELECT d.run_id, d.seq, d.spec, d.size, d.priority, d.status, d.started_at, d.finished_at, d.duration_ms, d.hosts_up, d.pps, d.error, d.work_group
 	FROM jsonb_to_recordset($1::jsonb) AS d(run_id bigint, seq int, spec text[], size int, priority int, status text, started_at timestamptz,
-		finished_at timestamptz, duration_ms bigint, hosts_up int, pps float8, error text)
+		finished_at timestamptz, duration_ms bigint, hosts_up int, pps float8, error text, work_group int)
 	ON CONFLICT (run_id, seq) DO UPDATE SET spec = EXCLUDED.spec, size = EXCLUDED.size, priority = EXCLUDED.priority, status = EXCLUDED.status,
 		started_at = EXCLUDED.started_at, finished_at = EXCLUDED.finished_at, duration_ms = EXCLUDED.duration_ms, hosts_up = EXCLUDED.hosts_up,
-		pps = EXCLUDED.pps, error = EXCLUDED.error`
+		pps = EXCLUDED.pps, error = EXCLUDED.error, work_group = EXCLUDED.work_group`
 
 // SavePlan stores the planned chunks of a run in one statement. A chunk is
 // identified by (run, seq), so a resumed run updates its remaining chunks.

@@ -192,7 +192,11 @@ func serve() error {
 
 	bus := runner.NewBus()
 	w := wire2(cfg, st, log)
-	mgr := runner.New(st, runner.Options{Engine: w.Engine, Analyzer: w.RunAnalyzer, Window: w.Window, Bus: bus, IngestBatch: cfg.IngestBatch, Logger: log})
+	mgr := runner.New(st, runner.Options{Engine: w.Engine, Analyzer: w.RunAnalyzer, Window: w.Window, PauseCause: w.PauseCause, Bus: bus, IngestBatch: cfg.IngestBatch, Logger: log})
+	// Seed and load the signatures before a recovered run resumes; start the scheduler loop.
+	if err := w.Start(ctx, mgr); err != nil {
+		return err
+	}
 	if recovered, err := mgr.Recover(ctx, cfg.AutoResume); err != nil {
 		log.Error("recover interrupted runs", "err", err)
 	} else if len(recovered) > 0 {

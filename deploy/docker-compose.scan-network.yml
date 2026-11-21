@@ -1,0 +1,22 @@
+# Attach the Czujka container to an existing docker network, to scan it.
+#
+# On macOS (Docker Desktop) the host cannot route to container addresses, so
+# the scanner must stand on the target network itself. The jury's lab and our
+# own labs are docker networks: name the network and start the stack with both
+# files.
+#
+#   CZUJKA_SCAN_NETWORK=czujka-lab \
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.scan-network.yml up -d --wait
+#
+# Czujka gets a free address on that network. Its own address is inside the
+# scanned range: add it to the exclusions of the safety policy, or the scan
+# also lists Czujka itself.
+services:
+  czujka:
+    networks:
+      target: {}
+
+networks:
+  target:
+    name: ${CZUJKA_SCAN_NETWORK:?set CZUJKA_SCAN_NETWORK to the docker network to scan}
+    external: true

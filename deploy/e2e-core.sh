@@ -1,5 +1,5 @@
 #!/bin/bash
-# End-to-end check of the Czujka core with real components and no scan engine:
+# End-to-end check of the Czujka core with real components and no scan run:
 # the product stack (PostgreSQL with pg_tde + czujka), a real nmap XML file and
 # the local DefectDojo of lab/defectdojo.
 #
@@ -77,7 +77,7 @@ step "1. Start the stack from a clean state"
 $DC down -v --remove-orphans >/dev/null 2>&1 || true
 $DC up -d --build --wait 2>&1 | grep -E "Healthy|Error|error" || true
 curl -sS $BASE/healthz | jq -c "{status, db, tde, tables: .tde_detail.tables, encrypted: .tde_detail.encrypted, engine}"
-check "healthz" "$(curl -sS $BASE/healthz | jq -r '"\(.status) tde=\(.tde) engine=\(.engine)"')" "ok tde=true engine=false"
+check "healthz" "$(curl -sS $BASE/healthz | jq -r '"\(.status) tde=\(.tde) engine=\(.engine)"')" "ok tde=true engine=true"
 
 step "2. Log in; the first start seeded a safety policy and one profile, nothing else"
 LOGIN=$(curl -sS -c "$JAR" -H "Content-Type: application/json" -d "{\"email\":\"$ADMIN\",\"password\":\"$ADMIN_PW\"}" $API/auth/login)

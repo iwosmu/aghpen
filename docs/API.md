@@ -67,6 +67,13 @@ Base path `/api/v1`. JSON bodies use the types of `internal/model/types.go` (the
 | DELETE `/signatures/{id}` | signatures:delete | |
 | POST `/signatures/validate` | signatures:read | `{yaml}` → `SignatureValidation` |
 | POST `/signatures/retrohunt` | signatures:read | `{yaml}` or `{id}`, optional `{latest_only}` → `RetroHuntResult` |
+| POST `/signatures/import` | signatures:create | a whole signature file in any accepted format (Czujka YAML, a YAML or JSON list, a map keyed by name, passive nuclei templates): multipart `file` or `text`, JSON `{text}`, or the raw body → `{created, updated, skipped: [{slug, reason}], validation}`. 201 when at least one signature was stored; 422 `validation` with the same report in `details` when none was. A rejected signature is not stored; its reasons are in `validation.issues`. Built-in signatures are never replaced |
+| GET `/runs/{id}/report.html` · GET `/runs/{id}/report.md` | results:read | the report of one run (summary, changes, top findings and services, unstable hosts, parameters, traffic, safety policy) as a self-contained HTML page or Markdown; `?download=1` sends it as an attachment |
+| POST `/passive/import` | targets:create | multipart `file`: DNS zone, CSV, JSON or JSONL with hostnames and addresses → `PassiveResult` `{facts, out_of_scope, candidates: [{kind, value, hostnames, ports, sources, last_seen, reason}], hints, sources, file}`. Nothing is saved; facts outside every scope are listed, never candidates |
+| POST `/passive/ptr` | results:update | reverse DNS (system resolver, at most 5 lookups/s) of the known live hosts; the names are added to those hosts (not to a host whose hostnames an analyst set) → `PassiveResult` with `hosts_updated` |
+| POST `/passive/crtsh` | targets:create | asks crt.sh (an external service) for the certificates of the scope domains → `PassiveResult`. 409 `disabled` until an administrator sets `crtsh_enabled` |
+| POST `/passive/confirm` | targets:create | `{scope_id, candidates: [{value, sources, note}]}` → `TargetPreview` (saved); the targets get `source: "passive"` and the tag `passive` |
+| GET `/settings/passive` · PUT | integrations:manage | `{crtsh_enabled}` (default false) |
 | GET `/tags` | results:read | → `NameCount[]` |
 | POST `/import/results` | results:create | multipart `file` (nmap XML, Czujka JSON, CSV; the format is detected) → `ImportReport`. Imported hosts take the same ingest and analysis as scanned ones (run with `trigger: "import"`). A host that the file reports as down is kept only when the inventory already knows it |
 | GET `/export/{kind}.{fmt}` | export:run | kind `hosts, services, findings, changes, signatures`; fmt `json, csv`; list filters apply; `/export/runs/{id}.{json,csv,xml}`: json = Czujka JSON (lossless `HostResult` records), csv = one row per service, xml = nmap XML (for DefectDojo "Nmap Scan"); each of the three imports again through `/import/results` |
@@ -76,4 +83,4 @@ Base path `/api/v1`. JSON bodies use the types of `internal/model/types.go` (the
 | POST `/emergency-stop` | safety:stop | → `SafetyPolicy` (sets the flag; every running run stops at once and becomes `paused` with `pause_reason: "emergency_stop"`; new runs and resumes answer 409 `emergency_stop`) |
 | POST `/emergency-stop/release` | safety:manage | → `SafetyPolicy` (clears the flag; paused runs stay paused until someone calls `/runs/{id}/resume`) |
 | GET `/settings/defectdojo` · PUT · POST `/settings/defectdojo/test` | integrations:manage | `DefectDojoSettings` → `{ok, message, version}` |
-| GET `/healthz` | public | → `{status, version, db, tde}` |
+| GET `/healthz` | public | → `{status, version, db, tde, tde_detail, field_encryption, engine, probe: {prober, mode, raw_sockets}}`; `probe.mode` is `nmap-raw` (SYN scan, ICMP/ARP discovery), `nmap-connect` (no raw sockets: `-sT`) or `native` (Go TCP connect, no nmap) |

@@ -43,12 +43,16 @@ func TestUserCommandNeedsArguments(t *testing.T) {
 
 func TestWiring(t *testing.T) {
 	w := wire2(config.Config{Timezone: "Europe/Warsaw"}, nil, nil)
-	// Wired: analysis, import and export, DefectDojo.
 	if w.RunAnalyzer == nil || w.API.Analyzer == nil || w.API.Importer == nil || w.API.Exporter == nil || w.API.Dojo == nil {
 		t.Fatalf("missing wiring: %+v", w)
 	}
-	// Not merged yet: nothing is faked, the seams stay nil and the API answers 501.
-	if w.Engine != nil || w.Window != nil || w.API.Signatures != nil || w.API.RetroHunter != nil || w.API.WebFS != nil {
-		t.Fatalf("unexpected wiring: %+v", w)
+	if w.Engine == nil || w.Window == nil || w.PauseCause == nil || w.API.Signatures == nil || w.API.RetroHunter == nil ||
+		w.API.SigImporter == nil || w.API.Reporter == nil || w.API.Passive == nil || w.API.TargetParser == nil ||
+		w.API.Hooks.SignaturesChanged == nil || w.API.Hooks.ProfileChanged == nil || w.API.EngineInfo == nil {
+		t.Fatalf("missing wiring: %+v", w)
+	}
+	// Without the embedui build tag the binary carries no UI.
+	if w.API.WebFS != nil {
+		t.Fatalf("WebFS set without the embedui tag")
 	}
 }

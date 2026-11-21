@@ -256,6 +256,18 @@ func (s *Store) LastRunStart(ctx context.Context, profileID int64) (*time.Time, 
 	return t, mapErr(err)
 }
 
+// AddHostnames adds names to the known host with this address, unless an
+// analyst set the hostnames by hand. changed is false when the host is
+// unknown or already had every name.
+func (s *Store) AddHostnames(ctx context.Context, ip string, names []string) (changed bool, err error) {
+	tag, err := s.db.Exec(ctx, `UPDATE hosts SET hostnames = (SELECT array_agg(DISTINCT n ORDER BY n) FROM unnest(hostnames || $2::text[]) n)
+		WHERE ip = $1::inet AND NOT (overrides ? 'hostnames') AND NOT (hostnames @> $2::text[])`, ip, names)
+	if err != nil {
+		return false, mapErr(err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 // WindowPausedRuns returns the runs that a closed scan window paused, with
 // their resume_at, the earliest first.
 func (s *Store) WindowPausedRuns(ctx context.Context) ([]model.ScanRun, error) {

@@ -5,4 +5,6 @@ web/dist
 deploy/.env
 **/*.key
 docs
-e2e
+e2e/full/out
+e2e/engine/out
+lab

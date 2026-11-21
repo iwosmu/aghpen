@@ -77,6 +77,9 @@ func profileDefaults(p *model.ScanProfile) {
 	if p.Schedule.Timezone == "" {
 		p.Schedule.Timezone = "Europe/Warsaw"
 	}
+	if p.Discovery.Mode == "" {
+		p.Discovery.Mode = model.DiscoveryBalanced
+	}
 }
 
 // checkProfile validates a profile. A profile can only be stricter than the safety policy.
@@ -120,6 +123,8 @@ func (s *Server) checkProfile(r *http.Request, p *model.ScanProfile) error {
 		return invalid("http.max_redirects must be between 0 and 10")
 	case p.Schedule.IntervalMinutes < 0:
 		return invalid("schedule.interval_minutes must not be negative")
+	case p.Discovery.Mode != "" && p.Discovery.Mode != model.DiscoveryFast && p.Discovery.Mode != model.DiscoveryBalanced && p.Discovery.Mode != model.DiscoveryThorough:
+		return invalid("discovery.mode must be fast, balanced or thorough")
 	}
 	if strings.ContainsAny(p.Ports, " ;|&$`'\"\\\n") {
 		return invalid("ports must be an nmap port list such as top-100 or 22,80,443,8000-8100")
