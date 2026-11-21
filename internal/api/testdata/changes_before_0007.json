@@ -1,0 +1,196 @@
+[
+ {
+  "ip": "10.66.0.10",
+  "port": 80,
+  "kind": "service_changed",
+  "severity": "low",
+  "field": "version",
+  "before": "1.24.0",
+  "after": "1.26.1",
+  "expected": false,
+  "summary": "Zmiana wersji 10.66.0.10:80: nginx 1.24.0 → nginx 1.26.1"
+ },
+ {
+  "ip": "10.66.0.10",
+  "port": 80,
+  "kind": "tech_version",
+  "severity": "low",
+  "field": "technologies.WordPress",
+  "before": "6.4",
+  "after": "6.5",
+  "expected": false,
+  "summary": "Zmiana wersji WordPress na 10.66.0.10:80: 6.4 → 6.5"
+ },
+ {
+  "ip": "10.66.0.10",
+  "port": 80,
+  "kind": "class_changed",
+  "severity": "medium",
+  "field": "classes",
+  "before": [],
+  "after": [
+   "admin-panel"
+  ],
+  "expected": false,
+  "summary": "Zmiana klasy usługi 10.66.0.10:80 (teraz: panel administracyjny)"
+ },
+ {
+  "ip": "10.66.0.10",
+  "port": 80,
+  "kind": "status_changed",
+  "severity": "low",
+  "field": "http.status",
+  "before": 200,
+  "after": 503,
+  "expected": false,
+  "summary": "Zmiana kodu HTTP 10.66.0.10:80: 200 → 503"
+ },
+ {
+  "ip": "10.66.0.10",
+  "port": 80,
+  "kind": "title_changed",
+  "severity": "info",
+  "field": "http.title",
+  "before": "Shop",
+  "after": "Shop v2",
+  "expected": false,
+  "summary": "Zmiana tytułu strony 10.66.0.10:80: „Shop” → „Shop v2”"
+ },
+ {
+  "ip": "10.66.0.10",
+  "port": 80,
+  "kind": "headers_changed",
+  "severity": "info",
+  "field": "http.headers",
+  "before": [
+   "Content-Type",
+   "Server"
+  ],
+  "after": [
+   "Server",
+   "X-Powered-By"
+  ],
+  "expected": false,
+  "summary": "Zmiana nagłówków 10.66.0.10:80: dodano X-Powered-By; usunięto Content-Type; Server: nginx → Apache"
+ },
+ {
+  "ip": "10.66.0.10",
+  "port": 80,
+  "kind": "cookies_changed",
+  "severity": "low",
+  "field": "http.cookies",
+  "before": [
+   "PHPSESSID"
+  ],
+  "after": [
+   "PHPSESSID"
+  ],
+  "expected": false,
+  "summary": "Zmiana ciasteczek 10.66.0.10:80: PHPSESSID: Secure+HttpOnly → HttpOnly"
+ },
+ {
+  "ip": "10.66.0.10",
+  "port": 8080,
+  "kind": "service_new",
+  "severity": "medium",
+  "field": "state",
+  "before": null,
+  "after": "open",
+  "expected": false,
+  "summary": "Nowa usługa 10.66.0.10:8080 (Jetty 10.0.20)"
+ },
+ {
+  "ip": "10.66.0.20",
+  "port": 0,
+  "kind": "host_missing",
+  "severity": "medium",
+  "field": "status",
+  "before": "up",
+  "after": "missing",
+  "expected": false,
+  "summary": "Host 10.66.0.20 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 2 otwarte usługi: 22/tcp ssh OpenSSH, 5432/tcp postgresql; model: p_alive 0,41, zgłoszenie nieaktywności po 2 kolejnych brakach"
+ },
+ {
+  "ip": "10.66.0.20",
+  "port": 22,
+  "kind": "service_unreachable",
+  "severity": "low",
+  "field": "state",
+  "before": "open",
+  "after": "unknown",
+  "expected": false,
+  "summary": "Usługa 10.66.0.20:22 (ssh OpenSSH) nie odpowiada (niepotwierdzone): host nie odpowiedział w tym przebiegu"
+ },
+ {
+  "ip": "10.66.0.20",
+  "port": 5432,
+  "kind": "service_unreachable",
+  "severity": "low",
+  "field": "state",
+  "before": "open",
+  "after": "unknown",
+  "expected": false,
+  "summary": "Usługa 10.66.0.20:5432 (postgresql) nie odpowiada (niepotwierdzone): host nie odpowiedział w tym przebiegu"
+ },
+ {
+  "ip": "10.66.0.30",
+  "port": 0,
+  "kind": "host_new",
+  "severity": "low",
+  "field": "status",
+  "before": null,
+  "after": "up",
+  "expected": false,
+  "summary": "Nowy host 10.66.0.30 (otwarte porty: 22)"
+ },
+ {
+  "ip": "10.66.0.30",
+  "port": 22,
+  "kind": "service_new",
+  "severity": "medium",
+  "field": "state",
+  "before": null,
+  "after": "open",
+  "expected": false,
+  "summary": "Nowa usługa 10.66.0.30:22 (OpenSSH 8.9)"
+ },
+ {
+  "ip": "10.66.0.10",
+  "port": 8080,
+  "kind": "service_gone",
+  "severity": "low",
+  "field": "state",
+  "before": "open",
+  "after": "closed",
+  "expected": false,
+  "summary": "Usługa 10.66.0.10:8080 zniknęła (Jetty 10.0.20)"
+ },
+ {
+  "ip": "10.66.0.10",
+  "port": 8080,
+  "kind": "service_returned",
+  "severity": "medium",
+  "field": "state",
+  "before": {
+   "state": "gone",
+   "runs_away": 1,
+   "away_seconds": 7200,
+   "last_open_at": "2026-11-20T21:18:57Z",
+   "last_open_run_id": 2
+  },
+  "after": "open",
+  "expected": false,
+  "summary": "Usługa 10.66.0.10:8080 wróciła po 2 h (nie było jej w 1 skanie) (Jetty 10.0.20)"
+ },
+ {
+  "ip": "10.66.0.20",
+  "port": 0,
+  "kind": "host_back",
+  "severity": "info",
+  "field": "status",
+  "before": "unstable",
+  "after": "up",
+  "expected": false,
+  "summary": "Host 10.66.0.20 znów odpowiada po chwilowym braku odpowiedzi"
+ }
+]
