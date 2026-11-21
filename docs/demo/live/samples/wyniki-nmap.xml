@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.99 scan initiated Sat Nov 21 12:05:27 2026 as: nmap -sV -&#45;script http-title,banner -p 22,80,6379 -oX - 172.31.250.2-5 -->
+<nmaprun scanner="nmap" args="nmap -sV -&#45;script http-title,banner -p 22,80,6379 -oX - 172.31.250.2-5" start="1795262727" startstr="Sat Nov 21 12:05:27 2026" version="7.99" xmloutputversion="1.05">
+<scaninfo type="syn" protocol="tcp" numservices="3" services="22,80,6379"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="172.31.250.3" addrtype="ipv4"/>
+<address addr="6A:ED:52:6D:D6:DB" addrtype="mac"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="172.31.250.4" addrtype="ipv4"/>
+<address addr="BE:23:3E:94:E6:C4" addrtype="mac"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="172.31.250.2" addrtype="ipv4"/>
+<address addr="72:F8:25:39:A1:2E" addrtype="mac"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1795262728" endtime="1795262749"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="172.31.250.2" addrtype="ipv4"/>
+<address addr="72:F8:25:39:A1:2E" addrtype="mac"/>
+<hostnames>
+<hostname name="czujka-an-nginx.czujka-an-net" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="22"><state state="closed" reason="reset" reason_ttl="64"/><service name="ssh" method="table" conf="3"/></port>
+<port protocol="tcp" portid="80"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="http" product="nginx" version="1.31.9" method="probed" conf="10"><cpe>cpe:/a:igor_sysoev:nginx:1.31.9</cpe></service><script id="http-title" output="Welcome to nginx!"><elem key="title">Welcome to nginx!</elem>
+</script><script id="http-server-header" output="nginx/1.31.9"><elem>nginx/1.31.9</elem>
+</script></port>
+<port protocol="tcp" portid="6379"><state state="closed" reason="reset" reason_ttl="64"/><service name="redis" method="table" conf="3"/></port>
+</ports>
+<times srtt="10" rttvar="2112" to="100000"/>
+</host>
+<host starttime="1795262728" endtime="1795262749"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="172.31.250.3" addrtype="ipv4"/>
+<address addr="6A:ED:52:6D:D6:DB" addrtype="mac"/>
+<hostnames>
+<hostname name="czujka-an-httpd.czujka-an-net" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="22"><state state="closed" reason="reset" reason_ttl="64"/><service name="ssh" method="table" conf="3"/></port>
+<port protocol="tcp" portid="80"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="http" product="Apache httpd" version="2.4.71" extrainfo="(Unix)" method="probed" conf="10"><cpe>cpe:/a:apache:http_server:2.4.71</cpe></service><script id="http-title" output="It works! Apache httpd"><elem key="title">It works! Apache httpd</elem>
+</script><script id="http-server-header" output="Apache/2.4.71 (Unix)"><elem>Apache/2.4.71 (Unix)</elem>
+</script></port>
+<port protocol="tcp" portid="6379"><state state="closed" reason="reset" reason_ttl="64"/><service name="redis" method="table" conf="3"/></port>
+</ports>
+<times srtt="44" rttvar="2135" to="100000"/>
+</host>
+<host starttime="1795262728" endtime="1795262749"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="172.31.250.4" addrtype="ipv4"/>
+<address addr="BE:23:3E:94:E6:C4" addrtype="mac"/>
+<hostnames>
+<hostname name="czujka-an-redis.czujka-an-net" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="22"><state state="closed" reason="reset" reason_ttl="64"/><service name="ssh" method="table" conf="3"/></port>
+<port protocol="tcp" portid="80"><state state="closed" reason="reset" reason_ttl="64"/><service name="http" method="table" conf="3"/></port>
+<port protocol="tcp" portid="6379"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="redis" product="Redis key-value store" version="7.4.12" method="probed" conf="10"><cpe>cpe:/a:redislabs:redis:7.4.12</cpe></service></port>
+</ports>
+<times srtt="9" rttvar="2111" to="100000"/>
+</host>
+<host starttime="1795262749" endtime="1795262752"><status state="up" reason="localhost-response" reason_ttl="0"/>
+<address addr="172.31.250.5" addrtype="ipv4"/>
+<hostnames>
+<hostname name="8b004bfa9971" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="22"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="ssh" method="table" conf="3"/></port>
+<port protocol="tcp" portid="80"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="http" method="table" conf="3"/></port>
+<port protocol="tcp" portid="6379"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="redis" method="table" conf="3"/></port>
+</ports>
+</host>
+<runstats><finished time="1795262752" timestr="Sat Nov 21 12:05:52 2026" summary="Nmap done at Sat Nov 21 12:05:52 2026; 4 IP addresses (4 hosts up) scanned in 24.26 seconds" elapsed="24.26" exit="success"/><hosts up="4" down="0" total="4"/>
+</runstats>
+</nmaprun>

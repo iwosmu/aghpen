@@ -1,0 +1,15 @@
+Case 5: what each built-in role may do, measured on the API in the live jury machine (2026-11-21, accounts created by live.sh 5).
+403 = forbidden by the role. 200/400/404/422 = the role may call it (the probe used a missing id or an empty body on purpose).
+
+action                     viewer  analyst editor  admin
+czytaj usługi              200     200     200     200     
+uruchom skan               403     404     404     404     
+edytuj znalezisko          403     404     404     404     
+usuń znalezisko            403     403     404     404     
+dodaj sygnaturę            403     403     422     422     
+usuń cel/zakres            403     403     404     404     
+eksport                    403     200     200     200     
+import wyników             403     403     400     400     
+użytkownicy                403     403     403     200     
+polityka bezpieczeństwa    403     403     403     200     
+stop awaryjny              403     403     403     200     
