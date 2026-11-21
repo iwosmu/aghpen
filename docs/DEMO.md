@@ -27,13 +27,13 @@ Stan wyjściowy: rozdział 3. Ujęcia 1–2 nagrywa się na świeżej instalacji
 | --- | --- |
 | Ekran | Terminal na czarnym tle, czcionka 20 pt. Potem ekran logowania Czujki. |
 | Kliknięcia | Wpisz `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.scan-network.yml up -d --wait` (obrazy zbudowane wcześniej). Przyspiesz oczekiwanie 4×. Otwórz `http://127.0.0.1:8080`, wklej hasło z logu, „Zaloguj”. |
-| Lektor | „Czujka staje jednym poleceniem: binarka Go i PostgreSQL w Docker Compose. Bez Kubernetesa i bez klastra.” |
+| Lektor | „Czujka staje jednym poleceniem: binarka Go i PostgreSQL w Docker Compose. Kubernetes nie jest potrzebny.” |
 | Długość | 16 słów, 7,0 s przy 2,3 słowa/s (zapas 3,0 s) |
 
 Napisy (jedna plansza na wiersz, ⏎ = nowa linia, najwyżej 42 znaki w linii):
 
 - Czujka staje jednym poleceniem: binarka Go ⏎ i PostgreSQL w Docker Compose.
-- Bez Kubernetesa i bez klastra.
+- Kubernetes nie jest potrzebny.
 
 ### Ujęcie 2 · 0:10–0:24 (14 s)
 

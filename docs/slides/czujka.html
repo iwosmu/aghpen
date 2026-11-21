@@ -145,7 +145,7 @@ table.cmp td.them { color: var(--ink-2); }
       <div class="col" style="flex:1; gap:0;">
         <div style="padding:0 0 28px; border-bottom:1px solid var(--rule);">
           <div style="display:flex; gap:16px; align-items:center;"><svg class="mark" width="34" height="34"><use href="#g-expected"/></svg><h2 style="margin:0;">16 braków przez weekend</h2></div>
-          <p style="margin-top:10px; color:var(--ink-2);">Zgodne z rytmem. Brak alarmu.</p>
+          <p style="margin-top:10px; color:var(--ink-2);">Zgodne z rytmem, więc bez alarmu.</p>
           <p class="mono muted" style="margin-top:6px; font-size:26px;">p_alive 0,78 → 0,70</p>
         </div>
         <div style="padding:28px 0; border-bottom:1px solid var(--rule);">
@@ -230,7 +230,7 @@ table.cmp td.them { color: var(--ink-2); }
       <div class="col" style="width:520px;">
         <h2>Sprawdza ponownie tylko to, co milczy</h2>
         <svg id="reprobe" width="520" height="300" role="img" aria-label="Brak odpowiedzi, potem sprawdzenia po 10, 30 i 90 minutach, potem host_gone"></svg>
-        <p style="color:var(--ink-2); font-size:26px; margin-top:8px;">Jeden adres, nie cała sieć. Najwyżej 200 adresów na godzinę, tylko w oknie skanu. Host z rytmem: o godzinie, w której model spodziewa się odpowiedzi.</p>
+        <p style="color:var(--ink-2); font-size:26px; margin-top:8px;">Czujka sprawdza tylko ten adres, najwyżej 200 adresów na godzinę, tylko w oknie skanu. Host z rytmem: o godzinie, w której model spodziewa się odpowiedzi.</p>
       </div>
       <div class="col" style="flex:1;">
         <h2>Wehikuł czasu</h2>
@@ -306,7 +306,7 @@ table.cmp td.them { color: var(--ink-2); }
       <div class="col" style="flex:1;">
         <div style="display:flex; align-items:baseline; gap:24px;"><span class="big">0,06 s</span><span style="font-size:28px; color:var(--ink-2);">stop awaryjny; po 1 s żaden proces nmap</span></div>
         <ul class="list" style="margin-top:32px;">
-          <li><svg width="26" height="26"><use href="#g-ok"/></svg><span>Tylko GET i HEAD. Bez logowania, ładunków i skryptów NSE.</span></li>
+          <li><svg width="26" height="26"><use href="#g-ok"/></svg><span>Tylko GET i HEAD; Czujka nie loguje się, nie wysyła ładunków ani skryptów NSE.</span></li>
           <li><svg width="26" height="26"><use href="#g-ok"/></svg><span>Walidator odrzuca sygnaturę z POST, treścią żądania albo hasłem.</span></li>
           <li><svg width="26" height="26"><use href="#g-ok"/></svg><span>Limit polityki zawsze wygrywa z profilem: pakiety, HTTP, jeden host.</span></li>
           <li><svg width="26" height="26"><use href="#g-ok"/></svg><span>Okno czasowe się zamyka: skan staje i wraca w następnym oknie.</span></li>
@@ -359,7 +359,7 @@ docker compose -f deploy/docker-compose.yml \
             <tr><th>Zasoby</th><td class="us">obraz 107 MB; czujka.dev gotowa w 46 s na 4 vCPU</td><td class="them">klaster Kubernetes</td></tr>
           </tbody>
         </table>
-        <p style="margin-top:20px; color:var(--ink-2); font-size:26px;">SecureCodeBox orkiestruje wiele skanerów (ZAP, nikto, trivy). Czujka robi jedno: discovery, które pamięta czas.</p>
+        <p style="margin-top:20px; color:var(--ink-2); font-size:26px;">SecureCodeBox orkiestruje wiele skanerów (ZAP, nikto, trivy). Czujka robi tylko discovery i pamięta jego historię.</p>
         <p class="src" style="margin-top:10px;">securecodebox.io/docs/getting-started/installation, stan 21.11.2026</p>
       </div>
     </div>
