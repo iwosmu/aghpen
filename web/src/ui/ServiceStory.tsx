@@ -48,14 +48,20 @@ export function ResponseTimeChart({ serviceId }: { serviceId: number }) {
   if (q.error && routeMissing(q.error)) return null;
   const pts = q.data?.points ?? [];
   if (!q.data || pts.length === 0) return null;
-  const max = Math.max(1, ...pts.map((p) => Math.max(p.ms ?? 0, p.baseline_ms ?? 0)));
   const last = pts[pts.length - 1];
   const base = [...pts].reverse().find((p) => p.baseline_ms !== null)?.baseline_ms ?? null;
+  // The scale reaches at least the "slower" threshold of the API rule, so a
+  // jitter of a few milliseconds stays a flat line and only a point the API
+  // marks slow can rise above it. Colour comes only from the API's slow flag.
+  const { slow_factor: f, slow_min_ms: minMs } = q.data.rule;
+  const threshold = base !== null ? Math.max(base * f, base + minMs) : null;
+  const max = Math.max(1, threshold ?? 0, ...pts.map((p) => Math.max(p.ms ?? 0, p.baseline_ms ?? 0)));
   const H = 72;
   return (
     <Panel title={t('Czas odpowiedzi HTTP', 'HTTP response time')} actions={<span className="text-ink-3">{t('ostatnio', 'last')} <span className={cx('num', last.slow ? 'text-st-changed' : 'text-ink')}>{last.ms === null ? t('brak odpowiedzi', 'no answer') : fmtMs(last.ms)}</span>{base !== null ? <> · {t('zwykle', 'usually')} <span className="num text-ink-2">{fmtMs(base)}</span></> : null}</span>}>
       <div className="relative" style={{ height: H }} data-testid="response-chart" role="img" aria-label={t('Czas odpowiedzi w kolejnych skanach', 'Response time over runs')}>
         {base !== null ? <div className="absolute inset-x-0 border-t border-dashed border-ink-3" style={{ bottom: (base / max) * H }} title={t('zwykły czas (mediana)', 'usual time (median)')} /> : null}
+        {threshold !== null ? <div className="absolute inset-x-0 border-t border-dotted border-st-changed/60" style={{ bottom: (threshold / max) * H }} title={t('próg „wolniej”: ', 'the "slower" threshold: ') + fmtMs(threshold)} /> : null}
         <div className="absolute inset-0 flex items-end gap-[3px]">
           {pts.map((p) => (
             <Link key={p.run_id} to={'/runs/' + p.run_id} className="group relative flex h-full min-w-[4px] max-w-[22px] flex-1 items-end" title={'#' + p.run_id + ' · ' + fmtDateTime(p.at) + ' · ' + (p.ms === null ? t('brak odpowiedzi HTTP', 'no HTTP answer') : fmtMs(p.ms)) + (p.slow ? ' · ' + t('wolniej niż zwykle', 'slower than usual') : '')}>
@@ -70,7 +76,7 @@ export function ResponseTimeChart({ serviceId }: { serviceId: number }) {
         <span className="num">#{pts[0].run_id}</span>
         <span className="num">#{last.run_id}</span>
       </div>
-      <p className="mt-1 text-2xs text-ink-3">{t('słupek = skan; wyróżniony = wolniej niż zwykle; × = brak odpowiedzi HTTP', 'bar = run; highlighted = slower than usual; × = no HTTP answer')}</p>
+      <p className="mt-1 text-2xs text-ink-3">{t('słupek = skan; wyróżniony = wolniej niż zwykle (', 'bar = run; highlighted = slower than usual (') + String(q.data.rule.slow_factor) + '× ' + t('i', 'and') + ' +' + fmtMs(q.data.rule.slow_min_ms) + (threshold !== null ? t(', próg ', ', threshold ') + fmtMs(threshold) : '') + t('); × = brak odpowiedzi HTTP', '); × = no HTTP answer')}</p>
     </Panel>
   );
 }
