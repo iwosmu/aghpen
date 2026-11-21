@@ -176,7 +176,7 @@ export default function RunDetail() {
     <div>
       <PageHeader
         back={{ to: '/runs', label: t('Przebiegi skanów', 'Scan runs') }}
-        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{t('Przebieg', 'Run')} <span className="num">#{run.id}</span></span><span className="text-base font-normal"><RunStatusMark status={run.status} pauseReason={run.pause_reason} /></span></span>}
+        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{t('Przebieg', 'Run')} <span className="num">#{run.id}</span></span><span className="font-sans text-base font-normal"><RunStatusMark status={run.status} pauseReason={run.pause_reason} /></span></span>}
         sub={<>{run.profile_id ? <Link to={'/profiles/' + run.profile_id} className="link">{run.profile_name}</Link> : run.profile_name} · {run.trigger === 'schedule' ? t('z harmonogramu', 'from the schedule') : run.trigger === 'import' ? t('import pliku', 'file import') : run.trigger === 'manual' ? t('uruchomiony ręcznie', 'started by hand') : triggerLabel(run.trigger)} · {fmtDateTime(run.started_at)}
           {isLive ? <span className="ml-2 inline-flex items-center gap-1 text-xs text-ink-3"><span className={cx('inline-block h-1.5 w-1.5 rounded-full', connected ? 'bg-st-new' : 'bg-st-changed')} />{connected ? t('na żywo', 'live') : t('łączenie…', 'connecting…')}</span> : null}</>}
         readOnly={!canRun && (isLive || run.status === 'paused')}

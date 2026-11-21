@@ -54,7 +54,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   if (!run && partial) {
     return (
       <div>
-        <p className="text-xl font-semibold tracking-[-0.015em]" data-testid="handover">{t('Nie ma jeszcze pełnego skanu profilu do porównania.', 'No full profile scan to compare yet.')}</p>
+        <p className="font-display text-[40px] leading-[1.02] sm:text-[52px]" data-testid="handover">{t('Nie ma jeszcze pełnego skanu profilu do porównania.', 'No full profile scan to compare yet.')}</p>
         <p className="mt-2 text-sm text-ink-2" data-testid="handover-partial">{t('Ostatnio', 'Last')}: {partialRunPhrase(partial)} (<Link to={'/runs/' + partial.id} className="num link">#{partial.id}</Link>, {fmtRelative(partial.finished_at)}).</p>
       </div>
     );
@@ -62,7 +62,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   if (!run) {
     return (
       <div>
-        <p className="text-xl font-semibold tracking-[-0.015em]">{t('Nie ma jeszcze zakończonego skanu.', 'No scan has completed yet.')}</p>
+        <p className="font-display text-[40px] leading-[1.02] sm:text-[52px]">{t('Nie ma jeszcze zakończonego skanu.', 'No scan has completed yet.')}</p>
         <p className="mt-2 text-base text-ink-2">{t('Dodaj cele, przygotuj profil i uruchom pierwszy przebieg. Pulpit pokaże wtedy, co działa w sieci.', 'Add targets, prepare a profile and start the first run. The dashboard then shows what is on the network.')}</p>
         <Link to="/targets" className="link mt-3 inline-block text-sm">{t('Dodaj cele', 'Add targets')}</Link>
       </div>
@@ -92,8 +92,8 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
       : t('Od poprzedniego skanu: ', 'Since the previous scan: ') + parts.join(', ') + '.';
   return (
     <div>
-      <p className="max-w-[30ch] text-xl font-semibold tracking-[-0.015em] text-ink sm:max-w-none" data-testid="handover">{headline}</p>
-      <p className={cx('mt-2 flex items-start gap-2 text-base', attention ? 'text-ink' : 'text-ink-2')} data-testid="handover-attention">
+      <p className="font-display max-w-[30ch] text-[40px] leading-[1.02] tracking-[-0.01em] text-ink sm:text-[52px] xl:text-[60px]" data-testid="handover">{headline}</p>
+      <p className={cx('mt-4 flex max-w-[80ch] items-start gap-2 text-base', attention ? 'text-ink' : 'text-ink-2')} data-testid="handover-attention">
         {attention ? <Icon name="alert" className="mt-[3px] flex-none text-st-gone" /> : <Icon name="check" className="mt-[3px] flex-none text-st-new" />}
         <span>
           {h.admin_panels > 0 ? (
@@ -150,18 +150,18 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
 function Stat({ label, value, delta, deltaTitle, to, mono = true }: { label: string; value: ReactNode; delta?: number | null; deltaTitle?: string; to?: string; mono?: boolean }) {
   const inner = (
     <>
-      <dt className="text-xs text-ink-3">{label}</dt>
       <dd className="flex items-baseline gap-2">
-        <span className={cx('text-base font-medium text-ink', mono && 'num')}>{value}</span>
+        <span className={cx('text-ink', mono ? 'font-display text-[34px] leading-none sm:text-[40px]' : 'text-base font-medium')}>{value}</span>
         {delta !== undefined && delta !== null ? (
           <span className="num text-xs text-ink-3" title={deltaTitle ?? t('zmiana względem poprzedniego skanu', 'change against the previous scan')}>{delta === 0 ? '±0' : fmtSigned(delta)}</span>
         ) : null}
       </dd>
+      <dt className="mt-1.5 text-xs text-ink-3 group-hover:text-ink-2">{label}</dt>
     </>
   );
   return to
-    ? <Link to={to} className="flex items-baseline justify-between gap-3 border-b border-rule py-1.5 hover:bg-raised">{inner}</Link>
-    : <div className="flex items-baseline justify-between gap-3 border-b border-rule py-1.5">{inner}</div>;
+    ? <Link to={to} className="group -mx-2 flex flex-col rounded-md px-2 py-1.5 transition-colors hover:bg-raised">{inner}</Link>
+    : <div className="flex flex-col py-1.5">{inner}</div>;
 }
 
 function Inventory({ d, pair }: { d: Dash; pair?: { full?: ScanRun; prev?: ScanRun } }) {
@@ -172,7 +172,7 @@ function Inventory({ d, pair }: { d: Dash; pair?: { full?: ScanRun; prev?: ScanR
   const dServices = full && prev ? full.stats.services_open - prev.stats.services_open : null;
   const deltaTitle = full && prev ? t('zmiana między pełnymi skanami #' + prev.id + ' i #' + full.id + (full.profile_name ? ' (' + full.profile_name + ')' : ''), 'change between the full scans #' + prev.id + ' and #' + full.id + (full.profile_name ? ' (' + full.profile_name + ')' : '')) : undefined;
   return (
-    <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 xl:grid-cols-8" data-testid="dash-numbers">
       <Stat label={t('Adresy w zakresie', 'Addresses in scope')} value={fmtInt(h.addresses_in_scope)} to="/targets" />
       <Stat label={t('Aktywne hosty', 'Hosts up')} value={fmtInt(h.hosts_up)} delta={dHosts} deltaTitle={deltaTitle} to="/hosts?status=up" />
       <Stat label={t('Otwarte usługi', 'Open services')} value={fmtInt(h.services_open)} delta={dServices} deltaTitle={deltaTitle} to="/services?state=open" />
@@ -261,7 +261,7 @@ function IdleRun({ d }: { d: Dash }) {
 }
 
 function Row({ to, children }: { to: string; children: ReactNode }) {
-  return <li><Link to={to} className="flex min-h-[44px] items-start gap-3 border-b border-rule px-3 py-2 hover:bg-raised">{children}</Link></li>;
+  return <li><Link to={to} className="flex min-h-[48px] items-start gap-3 border-b border-rule/60 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-raised">{children}</Link></li>;
 }
 
 function RecentChanges({ changes }: { changes: Change[] }) {
@@ -427,16 +427,17 @@ export default function Dashboard() {
     );
   }
   return (
-    <div className="mx-auto max-w-[1480px] space-y-4 p-4 sm:p-6">
+    <div className="mx-auto max-w-[1480px] space-y-6 p-4 sm:p-6 lg:p-8">
       <h1 className="sr-only">{t('Pulpit', 'Dashboard')}</h1>
-      <div className="grid gap-x-10 gap-y-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+      <div className="space-y-7 pt-1">
         <Handover d={d} full={runs.data ? (pair.full ?? null) : undefined} />
-        <Inventory d={d} pair={runs.data ? pair : undefined} />
+        <div className="border-t border-rule/70 pt-5"><Inventory d={d} pair={runs.data ? pair : undefined} /></div>
       </div>
 
       {d.active_run ? <ActiveRun initial={d.active_run} d={d} /> : <IdleRun d={d} />}
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <RecentChanges changes={d.recent_changes ?? []} />
         <Panel title={t('Najważniejsze znaleziska', 'Top findings')} flush actions={<Link to="/findings" className="link">{t('Wszystkie', 'All')}</Link>}>
           {(d.top_findings ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Brak otwartych znalezisk.', 'No open finding.')}</p> : null}
           <ul>
@@ -456,7 +457,6 @@ export default function Dashboard() {
           </ul>
         </Panel>
 
-        <RecentChanges changes={d.recent_changes ?? []} />
 
         <Panel title={t('Najciekawsze usługi', 'Most interesting services')} flush actions={<Link to="/services?sort=-interest" className="link">{t('Eksplorator', 'Explorer')}</Link>}>
           <ul>

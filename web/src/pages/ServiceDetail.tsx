@@ -206,7 +206,7 @@ export default function ServiceDetail() {
     <div>
       <PageHeader
         back={{ to: '/services', label: t('Usługi', 'Services') }}
-        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono">{s.ip}:{s.port}</span><span className="text-base font-normal"><ServiceStateMark state={s.state} /></span></span>}
+        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono">{s.ip}:{s.port}</span><span className="font-sans text-base font-normal"><ServiceStateMark state={s.state} /></span></span>}
         sub={<><Link to={'/hosts/' + s.host_id} className="link">{t('host', 'host')} <span className="mono">{s.hostname || s.ip}</span></Link> · {serviceName(s)}{isSelf(s) ? <SelfTag /> : null}{s.tls ? ' · TLS' : ''}{s.url ? <> · <a className="link mono inline-flex items-center gap-1" href={s.url} target="_blank" rel="noreferrer noopener">{s.url}<Icon name="external" size={11} /></a></> : null}</>}
         readOnly={!canEdit}
         actions={<span className="flex items-center gap-3 text-sm text-ink-2">{canSuggest ? <SuggestButton serviceId={s.id} /> : null}<span className="flex items-center gap-2">{t('Ciekawość', 'Interest')} <InterestScore value={s.interest} /></span></span>}
