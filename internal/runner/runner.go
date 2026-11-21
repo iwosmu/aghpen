@@ -186,7 +186,14 @@ func (m *Manager) BuildPlan(ctx context.Context, profile model.ScanProfile, run 
 		return plan, fmt.Errorf("%w: every target of the profile lies outside the allowed networks of the safety policy", ErrInvalid)
 	}
 	plan.Targets = kept
-	if plan.Hints, err = m.st.HostHints(ctx, profile.ScopeIDs); err != nil {
+	if adHoc {
+		// Every known address of the ad-hoc list is a hint, whatever its scope:
+		// a silent one then gets a down observation (a confirmation probe).
+		plan.Hints, err = m.st.HostHintsIn(ctx, run.AdHoc.Addresses)
+	} else {
+		plan.Hints, err = m.st.HostHints(ctx, profile.ScopeIDs)
+	}
+	if err != nil {
 		return plan, err
 	}
 	if plan.MeasuredPPS, err = m.st.ProfileMeasuredPPS(ctx, profile.ID); err != nil {

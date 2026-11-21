@@ -15,6 +15,7 @@ import (
 	"github.com/iwosmu/aghpen/internal/analyze"
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/probe"
+	"github.com/iwosmu/aghpen/internal/rules"
 	"github.com/iwosmu/aghpen/internal/store"
 )
 
@@ -35,6 +36,12 @@ type Analysis struct {
 	loc  *time.Location
 	log  *slog.Logger
 	Auto AutoExporter // optional
+
+	// Policy evaluates the exposure rules after every analysis (runs, imports,
+	// manual entries, re-probes); optional.
+	Policy interface {
+		Evaluate(ctx context.Context, runID int64) (rules.Report, error)
+	}
 }
 
 // NewAnalysis returns the analysis adapter. loc is the timezone of the availability histogram.
@@ -382,7 +389,8 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 	if len(upHosts) > 0 && run.Trigger != "manual-entry" { // a manual entry adds facts, it does not prove absence
 		var stale []int64
 		err := a.st.EachFinding(ctx, store.FindingFilter{HostIDs: upHosts, Status: []string{string(model.FindingNew)}}, func(f *model.Finding) error {
-			if f.Manual || derived[f.Key] || f.LastRunID >= runID {
+			// Policy findings belong to internal/rules: Policy.Evaluate resolves them.
+			if f.Manual || derived[f.Key] || f.LastRunID >= runID || f.Type == rules.FindingType {
 				return nil
 			}
 			if f.Port != 0 && opts.PortInScope != nil && !opts.PortInScope("tcp", f.Port) && !opts.PortInScope("udp", f.Port) {
@@ -402,6 +410,15 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 		return nil, err
 	}
 	a.log.Info("run analysed", "run", runID, "hosts", len(hosts), "changes", len(changes), "findings", len(findings), "findings_new", sum.FindingsNew)
+	if a.Policy != nil {
+		// Exposure rules see the analysed inventory; their findings then go to
+		// DefectDojo with the others.
+		if rep, err := a.Policy.Evaluate(ctx, runID); err != nil {
+			a.log.Error("policy evaluation failed", "run", runID, "err", err)
+		} else {
+			a.log.Info("policy evaluated", "run", runID, "report", rep)
+		}
+	}
 	if a.Auto != nil {
 		a.Auto.AutoExport(ctx, runID)
 	}

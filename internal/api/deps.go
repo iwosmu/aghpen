@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/iwosmu/aghpen/internal/auth"
 	"github.com/iwosmu/aghpen/internal/defectdojo"
 	"github.com/iwosmu/aghpen/internal/model"
@@ -211,6 +212,9 @@ type Deps struct {
 
 	// Mounts are sub-routers of other packages, mounted under /api/v1.
 	Mounts []Mount
+	// Routes register routes of other packages directly on the /api/v1 router
+	// (after the built-in routes), guarded by the permission middleware.
+	Routes []func(r chi.Router, can Guard)
 
 	// Lookup resolves domain targets for the allowed-networks check; nil uses the system resolver.
 	Lookup runner.LookupFunc

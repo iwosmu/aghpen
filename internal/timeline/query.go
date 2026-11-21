@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// indexes are created by Start when missing. See docs/API-time.md.
+// indexes are created by Start when missing. See docs/API.md (Time machine, Re-probing).
 var indexes = []string{
 	// GET /timeline/at: the latest observation of a service as of a run is a
 	// LATERAL lookup by (service_id, run_id); the stock index orders by "at".
