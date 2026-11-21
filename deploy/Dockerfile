@@ -33,7 +33,8 @@ FROM alpine:${ALPINE_VERSION}
 #    sockets work, and then runs nmap in SYN mode; without it the engine falls back to nmap -sT.
 # The container must keep NET_RAW and NET_ADMIN in its bounding set (docker-compose.yml: cap_add),
 # and must not set no-new-privileges, which would ignore file capabilities.
-RUN apk add --no-cache nmap nmap-scripts libcap ca-certificates tzdata \
+# postgresql17-client: pg_dump and pg_restore for czujka backup / czujka restore.
+RUN apk add --no-cache nmap nmap-scripts libcap ca-certificates tzdata postgresql17-client \
  && addgroup -S -g 10001 czujka && adduser -S -u 10001 -G czujka -h /var/lib/czujka czujka \
  && mkdir -p /var/lib/czujka && chown -R czujka:czujka /var/lib/czujka \
  && setcap cap_net_raw,cap_net_admin+eip "$(readlink -f /usr/bin/nmap)"
