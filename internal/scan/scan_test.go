@@ -609,8 +609,8 @@ func TestHTTPAndSignatureStage(t *testing.T) {
 	if h == nil || !reflect.DeepEqual(h.Hostnames, []string{"panel.example.com"}) {
 		t.Fatalf("host = %+v", h)
 	}
-	if len(fp.reqs) != 3 {
-		t.Fatalf("fingerprint calls = %d, want one per open TCP port", len(fp.reqs))
+	if len(fp.reqs) != 2 {
+		t.Fatalf("fingerprint calls = %d, want one per open TCP port except ssh (not HTTP)", len(fp.reqs))
 	}
 	for _, r := range fp.reqs {
 		if r.IP != "10.7.0.5" || r.Hostname != "panel.example.com" || r.UserAgent != "Czujka-test" || !r.Opts.Enabled {
@@ -638,9 +638,9 @@ func TestHTTPAndSignatureStage(t *testing.T) {
 			}
 		}
 	}
-	// 3 calls pay one request each (also the port that is not HTTP), the two
-	// HTTP answers carry two extra paths each
-	if out.Stats.HTTPServices != 2 || out.Stats.HTTPRequests != 7 {
+	// 2 calls pay one request each (ssh is not HTTP and gets no request),
+	// the two HTTP answers carry two extra paths each
+	if out.Stats.HTTPServices != 2 || out.Stats.HTTPRequests != 6 {
 		t.Errorf("http stats = %+v", out.Stats)
 	}
 
@@ -870,6 +870,26 @@ func TestNameServiceNeverEmpty(t *testing.T) {
 		s := c.in
 		if nameService(&s); s.Name != c.want {
 			t.Errorf("%+v: %q, want %q", c.in, s.Name, c.want)
+		}
+	}
+}
+
+func TestNotHTTPSkipsKnownProtocolsOnly(t *testing.T) {
+	for _, c := range []struct {
+		s    model.ServiceResult
+		want bool
+	}{
+		{model.ServiceResult{Name: "ssh"}, true},
+		{model.ServiceResult{Name: "postgresql"}, true},
+		{model.ServiceResult{Name: "amqp"}, true},
+		{model.ServiceResult{Name: "imap", Tunnel: "ssl"}, false},
+		{model.ServiceResult{Name: "tcpwrapped"}, false},
+		{model.ServiceResult{Name: "unknown"}, false},
+		{model.ServiceResult{Name: "http-proxy"}, false},
+		{model.ServiceResult{Name: ""}, false},
+	} {
+		if got := notHTTP(&c.s); got != c.want {
+			t.Errorf("%+v: %v, want %v", c.s, got, c.want)
 		}
 	}
 }

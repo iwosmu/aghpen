@@ -843,3 +843,31 @@ func TestTLSPortWithFailedHandshake(t *testing.T) {
 		t.Errorf("title %q, note %q", fp.Title, fp.Error)
 	}
 }
+
+// FetchPaths asks for the paths only: the root page is not requested again.
+func TestFetchPathsSkipsTheRoot(t *testing.T) {
+	var mu sync.Mutex
+	hits := map[string]int{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits[r.URL.Path]++
+		mu.Unlock()
+		fmt.Fprint(w, "<title>x</title>")
+	}))
+	defer srv.Close()
+	req := reqFor(t, srv)
+	fp, _, err := New().Fingerprint(context.Background(), req)
+	if err != nil || fp == nil {
+		t.Fatal(fp, err)
+	}
+	req.Paths = []string{"/login", "/version"}
+	out, _, err := New().FetchPaths(context.Background(), req, fp)
+	if err != nil || len(out.Paths) != 2 || len(fp.Paths) != 0 {
+		t.Fatalf("out=%+v err=%v (input paths %d)", out, err, len(fp.Paths))
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if hits["/"] != 1 || hits["/login"] != 1 || hits["/version"] != 1 {
+		t.Errorf("hits = %v", hits)
+	}
+}
