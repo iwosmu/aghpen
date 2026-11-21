@@ -4,6 +4,17 @@ import { useAction, useItem, usePage } from '../api/hooks';
 import { ApiError, del, patch, post, put } from '../api/client';
 import type { AuditEntry, DefectDojoSettings, DojoPullResult, DojoScopeMapping, DojoSyncResult, DojoTestResult, Permission, PermissionInfo, Role, SafetyPolicy, Scope, User } from '../api/types';
 import { t, getLang, plural } from '../i18n';
+
+/** The heading of a permission group ("targets" → "Cele"). */
+function permGroupLabel(g: string): string {
+  const m: Record<string, [string, string]> = {
+    targets: ['Cele i zakresy', 'Targets and scopes'], scans: ['Skany i profile', 'Scans and profiles'], results: ['Wyniki i znaleziska', 'Results and findings'],
+    signatures: ['Sygnatury i reguły', 'Signatures and rules'], export: ['Eksport', 'Export'], users: ['Użytkownicy', 'Users'], roles: ['Role', 'Roles'],
+    audit: ['Dziennik audytu', 'Audit log'], safety: ['Bezpieczeństwo', 'Safety'], integrations: ['Integracje', 'Integrations'], admin: ['Administracja', 'Administration'],
+  };
+  const v = m[g];
+  return v ? t(v[0], v[1]) : g;
+}
 import { cx, fmtDateTime, fmtInt, fmtRelative } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
 import { lockMessage, outsideLock } from '../lib/lock';
@@ -104,7 +115,7 @@ function RolesTab({ canManage }: { canManage: boolean }) {
               {list.map((r) => (
                 <th key={r.id} className="min-w-[104px] px-2 py-2 text-left align-bottom font-medium">
                   <div className="text-sm text-ink">{roleLabel(r.slug, r.name)}</div>
-                  <div className="text-2xs font-normal text-ink-3">{r.builtin ? t('wbudowana', 'built-in') : t('własna', 'custom')} · {r.user_count} {t('os.', 'users')}</div>
+                  <div className="text-2xs font-normal text-ink-3">{r.builtin ? t('wbudowana', 'built-in') : t('własna', 'custom')} · {r.user_count} {getLang() === 'pl' ? 'os.' : plural(r.user_count, ['', '', ''], ['user', 'users'])}</div>
                   {!r.builtin && canManage ? (
                     <div className="mt-1 flex gap-1">
                       {draft[r.id] ? <Button size="sm" variant="primary" busy={save.isPending} onClick={() => save.mutate(r)}>{t('Zapisz', 'Save')}</Button> : null}
@@ -118,7 +129,7 @@ function RolesTab({ canManage }: { canManage: boolean }) {
           <tbody>
             {groups.map(([group, items]) => (
               <Fragment key={group}>
-                <tr className="border-b border-rule bg-raised"><th colSpan={list.length + 1} className="sticky left-0 px-3 py-1 text-left text-xs font-semibold text-ink-2">{group}</th></tr>
+                <tr className="border-b border-rule bg-raised"><th colSpan={list.length + 1} className="sticky left-0 px-3 py-1 text-left text-xs font-semibold text-ink-2">{permGroupLabel(group)}</th></tr>
                 {items.map((p) => (
                   <tr key={p.permission} className="border-b border-rule last:border-b-0 hover:bg-raised">
                     <th scope="row" className="sticky left-0 z-10 bg-panel px-3 py-1 text-left font-normal"><div className="text-sm text-ink">{en ? p.label_en : p.label_pl}</div><div className="mono text-2xs text-ink-3">{p.permission}</div></th>
@@ -307,7 +318,7 @@ function DojoTab() {
         <p className="mb-3 max-w-[72ch] text-sm text-ink-2">{t('Czujka wysyła wybrane znaleziska do DefectDojo jako jeden test w zaangażowaniu. Ponowny eksport aktualizuje istniejące wpisy zamiast tworzyć duplikaty.', 'Czujka sends chosen findings to DefectDojo as one test in an engagement. A repeated export updates existing entries instead of making duplicates.')}</p>
         <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label={t('Integracja włączona', 'Integration enabled')} />
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Field label={t('Adres DefectDojo', 'DefectDojo URL')} hint={/\/\/(host\.docker\.internal|localhost|127\.)/.test(f.url) ? t('Czujka zapisuje odnośniki do znalezisk z tym adresem. Adres widoczny tylko z kontenera (host.docker.internal, localhost) nie otworzy się w przeglądarce analityka.', 'Czujka writes finding links with this address. An address visible only from the container (host.docker.internal, localhost) does not open in the analyst browser.') : undefined}><input className="field mono" value={f.url} onChange={(e) => { setF({ ...f, url: e.target.value }); setTest(null); }} placeholder="https://defectdojo.example" /></Field>
+          <Field label={t('Adres DefectDojo', 'DefectDojo URL')} hint={/\/\/(host\.docker\.internal|localhost|127\.)/.test(f.url) && !f.link_url ? t('Bez adresu do odnośników Czujka zapisuje linki z tym adresem. Adres widoczny tylko z kontenera (host.docker.internal, localhost) nie otworzy się w przeglądarce analityka.', 'Czujka writes finding links with this address. An address visible only from the container (host.docker.internal, localhost) does not open in the analyst browser.') : undefined}><input className="field mono" value={f.url} onChange={(e) => { setF({ ...f, url: e.target.value }); setTest(null); }} placeholder="https://defectdojo.example" /></Field>
           {'link_url' in q.data ? (
             <Field label={t('Adres do odnośników (publiczny)', 'Link address (public)')} hint={t('Pod tym adresem przeglądarka analityka otwiera DefectDojo. Puste: jak adres DefectDojo wyżej.', 'The analyst browser opens DefectDojo at this address. Empty: the DefectDojo URL above.')}>
               <input className="field mono" value={f.link_url ?? ''} onChange={(e) => setF({ ...f, link_url: e.target.value })} placeholder="http://127.0.0.1:18080" data-testid="dojo-link-url" />
@@ -361,14 +372,15 @@ function DojoTab() {
           <p className="mt-1 text-xs text-ink-3">{t('Status ustawiony przez analityka w Czujce wygrywa: różnicę pokazujemy jako konflikt, nie nadpisujemy.', 'A status that an analyst set in Czujka wins: a difference shows as a conflict and is not overwritten.')}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button size="sm" icon="download" busy={pullRun.isPending && !pullRun.variables} disabled={!q.data.api_key_set} onClick={() => pullRun.mutate(false)} data-testid="dojo-pull">{t('Sprawdź statusy w DefectDojo', 'Check the statuses in DefectDojo')}</Button>
-            {pull && (pull.updates ?? []).length && !pull.applied ? <Button size="sm" variant="primary" icon="check" busy={pullRun.isPending && pullRun.variables === true} onClick={() => pullRun.mutate(true)}>{t('Zastosuj ' + (pull.updates ?? []).length + ' zmian', 'Apply ' + (pull.updates ?? []).length + ' changes')}</Button> : null}
+            {pull && (pull.updates ?? []).length && !pull.applied ? <Button size="sm" variant="primary" icon="check" busy={pullRun.isPending && pullRun.variables === true} onClick={() => pullRun.mutate(true)}>{t('Zastosuj ' + (pull.updates ?? []).length + ' ' + plural((pull.updates ?? []).length, ['zmianę', 'zmiany', 'zmian'], ['change', 'changes']), 'Apply ' + (pull.updates ?? []).length + ' ' + plural((pull.updates ?? []).length, ['zmianę', 'zmiany', 'zmian'], ['change', 'changes']))}</Button> : null}
             <Button size="sm" icon="upload" busy={syncRun.isPending} disabled={!q.data.api_key_set} onClick={() => syncRun.mutate(undefined)}>{t('Wyślij statusy do DefectDojo', 'Push the statuses to DefectDojo')}</Button>
           </div>
           {!q.data.api_key_set ? <p className="mt-1 text-xs text-ink-3">{t('Najpierw zapisz adres i klucz API.', 'Save the URL and the API key first.')}</p> : null}
           <InlineError error={pullRun.error ?? syncRun.error} />
           {pull ? (
             <div className="mt-2 border border-rule p-2 text-sm" data-testid="dojo-pull-result">
-              <p>{t('Sprawdzono ' + fmtInt(pull.checked) + ' znalezisk: ' + (pull.updates ?? []).length + ' zmian do przyjęcia, ' + count(pull.conflicts) + ' konfliktów, ' + count(pull.missing) + ' brakujących w DefectDojo.', 'Checked ' + fmtInt(pull.checked) + ' findings: ' + (pull.updates ?? []).length + ' changes to take, ' + count(pull.conflicts) + ' conflicts, ' + count(pull.missing) + ' missing in DefectDojo.')}{pull.applied ? ' ' + t('Zastosowano: ' + pull.applied + '.', 'Applied: ' + pull.applied + '.') : ''}</p>
+              <p>{t('Sprawdzono ' + fmtInt(pull.checked) + ' znalezisk: ' + (pull.updates ?? []).length + ' ' + plural((pull.updates ?? []).length, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes']) + ' do przyjęcia, ' + count(pull.conflicts) + ' ' + plural(count(pull.conflicts), ['konflikt', 'konflikty', 'konfliktów'], ['conflict', 'conflicts']) + ', ' + count(pull.missing) + ' brakujących w DefectDojo.', 'Checked ' + fmtInt(pull.checked) + ' findings: ' + (pull.updates ?? []).length + ' changes to take, ' + count(pull.conflicts) + ' conflicts, ' + count(pull.missing) + ' missing in DefectDojo.')}{pull.applied ? ' ' + t('Zastosowano: ' + pull.applied + '.', 'Applied: ' + pull.applied + '.') : ''}</p>
+              {pull.linked ? <p className="mt-1 flex items-center gap-1.5 text-xs text-ink" data-testid="dojo-pull-linked"><Icon name="link" size={12} className="text-ink-2" />{t('Połączono ' + pull.linked + ' ' + plural(pull.linked, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']) + ' wysłane w niepotwierdzonym eksporcie (po kluczu, bez duplikatów).', 'Linked ' + pull.linked + ' findings sent by an unconfirmed export (by key, without duplicates).')}</p> : null}
               {(pull.updates ?? []).length ? (
                 <ul className="mt-2 max-h-[220px] overflow-auto border-t border-rule">
                   {(pull.updates ?? []).map((x) => (

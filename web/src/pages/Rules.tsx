@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAction, useItem, usePage } from '../api/hooks';
 import { del, patch, post } from '../api/client';
 import type { ExposureRule, Finding, RuleDryRun } from '../api/types';
-import { t } from '../i18n';
+import { plural, t } from '../i18n';
 import { cx, fmtInt, fmtRelative } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
 import { routeMissing } from '../lib/route';
@@ -118,7 +118,7 @@ export default function Rules() {
               <li key={r.id} className={cx('grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2 sm:px-4', rule?.id === r.id && sel !== 'new' && 'bg-accent-wash')}>
                 <button type="button" className="min-w-0 text-left" onClick={() => u.set({ rule: r.id, slug: null })}>
                   <span className={cx('block truncate text-sm', !r.enabled && 'text-ink-3')}>{r.name}</span>
-                  <span className="flex items-center gap-2 text-xs text-ink-3"><Sev level={r.severity} compact /><span className={cx('num', r.violations > 0 && r.enabled ? 'text-ink' : '')}>{fmtInt(r.violations)} {t('naruszeń', 'violations')}</span>{r.builtin ? <span>{t('wbudowana', 'built-in')}</span> : null}{r.last_eval_at ? <span>{fmtRelative(r.last_eval_at)}</span> : null}</span>
+                  <span className="flex items-center gap-2 text-xs text-ink-3"><Sev level={r.severity} compact /><span className={cx('num', r.violations > 0 && r.enabled ? 'text-ink' : '')}>{fmtInt(r.violations)} {plural(r.violations, ['naruszenie', 'naruszenia', 'naruszeń'], ['violation', 'violations'])}</span>{r.builtin ? <span>{t('wbudowana', 'built-in')}</span> : null}{r.last_eval_at ? <span>{fmtRelative(r.last_eval_at)}</span> : null}</span>
                 </button>
                 <Switch checked={r.enabled} disabled={!canUpdate || toggle.isPending} onChange={() => toggle.mutate(r)} label={t('Reguła włączona', 'Rule enabled')} />
               </li>

@@ -13,7 +13,7 @@ import { AddressMap } from '../viz/AddressMap';
 import { BarList, PacketCount, ProgressBar, RateGauge, TrendRows } from '../viz/charts';
 import { useSession } from '../session';
 import { ReprobePanel } from './Reprobe';
-import { ATTENTION_INTEREST, adminPanelNames, adminPanelServiceNames, changeParts } from '../lib/headline';
+import { ATTENTION_INTEREST, adminPanelNames, adminPanelServiceNames, changeParts, isFullRun, lastFullPair, partialRunPhrase } from '../lib/headline';
 
 function Count({ n, glyph, tone, label, to }: { n: number; glyph: GlyphName; tone: Tone; label: string; to: string }) {
   const zero = n === 0;
@@ -27,11 +27,23 @@ function Count({ n, glyph, tone, label, to }: { n: number; glyph: GlyphName; ton
 }
 
 /** The handover report: what changed and, from the data, what needs attention. */
-function Handover({ d }: { d: Dash }) {
+function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   const h = d.headline;
-  const run = d.last_run;
+  // The headline compares the last two full runs of one profile; a partial run
+  // (ad hoc, re-probe, import, manual entry) only gets its own short line.
+  const last = d.last_run;
+  const partial = last && !isFullRun(last) ? last : null;
+  const run = full === undefined ? (partial ? null : last) : full;
   const s = run?.summary;
   const expected = (d.recent_changes ?? []).filter((c) => c.expected).length;
+  if (!run && partial) {
+    return (
+      <div>
+        <p className="text-xl font-semibold tracking-[-0.015em]" data-testid="handover">{t('Nie ma jeszcze pełnego skanu profilu do porównania.', 'No full profile scan to compare yet.')}</p>
+        <p className="mt-2 text-sm text-ink-2" data-testid="handover-partial">{t('Ostatnio', 'Last')}: {partialRunPhrase(partial)} (<Link to={'/runs/' + partial.id} className="num link">#{partial.id}</Link>, {fmtRelative(partial.finished_at)}).</p>
+      </div>
+    );
+  }
   if (!run) {
     return (
       <div>
@@ -91,6 +103,11 @@ function Handover({ d }: { d: Dash }) {
           </span>
         </span>
       </p>
+      {partial ? (
+        <p className="mt-1.5 text-sm text-ink-2" data-testid="handover-partial" title={t('Przebieg częściowy widzi tylko część sieci, więc nie porównujemy go z pełnym skanem.', 'A partial run sees only part of the network, so it is not compared with a full scan.')}>
+          {t('Ostatnio', 'Last')}: {partialRunPhrase(partial)} (<Link to={'/runs/' + partial.id} className="num link">#{partial.id}</Link>, {fmtRelative(partial.finished_at)}); {t('przebieg częściowy, bez porównania.', 'a partial run, not compared.')}
+        </p>
+      ) : null}
       {s && !baseline ? (
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-0.5 border-t border-rule pt-2.5">
           <Count n={s.hosts_new} glyph="plus" tone="new" label={plural(s.hosts_new, ['nowy host', 'nowe hosty', 'nowych hostów'], ['new host', 'new hosts'])} to={'/changes?run_id=' + run.id + '&kind=host_new'} />
@@ -108,14 +125,14 @@ function Handover({ d }: { d: Dash }) {
   );
 }
 
-function Stat({ label, value, delta, to, mono = true }: { label: string; value: ReactNode; delta?: number | null; to?: string; mono?: boolean }) {
+function Stat({ label, value, delta, deltaTitle, to, mono = true }: { label: string; value: ReactNode; delta?: number | null; deltaTitle?: string; to?: string; mono?: boolean }) {
   const inner = (
     <>
       <dt className="text-xs text-ink-3">{label}</dt>
       <dd className="flex items-baseline gap-2">
         <span className={cx('text-base font-medium text-ink', mono && 'num')}>{value}</span>
         {delta !== undefined && delta !== null ? (
-          <span className="num text-xs text-ink-3" title={t('zmiana względem poprzedniego skanu', 'change against the previous scan')}>{delta === 0 ? '±0' : fmtSigned(delta)}</span>
+          <span className="num text-xs text-ink-3" title={deltaTitle ?? t('zmiana względem poprzedniego skanu', 'change against the previous scan')}>{delta === 0 ? '±0' : fmtSigned(delta)}</span>
         ) : null}
       </dd>
     </>
@@ -125,15 +142,18 @@ function Stat({ label, value, delta, to, mono = true }: { label: string; value: 
     : <div className="flex items-baseline justify-between gap-3 border-b border-rule py-1.5">{inner}</div>;
 }
 
-function Inventory({ d }: { d: Dash }) {
+function Inventory({ d, pair }: { d: Dash; pair?: { full?: ScanRun; prev?: ScanRun } }) {
   const h = d.headline;
-  const tr = d.trend ?? [];
-  const last = tr[tr.length - 1], prev = tr[tr.length - 2];
+  // Deltas only between two full runs of the same profile, never across a partial run.
+  const full = pair?.full, prev = pair?.prev;
+  const dHosts = full && prev ? full.stats.hosts_up - prev.stats.hosts_up : null;
+  const dServices = full && prev ? full.stats.services_open - prev.stats.services_open : null;
+  const deltaTitle = full && prev ? t('zmiana między pełnymi skanami #' + prev.id + ' i #' + full.id + (full.profile_name ? ' (' + full.profile_name + ')' : ''), 'change between the full scans #' + prev.id + ' and #' + full.id + (full.profile_name ? ' (' + full.profile_name + ')' : '')) : undefined;
   return (
     <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
       <Stat label={t('Adresy w zakresie', 'Addresses in scope')} value={fmtInt(h.addresses_in_scope)} to="/targets" />
-      <Stat label={t('Aktywne hosty', 'Hosts up')} value={fmtInt(h.hosts_up)} delta={last && prev ? last.hosts - prev.hosts : null} to="/hosts?status=up" />
-      <Stat label={t('Otwarte usługi', 'Open services')} value={fmtInt(h.services_open)} delta={last && prev ? last.services - prev.services : null} to="/services?state=open" />
+      <Stat label={t('Aktywne hosty', 'Hosts up')} value={fmtInt(h.hosts_up)} delta={dHosts} deltaTitle={deltaTitle} to="/hosts?status=up" />
+      <Stat label={t('Otwarte usługi', 'Open services')} value={fmtInt(h.services_open)} delta={dServices} deltaTitle={deltaTitle} to="/services?state=open" />
       <Stat label={t('Usługi WWW', 'Web services')} value={fmtInt(h.web_services)} to="/services?name=http" />
       <Stat label={t('Otwarte znaleziska', 'Open findings')} value={fmtInt(h.findings_open)} to="/findings?status=new,triaged" />
       <Stat label={t('Niepotwierdzone zmiany', 'Unacknowledged changes')} value={fmtInt(h.changes_unacked)} to="/changes?acked=false&expected=false" />
@@ -334,10 +354,12 @@ function FirstRun({ d }: { d: Dash }) {
 export default function Dashboard() {
   const { can } = useSession();
   const q = useItem<Dash>('/dashboard', undefined, { refetchInterval: 60_000 });
+  const runs = usePage<ScanRun>('/runs', { limit: 100, status: 'completed', sort: '-id' }, can('scans:read'));
   const now = useNow();
   if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
   if (!q.data) return <div className="p-4 sm:p-6"><div className="skeleton mb-3 h-8 w-[min(520px,80%)]" /><div className="skeleton mb-6 h-4 w-[min(380px,60%)]" /><SkeletonRows rows={10} /></div>;
   const d = q.data;
+  const pair = lastFullPair(runs.data?.items ?? []);
   void now;
   const st = d.safety;
   const h0 = d.headline;
@@ -364,8 +386,8 @@ export default function Dashboard() {
     <div className="mx-auto max-w-[1480px] space-y-4 p-4 sm:p-6">
       <h1 className="sr-only">{t('Pulpit', 'Dashboard')}</h1>
       <div className="grid gap-x-10 gap-y-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <Handover d={d} />
-        <Inventory d={d} />
+        <Handover d={d} full={runs.data ? (pair.full ?? null) : undefined} />
+        <Inventory d={d} pair={runs.data ? pair : undefined} />
       </div>
 
       {d.active_run ? <ActiveRun initial={d.active_run} d={d} /> : <IdleRun d={d} />}

@@ -10,13 +10,15 @@ export function isLockRefusal(text: string | undefined | null): boolean {
  * Returns null for any other message.
  */
 export function lockMessage(msg: string, lang: 'pl' | 'en'): string | null {
-  const net = msg.match(/allowed_networks: (\S+) lies outside the operator lock \(CZUJKA_ALLOWED_NETWORKS: ([^)]+)\)/);
+  const net = msg.match(/allowed_networks: (\S+) lies outside the operator lock \(CZUJKA_ALLOWED_NETWORKS: ([^)]+)\)/)
+    ?? msg.match(/allowed_networks: sieć (\S+) leży poza blokadą operatora \(CZUJKA_ALLOWED_NETWORKS: ([^)]+)\)/);
   if (net) {
     return lang === 'pl'
       ? 'Sieć ' + net[1] + ' leży poza blokadą operatora wdrożenia (' + net[2] + '). Tę granicę zmienia tylko operator (zmienna CZUJKA_ALLOWED_NETWORKS); żaden użytkownik, także administrator, nie może jej poszerzyć.'
       : 'The network ' + net[1] + ' lies outside the deployment operator lock (' + net[2] + '). Only the operator changes it (the CZUJKA_ALLOWED_NETWORKS variable); no user, an administrator included, can widen it.';
   }
-  const all = msg.match(/every target lies outside the allowed networks.*?operator lock \(CZUJKA_ALLOWED_NETWORKS: ([^)]+)\);?\s*(.*)$/);
+  const all = msg.match(/every target lies outside the allowed networks.*?operator lock \(CZUJKA_ALLOWED_NETWORKS: ([^)]+)\);?\s*(.*)$/)
+    ?? msg.match(/każdy cel leży poza dozwolonymi sieciami.*?blokadą operatora \(CZUJKA_ALLOWED_NETWORKS: ([^)]+)\);?\s*(.*)$/);
   if (all) {
     const lead = lang === 'pl'
       ? 'Żaden adres nie leży w dozwolonych sieciach i w blokadzie operatora wdrożenia (' + all[1] + ').'
