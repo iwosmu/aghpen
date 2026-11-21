@@ -10,8 +10,8 @@ Wszystko działa lokalnie na laptopie: produkt, laboratorium i DefectDojo. Inter
 | [3. Przygotowanie](#3-przygotowanie-stanowiska) | polecenia od zera do stanu startowego demo i reset |
 | [4. Pytania jury](#4-pytania-jury) | 19 pytań z odpowiedziami i wskazaniem pliku albo ekranu |
 
-Liczby w tekście lektora pochodzą z repozytorium: 19,9 s kreatora (`web/REPORT-LAB.md` §5), 0,06 s wywołania stopu awaryjnego i brak procesu nmap sekundę później (`e2e/full/transcript.txt` krok 17, dowód z procesów), 65 535 adresów /16 (`web/screenshots/lab/47-run-completed-pl-dark-1440.png`).
-Liczby pakietów z `e2e/full/transcript.txt` (średnie tempo, „0 pakietów” po stopie i przy retro-huncie) są niepotwierdzone: przechwytywanie `tcpdump -Q out` nie widzi pakietów, które nmap wysyła przez surowe gniazdo. Demo ich nie cytuje, dopóki pomiar nie zostanie powtórzony.
+Liczby w tekście lektora pochodzą z repozytorium: 19,9 s kreatora (`web/REPORT-LAB.md` §5), 0,09 s wywołania stopu awaryjnego, brak procesu nmap sekundę później i żaden pakiet IP później niż 1 s po stopie (`e2e/full/transcript.txt` krok 17), 65 535 adresów /16 (`web/screenshots/lab/47-run-completed-pl-dark-1440.png`).
+Liczby pakietów z `e2e/full/transcript.txt` są zmierzone na łączu (tcpdump z filtrem źródła, widzi surowe gniazdo nmapa): najwięcej 641 pakietów nmapa na sekundę przy limicie 800, po stopie żaden pakiet IP później niż 1 s, przy retro-huncie 0 pakietów.
 
 ## 1. Nagranie (2 minuty)
 
@@ -150,7 +150,7 @@ Napisy (jedna plansza na wiersz, ⏎ = nowa linia, najwyżej 42 znaki w linii):
 Napisy (jedna plansza na wiersz, ⏎ = nowa linia, najwyżej 42 znaki w linii):
 
 - Stop awaryjny zatrzymuje każdy skan.
-- Wywołanie trwało 0,06 s, a po sekundzie ⏎ nie działał już żaden proces nmap.
+- Wywołanie trwało 0,09 s, a po sekundzie ⏎ nie działał już żaden proces nmap.
 
 ### Ujęcie 10 · 1:50–2:00 (10 s)
 
@@ -297,5 +297,5 @@ docker compose -f lab/defectdojo/docker-compose.yml down -v
 | 15 | Jak to utrzymamy po hackathonie? | Jedna binarka w Go, kilka małych zależności, testy w każdym pakiecie i test e2e całego produktu. Dokumentacja jest po polsku, a każdy próg algorytmu ma komentarz w kodzie. | `README.md`, `make test`, `e2e/full/README.md` |
 | 16 | Czy działa bez internetu? | Tak. Jedyne źródło zewnętrzne, crt.sh, jest domyślnie wyłączone i włącza je tylko administrator. | `docs/INTEGRACJE.md` §3.1 |
 | 17 | Jak baza zniesie długą historię? | Pełne sprawdzenie 11 reguł na 2000 hostach i 6000 usług trwa 99 ms, retro-hunt czyta obserwacje strumieniowo. Nie mierzyliśmy milionów obserwacji; to pierwszy pomiar do zrobienia w CBI. | `docs/REGULY.md` §8; `docs/SIGNATURES.md` §8 |
-| 18 | Dlaczego Go? | Treść zadania sugeruje język o niskim zużyciu zasobów. Obraz ma 107 MB, a w czasie skanów kontener zużył najwyżej 99,9 MiB pamięci. | `e2e/full/transcript.txt` krok 18 |
+| 18 | Dlaczego Go? | Treść zadania sugeruje język o niskim zużyciu zasobów. Obraz ma 107 MB, a w czasie skanów kontener zużył najwyżej 90,7 MiB pamięci. | `e2e/full/transcript.txt` krok 18 |
 | 19 | Czy możemy to sami wypróbować? | Tak: `https://czujka.dev` działa z laboratorium 70 hostów i zaplanowanym skanem; konto do odczytu dla jury jest w zgłoszeniu. Na serwerze 4 vCPU i 8 GB stos zbudował się i był zdrowy po 46 s. | `https://czujka.dev` |

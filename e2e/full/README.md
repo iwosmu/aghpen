@@ -35,6 +35,7 @@ Skaner skanuje **tylko** sieć `czfull-net` (10.91.0.0/22), którą skrypt tworz
 
 ## Co sprawdza
 
+0. Warunek wstępny: tablica sąsiadów hosta dockera ma co najmniej 2048 wolnych wpisów (`gc_thresh3` jest wspólne dla wszystkich przestrzeni sieciowych). Inaczej skrypt kończy się kodem 3 z poleceniem `sysctl`, bo przy pełnej tablicy giną odpowiedzi ARP i wynik nic nie mówi o produkcie. Na końcu sprawdza, że tablica nie przepełniła się w czasie testu.
 1. `/healthz`: silnik podłączony, nmap z surowymi gniazdami (`mode: nmap-raw`) w kontenerze bez roota; UI z tej samej binarki i tego samego portu.
 2. Logowanie, polityka bezpieczeństwa (wykluczenie), zakres z CIDR, profil, estymacja ruchu.
 3. Przebieg 1: start, strumień SSE do końca, hosty, usługi z technologiami, wersjami, klasami i powodami oceny, ustalenia, dashboard.
@@ -49,4 +50,4 @@ Skaner skanuje **tylko** sieć `czfull-net` (10.91.0.0/22), którą skrypt tworz
 12. Awaryjne zatrzymanie w trakcie skanu: brak procesów nmap po sekundzie, `tcpdump` nie widzi żadnego pakietu IP (SYN, ICMP, HTTP) później niż 1 s po zatrzymaniu, przebieg `paused` z `emergency_stop`, nowy przebieg odrzucony (409). Jądro wysyła jeszcze przez około 2 s zapytania ARP: to ponowienia rozwiązywania adresów, o które pytał nmap (warstwa 2, bez sond do usług). Skrypt podaje ich liczbę.
 13. Pomiary: pamięć kontenera Czujki w czasie skanów, czas przebiegów, liczba pakietów i żądań HTTP wobec limitów.
 
-Zapis ostatniego uruchomienia: `e2e/full/transcript.txt`. Podsumowanie i pomiary: `deploy/INTEGRATION2_REPORT.md`.
+Zapis ostatniego uruchomienia: `e2e/full/transcript.txt` (100 ze 100, 2026-11-21, około 9,5 minuty). Podsumowanie i pomiary: `deploy/INTEGRATION2_REPORT.md`.

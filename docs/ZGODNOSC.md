@@ -5,7 +5,7 @@ Skrót dla jury. Każde wymaganie z `docs/PROBLEM_DEFINITION.md`, każdy z 12 pu
 | | |
 | --- | --- |
 | Stan na | 2026-11-21, gałąź `iwosmu/agh-orchestrated-kickoff`, kod z commitu `aa386fd` |
-| Metoda | czytanie kodu i tras API (`internal/api/server.go`, `internal/wire/wire.go`, `cmd/czujka/reprobe.go`), nazwy testów w kodzie, zapis testu e2e `e2e/full/transcript.txt` (52 z 52), raport interfejsu na laboratorium `web/REPORT-LAB.md` i zrzuty `web/screenshots/lab/` |
+| Metoda | czytanie kodu i tras API (`internal/api/server.go`, `internal/wire/wire.go`, `cmd/czujka/reprobe.go`), nazwy testów w kodzie, zapis testu e2e `e2e/full/transcript.txt` (100 ze 100), raport interfejsu na laboratorium `web/REPORT-LAB.md` i zrzuty `web/screenshots/lab/` |
 | Nie jest źródłem | poprzednia wersja tego pliku; każdy status sprawdzono od nowa |
 | Publiczna instancja | `https://czujka.dev` z laboratorium 70 hostów; konto do odczytu dla jury: dane logowania w zgłoszeniu |
 
@@ -25,7 +25,7 @@ Razem 96 wierszy.
 ## Najsłabsze miejsca
 
 1. **Trafność wykrycia (punkty 7.1–7.4, kryterium 30%).** Czujka znajduje hosty, usługi i technologie na /16 laboratorium, ale nie ma jeszcze liczb precyzji i czułości względem prawdy wzorcowej 70 hostów. Pomiar narzędziem `e2e/score` trafi do `docs/WYNIKI.md` (w toku).
-2. **Liczby pakietów.** Średnie tempo (234 i 127 pps), „0 pakietów” po stopie awaryjnym i przy retro-huncie w `e2e/full/transcript.txt` są niepotwierdzone: przechwytywanie `tcpdump -Q out` nie widzi pakietów, które nmap wysyła przez surowe gniazdo. Ważne zostaje: wywołanie stopu trwało 0,06 s, a po 1 s nie działał żaden proces nmap; retro-hunt z konstrukcji czyta tylko zapisane dane.
+2. **Liczby pakietów: zmierzone na łączu.** `e2e/full/transcript.txt` (100 ze 100) przechwytuje ruch z filtrem źródła (`src host <adres Czujki> or arp`), który widzi pakiety wysyłane przez nmapa przez surowe gniazdo; stare liczby z przechwytywania `-Q out` są usunięte. Przebieg 1: 13 147 surowych pakietów nmapa na łączu (licznik silnika 13 246), najwięcej 641 na sekundę przy limicie 800, średnio 234,7/s. Przebieg 2: 13 125 pakietów, najwięcej 641/s, średnio 305,2/s. Wszystkie wysłane pakiety: najwięcej 643/s. Stop awaryjny: wywołanie trwało 0,09 s, po 1 s nie działał żaden proces nmap, po stopie wyszło 5 pakietów IP w ciągu 0,01 s i żaden później niż 1 s. Retro-hunt: 0 pakietów od Czujki. Pozostaje: pomiar dotyczy sieci /22 z 9 hostami; tempo na /16 opisuje `docs/WYNIKI.md`.
 3. **DefectDojo z ekranu produktu.** Pliki eksportu i ponowny import są udowodnione, a wysyłkę przez API sprawdzono na żywym DefectDojo 3.5.202 narzędziem `dojoprobe` na tych samych pakietach. Wysyłki z ekranu produktu do żywej instancji nie ma w żadnym zapisie.
 
 ## 1. Wymagania z rozdziału 2 zadania
@@ -96,7 +96,7 @@ Razem 96 wierszy.
 | import wyników skanów JSON lub CSV | nmap XML, JSON (4 kształty), CSV z tabelą nazw kolumn; błędny wiersz nie przerywa importu | „Import / eksport” | e2e krok 13 | **udowodnione** |
 | obsługa dużych zakresów, ponad 10 000 IP | Liczenie adresów bez rozwijania listy, plan w blokach /24, zapis wsadowy. | strona przebiegu /16 | 65 535 adresów w jednym przebiegu (zrzut `47`); `TestCountLargeAndExclusions` | **udowodnione** |
 | konfiguracja skanu: okno i częstotliwość | rozdz. 3 | „Profile skanów” | e2e krok 16 | **udowodnione** |
-| ograniczanie tempa zapytań | Limit = mniejsza z wartości profilu i polityki. Jeden budżet pakietów dla wszystkich procesów nmap; HTTP: limit globalny i na host. | górny pasek: „limit 2 000 pps”; wskaźnik tempa | licznik Czujki: /16 średnio 1 091 pps przy limicie 2 000 (zrzut `47`); licznik interfejsu w laboratorium silnika: 498–504 pps przy limicie 500 (`e2e/engine/REPORT.md`); liczby pakietów z `e2e/full/transcript.txt` niepotwierdzone (przechwytywanie nie widzi surowego gniazda nmap), do powtórzenia | **gotowe** |
+| ograniczanie tempa zapytań | Limit = mniejsza z wartości profilu i polityki. Jeden budżet pakietów dla wszystkich procesów nmap; HTTP: limit globalny i na host. | górny pasek: „limit 2 000 pps”; wskaźnik tempa | licznik Czujki: /16 średnio 1 091 pps przy limicie 2 000 (zrzut `47`); licznik interfejsu w laboratorium silnika: 498–504 pps przy limicie 500 (`e2e/engine/REPORT.md`); tcpdump na łączu w `e2e/full/transcript.txt`: surowe pakiety nmapa najwięcej 641/s przy limicie 800, wszystkie wysłane pakiety najwięcej 643/s, 0 sekund ponad limitem (kroki 6, 11, 18) | **gotowe** |
 | wykrywanie aktywnych hostów | wiersz 3 | „Hosty” | wiersz 3 | **udowodnione** |
 | podstawowa identyfikacja usług | wiersz 4 | „Usługi” | wiersz 4 | **udowodnione** |
 | zapis wyników do bazy lub pliku | PostgreSQL: hosty, usługi, obserwacje z historią, zmiany, znaleziska; pliki eksportu | „Hosty”, „Import / eksport” | `TestIngestInventoryAndFieldEncryption`; e2e kroki 7 i 13 | **udowodnione** |
@@ -134,7 +134,7 @@ Razem 96 wierszy.
 | Prezentacja do 10 slajdów | 10 slajdów, PDF i HTML, zrzuty z laboratorium. 2 miejsca czekają na pomiary (`DO UZUPEŁNIENIA`): pakiety po stopie awaryjnym, precyzja i czułość. | `docs/slides/czujka.pdf` | **częściowe** |
 | Działające demo, lokalnie lub w środowisku testowym | Stos startuje jednym poleceniem; laboratorium 70 hostów lokalnie; publiczna instancja `https://czujka.dev` z laboratorium i zaplanowanym skanem. Scenariusz i lista ujęć: `docs/DEMO.md`. Nagranie jeszcze nie powstało. | `docs/DEMO.md`; `https://czujka.dev` | **gotowe** |
 | Technologie bezpłatne i open-source | Go, PostgreSQL (Percona z `pg_tde`), nmap, chi, pgx, React, Vite. Bez płatnych API. | `go.mod`, `web/package.json` | **udowodnione** |
-| Język o niskim zużyciu zasobów | Go; obraz 107 MB (`docker images`, 2026-11-21); najwyżej 99,9 MiB pamięci kontenera w czasie skanów | `e2e/full/transcript.txt` krok 18 | **udowodnione** |
+| Język o niskim zużyciu zasobów | Go; obraz 107 MB (`docker images`, 2026-11-21); najwyżej 90,7 MiB pamięci kontenera w czasie skanów | `e2e/full/transcript.txt` krok 18 | **udowodnione** |
 
 ## 7. Dwanaście punktów weryfikowanych przez jury (rozdz. 6)
 
@@ -148,7 +148,7 @@ Razem 96 wierszy.
 | 7.6 | Działanie customowych sygnatur | wiersz 10 | „Sygnatury” | e2e kroki 9, 11, 14 | **udowodnione** |
 | 7.7 | Porównanie wyników między skanami | wiersze 8–9 | „Zmiany” | e2e krok 11 | **udowodnione** |
 | 7.8 | Hosty niestabilne lub zmieniające odpowiedź | Model 168 godzin, `host_unstable` zamiast fałszywego „zniknął”, plan ponownych sprawdzeń, `host_back`. Hosty `flapper`, `tod-office`, `tod-night` w laboratorium. | szczegóły hosta | e2e krok 11 (`host_unstable`); `TestStabilityScenarios`; `e2e/full/run.sh` krok 11b w toku; `go run ./e2e/watchunstable` | **gotowe** |
-| 7.9 | Bezpieczeństwo i ostrożność skanera | Tylko GET i HEAD, walidator sygnatur, limity polityki ponad profilem, okna, wykluczenia, dozwolone sieci, stop awaryjny, kontener bez roota. | górny pasek: limit, GET/HEAD, „Stop awaryjny” | e2e: wywołanie stopu 0,06 s, brak procesu nmap po 1 s, nowy przebieg odrzucony 409 (krok 17); sygnatura z POST odrzucona (krok 14); proces uid 10001 (krok 2). Liczby pakietów po stopie: do ponownego pomiaru | **udowodnione** |
+| 7.9 | Bezpieczeństwo i ostrożność skanera | Tylko GET i HEAD, walidator sygnatur, limity polityki ponad profilem, okna, wykluczenia, dozwolone sieci, stop awaryjny, kontener bez roota. | górny pasek: limit, GET/HEAD, „Stop awaryjny” | e2e: wywołanie stopu 0,09 s, brak procesu nmap po 1 s, po stopie 5 pakietów IP w ciągu 0,01 s i żaden później niż 1 s (tcpdump z filtrem źródła), nowy przebieg odrzucony 409 (krok 17); sygnatura z POST odrzucona (krok 14); proces uid 10001 (krok 2) | **udowodnione** |
 | 7.10 | Czytelność dashboardu lub raportu | Pulpit ze zdaniem na górze, raport przebiegu A4. | „Pulpit”, „Raport” | zrzuty `40`–`47`, `55`; e2e krok 12 | **udowodnione** |
 | 7.11 | Import oraz export danych | Cele, wyniki (XML, JSON, CSV), znaleziska, sygnatury; eksport każdej listy i przebiegu. | „Import / eksport” | e2e kroki 13–14; `web/REPORT-LAB.md` §3 | **udowodnione** |
 | 7.12 | Rozgraniczenie funkcjonalności między role | wiersze 12–13 | konto „Obserwator” | `TestRBACMatrixCSRFAndAudit` | **udowodnione** |
@@ -159,8 +159,8 @@ Razem 96 wierszy.
 | --- | --- | --- | --- |
 | 30% | Skuteczność discovery i identyfikacji usług w dużej infrastrukturze | /16 (65 535 adresów) w 7 min 24 s przy limicie 2000 pps; 66 aktywnych hostów, 71 usług. Brak liczb precyzji i czułości (`docs/WYNIKI.md` w toku). | **częściowe** |
 | 15% | Zmiany w czasie, niestabilne hosty, raportowanie | Zmiany i porównanie udowodnione w e2e. Ponowne sprawdzenia, wehikuł czasu i reguły udowodnione zrzutami na laboratorium (`90`–`97`). Model rytmu: testy i scenariusze w `docs/ALGORYTMY.md` §2.6. | **udowodnione** |
-| 20% | Jakość techniczna, dokumentacja, prezentacja, uruchomienie, import/eksport, DefectDojo | Jedno polecenie; e2e 52 z 52; czujka.dev działa; import i eksport udowodnione; prezentacja z 2 miejscami do uzupełnienia; wysyłka do żywego DefectDojo z produktu bez zapisu. | **gotowe** |
-| 15% | Bezpieczeństwo, kontrola intensywności, przejrzystość dashboardu | Mechanizmy udowodnione (krok 14, 16, 17); pulpit na danych laboratorium. Liczby pakietów do ponownego pomiaru. | **gotowe** |
+| 20% | Jakość techniczna, dokumentacja, prezentacja, uruchomienie, import/eksport, DefectDojo | Jedno polecenie; e2e 100 ze 100; czujka.dev działa; import i eksport udowodnione; prezentacja z 2 miejscami do uzupełnienia; wysyłka do żywego DefectDojo z produktu bez zapisu. | **gotowe** |
+| 15% | Bezpieczeństwo, kontrola intensywności, przejrzystość dashboardu | Mechanizmy udowodnione (krok 14, 16, 17); pulpit na danych laboratorium. Tempo na łączu zmierzone: najwięcej 641 pakietów nmapa na sekundę przy limicie 800, po stopie żaden pakiet IP później niż 1 s. | **gotowe** |
 | 10% | Fingerprinting, technologie, CMS, nagłówki, ciasteczka, sygnatury | 386 sygnatur, wersje z dowodami, własne sygnatury i sygnatura z przykładu. | **udowodnione** |
 | 10% | Role i zabezpieczenie danych | 4 role i własne role, 22 uprawnienia, `pg_tde` i AES-256-GCM, audyt. Kopia zapasowa szyfrowana (`czujka backup`). | **udowodnione** |
 

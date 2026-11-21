@@ -43,18 +43,17 @@ Skanuj tylko sieci, do których masz uprawnienia.
 | Reguły ekspozycji | Czego w sieci być nie może (albo co musi być), w YAML; sprawdzane po każdym skanie, bez pakietów. | [`docs/REGULY.md`](docs/REGULY.md) |
 | Retro-hunt i sygnatura z przykładu | Nowa sygnatura sprawdza zapisaną historię bez wysyłania sond; jeden klik na usłudze proponuje sygnaturę z jej rzadkich cech. | [`docs/SIGNATURES.md`](docs/SIGNATURES.md), [`docs/REGULY.md`](docs/REGULY.md) §10 |
 
-Skaner jest bezpieczny z konstrukcji. Wysyła tylko `GET` i `HEAD`, a walidator odrzuca sygnatury z inną metodą, treścią albo hasłem. Limity polityki zawsze wygrywają z profilem, skan staje na końcu okna czasowego, a stop awaryjny zatrzymuje wszystko: wywołanie trwało 0,06 s i po sekundzie nie działał żaden proces nmap ([`docs/BEZPIECZENSTWO.md`](docs/BEZPIECZENSTWO.md)).
+Skaner jest bezpieczny z konstrukcji. Wysyła tylko `GET` i `HEAD`, a walidator odrzuca sygnatury z inną metodą, treścią albo hasłem. Limity polityki zawsze wygrywają z profilem, skan staje na końcu okna czasowego, a stop awaryjny zatrzymuje wszystko: wywołanie trwało 0,09 s, po sekundzie nie działał żaden proces nmap i nie wyszedł żaden pakiet IP ([`docs/BEZPIECZENSTWO.md`](docs/BEZPIECZENSTWO.md)).
 
 Wdrożenie to jedno polecenie. Produkt to dwa kontenery: binarka z interfejsem WWW i nmapem oraz PostgreSQL z `pg_tde`; Kubernetes nie jest potrzebny ([`docs/WDROZENIE.md`](docs/WDROZENIE.md)).
 
 ## Stan
 
-Produkt działa od końca do końca: `e2e/full/run.sh` przechodzi 52 z 52 sprawdzeń przez REST API na prawdziwych usługach (zapis: `e2e/full/transcript.txt`). Interfejs sprawdzono na laboratorium /16 z 70 hostami (`web/REPORT-LAB.md`). Dokładny stan każdego wymagania: [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md).
+Produkt działa od końca do końca: `e2e/full/run.sh` przechodzi 100 ze 100 sprawdzeń przez REST API na prawdziwych usługach (zapis: `e2e/full/transcript.txt`). Interfejs sprawdzono na laboratorium /16 z 70 hostami (`web/REPORT-LAB.md`). Dokładny stan każdego wymagania: [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md).
 
 Czego jeszcze brakuje:
 
 - liczb precyzji i czułości na 70 hostach (`docs/WYNIKI.md`, w toku);
-- ponownego pomiaru liczby pakietów w teście e2e: przechwytywanie `tcpdump -Q out` nie widziało pakietów z surowego gniazda nmap, więc średnie tempo i „0 pakietów” z `e2e/full/transcript.txt` są niepotwierdzone;
 - zakresów CIDR IPv6 (pojedyncze adresy IPv6 działają);
 - zapisu wysyłki z ekranu produktu do żywego DefectDojo (pliki i API sprawdzone osobno, `docs/INTEGRACJE.md` §4.11).
 

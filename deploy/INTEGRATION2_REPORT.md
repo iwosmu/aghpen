@@ -12,7 +12,7 @@ Branch `iwosmu/czujka-core`. Date 2026-11-21.
 | `internal/store` | Migration 0003: `chunks.work_group` (persists `model.Chunk.Group`). Passive settings. `AddHostnames` (PTR names, respects overrides). |
 | `internal/config` | `CZUJKA_SCHED_INTERVAL`, `CZUJKA_NMAP_PATH`, `CZUJKA_FORCE_NATIVE`. |
 | `deploy/` | Dockerfile builds the web UI and the binary with `-tags embedui`; runtime runs as uid 10001 with file capabilities on nmap (`cap_net_raw,cap_net_admin+eip`) and czujka (`cap_net_raw+ep`). Compose serves the whole product on one port; the DB has the unique alias `czujka-postgres`. `docker-compose.scan-network.yml` attaches Czujka to an external docker network. |
-| `e2e/full` | `lab.sh` (10 real services on `czfull-net` 10.91.0.0/22) and `run.sh` (52 checks, REST API only, tcpdump sidecar for packet evidence, cleans up). |
+| `e2e/full` | `lab.sh` (10 real services on `czfull-net` 10.91.0.0/22) and `run.sh` (100 checks in the last run, REST API only, tcpdump sidecar for packet evidence, cleans up). |
 
 `internal/model`: nothing added or changed.
 
@@ -21,22 +21,26 @@ Branch `iwosmu/czujka-core`. Date 2026-11-21.
 - `gofmt -l cmd internal`: empty. `go build ./...`, `go vet ./...`: pass.
 - `go test -count=1 -p 2 ./...` with the real pg_tde database (`CZUJKA_TEST_REQUIRE_TDE=1`): every package passes except `internal/enginewire` `TestSchedulerBackendWithRealStoreAndRunner` (see Gaps).
 - `make e2e-core` (project `czfull-core`, port 18493): `E2E OK: every check passed`, 24 checks.
-- `e2e/full/run.sh`: **PASS 52, FAIL 0**. Transcript: `e2e/full/transcript.txt`.
+- `e2e/full/run.sh`: **PASS 100, FAIL 0** (rerun after the rate fix, 2026-11-21). Transcript: `e2e/full/transcript.txt`.
 - `/healthz` in the container: `{"engine":true,"probe":{"mode":"nmap-raw","prober":"nmap","raw_sockets":true}}`, process uid 10001.
 
-## Measurements (last e2e/full run, /22 with 10 live hosts, top-1000 + 3 ports, service detection, HTTP)
+## Measurements (last e2e/full run, /22 with 9 live hosts, top-1000 + 3 ports, service detection, HTTP)
+
+Packets are counted twice: by the engine and on the wire by tcpdump with a source filter (`src host <czujka> or arp`), which sees the packets nmap sends through its raw socket. The earlier figures came from a `-Q out` capture that missed those packets; they are removed.
 
 | | Run 1 | Run 2 |
 | --- | --- | --- |
-| Wall time | 74 s | 136 s |
-| Packets | 17 301 | 17 287 |
-| Average rate | 234 pps (cap 800) | 127 pps (cap 800) |
-| HTTP requests | 77, 1 req/s average (cap 20 req/s) | 86, 0.6 req/s (cap 20 req/s) |
+| Wall time | 55 s | 43 s |
+| Packets (engine counter) | 13 246 | 13 232 |
+| nmap raw packets on the wire | 13 147 | 13 125 |
+| Per second on the wire (nmap raw) | max 641, p99 640, avg 234.7 (cap 800) | max 641, p99 641, avg 305.2 (cap 800) |
+| All sent packets per second | max 641 | max 643 |
+| HTTP requests | 77, 1.4 req/s average (cap 20 req/s) | 86, 2 req/s (cap 20 req/s) |
 
-- Memory of the Czujka container during all scans: max 99.9 MiB (174 samples, every 2 s).
-- Retro-hunt over stored observations: 3 hits, 0 packets to lab hosts (tcpdump).
-- Scan window closing mid-run: paused with `window_closed` after 2 of 5 chunks; the scheduler resumed it when the next window opened (+2 s); completed. No `service_gone` outside the scanned ports.
-- Emergency stop: the API call took 0.06 s; no nmap process after 1 s; 0 IP packets (SYN, ICMP, HTTP) after the stop. The kernel still sends ARP requests for about 2 s: neighbour-resolution retries for addresses nmap had asked about (layer 2, no probe reaches a service). Removing them needs `ip neigh flush` (NET_ADMIN in the czujka process) or a lower `mcast_solicit`; not done.
+- Memory of the Czujka container during all scans: max 90.7 MiB (152 samples, every 2 s).
+- Retro-hunt over stored observations: 3 hits, 0 packets sent by Czujka (tcpdump, source filter).
+- Scan window closing mid-run: paused with `window_closed` after 3 of 5 chunks; the scheduler resumed it when the next window opened (+5 s); completed. No `service_gone` outside the scanned ports.
+- Emergency stop: the API call took 0.09 s; no nmap process after 1 s; 120 SYN probes were on the wire in the 3 s before the stop; after it 5 IP packets within 0.01 s and none later than 1 s. The kernel still sent 3 ARP requests until +1.9 s: neighbour-resolution retries for addresses nmap had asked about (layer 2, no probe reaches a service). Removing them needs `ip neigh flush` (NET_ADMIN in the czujka process) or a lower `mcast_solicit`; not done.
 
 ## Gaps and next steps
 

@@ -303,8 +303,8 @@ table.cmp td.them { color: var(--ink-2); }
 </section></div>
 
 <!-- ============ 8. Safe by construction; roles and encryption ============ -->
-<!-- Emergency stop: the API call took 0.06 s and no nmap process was alive 1 s later: e2e/full/transcript.txt section 17 (process evidence).
-     The packet counts of that transcript are unverified (tcpdump -Q out misses nmap's raw-socket packets): slot until re-measured.
+<!-- Emergency stop: the API call took 0.09 s, no nmap process was alive 1 s later and no IP packet left later than 1 s: e2e/full/transcript.txt section 17.
+     Packets on the wire (tcpdump, source filter): nmap raw max 641/s at cap 800, after the stop 5 IP packets within 0.01 s and none later than 1 s: transcript sections 6, 11, 17, 18.
      Unsafe signature rejected (POST, body): transcript section 14. Limits: docs/BEZPIECZENSTWO.md §1.2.
      Window pause and resume: transcript section 16. Roles and 22 permissions: internal/model/types.go, internal/auth/roles.go.
      Encryption: docs/BEZPIECZENSTWO.md §2.1–2.3 (pg_tde for tables and WAL, AES-256-GCM fields, key rotation). -->
@@ -313,7 +313,7 @@ table.cmp td.them { color: var(--ink-2); }
   <div class="body" style="top:250px;">
     <div class="row" style="gap:96px;">
       <div class="col" style="flex:1;">
-        <div style="display:flex; align-items:baseline; gap:24px;"><span class="big">0,06 s</span><span style="font-size:28px; color:var(--ink-2);">stop awaryjny; po 1 s żaden proces nmap</span></div>
+        <div style="display:flex; align-items:baseline; gap:24px;"><span class="big">0,09 s</span><span style="font-size:28px; color:var(--ink-2);">stop awaryjny; po 1 s żaden proces nmap</span></div>
         <ul class="list" style="margin-top:32px;">
           <li><svg width="26" height="26"><use href="#g-ok"/></svg><span>Tylko GET i HEAD; Czujka nie loguje się, nie wysyła ładunków ani skryptów NSE.</span></li>
           <li><svg width="26" height="26"><use href="#g-ok"/></svg><span>Walidator odrzuca sygnaturę z POST, treścią żądania albo hasłem.</span></li>
@@ -338,7 +338,7 @@ table.cmp td.them { color: var(--ink-2); }
 
 <!-- ============ 9. One command to deploy ============ -->
 <!-- Wizard 19.9 s: web/REPORT-LAB.md §5. Screenshot: web/screenshots/lab/21-wizard-2-network-preview.png.
-     Image 107 MB: docker images czujka:czfull (2026-11-21). Memory max 99.9 MiB: e2e/full/transcript.txt section 18.
+     Image 107 MB: docker images czujka:czfull (2026-11-21). Memory max 90.7 MiB: e2e/full/transcript.txt section 18.
      SecureCodeBox: https://www.securecodebox.io/docs/getting-started/installation, read 2026-11-21:
      "running on Kubernetes", supports the 4 latest Kubernetes releases (v1.34–v1.37), "you need Helm", operator in securecodebox-system,
      bundled Garage S3 store "only for development, testing, and quickstart", one Helm chart per scanner, no web UI described.
@@ -377,8 +377,8 @@ docker compose -f deploy/docker-compose.yml \
 </section></div>
 
 <!-- ============ 10. Measured results and what comes next ============ -->
-<!-- 52/52: e2e/full/transcript.txt ("PASS: 52  FAIL: 0"). czujka.dev 46 s and the read-only jury account: coordinator message 2026-11-21 (password only in the submission).
-     19.9 s: web/REPORT-LAB.md §5. 99.9 MiB: transcript section 18.
+<!-- 100/100: e2e/full/transcript.txt ("PASS: 100  FAIL: 0"). czujka.dev 46 s and the read-only jury account: coordinator message 2026-11-21 (password only in the submission).
+     19.9 s: web/REPORT-LAB.md §5. 90.7 MiB: transcript section 18.
      Accuracy (precision/recall on the 70-host lab) is pending in docs/WYNIKI.md (accuracy worker). IPv6: internal/targets/parse.go (single addresses only). -->
 <div class="frame"><section class="slide" id="s10">
   <h1>Zmierzone w laboratorium. Gotowe na wdrożenie w CBI.</h1>
@@ -386,10 +386,10 @@ docker compose -f deploy/docker-compose.yml \
     <div class="row" style="gap:80px;">
       <div class="col" style="width:980px;">
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:0; border-top:1px solid var(--rule);">
-          <div style="padding:24px 24px 24px 0; border-bottom:1px solid var(--rule);"><div class="n mono" style="font-size:56px; font-weight:500;">52 / 52</div><p style="color:var(--ink-2); font-size:26px;">kontroli e2e przez REST API, prawdziwe skany</p></div>
+          <div style="padding:24px 24px 24px 0; border-bottom:1px solid var(--rule);"><div class="n mono" style="font-size:56px; font-weight:500;">100 / 100</div><p style="color:var(--ink-2); font-size:26px;">kontroli e2e przez REST API, prawdziwe skany</p></div>
           <div style="padding:24px 0 24px 24px; border-bottom:1px solid var(--rule); border-left:1px solid var(--rule);"><div class="n mono" style="font-size:56px; font-weight:500;">46 s</div><p style="color:var(--ink-2); font-size:26px;">czujka.dev: od zera do działającego stosu</p></div>
           <div style="padding:24px 24px 24px 0; border-bottom:1px solid var(--rule);"><div class="n mono" style="font-size:56px; font-weight:500;">19,9 s</div><p style="color:var(--ink-2); font-size:26px;">od logowania do pierwszego skanu</p></div>
-          <div style="padding:24px 0 24px 24px; border-bottom:1px solid var(--rule); border-left:1px solid var(--rule);"><div class="n mono" style="font-size:56px; font-weight:500;">99,9 MiB</div><p style="color:var(--ink-2); font-size:26px;">najwięcej RAM w czasie skanów</p></div>
+          <div style="padding:24px 0 24px 24px; border-bottom:1px solid var(--rule); border-left:1px solid var(--rule);"><div class="n mono" style="font-size:56px; font-weight:500;">90,7 MiB</div><p style="color:var(--ink-2); font-size:26px;">najwięcej RAM w czasie skanów</p></div>
         </div>
         <p style="margin-top:24px; font-size:27px; color:var(--ink-2);">Działa publicznie: <span class="mono" style="color:var(--ink);">https://czujka.dev</span>, konto do odczytu dla jury (dane logowania w zgłoszeniu).</p>
         <div class="slot" style="height:150px; margin-top:20px;">DO UZUPEŁNIENIA: precyzja i czułość (hosty, usługi, technologie) na 70 hostach laboratorium, z docs/WYNIKI.md</div>
