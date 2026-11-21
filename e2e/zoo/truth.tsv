@@ -80,7 +80,7 @@
 08-proxies	3128	tcp	proxy	ubuntu/squid:6.6-24.04_beta	http-proxy|http	^Squid$	6.6					tcp
 08-proxies	36081	tcp	proxy	varnish:9.1.0 -> httpd:2.4.71-alpine	http	^Varnish$	9.1	Apache	default-page			http/
 09-heavy	48081	tcp	panel	sonatype/nexus3:3.98.3	http	Nexus	3.98.3				class:dev-tool	http/
-10-sonarqube	9000	tcp	panel	sonarqube:26.11.0.134175-community	http	^SonarQube$	26.11		login			http/api/system/status
+10-sonarqube	9000	tcp	panel	sonarqube:26.11.0.134175-community	http	^SonarQube$	26.11		login		class:dev-tool	http/api/system/status
 # Held-out set (batches held-*): truth written before any scan; never looked at during tuning.
 held-1	23000	tcp	cms	requarks/wiki:3.5.0	http	Wiki\.js			install-page			http/
 held-1	8443	tcp	panel	vaultwarden/server:1.37.5-alpine	http	Vaultwarden|Bitwarden			login			http/
