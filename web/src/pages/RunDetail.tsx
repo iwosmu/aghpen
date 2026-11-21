@@ -20,13 +20,17 @@ import { PartialNote, RunPasses } from '../ui/RunPasses';
 import { useArrivalOrder } from '../ui/arrivalOrder';
 import { ResponseCell, SelfTag } from '../ui/serviceBits';
 import { NotScanned, notScannedHint, scannedFirst } from '../ui/NotScanned';
+import { runNoteText } from '../lib/runNotes';
 
 /** A run over this many addresses or fewer is a "one machine" run: the page shows its services instead of the address map. */
 export const SMALL_RUN = 4;
+/** A larger run shows this many of its services (most interesting first) under the map, with a link to all of them. */
+export const RUN_SERVICES_CAP = 50;
 
 /** The services of one run, as they arrive (polled while the run is live). */
-function RunServices({ run, live }: { run: ScanRun; live: boolean }) {
-  const q = useItem<Page<Service>>('/services', { run_id: run.id, limit: 500 }, { refetchInterval: live ? 1500 : false }); // one small run: cheap to poll often
+function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: number }) {
+  // One small run: all rows, cheap to poll often. A larger run: the most interesting rows, polled less often.
+  const q = useItem<Page<Service>>('/services', cap ? { run_id: run.id, limit: cap, sort: '-interest' } : { run_id: run.id, limit: 500 }, { refetchInterval: live ? (cap ? 5000 : 1500) : false });
   // While the run is live, rows keep their arrival order: a service of the
   // first pass never moves when a later pass adds more. When the run is over:
   // open services first, then the ones that are gone now; by address and port.
@@ -67,6 +71,12 @@ function RunServices({ run, live }: { run: ScanRun; live: boolean }) {
               ))}
             </tbody>
           </table>
+          {q.data.total > items.length ? (
+            <p className="border-t border-rule px-3 py-2 text-sm" data-testid="run-services-more">
+              <span className="text-ink-2">{t('Pokazano ' + items.length + ' z ' + fmtInt(q.data.total) + ', najciekawsze najpierw.', 'Showing ' + items.length + ' of ' + fmtInt(q.data.total) + ', most interesting first.')}</span>{' '}
+              <Link to={'/services?run_id=' + run.id + '&state=all'} className="link">{t('Wszystkie usługi tego przebiegu', 'All services of this run')}</Link>
+            </p>
+          ) : null}
           {carried > 0 ? <p className="border-t border-rule px-3 py-2 text-xs text-ink-3" data-testid="run-services-carried">{t('Nie skanowane w tym przebiegu', 'Not scanned in this run')}: {carried} {t('(na końcu listy). Ten skan nie sprawdzał tych portów, więc stan pochodzi z ostatniej obserwacji.', '(at the end of the list). This scan did not check these ports, so the state comes from the last observation.')}</p> : null}
         </div>
       )}
@@ -234,7 +244,7 @@ export default function RunDetail() {
         ) : null}
         {s.notes && s.notes.length > 0 ? (
           <div data-testid="run-notes" className="border border-rule bg-panel px-3 py-2 text-sm text-ink-2">
-            {s.notes.map((n) => <span key={n} className="block">{n}</span>)}
+            {s.notes.map((n) => <span key={n} className="block">{runNoteText(n)}</span>)}
           </div>
         ) : null}
 
@@ -327,6 +337,7 @@ export default function RunDetail() {
             )}
           </Panel>
         </div>}
+        {small ? null : <RunServices run={run} live={isLive} cap={RUN_SERVICES_CAP} />}
 
         <div className="grid gap-4 xl:grid-cols-2">
           {!small && (isLive || recent.length > 0) ? (
