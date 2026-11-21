@@ -1159,3 +1159,41 @@ func TestExplicitFullRangeGoesTopPortsFirst(t *testing.T) {
 		t.Errorf("passes = %+v", p)
 	}
 }
+
+// flakyFP fails the first GET to port 8080, like a one-worker server busy
+// with nmap's idle -sV connection.
+type flakyFP struct {
+	fakeFP
+	mu    sync.Mutex
+	tries int
+}
+
+func (f *flakyFP) Fingerprint(ctx context.Context, req model.FingerprintRequest) (*model.HTTPFingerprint, *model.TLSInfo, error) {
+	if req.Port == 8080 {
+		f.mu.Lock()
+		f.tries++
+		first := f.tries == 1
+		f.mu.Unlock()
+		if first {
+			return nil, nil, errors.New("timeout")
+		}
+	}
+	return f.fakeFP.Fingerprint(ctx, req)
+}
+
+func TestQuickPathRetriesHTTPAfterVersionDetection(t *testing.T) {
+	netw := &fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 8080}}}
+	fp := &flakyFP{}
+	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: fp, Signatures: fakeSig{}})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	plan.Policy.MaxPerHostRPS = 100
+	sink := newSink()
+	if out := e.Run(context.Background(), plan, sink); out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	h := sink.host("10.7.0.5")
+	if h == nil || h.Services[1].Port != 8080 || h.Services[1].HTTP == nil || fp.tries != 2 {
+		t.Fatalf("host = %+v, tries = %d", h, fp.tries)
+	}
+}

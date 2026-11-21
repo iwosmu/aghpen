@@ -997,8 +997,35 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 	close(stop)
 	pwg.Wait()
 	res = quickMerge(res, detected)
+	r.retryHTTP(ctx, &res, detected)
 	r.finishHost(&res)
 	return res
+}
+
+// retryHTTP runs the HTTP stage again on ports that nmap names HTTP but
+// that gave our GET no answer while nmap's version detection ran on them.
+// A server with one worker (Gunicorn's sync worker) serves one connection at
+// a time; nmap's -sV holds an idle connection for seconds and the GET timed
+// out behind it (the lab's Flask app on 5000 lost its technology that way).
+func (r *run) retryHTTP(ctx context.Context, res *model.HostResult, detected map[int]probe.Port) {
+	retry := model.HostResult{IP: res.IP, Hostnames: res.Hostnames}
+	var idx []int
+	for i, s := range res.Services {
+		d, ok := detected[s.Port]
+		if s.Proto == "tcp" && s.State == "open" && s.HTTP == nil && ok && strings.Contains(strings.ToLower(d.Name), "http") {
+			retry.Services = append(retry.Services, s)
+			idx = append(idx, i)
+		}
+	}
+	if len(idx) == 0 || ctx.Err() != nil {
+		return
+	}
+	r.httpHost(ctx, &retry, nil)
+	for j, i := range idx {
+		if s := retry.Services[j]; s.HTTP != nil {
+			res.Services[i].HTTP, res.Services[i].TLS, res.Services[i].Tunnel = s.HTTP, s.TLS, s.Tunnel
+		}
+	}
 }
 
 // quickMerge returns a copy of res with the version-detection answers in
