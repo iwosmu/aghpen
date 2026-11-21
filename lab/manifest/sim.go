@@ -208,6 +208,7 @@ func manyPorts() []SimPort {
 	for _, p := range ports {
 		sp := simplePage(p, "nginx", fmt.Sprintf("Instancja testowa %d", p), fmt.Sprintf("<p>Usługa na porcie %d.</p>", p))
 		sp.NameAlt = []string{"*"}
+		sp.TechOptional = []string{"nginx"} // the Server header says nginx
 		out = append(out, sp)
 	}
 	return out

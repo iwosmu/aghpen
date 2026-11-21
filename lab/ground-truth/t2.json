@@ -1532,6 +1532,9 @@
           "tech_optional": [
             "Portainer",
             "Go"
+          ],
+          "class_optional": [
+            "error-page"
           ]
         },
         {
@@ -1626,7 +1629,11 @@
           "port": 4369,
           "proto": "tcp",
           "name": "epmd",
-          "product": "Erlang Port Mapper Daemon"
+          "product": "Erlang Port Mapper Daemon",
+          "tech_optional": [
+            "Erlang Port Mapper Daemon",
+            "Erlang"
+          ]
         },
         {
           "port": 5672,
@@ -1662,7 +1669,9 @@
           ],
           "tech_optional": [
             "Cowboy",
-            "Erlang"
+            "Erlang",
+            "jQuery",
+            "Bootstrap"
           ],
           "classes": [
             "admin-panel",
@@ -1689,7 +1698,8 @@
             "Prometheus"
           ],
           "class_optional": [
-            "api"
+            "api",
+            "error-page"
           ]
         },
         {
@@ -1966,6 +1976,9 @@
                 "eclipse mosquitto"
               ]
             }
+          ],
+          "class_optional": [
+            "iot"
           ]
         }
       ]
@@ -3761,6 +3774,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3777,6 +3791,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3793,6 +3808,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3809,6 +3825,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3825,6 +3842,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3841,6 +3859,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3857,6 +3876,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3873,6 +3893,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3889,6 +3910,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3905,6 +3927,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3921,6 +3944,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3937,6 +3961,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3953,6 +3978,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3969,6 +3995,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -3985,6 +4012,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4001,6 +4029,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4017,6 +4046,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4033,6 +4063,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4049,6 +4080,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4065,6 +4097,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4081,6 +4114,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4097,6 +4131,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4113,6 +4148,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4129,6 +4165,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4145,6 +4182,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4161,6 +4199,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4177,6 +4216,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4193,6 +4233,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4209,6 +4250,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4225,6 +4267,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4241,6 +4284,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4257,6 +4301,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4273,6 +4318,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4289,6 +4335,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4305,6 +4352,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4321,6 +4369,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4337,6 +4386,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4353,6 +4403,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4369,6 +4420,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4385,6 +4437,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4401,6 +4454,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4417,6 +4471,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4433,6 +4488,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4449,6 +4505,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4465,6 +4522,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4481,6 +4539,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4497,6 +4556,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4513,6 +4573,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4529,6 +4590,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4545,6 +4607,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4561,6 +4624,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4577,6 +4641,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4593,6 +4658,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4609,6 +4675,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4625,6 +4692,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4641,6 +4709,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4657,6 +4726,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4673,6 +4743,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4689,6 +4760,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4705,6 +4777,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4721,6 +4794,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4737,6 +4811,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4753,6 +4828,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {
@@ -4769,6 +4845,7 @@
             "*"
           ],
           "tech_optional": [
+            "nginx",
             "Go"
           ],
           "http": {

@@ -116,6 +116,13 @@ PREV=""
 for st in $STATES; do
   log "=== state $st ==="
   lab/scenario.sh "$st" 2>&1 | tail -1 | tee -a "$OUT/run.log"
+  # every packet the scanner sends on the lab interface, for one-second bins (e2e/ppsbins)
+  LABIF=$(docker exec "$CZ" sh -c "ip -o -4 addr | awk '/ 10\\.66\\./ {print \$2}'")
+  docker rm -f "$PROJECT-tcpdump" >/dev/null 2>&1
+  docker image inspect czfull-tcpdump:latest >/dev/null 2>&1 ||
+    printf 'FROM alpine:3.22\nRUN apk add --no-cache tcpdump\n' | docker build -q -t czfull-tcpdump:latest - >/dev/null
+  docker run -d --name "$PROJECT-tcpdump" --network "container:$CZ" --cap-add NET_RAW --cap-add NET_ADMIN \
+    czfull-tcpdump:latest tcpdump -i "$LABIF" -n -tt -l "src host $LR_IP or arp" >/dev/null
   P0=$(txp)
   T0=$(date +%s)
   RUN=$(api POST /runs "{\"profile_id\":$PROFILE}" | jq -r .id)
@@ -132,6 +139,12 @@ for st in $STATES; do
   done
   WALL=$(( $(date +%s) - T0 ))
   P1=$(txp)
+  sleep 1; docker logs "$PROJECT-tcpdump" 2>/dev/null > "$OUT/tcpdump-$st.txt"; docker rm -f "$PROJECT-tcpdump" >/dev/null 2>&1
+  CAPPPS=$(echo "$PJSON" | jq '.rate.max_pps')
+  go run ./e2e/ppsbins -src "$LR_IP" -cap "$CAPPPS" "$OUT/tcpdump-$st.txt" > "$OUT/pps-$st.txt"
+  go run ./e2e/ppsbins -src "$LR_IP" -cap "$CAPPPS" -json "$OUT/tcpdump-$st.txt" > "$OUT/pps-$st.json"
+  gzip -f "$OUT/tcpdump-$st.txt"
+  sed -n 2,3p "$OUT/pps-$st.txt" | tee -a "$OUT/run.log"
   echo "$R" | jq . > "$OUT/run-$st.json"
   log "run $RUN $(echo "$R" | jq -r .status) in $WALL s; tx packets on the lab interface: $((P1 - P0)), peak $PEAK pps; $(echo "$R" | jq -c '{hosts_up: .stats.hosts_up, services: .stats.services_open, packets: .stats.packets_sent, avg_pps: (.stats.avg_pps|floor), peak_pps: .stats.peak_pps, http_requests: .stats.http_requests, elapsed: .stats.elapsed_sec}')"
   echo "$st run=$RUN wall=$WALL tx=$((P1 - P0)) peak=$PEAK" >> "$OUT/runs.txt"

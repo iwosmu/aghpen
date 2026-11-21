@@ -214,3 +214,67 @@ func TestMergeHostsDropsDuplicates(t *testing.T) {
 		}
 	}
 }
+
+// lossyARP answers ARP-only discovery, but drops the first request to each
+// host in lost: the loss that a second sweep must repair.
+type lossyARP struct {
+	probeNet
+	lost map[string]bool
+}
+
+func (p *lossyARP) Discover(_ context.Context, req probe.DiscoverRequest) (*probe.Result, error) {
+	st := targets.Build(req.Targets)
+	res := &probe.Result{Packets: st.V4.Count() * int64(1+req.MaxRetries), PacketsExact: true}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.passes = append(p.passes, req)
+	for ip := range p.hosts {
+		v, _ := targets.ParseValue(ip)
+		if !st.V4.Contains(v.Range.Lo) || !req.ARPOnly {
+			continue
+		}
+		if p.lost[ip] {
+			delete(p.lost, ip)
+			continue
+		}
+		res.Hosts = append(res.Hosts, probe.Host{IP: ip, Up: true, Reason: "arp-response", Responded: true})
+	}
+	return res, nil
+}
+
+func TestARPConfirmationPassFindsALostHost(t *testing.T) {
+	saved := localNetsFn
+	localNetsFn = func() []targets.Range { return targets.Build([]string{"10.9.0.0/16"}).V4.Ranges() }
+	defer func() { localNetsFn = saved }()
+	netw := &lossyARP{
+		probeNet: probeNet{hosts: map[string]answers{"10.9.1.10": {syn: []int{80}}, "10.9.1.12": {syn: []int{80}}, "10.9.3.7": {syn: []int{22}}}},
+		lost:     map[string]bool{"10.9.1.12": true},
+	}
+	plan := basePlan("10.9.0.0/22")
+	plan.Profile.Discovery = model.DiscoveryOpts{ICMPEcho: true, TCPSynPorts: []int{80}, ARP: true}
+	plan.Profile.ServiceDetection = false
+	plan.Profile.Retry.UnstableRetries = 0
+	plan.Profile.Rate.MaxParallelChunks = 1
+	plan.Profile.Chunking = model.ChunkingOpts{InitialSize: 1024, MinSize: 1024, MaxSize: 1024}
+	sink := newSink()
+	if out := New(Deps{Prober: netw, Logger: quiet}).Run(context.Background(), plan, sink); out.Status != model.RunCompleted {
+		t.Fatalf("%+v", out)
+	}
+	var found []string
+	for _, h := range sink.hosts {
+		if h.Up {
+			found = append(found, h.IP)
+		}
+	}
+	sort.Strings(found)
+	if want := []string{"10.9.1.10", "10.9.1.12", "10.9.3.7"}; !reflect.DeepEqual(found, want) {
+		t.Errorf("found %v, want %v", found, want)
+	}
+	if len(netw.passes) != 2 {
+		t.Fatalf("passes = %d, want 2", len(netw.passes))
+	}
+	// the second sweep covers only the silent addresses of blocks 1 and 3
+	if n := targets.Build(netw.passes[1].Targets).V4.Count(); n != 2*256-2 {
+		t.Errorf("second sweep = %d addresses (%v)", n, netw.passes[1].Targets)
+	}
+}

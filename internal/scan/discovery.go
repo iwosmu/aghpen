@@ -106,6 +106,9 @@ func localNets() []targets.Range {
 	return out
 }
 
+// localNetsFn lists the directly connected IPv4 networks; tests replace it.
+var localNetsFn = localNets
+
 // onLink reports whether every address of the group is in a directly
 // connected network.
 func (r *run) onLink(g *group) bool {
@@ -151,7 +154,27 @@ func (r *run) discover(ctx context.Context, g *group, tgts []string, rate int, g
 	first, rest, ok := splitDiscovery(r.disc, r.prober.Privileged())
 	if arpOnly {
 		// Two retries: an ARP request costs one small frame per address.
-		return pass(tgts, r.disc, 2)
+		live, err := pass(tgts, r.disc, 2)
+		if err != nil {
+			return nil, err
+		}
+		// A second ARP sweep over the silent addresses of each /24 block where
+		// a host answered. Measured on the lab /16 (4 groups in parallel): a
+		// single sweep lost 1 of 3 hosts in 10.66.40.0/24 and 1 of 6 in
+		// 10.66.50.0/24, and nmap alone on the same ranges lost none. Live
+		// hosts cluster, so this costs about 254 frames per active block.
+		second := r.silentInLiveBlocks(g, live)
+		if second.Count() == 0 {
+			return live, nil
+		}
+		r.log.Debug("discovery ARP confirmation pass", "group", g.id, "addresses", second.Count(), "first_pass_hosts", len(live))
+		more, err := pass(targets.Spec(second.Ranges()), r.disc, 2)
+		if err != nil {
+			return nil, err
+		}
+		live = mergeHosts(live, more)
+		sort.SliceStable(live, func(i, j int) bool { return ipLess(live[i].IP, live[j].IP) })
+		return live, nil
 	}
 	if r.mode == model.DiscoveryThorough || !ok || g.v6 {
 		return pass(tgts, r.disc, 1)
@@ -205,6 +228,36 @@ func (r *run) discover(ctx context.Context, g *group, tgts []string, rate int, g
 	live = mergeHosts(live, more)
 	sort.SliceStable(live, func(i, j int) bool { return ipLess(live[i].IP, live[j].IP) })
 	return live, nil
+}
+
+// silentInLiveBlocks returns the addresses of the group that did not answer
+// and lie in a /24 block where a host answered or a hint exists.
+func (r *run) silentInLiveBlocks(g *group, live []probe.Host) targets.Set {
+	found := make([]targets.Range, 0, len(live))
+	blocks := map[uint32]bool{}
+	for _, h := range live {
+		if p, err := targets.ParseValue(h.IP); err == nil {
+			found = append(found, p.Range)
+			blocks[p.Range.Lo>>8] = true
+		}
+	}
+	for _, h := range r.hintsIn(g) {
+		if p, err := targets.ParseValue(h.IP); err == nil {
+			blocks[p.Range.Lo>>8] = true
+		}
+	}
+	var again []targets.Range
+	for _, rg := range g.ranges() {
+		for b := rg.Lo >> 8; b <= rg.Hi>>8; b++ {
+			if blocks[b] {
+				again = append(again, targets.Range{Lo: max(rg.Lo, b<<8), Hi: min(rg.Hi, b<<8|255)})
+			}
+			if b == 1<<24-1 {
+				break
+			}
+		}
+	}
+	return targets.NewSet(again...).Subtract(targets.NewSet(found...))
 }
 
 // mergeHosts adds the hosts of a later discovery pass that an earlier pass

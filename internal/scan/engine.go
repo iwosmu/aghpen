@@ -181,7 +181,7 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 	r := &run{
 		e: e, log: log, plan: plan, sink: sink, sinkCtx: context.WithoutCancel(ctx),
 		prober: e.Prober(), ports: ports, disc: disc, lim: lim,
-		mode: discoveryMode(plan.Profile.Discovery.Mode), local: localNets(),
+		mode: discoveryMode(plan.Profile.Discovery.Mode), local: localNetsFn(),
 		budget:    NewBudget(lim.PPS),
 		httpLim:   probe.NewLimiter(lim.HTTPRPS, 1), // no burst: the cap holds in every second
 		hostSem:   make(chan struct{}, lim.ParallelHosts),

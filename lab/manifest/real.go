@@ -433,7 +433,7 @@ server {
 			Command: []string{"--admin-password-file", "/run/lab/portainer-pass"},
 			Health:  Health{Test: "wget -q -T 3 -O /dev/null http://127.0.0.1:9000/api/system/status", StartPeriod: "90s"},
 			Services: []truth.Service{
-				{Port: 8000, Proto: "tcp", Name: "unknown", NameAlt: []string{"http", "nagios-nsca"}, Hard: "name-unknown", TechOptional: []string{"Portainer", "Go"}},
+				{Port: 8000, Proto: "tcp", Name: "unknown", NameAlt: []string{"http", "nagios-nsca"}, Hard: "name-unknown", TechOptional: []string{"Portainer", "Go"}, ClassOptional: []string{"error-page"}}, // the edge-agent port answers HTTP 404
 				{
 					Port: 9000, Proto: "tcp", Name: "http", NameAlt: []string{"cslistener"}, Product: "Golang net/http server",
 					Technologies: []truth.Tech{tech("Portainer", "panel", "", "portainer")}, TechOptional: []string{"Go", "AngularJS", "React"},
@@ -456,15 +456,15 @@ server {
 			// the Erlang cookie with root ownership and the server then exits with "eacces".
 			Health: Health{Test: "wget -q -O /dev/null http://127.0.0.1:15672/ && nc -z 127.0.0.1 5672", StartPeriod: "180s"},
 			Services: []truth.Service{
-				{Port: 4369, Proto: "tcp", Name: "epmd", Product: "Erlang Port Mapper Daemon"},
+				{Port: 4369, Proto: "tcp", Name: "epmd", Product: "Erlang Port Mapper Daemon", TechOptional: []string{"Erlang Port Mapper Daemon", "Erlang"}},
 				{Port: 5672, Proto: "tcp", Name: "amqp", Product: "RabbitMQ", Version: "4.3.8", Technologies: []truth.Tech{tech("RabbitMQ", "other", "4.3.8", "rabbitmq")}},
 				{
 					Port: 15672, Proto: "tcp", Name: "http", Product: "Cowboy httpd",
-					Technologies: []truth.Tech{tech("RabbitMQ", "panel", "", "rabbitmq", "rabbitmq management")}, TechOptional: []string{"Cowboy", "Erlang"},
+					Technologies: []truth.Tech{tech("RabbitMQ", "panel", "", "rabbitmq", "rabbitmq management")}, TechOptional: []string{"Cowboy", "Erlang", "jQuery", "Bootstrap"}, // the management UI ships both
 					Classes: []string{"admin-panel", "login"},
 					HTTP:    &truth.HTTP{Status: 200, Title: "RabbitMQ Management", Server: "Cowboy"},
 				},
-				{Port: 15692, Proto: "tcp", Name: "http", Product: "Cowboy httpd", NameAlt: []string{"unknown"}, TechOptional: []string{"Cowboy", "RabbitMQ", "Erlang", "Prometheus"}, ClassOptional: []string{"api"}},
+				{Port: 15692, Proto: "tcp", Name: "http", Product: "Cowboy httpd", NameAlt: []string{"unknown"}, TechOptional: []string{"Cowboy", "RabbitMQ", "Erlang", "Prometheus"}, ClassOptional: []string{"api", "error-page"}}, // "/" answers 404, metrics live on /metrics
 				{Port: 25672, Proto: "tcp", Name: "unknown", NameAlt: []string{"erlang-distribution", "rabbitmq"}, Hard: "name-unknown"},
 			},
 		},
@@ -547,7 +547,7 @@ server {
 			Configs: []ConfigFile{{Target: "/mosquitto/config/mosquitto.conf", Content: "listener 1883 0.0.0.0\nallow_anonymous true\npersistence false\n"}},
 			Health:  Health{Test: "mosquitto_sub -h 127.0.0.1 -t '$SYS/broker/version' -C 1 -W 3 >/dev/null"},
 			Services: []truth.Service{{
-				Port: 1883, Proto: "tcp", Name: "mqtt", NameAlt: []string{"mosquitto*"}, Technologies: []truth.Tech{tech("Mosquitto", "other", "2.0.23", "mosquitto", "eclipse mosquitto")},
+				Port: 1883, Proto: "tcp", Name: "mqtt", NameAlt: []string{"mosquitto*"}, Technologies: []truth.Tech{tech("Mosquitto", "other", "2.0.23", "mosquitto", "eclipse mosquitto")}, ClassOptional: []string{"iot"}, // MQTT is the IoT messaging protocol
 			}},
 		},
 		netsvc("dns", DNSIP, []string{"ns1"}, "infra", "dnsmasq: strefa "+Zone+" (53/tcp, 53/udp)",

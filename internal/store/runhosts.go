@@ -336,7 +336,9 @@ func DefaultProfile() model.ScanProfile {
 		Ports:            DefaultPorts,
 		Discovery:        model.DiscoveryOpts{ICMPEcho: true, TCPSynPorts: []int{22, 80, 443, 3389, 8080}, TCPAckPorts: []int{80}, ARP: true, Mode: model.DiscoveryBalanced},
 		ServiceDetection: true,
-		VersionIntensity: 2,
+		// nmap's own default. Measured on the lab: intensity 2 named neither
+		// Mosquitto (MQTT) nor RabbitMQ (AMQP); 7 names both.
+		VersionIntensity: 7,
 		HTTP:             model.HTTPOpts{Enabled: true, MaxBodyBytes: 262144, TimeoutMs: 5000, MaxRedirects: 3, SignaturePaths: true, Favicon: true},
 		UDP:              model.UDPOpts{Enabled: true},
 		Rate:             model.RateLimits{MaxPPS: 1000, MaxParallelChunks: 4, MaxParallelHosts: 16, HTTPRPS: 20, PerHostConcurrency: 1},
