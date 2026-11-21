@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ApiError } from './api/client';
-import { useLang } from './i18n';
+import { useLang, onLangChange } from './i18n';
 import { RequireSession } from './session';
 import { Layout } from './shell/Layout';
 import { SkeletonRows, Toaster } from './ui/kit';
@@ -39,6 +39,9 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Change summaries come from the server in the chosen language: read everything again after a toggle.
+onLangChange(() => { void queryClient.invalidateQueries(); });
 
 function Shell() {
   return (

@@ -10,7 +10,6 @@ import { Glyph, Sev, changeKindInfo, type GlyphName, type Tone } from '../ui/mar
 import { BeforeAfter } from './Changes';
 import { isFullRun, lastFullPair } from '../lib/headline';
 import { StoryList } from '../ui/RunStory';
-import { changeSummary } from '../lib/changeText';
 
 function RunCard({ run, side }: { run: ScanRun; side: string }) {
   return (
@@ -41,7 +40,7 @@ function Column({ title, glyph, tone, items, showExpected }: { title: string; gl
                 <Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link text-sm">{c.ip}{c.port ? ':' + c.port : ''}</Link>
                 {c.expected ? <span className="inline-flex flex-none items-center gap-1 text-xs text-ink-3"><Glyph name="dashring" tone="expected" size={11} />{t('oczekiwana', 'expected')}</span> : <span className="flex-none"><Sev level={c.severity} /></span>}
               </div>
-              <div className={c.expected ? 'mt-0.5 text-sm text-ink-2' : 'mt-0.5 text-sm'}>{changeSummary(c)}</div>
+              <div className={c.expected ? 'mt-0.5 text-sm text-ink-2' : 'mt-0.5 text-sm'}>{c.summary}</div>
               <div className="text-xs text-ink-3">{changeKindInfo(c.kind).label}</div>
               <BeforeAfter c={c} />
             </li>

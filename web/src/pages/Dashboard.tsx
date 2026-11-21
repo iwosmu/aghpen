@@ -19,7 +19,6 @@ import { SMALL_RUN } from './RunDetail';
 import { serviceName } from '../lib/serviceName';
 import { ReprobePanel } from './Reprobe';
 import { ATTENTION_INTEREST, adminPanelNames, adminPanelServiceNames, isFullRun, lastFullPair, partialRunPhrase } from '../lib/headline';
-import { changeSummary } from '../lib/changeText';
 
 function Count({ n, glyph, tone, label, to }: { n: number; glyph: GlyphName; tone: Tone; label: string; to: string }) {
   const zero = n === 0;
@@ -239,7 +238,7 @@ function RecentChanges({ changes }: { changes: Change[] }) {
           <Row key={c.id} to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id}>
             <span className="mt-0.5"><Glyph name={c.expected ? 'dashring' : changeKindInfo(c.kind).glyph} tone={c.expected ? 'expected' : changeKindInfo(c.kind).tone} /></span>
             <span className="min-w-0 flex-1">
-              <span className={cx('block truncate text-sm', c.expected ? 'text-ink-2' : 'text-ink')} title={changeSummary(c)}>{changeSummary(c)}</span>
+              <span className={cx('block truncate text-sm', c.expected ? 'text-ink-2' : 'text-ink')} title={c.summary}>{c.summary}</span>
               <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
                 <span className="mono">{c.ip}{c.port ? ':' + c.port : ''}</span>
                 {c.expected ? <span>{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} />}

@@ -15,7 +15,6 @@ import { HostLifePanel } from './TimeMachine';
 import { isLocalMac } from '../lib/mac';
 import { serviceName, isSelf } from '../lib/serviceName';
 import { ResponseCell, SelfTag } from '../ui/serviceBits';
-import { changeSummary } from '../lib/changeText';
 import { ProductValue } from '../ui/ProductValue';
 import { productLine, shownProduct } from '../lib/shownProduct';
 
@@ -206,7 +205,7 @@ export default function HostDetail() {
                     <span className="num hidden text-xs text-ink-3 sm:block" title={fmtDateTime(c.at)}>{fmtDateTime(c.at)}</span>
                     <span><ChangeMark kind={c.kind} expected={c.expected} /></span>
                     <span className="col-span-2 min-w-0 text-sm sm:col-span-1">
-                      {changeSummary(c)}
+                      {c.summary}
                       {c.port ? <Link to={'/services/' + c.service_id} className="mono link ml-2 text-xs">:{c.port}</Link> : null}
                       <span className="num ml-2 text-xs text-ink-3 sm:hidden">{fmtRelative(c.at)}</span>
                     </span>

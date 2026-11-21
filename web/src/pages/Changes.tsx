@@ -14,7 +14,6 @@ import { DataTable, FilterBar, FilterField, Pager, SearchField, type Col } from 
 import { CHANGE_KINDS, ChangeMark, Glyph, SEVERITIES, Sev, changeKindInfo, severityLabel } from '../ui/marks';
 import { ExportButtons, useDraft } from '../ui/edit';
 import { useCan } from '../session';
-import { changeSummary } from '../lib/changeText';
 
 const FILTERS = ['q', 'run_id', 'kind', 'severity', 'acked', 'expected', 'host_id'];
 
@@ -32,6 +31,21 @@ export function BeforeAfter({ c }: { c: Change }) {
       <Icon name="arrowRight" size={11} className="text-ink-3" />
       {a ? <span className="mono max-w-[180px] truncate text-ink" title={a}>{a}</span> : <span className="text-ink-3">{t('brak', 'none')}</span>}
     </span>
+  );
+}
+
+/** The internal measures of a change, folded: small mono key/value pairs. */
+export function ChangeDetail({ c }: { c: Change }) {
+  const entries = Object.entries(c.detail ?? {}).filter(([, v]) => v !== null && v !== undefined && v !== '');
+  if (!entries.length) return null;
+  const val = (v: unknown) => (typeof v === 'object' ? JSON.stringify(v) : String(v));
+  return (
+    <details className="mt-1 text-xs" data-testid="change-detail">
+      <summary className="cursor-pointer select-none text-ink-3 hover:text-ink-2">{t('Szczegóły', 'Details')}</summary>
+      <dl className="mono mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-2xs text-ink-2">
+        {entries.map(([k, v]) => <div key={k} className="contents"><dt className="text-ink-3">{k}</dt><dd className="break-all">{val(v)}</dd></div>)}
+      </dl>
+    </details>
   );
 }
 
@@ -59,7 +73,7 @@ export default function Changes() {
   const cols: Col<Change>[] = [
     { id: 'kind', header: t('Rodzaj', 'Type'), cell: (c) => <ChangeMark kind={c.kind} expected={c.expected} /> },
     { id: 'what', header: t('Co się zmieniło', 'What changed'), wrap: true, cell: (c) => (
-      <div className="min-w-[220px] py-1"><div className={c.expected ? 'text-ink-2' : ''}>{changeSummary(c)}</div><BeforeAfter c={c} /></div>
+      <div className="min-w-[220px] py-1"><div className={c.expected ? 'text-ink-2' : ''}>{c.summary}</div><BeforeAfter c={c} /><ChangeDetail c={c} /></div>
     ) },
     { id: 'addr', header: t('Adres', 'Address'), sort: 'ip', cell: (c) => <Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link">{c.ip}{c.port ? ':' + c.port : ''}</Link> },
     { id: 'sev', header: t('Waga', 'Severity'), sort: 'severity', hide: 'md', cell: (c) => c.expected ? <span className="text-xs text-ink-3">{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} /> },
@@ -122,7 +136,7 @@ export default function Changes() {
         mobile={(c) => (
           <div>
             <div className="flex items-center justify-between gap-2"><ChangeMark kind={c.kind} expected={c.expected} /><span className="num text-xs text-ink-3">#{c.run_id}</span></div>
-            <div className="mt-0.5 text-sm">{changeSummary(c)}</div>
+            <div className="mt-0.5 text-sm">{c.summary}</div>
             <div className="mono mt-0.5 text-xs text-ink-3">{c.ip}{c.port ? ':' + c.port : ''}</div>
           </div>
         )}

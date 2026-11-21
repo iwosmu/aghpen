@@ -127,6 +127,7 @@ export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 /** A response time: "540 ms", "1,2 s". */
 export function fmtMs(ms: number | null | undefined): string {
   if (ms === null || ms === undefined || !Number.isFinite(ms)) return '–';
+  if (ms < 1) return t('poniżej 1 ms', 'under 1 ms');
   if (ms < 1000) return Math.round(ms) + ' ms';
   return (ms / 1000).toLocaleString(locale(), { maximumFractionDigits: 1 }) + ' s';
 }
