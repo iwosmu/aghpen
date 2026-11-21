@@ -41,6 +41,7 @@ Zmierzone na czystej maszynie: `docker:28-dind` na Docker Desktop (arm64), 0 obr
 | --- | --- | --- | --- |
 | obrazy pobrane z Docker Hub i zbudowane na maszynie (commit f964d6e) | 1 s | 79 s | **80 s** |
 | to samo przez mirror.gcr.io (Docker Hub odrzucał wtedy pobrania anonimowe: `toomanyrequests`), commit d250e29 | 1 s | 115 s | **116 s** |
+| to samo przez mirror.gcr.io, gałąź po scaleniu (commit 607c91e, z `pull_policy: build`) | 2 s | 51 s | **53 s** |
 | paczka offline (§2.2) zamiast budowy, bez sieci | 3 s (rozpakowanie) | 23 s (`sh install.sh`) | **26 s** |
 
 Dalej, w tej samej instancji: logowanie, „Ten komputer”, „Uruchom skan” w 9 s (przeglądarka sterowana skryptem), skan 41 s. Wynik na tej maszynie: nginx na 8787 (wersja i tytuł), API Dockera z TLS na 2376 i Czujka. Host ma etykietę „Host dockera (ten komputer)”. Czas pobierania obrazów zależy od łącza.
@@ -81,7 +82,7 @@ tar -xzf czujka-bundle-<wersja>.tar.gz && cd czujka-bundle-<wersja>
 sh install.sh      # docker load, .env z losowymi sekretami, start stosu, czujka doctor
 ```
 
-Sprawdzone (`deploy/e2e/bundle-proof.sh`, 9 z 9 kontroli): paczka (350 MiB) trafia do czystego kontenera `docker:28-dind` z `--network none`, czyli bez dostępu do sieci. `install.sh` ładuje obrazy, tworzy `deploy/.env` i uruchamia stos w 29 s. Pomiar 2026-11-21 (commit d250e29, paczka 354 MiB, czysty `docker:28-dind`): 26 s od rozpakowania do zdrowego stosu. `/healthz` zwraca `ok` z aktywnym `pg_tde`, a administrator loguje się hasłem z instalatora.
+Sprawdzone (`deploy/e2e/bundle-proof.sh`, 9 z 9 kontroli): paczka (350 MiB) trafia do czystego kontenera `docker:28-dind` z `--network none`, czyli bez dostępu do sieci. `install.sh` ładuje obrazy, tworzy `deploy/.env` i uruchamia stos w 29 s. Pomiar 2026-11-21 (commit d250e29, paczka 354 MiB, czysty `docker:28-dind`): 26 s od rozpakowania do zdrowego stosu. Ponownie po scaleniu (commit 607c91e, z obrazem `alpine:3.22` usługi `secrets`): 9 z 9 kontroli, instalacja 29 s. `/healthz` zwraca `ok` z aktywnym `pg_tde`, a administrator loguje się hasłem z instalatora.
 
 ### 2.3 Bez kontenerów: `make release`
 
@@ -127,6 +128,7 @@ Zmierzone 2026-11-21:
 - Linux (serwer z Ubuntu 24.04, ufw przepuszcza tylko 22), tryb domyślny, cel `localhost`, własne kontenery nginx opublikowane tylko na adresie mostu `172.17.0.1`, porty `28787,28788`: `host.docker.internal` w kontenerze to `172.17.0.1`, `host_gateway` 172.17.0.1, podgląd `localhost` → `maps_to` 172.17.0.1. Przebieg 1: obie usługi i etykieta „Host dockera (ten komputer)”. Przebieg 2 (nginx na 28787 zatrzymany): `service_gone` na 28787. Przebieg 3: `service_returned` (41 s nieobecności, 1 skan). Każdy przebieg 18–22 s.
   Na Linuksie port opublikowany tylko na `127.0.0.1` hosta (`-p 127.0.0.1:P:P`) nie jest osiągalny z kontenera przez `172.17.0.1`. Szablon publikuje porty na wszystkich adresach, więc tryb domyślny je widzi. Usługę związaną z `127.0.0.1` skanuje tryb sieci hosta.
   Za zaporą, która odrzuca pakiety bez odpowiedzi (ufw), zatrzymana usługa daje stan `filtered`, a nie `closed`. Port otwartej wcześniej usługi w stanie `filtered` na hoście, który odpowiada, to `service_gone`, a nie „usługa nieosiągalna”.
+- Linux, sieć hosta, po zmianie sekretów (commit 607c91e, bez `.env`): `up -d --build --wait` 31 s, usługa `secrets` wygenerowała hasło bazy, interfejs i baza słuchają tylko na `127.0.0.1` (18090 i 55491). Cel `127.0.0.1`, porty `18090,28787`: przebieg 1 obie usługi (Czujka z tagiem `czujka`), przebieg 2 `service_gone` na 28787, przebieg 3 `service_returned` (1 min, 1 skan). Każdy przebieg 33–38 s.
 - Linux (serwer z Ubuntu 24.04), sieć hosta, cel `127.0.0.1`, porty `18090,28787`: `network_mode=host`, interfejs i baza tylko na `127.0.0.1`, `host_gateway` puste. Przebiegi 1–3: `service_gone`, potem `service_returned` na 28787; usługa Czujki z tagiem `czujka`, bez znalezisk. Każdy przebieg 32–39 s.
 
 Zmiany między skanami (`docs/API.md`, rodzaje zmian):
