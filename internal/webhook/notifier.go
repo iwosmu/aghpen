@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/store"
@@ -51,6 +52,7 @@ func (n *Notifier) NotifyRun(ctx context.Context, runID int64) {
 		}
 		return nil
 	})
+	markFinished(&run, time.Now())
 	p, ok := Build(run, changes, findings, s.MinSeverity, s.UIURL)
 	if !ok {
 		n.log().Debug("webhook: nothing at the minimum severity", "run", runID, "min", s.MinSeverity)
@@ -66,4 +68,14 @@ func (n *Notifier) NotifyRun(ctx context.Context, runID int64) {
 		n.log().Info("webhook delivered", "run", runID, "status", res.Status, "ms", res.Ms)
 	}
 	_ = n.St.InsertAudit(ctx, model.AuditEntry{Action: "integration.webhook.send", Entity: "run", EntityID: fmt.Sprint(runID), UserEmail: "system", Detail: detail})
+}
+
+// markFinished sets FinishedAt when it is empty. The analysis runs before
+// the runner stores the end of the run (status "analyzing"), but an
+// analysed run is finished: its end is the time of the analysis.
+func markFinished(run *model.ScanRun, now time.Time) {
+	if run.FinishedAt == nil {
+		t := now.UTC()
+		run.FinishedAt = &t
+	}
 }

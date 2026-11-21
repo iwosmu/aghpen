@@ -131,3 +131,26 @@ func TestPayloadJSONShape(t *testing.T) {
 		}
 	}
 }
+
+// An analysed run is finished even when the runner has not stored its end
+// yet (the analysis runs in status "analyzing"): the payload never carries
+// finished_at: null.
+func TestMarkFinished(t *testing.T) {
+	now := time.Date(2026, 11, 21, 21, 0, 0, 0, time.FixedZone("CET", 3600))
+	run := model.ScanRun{ID: 4, Status: model.RunAnalyzing}
+	markFinished(&run, now)
+	if run.FinishedAt == nil || !run.FinishedAt.Equal(now) || run.FinishedAt.Location() != time.UTC {
+		t.Fatalf("finished_at %v", run.FinishedAt)
+	}
+	stored := time.Date(2026, 11, 21, 19, 0, 0, 0, time.UTC)
+	run.FinishedAt = &stored
+	markFinished(&run, now)
+	if !run.FinishedAt.Equal(stored) {
+		t.Errorf("a stored end was replaced: %v", run.FinishedAt)
+	}
+	p, _ := Build(run, nil, nil, model.SevInfo, "")
+	raw, _ := json.Marshal(p)
+	if !strings.Contains(string(raw), `"finished_at":"2026-11-21T19:00:00Z"`) {
+		t.Errorf("payload %s", raw)
+	}
+}

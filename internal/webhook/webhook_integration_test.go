@@ -82,7 +82,7 @@ func TestWebhookEndToEnd(t *testing.T) {
 	}
 
 	// An analysed run with a new service.
-	run, err := st.CreateRun(ctx, model.ScanRun{Status: model.RunCompleted, Trigger: "manual", ProfileName: "lab"})
+	run, err := st.CreateRun(ctx, model.ScanRun{Status: model.RunAnalyzing, Trigger: "manual", ProfileName: "lab"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,6 +113,9 @@ func TestWebhookEndToEnd(t *testing.T) {
 	}
 	if p.Event != EventRun || p.RunID != run.ID || len(p.Changes) != 1 || !strings.Contains(p.Text, "Nowa usługa 10.66.0.5:8080") || !strings.HasPrefix(p.RunURL, api.URL+"/runs/") {
 		t.Errorf("payload %+v", p)
+	}
+	if p.FinishedAt == nil || time.Since(*p.FinishedAt) > time.Minute {
+		t.Errorf("finished_at of an analysed run: %v (body %s)", p.FinishedAt, bodies[1])
 	}
 	if sigs[1] != Sign("s3cret", bodies[1]) {
 		t.Errorf("signature %q", sigs[1])
