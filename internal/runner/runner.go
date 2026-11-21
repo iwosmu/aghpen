@@ -196,6 +196,11 @@ func (m *Manager) BuildPlan(ctx context.Context, profile model.ScanProfile, run 
 	}
 	plan.Targets = kept
 	if adHoc {
+		// Only addresses inside an enabled target (security review H1); a
+		// resume checks again, so a target switched off meanwhile stops it.
+		if err = m.checkAdHocScope(ctx, plan.Targets); err != nil {
+			return plan, err
+		}
 		// Every known address of the ad-hoc list is a hint, whatever its scope:
 		// a silent one then gets a down observation (a confirmation probe).
 		plan.Hints, err = m.st.HostHintsIn(ctx, run.AdHoc.Addresses)

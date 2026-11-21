@@ -85,7 +85,18 @@ func targeted(mgr *runner.Manager) reprobe.Starter {
 		if trigger == "" {
 			trigger = runner.TriggerReprobe
 		}
-		return mgr.StartAdHoc(ctx, targetedRequest(req), nil, trigger)
+		// Only hosts inside an enabled target: a host that only an import or
+		// a manual entry knows is never probed (security review H1).
+		scope := targetedRequest(req)
+		kept, err := mgr.KeepInTargets(ctx, scope.Addresses)
+		if err != nil {
+			return model.ScanRun{}, err
+		}
+		if len(kept) == 0 {
+			return model.ScanRun{}, fmt.Errorf("%w: żaden z %d adresów nie leży we włączonym celu", runner.ErrInvalid, len(scope.Addresses))
+		}
+		scope.Addresses = kept
+		return mgr.StartAdHoc(ctx, scope, nil, trigger)
 	}
 }
 

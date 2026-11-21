@@ -520,6 +520,12 @@ func (s *Server) importResults(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	if scopeID != 0 && !principal(r).Can(model.PermTargetsCreate) {
+		// An import into a scope adds its hosts as targets: that needs
+		// targets:create, not only results:create (security review L6).
+		writeErr(w, http.StatusForbidden, "forbidden", "import do zakresu dodaje cele, więc wymaga uprawnienia targets:create; zaimportuj wyniki bez zakresu")
+		return
+	}
 	if scopeID != 0 {
 		if _, err := s.st.GetScope(r.Context(), scopeID); err != nil {
 			writeErr(w, http.StatusUnprocessableEntity, "validation", fmt.Sprintf("scope %d does not exist", scopeID))
