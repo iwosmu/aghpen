@@ -219,6 +219,9 @@ type Deps struct {
 	// Lookup resolves domain targets for the allowed-networks check; nil uses the system resolver.
 	Lookup runner.LookupFunc
 
+	// Doctor runs the installation checks of GET /doctor (internal/doctor); nil answers 501.
+	Doctor func(ctx context.Context) any
+
 	// EngineInfo describes the prober for /healthz (prober, mode, raw_sockets); nil omits it.
 	EngineInfo func() map[string]any
 }

@@ -119,20 +119,53 @@ func TargetAllowed(ctx context.Context, t model.Target, nets []netip.Prefix, loo
 
 // FilterAllowed keeps the targets that lie inside the allowed networks of the
 // policy and returns the dropped ones with their reasons.
+//
+// The operator lock (policy.OperatorNetworks, from CZUJKA_ALLOWED_NETWORKS)
+// is checked first and in addition: a target must lie inside both lists.
 func FilterAllowed(ctx context.Context, targets []model.Target, policy model.SafetyPolicy, lookup LookupFunc) (kept []model.Target, dropped []model.InvalidLine, err error) {
+	op, err := ParseAllowed(policy.OperatorNetworks)
+	if err != nil {
+		return nil, nil, err
+	}
 	nets, err := ParseAllowed(policy.AllowedNetworks)
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(nets) == 0 {
+	if len(op) == 0 && len(nets) == 0 {
 		return targets, nil, nil
 	}
 	for i, t := range targets {
-		if ok, why := TargetAllowed(ctx, t, nets, lookup); ok {
+		ok, why := TargetAllowed(ctx, t, op, lookup)
+		if !ok {
+			why = OperatorReason(why)
+		} else {
+			ok, why = TargetAllowed(ctx, t, nets, lookup)
+		}
+		if ok {
 			kept = append(kept, t)
 		} else {
 			dropped = append(dropped, model.InvalidLine{Line: i + 1, Value: t.Value, Reason: why})
 		}
 	}
 	return kept, dropped, nil
+}
+
+// OperatorReason turns a refusal of TargetAllowed into the Polish text for the operator lock.
+func OperatorReason(why string) string {
+	const policy = "dozwolonymi sieciami polityki bezpieczeństwa"
+	if strings.Contains(why, policy) {
+		return strings.ReplaceAll(why, policy, "sieciami, do których operator ograniczył skanowanie (CZUJKA_ALLOWED_NETWORKS; blokady nie zmieni żaden użytkownik)")
+	}
+	return why + " (blokada operatora: CZUJKA_ALLOWED_NETWORKS)"
+}
+
+// PrefixInside reports whether p lies wholly inside one of nets.
+func PrefixInside(p netip.Prefix, nets []netip.Prefix) bool {
+	p = p.Masked()
+	for _, q := range nets {
+		if q.Addr().BitLen() == p.Addr().BitLen() && q.Bits() <= p.Bits() && q.Contains(p.Addr()) {
+			return true
+		}
+	}
+	return false
 }

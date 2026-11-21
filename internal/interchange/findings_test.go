@@ -75,6 +75,30 @@ func TestDojoGenericJSONOnlyAllowedKeysAndRoundTrip(t *testing.T) {
 	}
 }
 
+func TestRuleFindingsRoundTripAsOwnExport(t *testing.T) {
+	t0 := time.Date(2026, 11, 21, 12, 5, 0, 0, time.UTC)
+	in := []model.Finding{
+		{Key: "policy-violation|database-port-exposed|10.91.1.81|3306/tcp", Type: "policy-violation", Title: "Reguła: port bazy danych dostępny",
+			Severity: model.SevHigh, Status: model.FindingNew, IP: "10.91.1.81", Port: 3306, FirstSeen: t0, LastSeen: t0},
+		{Key: "policy-violation|staging-or-debug-exposed|10.91.3.50", Type: "policy-violation", Title: "Reguła: host testowy",
+			Severity: model.SevMedium, Status: model.FindingNew, IP: "10.91.3.50", FirstSeen: t0, LastSeen: t0},
+	}
+	var buf bytes.Buffer
+	if err := WriteDojoGenericJSON(&buf, in); err != nil {
+		t.Fatal(err)
+	}
+	out, rep, err := ImportFindings(bytes.NewReader(buf.Bytes()), FindingsOptions{})
+	if err != nil || len(out) != 2 {
+		t.Fatalf("import: %v %+v", err, rep)
+	}
+	for i, f := range out {
+		w := in[i]
+		if f.Key != w.Key || f.Type != "policy-violation" || f.IP != w.IP || f.Port != w.Port || f.Manual || containsFold(f.Tags, "import:czujka") {
+			t.Errorf("rule finding %d is not kept as Czujka's own: got %+v", i, f)
+		}
+	}
+}
+
 func TestDojoGenericCSVRoundTrip(t *testing.T) {
 	in := sampleFindings()
 	var buf bytes.Buffer

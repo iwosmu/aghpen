@@ -214,8 +214,16 @@ func TestNextRunAndNextStart(t *testing.T) {
 	night := []model.Window{{Start: "22:00", End: "06:00"}}
 
 	iv := model.Schedule{Enabled: true, IntervalMinutes: 90}
-	if got, _ := NextRun(iv, time.Time{}, now); !got.Equal(now) {
-		t.Errorf("an interval schedule that never ran is due now: %v", got)
+	if got, _ := NextRun(iv, time.Time{}, now); !got.Equal(now.Add(90 * time.Minute)) {
+		t.Errorf("an interval schedule that never ran is due one interval after the save: %v", got)
+	}
+	ivw := model.Schedule{Enabled: true, IntervalMinutes: 1440, Windows: night}
+	if got, _ := NextRun(ivw, time.Time{}, now); !got.Equal(at(loc, "2026-11-23 22:00")) {
+		t.Errorf("an interval schedule with windows that never ran waits for the next window: %v", got)
+	}
+	inside := at(loc, "2026-11-23 23:00") // saved inside a window: still not at once
+	if got, _ := NextRun(ivw, time.Time{}, inside); !got.Equal(at(loc, "2026-11-24 22:00")) {
+		t.Errorf("saved inside a window: %v", got)
 	}
 	last := at(loc, "2026-11-23 09:00")
 	if got, _ := NextRun(iv, last, now); !got.Equal(at(loc, "2026-11-23 10:30")) {
@@ -295,8 +303,8 @@ func TestSchedulerTick(t *testing.T) {
 	clock := boot
 	b := &fakeBackend{
 		profiles: []model.ScanProfile{
-			prof(1, model.Schedule{IntervalMinutes: 60}),                  // no windows: due at once
-			prof(2, model.Schedule{IntervalMinutes: 60, Windows: night}),  // due, but must wait for 22:00
+			prof(1, model.Schedule{IntervalMinutes: 60}),                  // no windows: due one interval after the save (10:00)
+			prof(2, model.Schedule{IntervalMinutes: 60, Windows: night}),  // never ran: first due when the window opens (22:00)
 			prof(3, model.Schedule{Cron: "0 12 * * *"}),                   // due at 12:00
 			prof(4, model.Schedule{IntervalMinutes: 30}),                  // a run is active
 			prof(5, model.Schedule{IntervalMinutes: 600, Windows: night}), // has a window-paused run
@@ -312,19 +320,18 @@ func TestSchedulerTick(t *testing.T) {
 
 	s := New(b, Options{Now: func() time.Time { return clock }, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 
-	d := s.Tick(context.Background(), clock) // 09:00
-	if !reflect.DeepEqual(d.Started, []int64{1}) || len(d.Resumed) != 0 || !reflect.DeepEqual(d.Waiting, []int64{2}) {
+	d := s.Tick(context.Background(), clock) // 09:00: saving (here: boot) never starts a run
+	if len(d.Started) != 0 || len(d.Resumed) != 0 || len(d.Waiting) != 0 {
 		t.Fatalf("09:00 decision = %+v", d)
 	}
-	if b.ends[1] != nil {
-		t.Error("no windows: no window end")
-	}
-	b.last[1] = clock
 
 	clock = at(loc, "2026-11-23 12:00")
 	d = s.Tick(context.Background(), clock)
-	if !reflect.DeepEqual(d.Started, []int64{1, 3}) { // profile 1 is due again (60 min), cron fires
+	if !reflect.DeepEqual(d.Started, []int64{1, 3}) { // profile 1 is first due at 10:00, cron fires
 		t.Fatalf("12:00 decision = %+v", d)
+	}
+	if b.ends[1] != nil {
+		t.Error("no windows: no window end")
 	}
 	b.last[1], b.last[3] = clock, clock
 

@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -33,6 +34,10 @@ type Config struct {
 	SchedInterval time.Duration // CZUJKA_SCHED_INTERVAL: tick of the scheduler loop, default 20s
 	NmapPath      string        // CZUJKA_NMAP_PATH: nmap binary; empty means "nmap" from PATH
 	ForceNative   bool          // CZUJKA_FORCE_NATIVE: use the native Go prober even when nmap is installed
+	// AllowedNetworks: CZUJKA_ALLOWED_NETWORKS, comma-separated CIDRs (or
+	// addresses). The operator lock: a hard upper bound on what can be
+	// scanned that no user can widen. Empty: no lock.
+	AllowedNetworks []string
 }
 
 // Load reads the configuration from the process environment.
@@ -76,6 +81,20 @@ func FromEnv(get func(string) string) (Config, error) {
 	}
 	if c.SchedInterval, err = dur(get, "CZUJKA_SCHED_INTERVAL", 20*time.Second); err != nil {
 		return c, err
+	}
+	for _, n := range strings.Split(get("CZUJKA_ALLOWED_NETWORKS"), ",") {
+		if n = strings.TrimSpace(n); n == "" {
+			continue
+		}
+		p, err := netip.ParsePrefix(n)
+		if err != nil {
+			a, aerr := netip.ParseAddr(n)
+			if aerr != nil {
+				return c, fmt.Errorf("CZUJKA_ALLOWED_NETWORKS: %q is not a CIDR or an address", n)
+			}
+			p = netip.PrefixFrom(a.Unmap(), a.Unmap().BitLen())
+		}
+		c.AllowedNetworks = append(c.AllowedNetworks, p.Masked().String())
 	}
 	c.NmapPath = get("CZUJKA_NMAP_PATH")
 	if c.ForceNative, err = boolean(get, "CZUJKA_FORCE_NATIVE", false); err != nil {

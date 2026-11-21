@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/iwosmu/aghpen/internal/auth"
 	"github.com/iwosmu/aghpen/internal/interchange"
 	"github.com/iwosmu/aghpen/internal/model"
@@ -333,6 +334,19 @@ func TestPausedRunSendsPausedEvent(t *testing.T) {
 	if run.Status != model.RunPaused {
 		t.Fatalf("run status %s, want paused", run.Status)
 	}
+	// A second start of the same profile collides with the paused run: 409 run_active with its id.
+	resp, raw := admin.raw("POST", "/api/v1/runs", map[string]any{"profile_id": p.ID}, map[string]string{auth.CSRFHeader: admin.csrf, "Content-Type": "application/json"})
+	var ae struct {
+		Error struct {
+			Code    string           `json:"code"`
+			Message string           `json:"message"`
+			Details map[string]int64 `json:"details"`
+		} `json:"error"`
+	}
+	_ = json.Unmarshal(raw, &ae)
+	if resp.StatusCode != 409 || ae.Error.Code != "run_active" || ae.Error.Details["run_id"] != run.ID {
+		t.Fatalf("start during an active run: %d %s", resp.StatusCode, raw)
+	}
 }
 
 // testImporter is the import seam without the inventory check of internal/wire.
@@ -340,4 +354,26 @@ type testImporter struct{}
 
 func (testImporter) ParseResults(_ context.Context, _ string, data []byte) ([]model.HostResult, model.ImportReport, error) {
 	return interchange.Import(bytes.NewReader(data), interchange.Options{})
+}
+
+// A route registered through Deps.Routes next to /signatures/{id} is reached
+// (chi prefers the static segment), and goes through the permission guard.
+func TestRoutesHookSignatureSuggestNotShadowed(t *testing.T) {
+	e := setup(t, func(d *Deps) {
+		d.Routes = append(d.Routes, func(r chi.Router, can Guard) {
+			r.With(can(model.PermSignaturesRead)).Post("/signatures/suggest", func(w http.ResponseWriter, _ *http.Request) {
+				WriteJSON(w, http.StatusOK, map[string]bool{"suggested": true})
+			})
+		})
+	})
+	admin := e.login("admin@example.org", adminPW)
+	var out map[string]bool
+	admin.want(200, "POST", "/api/v1/signatures/suggest", map[string]any{"service_id": 1}, &out)
+	if !out["suggested"] {
+		t.Fatalf("suggest: %v", out)
+	}
+	resp, _ := (&client{e: e}).raw("POST", "/api/v1/signatures/suggest", map[string]any{}, nil)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("without a session: %d", resp.StatusCode)
+	}
 }
