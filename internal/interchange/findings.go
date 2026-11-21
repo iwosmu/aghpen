@@ -718,6 +718,8 @@ var (
 	reDescHost = regexp.MustCompile(`\*\*Host:\*\*\s*([0-9A-Fa-f:.]+)(?:\s*·\s*\*\*Port:\*\*\s*(\d+))?`)
 	reDescKey  = regexp.MustCompile(`Klucz:\s*([^\s_]+)`)
 	reKeyAddr  = regexp.MustCompile(`^[a-z0-9-]+/([0-9A-Fa-f:.]+)/(tcp|udp)-(\d+)(?:/|$)`)
+	// Exposure-rule findings (internal/rules): policy-violation|<rule>|<ip>[|<port>/<proto>] or |scope.
+	reKeyRule = regexp.MustCompile(`^policy-violation\|[^|]+\|(?:scope|([0-9A-Fa-f:.]+)(?:\|(\d+)/(tcp|udp))?)$`)
 )
 
 func (im *findingImporter) foreign(n int, in foreignFinding, value string) {
@@ -755,6 +757,10 @@ func (im *findingImporter) foreign(n int, in foreignFinding, value string) {
 	if m := reKeyAddr.FindStringSubmatch(key); m != nil {
 		ownExport = true
 	}
+	ruleKey := reKeyRule.FindStringSubmatch(key)
+	if ruleKey != nil {
+		ownExport = true
+	}
 	switch {
 	case len(in.Endpoints) > 0:
 		e := in.Endpoints[0]
@@ -781,6 +787,9 @@ func (im *findingImporter) foreign(n int, in foreignFinding, value string) {
 		if m := reKeyAddr.FindStringSubmatch(key); m != nil {
 			f.IP = m[1]
 			f.Port, _ = strconv.Atoi(m[3])
+		} else if ruleKey != nil && ruleKey[1] != "" {
+			f.IP = ruleKey[1]
+			f.Port, _ = strconv.Atoi(ruleKey[2])
 		}
 	}
 	if f.IP == "" {
@@ -811,6 +820,9 @@ func (im *findingImporter) foreign(n int, in foreignFinding, value string) {
 		// A finding Czujka exported earlier: keep its key and type.
 		f.Key = key
 		f.Type = strings.SplitN(key, "/", 2)[0]
+		if ruleKey != nil {
+			f.Type = "policy-violation"
+		}
 		f.Manual = false
 		if in.VulnID != "" {
 			f.Type = in.VulnID

@@ -71,9 +71,12 @@ func TestSchedulerBackendWithRealStoreAndRunner(t *testing.T) {
 		t.Fatalf("last run of a new profile = %v %v %v", last, active, err)
 	}
 
-	// 1. A profile that never ran is due at once.
+	// 1. A profile that never ran is not due on save; it is due one interval after the save.
 	now := time.Now()
-	if d := s.Tick(ctx, now); len(d.Started) != 1 || d.Started[0] != hourly.ID {
+	if d := s.Tick(ctx, now); len(d.Started) != 0 {
+		t.Fatalf("a schedule must not start on save: %+v", d)
+	}
+	if d := s.Tick(ctx, now.Add(61*time.Minute)); len(d.Started) != 1 || d.Started[0] != hourly.ID {
 		t.Fatalf("first tick = %+v", d)
 	}
 	mgr.Wait()

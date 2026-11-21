@@ -13,15 +13,26 @@ import { ProgressBar } from '../viz/charts';
 import { useCan } from '../session';
 import { EstimateBox } from './ProfileEdit';
 
-function triggerLabel(x: string): string {
-  return x === 'schedule' ? t('harmonogram', 'schedule') : x === 'import' ? t('import', 'import') : t('ręcznie', 'manual');
+export function triggerLabel(x: string): string {
+  switch (x) {
+    case 'schedule': return t('harmonogram', 'schedule');
+    case 'import': return t('import', 'import');
+    case 'reprobe': return t('ponowne sprawdzenie', 're-probe');
+    case 'manual-entry': return t('wpis ręczny', 'manual entry');
+    default: return t('ręcznie', 'manual');
+  }
 }
 
 export function StartRunDialog({ open, onClose, profileId }: { open: boolean; onClose: () => void; profileId?: number }) {
   const profiles = usePage<ScanProfile>('/profiles', { limit: 100 }, open);
   const [pid, setPid] = useState<string>(profileId ? String(profileId) : '');
   const navigate = useNavigate();
-  const chosen = pid || (profiles.data?.items[0] ? String(profiles.data.items[0].id) : '');
+  // Default to the first profile that can run: enabled and with at least one scope.
+  const items = profiles.data?.items ?? [];
+  const firstReady = items.find((p) => p.enabled && (p.scope_ids ?? []).length > 0) ?? items[0];
+  const chosen = pid || (firstReady ? String(firstReady.id) : '');
+  const chosenProfile = items.find((p) => String(p.id) === chosen);
+  const noScope = Boolean(chosenProfile && (chosenProfile.scope_ids ?? []).length === 0);
   const start = useAction((id: number) => post<ScanRun>('/runs', { profile_id: id }), {
     invalidate: ['/runs', '/dashboard'], silent: true,
     onSuccess: (run) => { onClose(); navigate('/runs/' + run.id); },
@@ -31,14 +42,14 @@ export function StartRunDialog({ open, onClose, profileId }: { open: boolean; on
       open={open} onClose={onClose} title={t('Uruchom skan', 'Start a scan')} width={560}
       footer={<>
         <Button onClick={onClose}>{t('Anuluj', 'Cancel')}</Button>
-        <Button variant="primary" icon="play" busy={start.isPending} disabled={!chosen} onClick={() => start.mutate(Number(chosen))}>{t('Uruchom', 'Start')}</Button>
+        <Button variant="primary" icon="play" busy={start.isPending} disabled={!chosen || noScope} onClick={() => start.mutate(Number(chosen))}>{t('Uruchom', 'Start')}</Button>
       </>}
     >
       <label className="block">
         <span className="label mb-1 block">{t('Profil skanu', 'Scan profile')}</span>
-        <Select value={chosen} onChange={setPid} options={(profiles.data?.items ?? []).map((p) => ({ value: String(p.id), label: p.name }))} />
+        <Select value={chosen} onChange={setPid} options={items.map((p) => ({ value: String(p.id), label: p.name + ((p.scope_ids ?? []).length === 0 ? t(' (bez zakresu)', ' (no scope)') : '') }))} />
       </label>
-      {chosen ? <div className="mt-4"><p className="label mb-1.5">{t('Budżet ruchu przed startem', 'Traffic budget before the start')}</p><EstimateBox profileId={Number(chosen)} /></div> : null}
+      {noScope ? <p className="mt-3 text-sm text-ink-2">{t('Ten profil nie ma przypisanego zakresu, więc nie ma czego skanować. ', 'This profile has no scope, so there is nothing to scan. ')}<Link to={'/profiles/' + chosen} className="link">{t('Przypisz zakres w profilu', 'Assign a scope in the profile')}</Link>.</p> : chosen ? <div className="mt-4"><p className="label mb-1.5">{t('Budżet ruchu przed startem', 'Traffic budget before the start')}</p><EstimateBox profileId={Number(chosen)} /></div> : null}
       <div className="mt-3"><InlineError error={start.error} /></div>
     </Dialog>
   );
@@ -55,8 +66,8 @@ export default function Runs() {
   const cols: Col<ScanRun>[] = [
     { id: 'id', header: '#', sort: 'id', width: 64, cell: (r) => <Link to={'/runs/' + r.id} className="num link">#{r.id}</Link> },
     { id: 'status', header: t('Stan', 'Status'), cell: (r) => <RunStatusMark status={r.status} pauseReason={r.pause_reason} /> },
-    { id: 'profile', header: t('Profil / źródło', 'Profile / source'), cell: (r) => <span className="block max-w-[280px] truncate" title={r.profile_name}>{r.profile_name}</span> },
-    { id: 'trigger', header: t('Start', 'Trigger'), hide: 'lg', cell: (r) => <span className="text-ink-2">{triggerLabel(r.trigger)}</span> },
+    { id: 'profile', header: t('Profil / źródło', 'Profile / source'), cell: (r) => <span className="block max-w-[280px] truncate" title={r.profile_name + (r.note ? ' · ' + r.note : '')}>{r.label ? <span className="mr-1.5 border border-rule-strong px-1 text-2xs text-ink-2">{r.label}</span> : null}{r.profile_name}</span> },
+    { id: 'trigger', header: t('Start', 'Trigger'), hide: 'lg', cell: (r) => <span className={r.trigger === 'reprobe' ? 'text-accent' : 'text-ink-2'}>{triggerLabel(r.trigger)}</span> },
     { id: 'started', header: t('Rozpoczęty', 'Started'), sort: 'started_at', cell: (r) => <span className="num text-ink-2" title={fmtDateTime(r.started_at)}>{fmtRelative(r.started_at)}</span> },
     { id: 'dur', header: t('Czas', 'Duration'), align: 'right', hide: 'md', cell: (r) => <span className="num">{fmtDuration(r.stats.elapsed_sec)}</span> },
     { id: 'progress', header: t('Adresy', 'Addresses'), width: 170, cell: (r) => {

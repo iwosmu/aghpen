@@ -261,7 +261,8 @@ func (s *Server) putSafety(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	in.EmergencyStop = cur.EmergencyStop // only the emergency-stop routes change the flag
+	in.EmergencyStop = cur.EmergencyStop       // only the emergency-stop routes change the flag
+	in.OperatorNetworks = cur.OperatorNetworks // read only: the operator sets it in the environment
 	switch {
 	case in.MaxPPS < 1 || in.MaxPPS > 100000:
 		err = invalid("max_pps must be between 1 and 100000")
@@ -310,7 +311,12 @@ func (s *Server) putSafety(w http.ResponseWriter, r *http.Request) {
 			err = invalid("allowed_networks: %v", perr)
 		} else {
 			in.AllowedNetworks = make([]string, 0, len(nets))
+			op, _ := runner.ParseAllowed(cur.OperatorNetworks)
 			for _, n := range nets {
+				if len(op) > 0 && !runner.PrefixInside(n, op) {
+					err = invalid("allowed_networks: %s lies outside the operator lock (CZUJKA_ALLOWED_NETWORKS: %s); only the operator can widen it", n, strings.Join(cur.OperatorNetworks, ", "))
+					break
+				}
 				in.AllowedNetworks = append(in.AllowedNetworks, n.String())
 			}
 		}
@@ -324,7 +330,7 @@ func (s *Server) putSafety(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	auditSet(r, "safety.update", "safety", nil, map[string]any{"max_pps": p.MaxPPS, "max_http_rps": p.MaxHTTPRPS, "exclusions": len(p.Exclusions)})
+	auditSet(r, "safety.update", "safety", nil, map[string]any{"max_pps": p.MaxPPS, "max_http_rps": p.MaxHTTPRPS, "exclusions": len(p.Exclusions), "allowed_networks": p.AllowedNetworks})
 	writeJSON(w, http.StatusOK, p)
 }
 

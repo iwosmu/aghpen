@@ -243,6 +243,40 @@ check "service edit survives the second scan" "$(echo "$S" | jq -r '"\(.note) | 
 F=$(api GET /findings/$DBF)
 check "finding triage survives the second scan" "$(echo "$F" | jq -r '"\(.status) | \(.note) | last_run=\(.last_run_id)"')" "accepted | baza testowa, ryzyko zaakceptowane | last_run=$RUN2"
 
+step "11b. Exposure rules, time machine and re-probing on the changed lab"
+# Rules are evaluated after every analysis. The starter rule database-port-exposed fired for redis and
+# MariaDB in run 1; redis stopped before run 2, so its violation is resolved and MariaDB's stays open.
+PV=$(api GET "/findings?type=policy-violation&limit=500&status=new,triaged,resolved")
+echo "$PV" | jq -r '.items[] | "  [\(.status)] \(.key)"' | head -20
+check "rule violation of the running MariaDB stays open" "$(echo "$PV" | jq -r --arg k "policy-violation|database-port-exposed|$P.1.81|3306/tcp" '[.items[] | select(.key == $k)][0].status')" "new"
+check "rule violation of the stopped redis is resolved" "$(echo "$PV" | jq -r --arg k "policy-violation|database-port-exposed|$P.1.30|6379/tcp" '[.items[] | select(.key == $k)][0].status')" "resolved"
+check "rules list shows the starter pack" "$(api GET /rules?limit=100 | jq '[.items[] | select(.builtin)] | length > 0')" "true"
+# Time machine: the redis host as of run 1 (up) and as of run 2 (silent).
+check "time machine: redis host up as of run 1" "$(api GET "/timeline/at/hosts?run_id=$RUN1&q=$P.1.30" | jq -r '.items[0].status')" "up"
+check "time machine: redis service open as of run 1" "$(api GET "/timeline/at/services?run_id=$RUN1&q=$P.1.30&port=6379" | jq -r '.items[0].state')" "open"
+check "time machine: redis host silent as of run 2" "$(api GET "/timeline/at/hosts?run_id=$RUN2&q=$P.1.30" | jq -r '.items[0].up')" "false"
+checkge "time machine: scrubber lists the runs" "$(api GET /timeline | jq '.runs | length')" 2
+# Re-probing is off in a fresh installation; enable it with short steps and wait for the confirmation.
+check "re-probing is off by default" "$(api GET /settings/reprobe | jq -r .enabled)" "false"
+api PUT /settings/reprobe '{"enabled":true,"backoff_minutes":[1,2,3]}' | jq -c '{enabled, backoff_minutes}'
+PLAN=$(api GET /reprobe/plan)
+echo "$PLAN" | jq -r '.probes[]? | "  plan: \(.ip) \(.kind) \(.step)/\(.steps) at \(.not_before): \(.reason)"' | head -5
+check "re-probe plan has a confirmation probe for the silent redis host" "$(echo "$PLAN" | jq -r --arg ip "$P.1.30" '[.probes[]? | select(.ip == $ip and .kind == "confirm")] | length > 0')" "true"
+RH30=$(api GET "/hosts?q=$P.1.30" | jq -r '.items[0].id')
+GONE_RUN=none
+for i in $(seq 1 60); do
+  GONE_RUN=$(api GET "/hosts/$RH30/changes?limit=50" | jq -r '[.items[] | select(.kind == "host_gone")][0].run_id // "none"')
+  [ "$GONE_RUN" != none ] && break
+  sleep 10
+done
+api PUT /settings/reprobe '{"enabled":false}' >/dev/null
+RP_RUNS=$(api GET "/runs?limit=50" | jq -r --argjson r2 "$RUN2" '[.items[] | select(.id > $r2)] | map(.trigger) | unique | join(",")')
+echo "  runs after run 2: triggers $RP_RUNS; host_gone in run $GONE_RUN"
+check "the stopped host became host_gone through re-probe runs" "$( [ "$GONE_RUN" != none ] && api GET /runs/$GONE_RUN | jq -r .trigger || echo none)" "reprobe"
+check "no full scan ran between run 2 and host_gone" "$RP_RUNS" "reprobe"
+check "re-probe runs probed only the silent host" "$(api GET "/runs?limit=50" | jq -r --argjson r2 "$RUN2" '[.items[] | select(.id > $r2) | .ad_hoc.addresses[]] | unique | join(",")')" "$P.1.30"
+check "redis host status after the confirmation" "$(api GET /hosts/$RH30 | jq -r .status)" "down"
+
 step "12. Run report (HTML and Markdown)"
 check "report.html" "$(curl -sS -b "$JAR" -o $TMP/r.html -w '%{http_code} %{content_type}' $API/runs/$RUN2/report.html)" "200 text/html; charset=utf-8"
 check "report.md" "$(curl -sS -b "$JAR" -o $TMP/r.md -w '%{http_code}' $API/runs/$RUN2/report.md)" "200"
@@ -252,8 +286,8 @@ step "13. Exports re-import"
 for fmt in json csv xml; do
   curl -sS -b "$JAR" -o $TMP/run2.$fmt $API/export/runs/$RUN2.$fmt
   IMP=$(upload /import/results $TMP/run2.$fmt)
-  echo "  $fmt: $(wc -c < $TMP/run2.$fmt | tr -d ' ') bytes -> $(echo "$IMP" | jq -c '{format, run_id, hosts, services, invalid: (.invalid | length)}')"
-  check "$fmt export imports again: hosts (live and silent) and open services" "$(echo "$IMP" | jq -r '"hosts=\(.hosts) services=\(.services)"')" "hosts=$(api GET "/hosts?limit=1" | jq .total) services=$(echo "$R2" | jq .stats.services_open)"
+  echo "  $fmt: $(wc -c < $TMP/run2.$fmt | tr -d ' ') bytes -> $(echo "$IMP" | jq -c '{format, run_id, hosts, hosts_down, services, invalid: (.invalid | length)}')"
+  check "$fmt export imports again: hosts (live and silent) and open services" "$(echo "$IMP" | jq -r '"hosts=\(.hosts + .hosts_down) services=\(.services)"')" "hosts=$(api GET "/hosts?limit=1" | jq .total) services=$(echo "$R2" | jq .stats.services_open)"
 done
 
 step "14. Signature file import (one valid, one unsafe)"

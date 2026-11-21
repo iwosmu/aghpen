@@ -31,6 +31,16 @@ func (s *Server) routesPart3(r chi.Router, can Guard) {
 	r.With(can(model.PermExportRun)).Post("/defectdojo/sync", s.dojoSync)
 	r.With(can(model.PermScansRun)).Patch("/runs/{id}", s.patchRun)
 	r.With(can(model.PermScansRun)).Post("/runs/adhoc", s.startAdHoc)
+	r.With(can(model.PermSafetyManage)).Get("/doctor", s.doctor)
+}
+
+// doctor answers the installation checks (czujka doctor) for administrators.
+func (s *Server) doctor(w http.ResponseWriter, r *http.Request) {
+	if s.d.Doctor == nil {
+		notWired(w, "the installation checks (internal/doctor)")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.d.Doctor(r.Context()))
 }
 
 // ---------- manual entry ----------

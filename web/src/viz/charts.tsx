@@ -4,6 +4,8 @@ import type { CountPoint, NameCount } from '../api/types';
 import { useWidth } from '../lib/hooks';
 import { cx, fmtDate, fmtInt, fmtSigned } from '../lib/format';
 import { t } from '../i18n';
+import { overCap } from '../lib/headline';
+import { Icon } from '../ui/Icon';
 
 /** Ranked horizontal bars: one series, one colour, the value at the tip. */
 export function BarList({ items, href, mono, labelWidth = 132, extra }: { items: NameCount[]; href?: (i: NameCount) => string; mono?: boolean; labelWidth?: number; extra?: (i: NameCount) => ReactNode }) {
@@ -96,33 +98,41 @@ export function TrendRows({ points, series }: { points: CountPoint[]; series: Se
   );
 }
 
-export function ProgressBar({ value, max, label }: { value: number; max: number; label?: string }) {
+/** Done part as a solid fill; "active" (addresses in chunks being scanned now) as a moving striped part after it. */
+export function ProgressBar({ value, max, label, active = 0 }: { value: number; max: number; label?: string; active?: number }) {
   const pct = max > 0 ? Math.min(1, value / max) : 0;
+  const act = max > 0 ? Math.min(1 - pct, active / max) : 0;
   return (
-    <div className="h-[6px] w-full bg-[color-mix(in_oklch,var(--accent)_14%,var(--raised))]" role="progressbar" aria-valuemin={0} aria-valuemax={max} aria-valuenow={value} aria-label={label}>
+    <div className="flex h-[6px] w-full bg-[color-mix(in_oklch,var(--accent)_14%,var(--raised))]" role="progressbar" aria-valuemin={0} aria-valuemax={max} aria-valuenow={value} aria-label={label}>
       <div className="h-full bg-accent transition-[width] duration-700 ease-out" style={{ width: pct * 100 + '%' }} />
+      {act > 0 ? <div className="bar-active h-full transition-[width] duration-700 ease-out" style={{ width: Math.max(0.6, act * 100) + '%' }} title={label} /> : null}
     </div>
   );
 }
 
 /** Rate against its caps: the fill is the current rate, the tick marks the profile cap, the track ends at the policy cap. */
 export function RateGauge({ current, cap, policyCap, unit = 'pps' }: { current: number; cap: number; policyCap: number; unit?: string }) {
-  const max = Math.max(policyCap, cap, 1);
-  const over = current > cap;
+  const max = Math.max(policyCap, cap, current, 1);
+  const over = overCap(current, cap);
   return (
-    <div>
+    <div data-over={over || undefined}>
       <div className="flex items-baseline justify-between gap-3">
-        <span><span className="num text-lg font-semibold text-ink">{fmtInt(current)}</span> <span className="text-xs text-ink-3">{unit}</span></span>
+        <span className={cx('inline-flex items-baseline gap-1', over && 'text-danger')}>{over ? <Icon name="alert" size={14} className="self-center" /> : null}<span className={cx('num text-lg font-semibold', over ? 'text-danger' : 'text-ink')}>{fmtInt(current)}</span> <span className="text-xs text-ink-3">{unit}</span></span>
         <span className="text-xs text-ink-2">{t('limit skanu', 'run cap')} <span className="num text-ink">{fmtInt(cap)}</span></span>
       </div>
       <div className="relative mt-1.5 h-[8px] bg-[color-mix(in_oklch,var(--accent)_14%,var(--raised))]" role="meter" aria-valuemin={0} aria-valuemax={max} aria-valuenow={current} aria-label={t('Tempo pakietów względem limitu', 'Packet rate against the cap')}>
-        <div className="h-full transition-[width] duration-700 ease-out" style={{ width: Math.min(100, (current / max) * 100) + '%', background: over ? 'var(--danger)' : 'var(--accent)' }} />
+        <div className={cx('h-full transition-[width] duration-700 ease-out', over && 'bar-over')} style={{ width: Math.min(100, (current / max) * 100) + '%', background: over ? undefined : 'var(--accent)' }} />
         <div className="absolute -bottom-1 -top-1 w-[2px] bg-ink" style={{ left: 'calc(' + Math.min(100, (cap / max) * 100) + '% - 1px)' }} title={t('limit skanu', 'run cap')} />
       </div>
       <div className="mt-1 flex justify-between text-2xs text-ink-3">
         <span className="num">0</span>
         <span>{t('limit polityki bezpieczeństwa', 'safety policy cap')} <span className="num text-ink-2">{fmtInt(policyCap)}</span></span>
       </div>
+      {over ? (
+        <p role="alert" className="mt-2 border-l-2 border-danger pl-2 text-xs text-ink" data-testid="rate-over-cap">
+          {t('Zgłoszone tempo przekracza limit skanu o ' + Math.round((current / cap - 1) * 100) + '%. To nie jest normalny stan: sprawdź przebieg albo użyj stopu awaryjnego.', 'The reported rate is ' + Math.round((current / cap - 1) * 100) + '% above the run cap. This is not a normal state: check the run or use the emergency stop.')}
+        </p>
+      ) : null}
     </div>
   );
 }

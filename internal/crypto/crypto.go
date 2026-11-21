@@ -43,6 +43,7 @@ var (
 type Keyring struct {
 	current string
 	keys    map[string]cipher.AEAD
+	raw     map[string][]byte // for key derivation (DeriveKey); never leaves the package
 }
 
 // ParseKey decodes a master key given as base64 (any alphabet, with or without
@@ -79,7 +80,7 @@ func KeyID(key []byte) string {
 
 // NewKeyring builds a keyring. New data is encrypted with current; old keys only decrypt.
 func NewKeyring(current []byte, old ...[]byte) (*Keyring, error) {
-	kr := &Keyring{keys: map[string]cipher.AEAD{}}
+	kr := &Keyring{keys: map[string]cipher.AEAD{}, raw: map[string][]byte{}}
 	for i, k := range append([][]byte{current}, old...) {
 		if len(k) != KeySize {
 			return nil, fmt.Errorf("crypto: master key %d has %d bytes, want %d", i, len(k), KeySize)
@@ -90,6 +91,7 @@ func NewKeyring(current []byte, old ...[]byte) (*Keyring, error) {
 		}
 		id := KeyID(k)
 		kr.keys[id] = a
+		kr.raw[id] = append([]byte(nil), k...)
 		if i == 0 {
 			kr.current = id
 		}

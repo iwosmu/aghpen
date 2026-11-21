@@ -183,10 +183,25 @@ func (m *Manager) BuildPlan(ctx context.Context, profile model.ScanProfile, run 
 		m.log.Warn("target outside the allowed networks dropped from the plan", "target", d.Value, "reason", d.Reason)
 	}
 	if len(kept) == 0 {
-		return plan, fmt.Errorf("%w: every target of the profile lies outside the allowed networks of the safety policy", ErrInvalid)
+		where := "the allowed networks of the safety policy"
+		if len(plan.Policy.OperatorNetworks) > 0 {
+			where += " or the operator lock (CZUJKA_ALLOWED_NETWORKS: " + strings.Join(plan.Policy.OperatorNetworks, ", ") + ")"
+		}
+		msg := "every target lies outside " + where
+		if len(dropped) > 0 {
+			msg += "; " + dropped[0].Value + ": " + dropped[0].Reason
+		}
+		return plan, fmt.Errorf("%w: %s", ErrInvalid, msg)
 	}
 	plan.Targets = kept
-	if plan.Hints, err = m.st.HostHints(ctx, profile.ScopeIDs); err != nil {
+	if adHoc {
+		// Every known address of the ad-hoc list is a hint, whatever its scope:
+		// a silent one then gets a down observation (a confirmation probe).
+		plan.Hints, err = m.st.HostHintsIn(ctx, run.AdHoc.Addresses)
+	} else {
+		plan.Hints, err = m.st.HostHints(ctx, profile.ScopeIDs)
+	}
+	if err != nil {
 		return plan, err
 	}
 	if plan.MeasuredPPS, err = m.st.ProfileMeasuredPPS(ctx, profile.ID); err != nil {
@@ -221,7 +236,42 @@ func (m *Manager) Estimate(ctx context.Context, profileID int64) (model.ScanEsti
 	if err != nil {
 		return model.ScanEstimate{}, err
 	}
-	return m.opt.Engine.Estimate(plan), nil
+	est := m.opt.Engine.Estimate(plan)
+	m.estimateWindow(&est, p, time.Now())
+	// The last completed run of the profile, as the measured reference.
+	if prev, err := m.st.ListRuns(ctx, store.RunFilter{ProfileID: p.ID, Status: []string{string(model.RunCompleted)}, ListOpts: store.ListOpts{Limit: 1, Sort: "-id"}}); err == nil && len(prev.Items) > 0 {
+		r := prev.Items[0]
+		est.PrevRunID, est.PrevFinishedAt = &r.ID, r.FinishedAt
+		est.PrevDurationSec, est.PrevHostsUp, est.PrevAddresses = r.Stats.ElapsedSec, r.Stats.HostsUp, r.Stats.AddressesDone
+		if est.PrevDurationSec == 0 && r.StartedAt != nil && r.FinishedAt != nil {
+			est.PrevDurationSec = int64(r.FinishedAt.Sub(*r.StartedAt).Seconds())
+		}
+	}
+	return est, nil
+}
+
+// estimateWindow fills the window fields of an estimate. Outside the windows
+// of the profile the run would start at the next window, so window_sec is the
+// length of that window and fits_window compares the duration with it.
+func (m *Manager) estimateWindow(est *model.ScanEstimate, p model.ScanProfile, now time.Time) {
+	est.InWindow = true
+	if m.opt.Window == nil || len(p.Schedule.Windows) == 0 {
+		return
+	}
+	end, next := m.opt.Window(p, now)
+	if end != nil && end.After(now.Add(time.Second)) {
+		return // inside a window: the engine measured against its end
+	}
+	est.InWindow = false
+	if next == nil {
+		est.WindowSec, est.FitsWindow = 0, false
+		return
+	}
+	est.NextWindowAt = next
+	if e2, _ := m.opt.Window(p, next.Add(time.Second)); e2 != nil && e2.After(*next) {
+		est.WindowSec = int64(e2.Sub(*next).Seconds())
+		est.FitsWindow = est.EstDurationSec <= est.WindowSec
+	}
 }
 
 // Start creates a run from a profile and starts it in the background.
@@ -244,6 +294,11 @@ func (m *Manager) Start(ctx context.Context, profileID int64, userID *int64, tri
 	if !p.Enabled {
 		return model.ScanRun{}, fmt.Errorf("%w: the profile is disabled", ErrInvalid)
 	}
+	if id, err := m.activeRunOf(ctx, p.ID); err != nil {
+		return model.ScanRun{}, err
+	} else if id != 0 {
+		return model.ScanRun{}, &ActiveRunError{RunID: id}
+	}
 	// Fail early on a profile that cannot be planned.
 	if _, err := m.BuildPlan(ctx, p, nil, false); err != nil {
 		return model.ScanRun{}, err
@@ -253,13 +308,34 @@ func (m *Manager) Start(ctx context.Context, profileID int64, userID *int64, tri
 	}
 	run, err := m.st.CreateRun(ctx, model.ScanRun{ProfileID: &p.ID, ProfileName: p.Name, Status: model.RunQueued, Trigger: trigger, CreatedBy: userID})
 	if errors.Is(err, store.ErrConflict) {
-		return model.ScanRun{}, ErrActiveRun // the unique index allows one active run per profile
+		// The unique index allows one active run per profile (a race with the check above).
+		id, _ := m.activeRunOf(ctx, p.ID)
+		return model.ScanRun{}, &ActiveRunError{RunID: id}
 	}
 	if err != nil {
 		return model.ScanRun{}, err
 	}
 	m.launch(run, p, false)
 	return run, nil
+}
+
+// ActiveRunError says that a profile already has a queued, running or paused
+// run. It wraps ErrActiveRun.
+type ActiveRunError struct{ RunID int64 }
+
+func (e *ActiveRunError) Error() string {
+	return fmt.Sprintf("profile already has an active run (run %d): pause, resume or cancel it first", e.RunID)
+}
+
+func (e *ActiveRunError) Unwrap() error { return ErrActiveRun }
+
+// activeRunOf returns the id of the queued, running or paused run of a profile, or 0.
+func (m *Manager) activeRunOf(ctx context.Context, profileID int64) (int64, error) {
+	page, err := m.st.ListRuns(ctx, store.RunFilter{ProfileID: profileID, Status: store.ActiveStatuses, ListOpts: store.ListOpts{Limit: 1, Sort: "-id"}})
+	if err != nil || len(page.Items) == 0 {
+		return 0, err
+	}
+	return page.Items[0].ID, nil
 }
 
 func (m *Manager) launch(run model.ScanRun, p model.ScanProfile, resume bool) {

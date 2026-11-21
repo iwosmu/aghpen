@@ -29,6 +29,8 @@ interface Props {
   describe?: (block: MapBlock) => ReactNode;
   compact?: boolean;
   maxCell?: number;
+  /** a state of the network, not a scan in progress: no chunk statuses in the readout and the legend */
+  snapshot?: boolean;
 }
 
 function Tile({ tile, cell, p, active, setActive, tip }: { tile: MapTile<MapBlock>; cell: number; p: Props; active: string | null; setActive: (c: string | null) => void; tip: ReturnType<typeof useTip> }) {
@@ -159,7 +161,7 @@ export function AddressMap(p: Props) {
           <p className="mt-2 min-h-[18px] text-xs text-ink-2" aria-live="polite">
             {activeBlock ? (
               <>
-                <span className="mono text-ink">{activeBlock.cidr}</span> · {chunkStatusInfo(activeBlock.status).label}
+                <span className="mono text-ink">{activeBlock.cidr}</span>{p.snapshot ? null : <> · {chunkStatusInfo(activeBlock.status).label}</>}
                 {activeBlock.status === 'done' ? <> · <span className="num">{activeBlock.hosts_up}</span> {plural(activeBlock.hosts_up, ['aktywny host', 'aktywne hosty', 'aktywnych hostów'], ['live host', 'live hosts'])}</> : null}
                 {p.describe ? <> · {p.describe(activeBlock)}</> : null}
               </>
@@ -167,7 +169,7 @@ export function AddressMap(p: Props) {
               <span className="text-ink-3">{t('Jedna komórka to blok /24 (256 adresów). Kolejność: krzywa Hilberta, sąsiednie sieci leżą obok siebie.', 'One cell is a /24 block (256 addresses). Order: Hilbert curve, neighbouring networks sit side by side.')}</span>
             )}
           </p>
-          <MapLegend counts={counts} />
+          <MapLegend counts={counts} densityOnly={p.snapshot} />
         </>
       ) : null}
       {tip.node}
@@ -184,18 +186,20 @@ function Swatch({ children, label, n }: { children: ReactNode; label: string; n?
   );
 }
 
-export function MapLegend({ counts }: { counts: { pending: number; running: number; done: number; deferred: number; failed: number; hosts: number } }) {
+export function MapLegend({ counts, densityOnly }: { counts: { pending: number; running: number; done: number; deferred: number; failed: number; hosts: number }; densityOnly?: boolean }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-rule pt-2 text-xs text-ink-2">
+      {densityOnly ? null : <>
       <Swatch label={t('oczekuje', 'pending')} n={counts.pending}><rect x="0.500" y="0.500" width="11" height="11" fill="var(--panel)" stroke="var(--rule-strong)" /></Swatch>
       <Swatch label={t('w toku', 'running')} n={counts.running}><rect x="0.750" y="0.750" width="10.500" height="10.500" fill="var(--accent-wash)" stroke="var(--accent)" strokeWidth="1.500" /></Swatch>
       <Swatch label={t('odroczony', 'deferred')} n={counts.deferred}>
         <defs><pattern id="lg-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4" height="4" fill="var(--st-changed-wash)" /><rect width="1.400" height="4" fill="var(--st-changed)" /></pattern></defs>
         <rect width="12" height="12" fill="url(#lg-hatch)" /><rect x="0.500" y="0.500" width="11" height="11" fill="none" stroke="var(--st-changed)" />
       </Swatch>
-      {counts.failed > 0 ? <Swatch label={t('błąd', 'failed')} n={counts.failed}><rect x="0.500" y="0.500" width="11" height="11" fill="var(--st-gone-wash)" stroke="var(--danger)" /></Swatch> : null}
+      </>}
+      {counts.failed > 0 && !densityOnly ? <Swatch label={t('błąd', 'failed')} n={counts.failed}><rect x="0.500" y="0.500" width="11" height="11" fill="var(--st-gone-wash)" stroke="var(--danger)" /></Swatch> : null}
       <span className="inline-flex items-center gap-1.5">
-        <span>{t('gotowy, aktywne hosty w bloku:', 'done, live hosts in the block:')}</span>
+        <span>{densityOnly ? t('aktywne hosty w bloku:', 'live hosts in the block:') : t('gotowy, aktywne hosty w bloku:', 'done, live hosts in the block:')}</span>
         <span className="inline-flex items-center gap-px">
           {DENSITY_STEPS.map((s, i) => (
             <span key={i} className="inline-flex flex-col items-center gap-0.5">

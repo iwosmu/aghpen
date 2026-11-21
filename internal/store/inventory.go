@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/iwosmu/aghpen/internal/model"
+	"net/netip"
 )
 
 func itoa(n int) string { return strconv.Itoa(n) }
@@ -119,6 +120,26 @@ func (s *Store) DeleteHost(ctx context.Context, id int64) error {
 func (s *Store) HostHints(ctx context.Context, scopeIDs []int64) ([]model.HostHint, error) {
 	return jsonRows[model.HostHint](ctx, s.db, wrapJSON(`SELECT host(h.ip) AS "IP", h.open_ports AS "OpenPorts", h.stability AS "Stability", h.last_up AS "LastUp"
 		FROM hosts h WHERE h.scope_ids && $1::bigint[] AND h.last_up IS NOT NULL AND h.status <> 'down' ORDER BY h.ip`), nonNil(scopeIDs))
+}
+
+// HostHintsIn returns the hints of the known hosts inside the given addresses
+// or CIDRs (an ad-hoc run), whatever their scope or status.
+func (s *Store) HostHintsIn(ctx context.Context, addrs []string) ([]model.HostHint, error) {
+	var nets []string
+	for _, a := range addrs {
+		if a = strings.TrimSpace(a); a != "" {
+			if _, err := netip.ParsePrefix(a); err == nil {
+				nets = append(nets, a)
+			} else if ip, err := netip.ParseAddr(a); err == nil {
+				nets = append(nets, netip.PrefixFrom(ip.Unmap(), ip.Unmap().BitLen()).String())
+			}
+		}
+	}
+	if len(nets) == 0 {
+		return []model.HostHint{}, nil
+	}
+	return jsonRows[model.HostHint](ctx, s.db, wrapJSON(`SELECT host(h.ip) AS "IP", h.open_ports AS "OpenPorts", h.stability AS "Stability", h.last_up AS "LastUp"
+		FROM hosts h WHERE h.ip <<= ANY($1::cidr[]) AND h.last_up IS NOT NULL ORDER BY h.ip`), nets)
 }
 
 // Availability returns the hour-of-week histogram and the latest observations of a host.

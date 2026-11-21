@@ -46,6 +46,8 @@ func (s *Store) putSetting(ctx context.Context, key string, v any, secret string
 func (s *Store) GetSafetyPolicy(ctx context.Context) (model.SafetyPolicy, error) {
 	p := DefaultSafetyPolicy()
 	_, updated, err := s.getSetting(ctx, keySafety, &p)
+	// The operator lock comes from the environment, never from the database.
+	p.OperatorNetworks = append([]string{}, s.sh.operator...)
 	if errors.Is(err, ErrNotFound) {
 		return p, nil
 	}
@@ -62,6 +64,7 @@ func (s *Store) GetSafetyPolicy(ctx context.Context) (model.SafetyPolicy, error)
 func (s *Store) PutSafetyPolicy(ctx context.Context, p model.SafetyPolicy) (model.SafetyPolicy, error) {
 	p.Exclusions = nonNil(p.Exclusions)
 	p.AllowedMethods = nonNil(p.AllowedMethods)
+	p.OperatorNetworks = nil // never stored: see GetSafetyPolicy
 	if err := s.putSetting(ctx, keySafety, p, ""); err != nil {
 		return p, err
 	}

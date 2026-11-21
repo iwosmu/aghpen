@@ -59,12 +59,18 @@ export interface SafetyPolicy {
   max_pps: number; max_http_rps: number; max_per_host_rps: number; max_paths_per_host: number;
   allowed_ports: string; denied_ports: string; exclusions: string[]; allowed_methods: string[];
   emergency_stop: boolean; user_agent: string; updated_at: string;
+  allowed_networks?: string[] | null;
 }
 
 export interface DiscoveryOpts {
   icmp_echo: boolean; icmp_timestamp: boolean; tcp_syn_ports: number[]; tcp_ack_ports: number[];
   arp: boolean; skip_discovery: boolean;
+  /** fast | balanced | thorough; empty means balanced. */
+  mode: DiscoveryMode | '';
 }
+export type DiscoveryMode = 'fast' | 'balanced' | 'thorough';
+/** Optional UDP scan of a short allow-list of harmless protocol queries. */
+export interface UDPOpts { enabled: boolean; ports: string }
 export interface HTTPOpts {
   enabled: boolean; max_redirects: number; signature_paths: boolean; max_body_bytes: number;
   timeout_ms: number; favicon: boolean;
@@ -74,7 +80,7 @@ export interface RateLimits {
   per_host_concurrency: number; per_host_delay_ms: number;
 }
 export interface ChunkingOpts { adaptive: boolean; initial_size: number; min_size: number; max_size: number; target_seconds: number }
-export interface RetryOpts { unstable_retries: number; backoff_ms: number }
+export interface RetryOpts { unstable_retries: number; backoff_ms: number; /** 0 = the availability model decides. */ down_after_misses: number }
 /** Days use 0 = Sunday .. 6 = Saturday. End before Start crosses midnight. */
 export interface Window { days: number[]; start: string; end: string }
 export interface Schedule { enabled: boolean; cron: string; interval_minutes: number; windows: Window[]; timezone: string }
@@ -82,13 +88,14 @@ export interface Schedule { enabled: boolean; cron: string; interval_minutes: nu
 export interface ScanProfile {
   id: number; name: string; description: string; scope_ids: number[]; ports: string;
   discovery: DiscoveryOpts; service_detection: boolean; version_intensity: number; http: HTTPOpts;
-  rate: RateLimits; chunking: ChunkingOpts; retry: RetryOpts; schedule: Schedule; enabled: boolean;
+  udp: UDPOpts; rate: RateLimits; chunking: ChunkingOpts; retry: RetryOpts; schedule: Schedule; enabled: boolean;
   next_run_at: string | null; last_run_id: number | null; created_at: string; updated_at: string;
 }
 
 export interface ScanEstimate {
   addresses: number; chunks: number; est_packets: number; est_duration_sec: number; effective_pps: number;
   fits_window: boolean; window_sec: number; based_on_history: boolean; expected_live_rate: number;
+  discovery_mode?: string;
 }
 
 export type RunStatus = 'queued' | 'running' | 'paused' | 'analyzing' | 'completed' | 'failed' | 'cancelled';
@@ -101,7 +108,9 @@ export interface RunStats {
 
 export interface RunDiffSummary {
   prev_run_id: number | null; hosts_new: number; hosts_gone: number; hosts_back: number; hosts_unstable: number;
-  services_new: number; services_gone: number; services_changed: number; by_kind: Record<string, number> | null;
+  services_new: number; services_gone: number; services_changed: number;
+  /** Silent hosts that are not reported inactive yet, and their open services. */
+  hosts_missing?: number; services_unreachable?: number; by_kind: Record<string, number> | null;
   findings_new: number;
 }
 
@@ -110,13 +119,17 @@ export interface ScanRun {
   trigger: string; created_by: number | null; created_at: string; started_at: string | null;
   finished_at: string | null; window_end: string | null; resume_at: string | null; stats: RunStats;
   summary: RunDiffSummary | null; error: string; import_file: string;
+  note?: string; label?: string; ad_hoc?: AdHocScope | null;
 }
+export interface AdHocScope { profile_id: number; addresses: string[]; ports: string; reason: string }
 
 export type ChunkStatus = 'pending' | 'running' | 'done' | 'deferred' | 'failed';
 
 export interface Chunk {
   id: number; run_id: number; seq: number; spec: string[]; size: number; priority: number; status: ChunkStatus;
   started_at: string | null; finished_at: string | null; duration_ms: number; hosts_up: number; pps: number; error: string;
+  /** Seq of the first chunk of the adaptive work group; 0 = not started. */
+  group?: number;
 }
 
 export interface MapBlock { cidr: string; size: number; status: ChunkStatus; hosts_up: number }
@@ -195,7 +208,7 @@ export interface ServiceGroup {
 }
 
 export type ChangeKind =
-  | 'host_new' | 'host_gone' | 'host_back' | 'host_unstable' | 'service_new' | 'service_gone' | 'service_changed'
+  | 'host_new' | 'host_gone' | 'host_back' | 'host_unstable' | 'host_missing' | 'service_new' | 'service_gone' | 'service_changed'
   | 'tech_new' | 'tech_gone' | 'tech_version' | 'title_changed' | 'status_changed' | 'cert_changed'
   | 'headers_changed' | 'cookies_changed' | 'content_changed' | 'redirect_changed' | 'class_changed';
 
@@ -227,17 +240,31 @@ export interface Signature {
 export interface SignatureIssue { level: 'error' | 'warning' | string; path: string; message: string; safety: boolean }
 export interface SignatureValidation { ok: boolean; issues: SignatureIssue[] | null; paths: string[] | null }
 export interface RetroHit { service_id: number; ip: string; port: number; url: string; run_id: number; at: string; match: SigMatch }
-export interface RetroHuntResult { scanned: number; hits: RetroHit[] | null; took_ms: number; packets_sent: number }
+export interface RetroHuntResult {
+  scanned: number; hits: RetroHit[] | null; took_ms: number; packets_sent: number;
+  missing_paths?: string[] | null; incomplete?: number; notes?: string[] | null; total_hits?: number; truncated?: boolean;
+}
+export interface SignatureImportReport {
+  created: string[] | null; updated: string[] | null; skipped: { slug: string; reason: string }[] | null;
+  validation: SignatureValidation;
+}
 
 export interface DefectDojoSettings {
   enabled: boolean; url: string; api_key?: string; api_key_set: boolean; product_name: string;
   engagement_name: string; product_type_name: string; verify_tls: boolean; auto_export: boolean; min_interest: number;
+  status_sync?: boolean; scope_mappings?: DojoScopeMapping[] | null;
 }
+export interface DojoScopeMapping { scope_id: number; product_type_name: string; product_name: string; engagement_name: string }
+export interface DojoPullUpdate { finding_id: number; key: string; dojo_id: number; from: string; to: string; dojo_changed_at: string | null; reason: string }
+export interface DojoPullResult { checked: number; updates: DojoPullUpdate[] | null; conflicts: DojoPullUpdate[] | number | null; missing: unknown; errors: unknown; applied: number }
+export interface DojoSyncResult { closed: number; reopened: number; skipped: number; errors: unknown }
+export interface FindingsImportReport { format: string; findings: number; skipped: number; invalid: InvalidLine[] | null; created: number; updated: number; hosts_created: number; run_id: number | null }
+export interface ManualEntryResult { run: ScanRun; host: Host }
 export interface DojoTestResult { ok: boolean; message: string; version: string }
 export interface DojoExportResult { exported: number; updated: number; failed: number; test_id: number; test_url: string; errors: string[] | null }
 export interface ImportReport {
   format: string; run_id: number | null; hosts: number; services: number; targets: number; skipped: number;
-  invalid: InvalidLine[] | null;
+  invalid: InvalidLine[] | null; hosts_down?: number;
 }
 
 export interface CountPoint { at: string; run_id: number; hosts: number; services: number; changes: number; findings: number }
@@ -247,6 +274,7 @@ export interface Headline {
   addresses_in_scope: number; hosts_up: number; hosts_unstable: number; hosts_down: number; services_open: number;
   web_services: number; findings_open: number; findings_high: number; changes_unacked: number;
   new_since_last_run: number; gone_since_last_run: number; admin_panels: number; staging_envs: number;
+  hosts_missing?: number;
 }
 
 export interface Dashboard {
@@ -258,5 +286,82 @@ export interface Dashboard {
 }
 
 export interface Page<T> { items: T[]; total: number; limit: number; offset: number }
-export interface Health { status: string; version: string; db: string; tde: string }
+export interface ProbeInfo { prober: string; mode: 'nmap-raw' | 'nmap-connect' | 'native' | string; raw_sockets: boolean }
+export interface Health {
+  status: string; version: string; db: string; tde: string; tde_detail?: string; field_encryption?: boolean;
+  engine?: boolean; probe?: ProbeInfo;
+}
+
+// Passive sources (internal/passive). Nothing is sent to a scope address.
+export interface PassiveFact {
+  hostname?: string; ip?: string; port?: number; kind: string; target?: string; source: string; sensor?: string;
+  first_seen?: string; last_seen?: string; count?: number; wildcard?: boolean;
+}
+export interface PassiveCandidate {
+  kind: TargetKind; value: string; hostnames?: string[]; ports?: number[]; sources: string[]; last_seen?: string; reason: string;
+}
+export interface PassiveHint { ip: string; hostnames: string[]; ports?: number[]; sources: string[]; known: boolean }
+export interface PassiveSourceReport { name: string; external: boolean; facts: number; skipped: boolean; error?: string }
+export interface PassiveFileReport { format: string; records: number; facts: number; skipped: number; invalid_total: number; invalid: InvalidLine[] | null }
+export interface PassiveResult {
+  facts: PassiveFact[] | null; out_of_scope: PassiveFact[] | null; candidates: PassiveCandidate[] | null;
+  hints: PassiveHint[] | null; sources: PassiveSourceReport[] | null; file?: PassiveFileReport; hosts_updated?: number;
+}
+export interface PassiveSettings { crtsh_enabled: boolean }
 export interface HostEvent { ip: string; up: boolean; services: number }
+
+// ---------- time machine and re-probing (docs/API-time.md) ----------
+export interface RunPoint {
+  run_id: number; at: string; trigger: string; status: string; profile_name: string;
+  hosts_up: number; hosts_missing: number; hosts_down: number; services_open: number; services_unknown: number; findings_open: number;
+  probed: number; probed_up: number; changes: number; changes_expected: number; changes_by_kind: Record<string, number> | null;
+}
+export interface Timeline { runs: RunPoint[]; from: string; to: string; took_ms: number }
+export interface AtHost { id: number; ip: string; hostnames: string[]; label: string; status: string; up: boolean; observed_at: string; run_id: number; status_now: string; open_ports: number[] }
+export interface AtService {
+  id: number; host_id: number; ip: string; port: number; proto: string; state: string; name: string; product: string; version: string;
+  title: string; http_status: number; tls: boolean; technologies: string[]; classes: string[]; observed_at: string; run_id: number; state_now: string; changed_since: boolean;
+}
+export interface AtFinding { id: number; key: string; type: string; title: string; severity: string; interest: number; host_id: number; ip: string; port: number; first_seen: string; last_seen: string; first_run_id: number; last_run_id: number; status_now: string }
+export interface DiffToNow {
+  services_gone_since: number; services_new_since: number; services_changed: number; hosts_down_since: number; hosts_up_since: number;
+  hosts_new_since: number; findings_opened_since: number; findings_closed_since: number; sentences: string[];
+}
+export interface SnapshotSummary {
+  hosts_up: number; hosts_missing: number; hosts_down: number; services_open: number; services_unknown: number; findings_open: number;
+  findings_by_severity: Record<string, number> | null; diff_to_now: DiffToNow;
+}
+export interface Snapshot { run: RunPoint; summary: SnapshotSummary; hosts: Page<AtHost>; services: Page<AtService>; findings: Page<AtFinding>; took_ms: number }
+export interface LifeInterval { state: string; status: string; from: string; to: string; from_run: number; to_run: number; observations: number; ongoing: boolean }
+export interface ServiceLane { service_id: number; port: number; proto: string; name: string; state_now: string; intervals: LifeInterval[]; versions: { at: string; run_id: number; before: string; after: string }[] | null }
+export interface HostLife { host_id: number; ip: string; status_now: string; first_seen: string; last_seen: string; host: LifeInterval[]; services: ServiceLane[] }
+export interface FieldHistory { field: string; values: { value: string; from: string; to: string; from_run: number; to_run: number; observations: number }[] }
+export interface ServiceHistory { service_id: number; host_id: number; ip: string; port: number; proto: string; observations: number; changed: FieldHistory[]; unchanged: Record<string, string> | null }
+export interface ReprobeSettings { enabled: boolean; budget_per_hour: number; backoff_minutes: number[]; likely_up_rate: number; max_ports_per_host: number }
+export interface ReprobeProbe { host_id: number; ip: string; ports: number[] | string | null; not_before: string; kind: 'confirm' | 'likely-up'; step: number; steps: number; reason: string; profile_id: number }
+export interface ReprobeSkip { host_id: number; ip: string; reason: string }
+export interface ReprobePlan {
+  generated_at: string; enabled: boolean; blocked: string; budget_per_hour: number; used_last_hour: number; due_now: number;
+  active_reprobe: unknown; probes: ReprobeProbe[] | null; skipped: ReprobeSkip[] | null; settings: ReprobeSettings;
+}
+
+// ---------- exposure rules and signature suggest (docs/API-policy.md) ----------
+export interface ExposureRule {
+  id: number; slug: string; name: string; severity: string; description: string; yaml: string; enabled: boolean; builtin: boolean;
+  author: string; violations: number; last_eval_at: string | null; created_at: string; updated_at: string;
+}
+export interface RuleIssue { level: string; path: string; message: string; safety: boolean }
+export interface RuleValidation { ok: boolean; issues: RuleIssue[] }
+export interface RuleViolation {
+  rule: string; rule_name: string; severity: string; subject: string; key: string; host_id: number; ip: string; service_id: number;
+  port: number; proto: string; url: string; title: string; summary: string; interest: number; storable: boolean;
+}
+export interface RuleDryRun { validation: RuleValidation; total: number; truncated: boolean; hosts: number; services: number; took_ms: number; condition: string; message: string; violations: RuleViolation[] | null }
+export interface SuggestRule { kind: string; feature: string; rule: string; weight: number; df: number; others: number; explanation: string }
+export interface Suggestion {
+  ok: boolean; message: string; service_id: number; target: string; slug: string; name: string; yaml: string;
+  rules: SuggestRule[] | null; rejected: { kind: string; value: string; reason: string }[] | null;
+  validation: { ok: boolean; issues: RuleIssue[] } | null;
+  retro_hunt: { scanned: number; total_hits: number; packets_sent: number; hits: unknown[] | null } | null;
+  matches_target: boolean; other_matches: number; took_ms: number;
+}

@@ -23,6 +23,7 @@ const P: Record<string, string> = {
   lock: 'M4 7.5h8v6H4ZM5.8 7.5V5.4a2.2 2.2 0 0 1 4.4 0v2.1',
   external: 'M9 3h4v4M13 3 7.5 8.5M11 9.5V13H3V5h3.5',
   download: 'M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10',
+  print: 'M4.5 6V2.5h7V6M4.5 11.5H2.5v-5.5h11v5.5h-2M4.5 9.5h7v4h-7Z',
   upload: 'M8 11V3M4.5 6 8 2.5 11.5 6M3 13.5h10',
   edit: 'M3 13h2.5L13 5.5 10.5 3 3 10.5ZM9.5 4l2.5 2.5',
   trash: 'M3 4.5h10M6 4.5V3h4v1.5M4.5 4.5l.6 9h5.8l.6-9M6.8 7v4M9.2 7v4',

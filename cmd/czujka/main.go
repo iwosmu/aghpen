@@ -6,6 +6,9 @@
 //	czujka rotate-key            re-wrap all data keys under the current master key
 //	czujka genkey                print a new random master key
 //	czujka healthcheck           ask the local server for /healthz (container health check)
+//	czujka doctor [--json]       check the database, pg_tde, the key, nmap, raw sockets, DNS, disk, routes
+//	czujka backup [-o FILE]      write one encrypted archive (pg_dump, key derived from the master key)
+//	czujka restore -i FILE       restore an archive into an empty database (--force drops the current data)
 //	czujka version
 package main
 
@@ -19,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
@@ -28,10 +32,10 @@ import (
 	"github.com/iwosmu/aghpen/internal/auth"
 	"github.com/iwosmu/aghpen/internal/config"
 	"github.com/iwosmu/aghpen/internal/crypto"
+	"github.com/iwosmu/aghpen/internal/doctor"
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/runner"
 	"github.com/iwosmu/aghpen/internal/store"
-	"path/filepath"
 )
 
 var version = "dev"
@@ -45,6 +49,9 @@ Usage:
   czujka rotate-key
   czujka genkey
   czujka healthcheck
+  czujka doctor [--json]       check the installation; prints a fix for every failure
+  czujka backup [-o FILE]      one encrypted archive of the database (key derived from the master key)
+  czujka restore -i FILE [--force]  restore an archive into an empty database (--force drops the current data)
   czujka version
 
 Configuration comes from CZUJKA_* environment variables; see deploy/.env.example.
@@ -76,6 +83,12 @@ func main() {
 		err = rotateKey()
 	case "healthcheck":
 		err = healthcheck()
+	case "doctor":
+		err = doctorCmd(os.Args[2:])
+	case "backup":
+		err = backupCmd(os.Args[2:])
+	case "restore":
+		err = restoreCmd(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "czujka: unknown command %q\n\n%s", os.Args[1], usage)
 		os.Exit(2)
@@ -130,7 +143,7 @@ func openWith(ctx context.Context, withOldKeys bool, mutate func(*config.Config)
 		log.Warn("a new master key was generated; keep this file safe, without it the encrypted fields are lost", "file", cfg.MasterKeyFile, "key_id", kr.CurrentID())
 	}
 	loc, _ := time.LoadLocation(cfg.Timezone)
-	st, err := store.Open(ctx, cfg.DBURL, store.Options{Keyring: kr, TDE: cfg.TDE, Location: loc})
+	st, err := store.Open(ctx, cfg.DBURL, store.Options{Keyring: kr, TDE: cfg.TDE, Location: loc, OperatorNetworks: cfg.AllowedNetworks})
 	if err != nil {
 		return cfg, nil, log, err
 	}
@@ -214,7 +227,20 @@ func serve() error {
 		log.Warn("recovered runs that a restart interrupted", "runs", recovered)
 	}
 
+	loc, _ := time.LoadLocation(cfg.Timezone)
+	if loc == nil {
+		loc = time.UTC
+	}
+	tmRoutes, err := timeMachine(ctx, st, mgr, loc, log)
+	if err != nil {
+		return err
+	}
 	deps := w.API
+	deps.Routes = append(deps.Routes, tmRoutes)
+	deps.Doctor = func(ctx context.Context) any {
+		return doctor.Run(ctx, doctor.Deps{Version: version, Store: st, NmapPath: cfg.NmapPath, DataDir: doctor.DataDir(cfg.MasterKeyFile), TDEMode: cfg.TDE,
+			KeyInfo: fmt.Sprintf("klucz %s, kluczy poprzednich: %d", st.Keyring().CurrentID(), len(st.Keyring().IDs())-1)})
+	}
 	deps.Store, deps.Auth, deps.Runner, deps.Bus, deps.Logger, deps.Version = st, authSvc, mgr, bus, log, version
 	deps.CookieSecure, deps.TrustProxy, deps.WebDir = cfg.CookieSecure, cfg.TrustProxy, cfg.WebDir
 	srv := &http.Server{

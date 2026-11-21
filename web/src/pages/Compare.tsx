@@ -32,8 +32,8 @@ function Column({ title, glyph, tone, items, showExpected }: { title: string; gl
       </h2>
       {list.length === 0 ? <p className="p-3 text-sm text-ink-3">{expected.length ? t('Tylko zmiany oczekiwane.', 'Expected changes only.') : t('Brak.', 'None.')}</p> : (
         <ul className="max-h-[560px] overflow-auto">
-          {list.map((c) => (
-            <li key={c.id} className="border-b border-rule px-3 py-2 last:border-b-0">
+          {list.map((c, i) => (
+            <li key={c.id || 'x' + i + '-' + c.ip + ':' + (c.port ?? '')} className="border-b border-rule px-3 py-2 last:border-b-0">
               <div className="flex items-start justify-between gap-2">
                 <Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link text-sm">{c.ip}{c.port ? ':' + c.port : ''}</Link>
                 {c.expected ? <span className="inline-flex flex-none items-center gap-1 text-xs text-ink-3"><Glyph name="dashring" tone="expected" size={11} />{t('oczekiwana', 'expected')}</span> : <span className="flex-none"><Sev level={c.severity} /></span>}
@@ -89,11 +89,17 @@ export default function Compare() {
               </div>
               <RunCard run={d.to} side={t('Po', 'After')} />
             </div>
-            <p className="text-sm text-ink-2">
+            <div className="flex flex-col text-sm text-ink-2">
               {all.length === 0 ? t('Między tymi skanami nie zapisano żadnej zmiany.', 'No change was recorded between these runs.') : (
-                <><span className="num text-ink">{all.filter((c) => !c.expected).length}</span> {plural(all.filter((c) => !c.expected).length, ['zmiana wymaga', 'zmiany wymagają', 'zmian wymaga'], ['change needs', 'changes need'])} {t('przeglądu', 'review')}, <span className="num text-ink">{all.filter((c) => c.expected).length}</span> {t('oczekiwanych', 'expected')}. {t('Nowych znalezisk:', 'New findings:')} <span className="num text-ink">{d.summary.findings_new}</span>.</>
+                <span><span className="num text-ink">{all.filter((c) => !c.expected).length}</span> {plural(all.filter((c) => !c.expected).length, ['zmiana wymaga', 'zmiany wymagają', 'zmian wymaga'], ['change needs', 'changes need'])} {t('przeglądu', 'review')}, <span className="num text-ink">{all.filter((c) => c.expected).length}</span> {t('oczekiwanych', 'expected')}. {t('Nowych znalezisk:', 'New findings:')} <span className="num text-ink">{d.summary.findings_new}</span>.</span>
               )}
-            </p>
+              {d.summary.hosts_missing ? (
+                <span className="mt-1 flex items-start gap-1.5 text-ink-2" data-testid="compare-missing">
+                  <Glyph name="half" tone="expected" />
+                  <span><span className="num text-ink">{d.summary.hosts_missing}</span> {plural(d.summary.hosts_missing, ['host nie odpowiedział', 'hosty nie odpowiedziały', 'hostów nie odpowiedziało'], ['host did not answer', 'hosts did not answer'])}{t(', ale nie jest jeszcze uznany za nieaktywny', ' but is not reported inactive yet')}{d.summary.services_unreachable ? <>{t('; ich ', '; their ')}<span className="num text-ink">{d.summary.services_unreachable}</span> {plural(d.summary.services_unreachable, ['usługa jest nieosiągalna', 'usługi są nieosiągalne', 'usług jest nieosiągalnych'], ['service is unreachable', 'services are unreachable'])}{t(' (stan nieznany, nie zamknięte)', ' (unknown, not closed)')}</> : null}. {t('Lista w kolumnie „Zmienione”.', 'They are listed under "Changed".')}</span>
+                </span>
+              ) : null}
+            </div>
             <div className="grid gap-4 lg:grid-cols-3">
               <Column title={t('Nowe', 'New')} glyph="plus" tone="new" items={group('new')} showExpected={showExpected} />
               <Column title={t('Zniknęły', 'Gone')} glyph="minus" tone="gone" items={group('gone')} showExpected={showExpected} />

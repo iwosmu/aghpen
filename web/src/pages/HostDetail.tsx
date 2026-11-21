@@ -10,8 +10,37 @@ import { ChangeMark, ClassChips, Crit, HostStatusMark, InterestScore, ServiceSta
 import { InlineText, OverrideNote } from '../ui/edit';
 import { WeekHeatmap } from '../viz/WeekHeatmap';
 import { useCan } from '../session';
+import { ReprobePanel } from './Reprobe';
+import { HostLifePanel } from './TimeMachine';
 
-function ModelOutput({ h, a }: { h: Host; a: AvailabilityProfile }) {
+/** Fewer observations than the model needs: the probes as a strip and when the weekly pattern appears. */
+const MIN_OBS = 8;
+function FewObservations({ a, n }: { a: AvailabilityProfile; n: number }) {
+  const recent = [...(a.recent ?? [])].slice(0, MIN_OBS).reverse();
+  return (
+    <div data-testid="few-observations">
+      <p className="text-sm text-ink">{t('Model zna ten host dopiero z ' + n + ' ' + plural(n, ['obserwacji', 'obserwacji', 'obserwacji'], ['', '']) + '.', 'The model knows this host from only ' + n + ' ' + (n === 1 ? 'observation' : 'observations') + '.')}</p>
+      <p className="mt-1 text-sm text-ink-2">{t('Wzorzec tygodniowy (mapa 7 × 24 godzin) pojawi się, gdy będzie co najmniej ' + MIN_OBS + ' obserwacji: jeszcze ' + (MIN_OBS - n) + ' ' + plural(MIN_OBS - n, ['skan', 'skany', 'skanów'], ['', '']) + ' tego hosta. Do tego czasu „nieaktywny” wynika z progu braków odpowiedzi.', 'The weekly pattern (a 7 × 24 hour map) appears from ' + MIN_OBS + ' observations: ' + (MIN_OBS - n) + ' more scans of this host. Until then "inactive" follows the miss threshold.')}</p>
+      <ol className="mt-3 grid grid-cols-8 gap-1.5">
+        {recent.map((o, i) => (
+          <li key={i} className="flex min-w-0 flex-col items-center gap-1 text-center">
+            <span className="block h-[22px] w-full" style={o.up ? { background: 'var(--seq-4)' } : { boxShadow: 'inset 0 0 0 1px var(--rule-strong)' }} aria-hidden="true" />
+            <span className="num text-2xs text-ink-2">{fmtDateTime(o.at).slice(-5)}</span>
+            <span className="text-2xs text-ink-3">{o.up ? t('odpowiedź', 'answer') : t('brak', 'miss')}</span>
+          </li>
+        ))}
+        {Array.from({ length: Math.max(0, MIN_OBS - recent.length) }).map((_, i) => (
+          <li key={'f' + i} className="flex min-w-0 flex-col items-center gap-1 text-center" aria-hidden="true">
+            <span className="block h-[22px] w-full border border-dashed border-rule" />
+            <span className="text-2xs text-ink-3">–</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function ModelOutput({ h, a, compact }: { h: Host; a: AvailabilityProfile; compact?: boolean }) {
   const left = Math.max(0, a.down_after_misses - h.consecutive_misses);
   const tip = useTip();
   const recent = [...(a.recent ?? [])].slice(0, 28).reverse();
@@ -36,14 +65,14 @@ function ModelOutput({ h, a }: { h: Host; a: AvailabilityProfile }) {
           </dd>
         </div>
       </dl>
-      <p className="border-l border-rule-strong pl-3 text-sm text-ink">{a.pattern || t('Za mało obserwacji, aby opisać wzorzec.', 'Too few observations to describe a pattern.')}</p>
+      {compact ? null : <p className="border-l border-rule-strong pl-3 text-sm text-ink">{a.pattern || t('Za mało obserwacji, aby opisać wzorzec.', 'Too few observations to describe a pattern.')}</p>}
       <p className="text-xs text-ink-2">
         {h.status === 'expected-offline' ? t('Host nie odpowiada, ale o tej porze zwykle nie odpowiada. Zmiana nie trafia do alertów.', 'The host does not answer, but at this hour it usually does not. The change raises no alert.')
           : h.status === 'unstable' ? t('Host odpowiada nieregularnie. Skaner ponawia próby, zanim zapisze brak odpowiedzi.', 'The host answers irregularly. The scanner retries before it records a miss.')
           : h.status === 'down' ? t('Liczba kolejnych braków odpowiedzi przekroczyła próg wynikający z profilu dostępności.', 'The run of misses passed the threshold that follows from the availability profile.')
           : t('Host odpowiada zgodnie z profilem.', 'The host answers as its profile predicts.')}
       </p>
-      {recent.length ? (
+      {recent.length && !compact ? (
         <div>
           <div className="mb-1 text-xs text-ink-3">{t('Ostatnie próby (najnowsza po prawej)', 'Recent probes (latest on the right)')}</div>
           <div className="flex flex-wrap gap-[3px]">
@@ -143,13 +172,20 @@ export default function HostDetail() {
           </Panel>
 
           <Panel title={t('Dostępność w tygodniu', 'Availability over the week')} actions={<span className="text-ink-3">{t('model decyduje, kiedy host jest „nieaktywny”', 'the model decides when the host is "inactive"')}</span>}>
-            {avail.error ? <ErrorState error={avail.error} retry={() => avail.refetch()} /> : !avail.data ? <div className="skeleton h-[220px]" /> : (
+            {avail.error ? <ErrorState error={avail.error} retry={() => avail.refetch()} /> : !avail.data ? <div className="skeleton h-[220px]" /> : obsCount(avail.data) < MIN_OBS ? (
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+                <FewObservations a={avail.data} n={obsCount(avail.data)} />
+                <ModelOutput h={h} a={avail.data} compact />
+              </div>
+            ) : (
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
                 <WeekHeatmap buckets={avail.data.buckets} nowIndex={now.getDay() * 24 + now.getHours()} />
                 <ModelOutput h={h} a={avail.data} />
               </div>
             )}
           </Panel>
+          <ReprobePanel hostId={h.id} />
+          <HostLifePanel hostId={h.id} />
 
           <Panel title={t('Historia zmian', 'Change timeline')} count={changes.data?.total} flush>
             {changes.error ? <ErrorState error={changes.error} retry={() => changes.refetch()} /> : !changes.data ? <SkeletonRows rows={4} /> : changes.data.items.length === 0 ? (
@@ -175,4 +211,8 @@ export default function HostDetail() {
       </div>
     </div>
   );
+}
+
+function obsCount(a: AvailabilityProfile): number {
+  return (a.buckets ?? []).reduce((n, b) => n + b.up + b.down, 0);
 }

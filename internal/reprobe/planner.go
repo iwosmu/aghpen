@@ -7,7 +7,7 @@
 // small Backend. StoreBackend is the Backend over the Czujka store; it needs
 // one capability of the runner, the Starter: a run on an ad-hoc list of
 // addresses and ports that goes through the normal engine, sink and analysis
-// with trigger "reprobe". See docs/API-time.md.
+// with trigger "reprobe". See docs/API.md (Time machine, Re-probing).
 package reprobe
 
 import (
