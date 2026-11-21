@@ -10,6 +10,7 @@ import { invalidate, useAction, useItem, usePage } from '../api/hooks';
 import { post } from '../api/client';
 import { openStream } from '../api/events';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
+import { PasswordDialog } from './PasswordDialog';
 import type { Health, Permission, SafetyPolicy, ScanProfile, ScanRun } from '../api/types';
 import { overCap, paceTip } from '../lib/headline';
 import { Glyph } from '../ui/marks';
@@ -62,6 +63,7 @@ function Rail({ onNavigate }: { onNavigate?: () => void }) {
   const { session, can } = useSession();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [pwOpen, setPwOpen] = useState(false);
   const logout = useAction(() => post('/auth/logout'), {
     silent: true,
     onSuccess: () => { qc.clear(); navigate('/login', { replace: true }); },
@@ -110,11 +112,17 @@ function Rail({ onNavigate }: { onNavigate?: () => void }) {
             <Icon name={u.role_slug === 'viewer' ? 'eye' : u.role_slug === 'admin' ? 'shield' : 'user'} size={12} />
             <span className="truncate">{roleLabel(u.role_slug, u.role_name)}</span>
           </span>
-          <button type="button" onClick={() => logout.mutate(undefined)} className="inline-flex items-center gap-1 text-xs text-rail-ink-2 hover:text-rail-ink">
-            <Icon name="logout" size={12} />{t('Wyloguj', 'Sign out')}
-          </button>
+          <span className="flex items-center gap-3">
+            <button type="button" onClick={() => setPwOpen(true)} className="inline-flex items-center text-rail-ink-2 hover:text-rail-ink" title={t('Zmień hasło', 'Change password')} aria-label={t('Zmień hasło', 'Change password')} data-testid="password-open">
+              <Icon name="lock" size={12} />
+            </button>
+            <button type="button" onClick={() => logout.mutate(undefined)} className="inline-flex items-center gap-1 text-xs text-rail-ink-2 hover:text-rail-ink">
+              <Icon name="logout" size={12} />{t('Wyloguj', 'Sign out')}
+            </button>
+          </span>
         </div>
       </div>
+      <PasswordDialog open={pwOpen} onClose={() => setPwOpen(false)} />
     </div>
   );
 }
