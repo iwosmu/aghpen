@@ -1,0 +1,325 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router';
+import { useItem } from '../api/hooks';
+import type { AtFinding, AtHost, AtService, FieldHistory, HostLife, LifeInterval, Page, RunMap, ServiceHistory, Snapshot, Timeline, RunPoint } from '../api/types';
+import { t, plural } from '../i18n';
+import { cx, fmtDateTime, fmtInt } from '../lib/format';
+import { useUrlState } from '../lib/hooks';
+import { routeMissing } from '../lib/route';
+import { Empty, ErrorState, PageHeader, Panel, Select, SkeletonRows, Tabs, Unavailable } from '../ui/kit';
+import { DataTable, FilterBar, FilterField, Pager, type Col } from '../ui/table';
+import { FindingStatusMark, HostStatusMark, ServiceStateMark, Sev } from '../ui/marks';
+import { AddressMap } from '../viz/AddressMap';
+import { triggerLabel } from './Runs';
+
+function useDebounced<T>(v: T, ms: number): T {
+  const [d, setD] = useState(v);
+  useEffect(() => { const h = setTimeout(() => setD(v), ms); return () => clearTimeout(h); }, [v, ms]);
+  return d;
+}
+
+const isLight = (r: RunPoint) => r.trigger === 'reprobe' || r.trigger === 'manual-entry';
+
+/** The scrubber: one mark per analysed run, height by the number of changes; re-probe runs are thin and short. */
+function Scrubber({ runs, index, onIndex }: { runs: RunPoint[]; index: number; onIndex: (i: number) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const drag = useRef(false);
+  const maxChanges = Math.max(1, ...runs.map((r) => r.changes));
+  const pick = (clientX: number) => {
+    const el = ref.current;
+    if (!el || runs.length === 0) return;
+    const b = el.getBoundingClientRect();
+    const x = Math.min(Math.max(clientX - b.left, 0), b.width);
+    onIndex(Math.round((x / b.width) * (runs.length - 1)));
+  };
+  const H = 56;
+  const pos = (i: number) => (runs.length === 1 ? 50 : (i / (runs.length - 1)) * 100);
+  const cur = runs[index];
+  return (
+    <div>
+      <div
+        ref={ref} role="slider" tabIndex={0} data-testid="tm-scrubber"
+        aria-label={t('Przebieg na osi czasu', 'Run on the time line')} aria-valuemin={0} aria-valuemax={runs.length - 1} aria-valuenow={index}
+        aria-valuetext={cur ? '#' + cur.run_id + ' ' + fmtDateTime(cur.at) : ''}
+        className="relative mx-2 cursor-pointer touch-none select-none outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        style={{ height: H + 8 }}
+        onPointerDown={(e) => { drag.current = true; (e.target as Element).setPointerCapture?.(e.pointerId); pick(e.clientX); }}
+        onPointerMove={(e) => { if (drag.current) pick(e.clientX); }}
+        onPointerUp={() => { drag.current = false; }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft') { e.preventDefault(); onIndex(Math.max(0, index - 1)); }
+          if (e.key === 'ArrowRight') { e.preventDefault(); onIndex(Math.min(runs.length - 1, index + 1)); }
+          if (e.key === 'Home') { e.preventDefault(); onIndex(0); }
+          if (e.key === 'End') { e.preventDefault(); onIndex(runs.length - 1); }
+        }}
+      >
+        <div className="absolute inset-x-0 bottom-1 h-px bg-rule-strong" />
+        {runs.map((r, i) => {
+          const light = isLight(r);
+          const h = light ? 8 : 10 + Math.round(Math.sqrt(r.changes / maxChanges) * (H - 12));
+          const sel = i === index;
+          return (
+            <span key={r.run_id} title={'#' + r.run_id + ' · ' + fmtDateTime(r.at) + ' · ' + triggerLabel(r.trigger) + ' · ' + r.changes + ' ' + t('zmian', 'changes')}
+              className={cx('absolute bottom-1 -translate-x-1/2', sel ? 'bg-accent' : r.changes - r.changes_expected > 0 ? 'bg-ink-2' : 'bg-ink-3', light && !sel && 'opacity-60')}
+              style={{ left: pos(i) + '%', height: h, width: light ? 2 : sel ? 6 : 4 }} />
+          );
+        })}
+        {cur ? <span className="pointer-events-none absolute -bottom-0.5 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-b border-r border-accent bg-panel" style={{ left: pos(index) + '%' }} /> : null}
+      </div>
+      <div className="mt-1 flex justify-between px-2 text-2xs text-ink-3">
+        <span className="num">{runs[0] ? fmtDateTime(runs[0].at) : ''}</span>
+        <span>{t('← → krok o jeden przebieg · wąskie kreski to ponowne sprawdzenia', '← → one run per step · thin marks are re-probes')}</span>
+        <span className="num">{runs.length ? fmtDateTime(runs[runs.length - 1].at) : ''}</span>
+      </div>
+    </div>
+  );
+}
+
+function Count({ label, value, now, tone }: { label: string; value: number; now?: number; tone?: string }) {
+  const d = now === undefined ? 0 : now - value;
+  return (
+    <div className="min-w-0 border-l border-rule pl-3 first:border-l-0 first:pl-0">
+      <dt className="text-xs text-ink-3">{label}</dt>
+      <dd className={cx('num text-xl', tone)}>{fmtInt(value)}{d ? <span className="ml-1.5 text-xs text-ink-3" title={t('różnica do dziś', 'difference to today')}>{d > 0 ? '+' : ''}{fmtInt(d)} {t('dziś', 'today')}</span> : null}</dd>
+    </div>
+  );
+}
+
+const ip24 = (ip: string) => ip.split('.').slice(0, 3).join('.') + '.0/24';
+
+function SnapshotMap({ runId, frameRunId }: { runId: number; frameRunId?: number }) {
+  const hosts = useItem<Page<AtHost>>('/timeline/at/hosts', { run_id: runId, limit: 1000 }, { staleTime: 60_000 });
+  const frame = useItem<RunMap>('/runs/' + frameRunId + '/map', undefined, { enabled: Boolean(frameRunId), staleTime: 300_000 });
+  const { blocks, gone, per } = useMemo(() => {
+    const per = new Map<string, { up: number; goneNow: number }>();
+    for (const h of hosts.data?.items ?? []) {
+      const k = ip24(h.ip);
+      const v = per.get(k) ?? { up: 0, goneNow: 0 };
+      if (h.up || h.status === 'up') { v.up++; if (h.status_now !== 'up') v.goneNow++; }
+      per.set(k, v);
+    }
+    const cidrs = new Set<string>([...(frame.data?.blocks ?? []).map((b) => b.cidr), ...per.keys()]);
+    const blocks = [...cidrs].map((cidr) => ({ cidr, size: 256, status: 'done' as const, hosts_up: per.get(cidr)?.up ?? 0 }));
+    const gone = new Set([...per.entries()].filter(([, v]) => v.goneNow > 0).map(([k]) => k));
+    return { blocks, gone, per };
+  }, [hosts.data, frame.data]);
+  if (hosts.error) return <ErrorState error={hosts.error} retry={() => hosts.refetch()} />;
+  if (!hosts.data) return <SkeletonRows rows={6} />;
+  return (
+    <div data-testid="tm-map">
+      <AddressMap blocks={blocks} highlight={gone} maxCell={30}
+        describe={(b) => { const v = per.get(b.cidr); return v && v.goneNow ? <span className="text-st-gone">{v.goneNow} {plural(v.goneNow, ['host z tamtej chwili dziś nie odpowiada', 'hosty z tamtej chwili dziś nie odpowiadają', 'hostów z tamtej chwili dziś nie odpowiada'], ['host from then is silent today', 'hosts from then are silent today'])}</span> : null; }} />
+      <p className="mt-2 text-xs text-ink-3">{t('Kolor: liczba hostów aktywnych w tamtym przebiegu. Obwódka: blok, w którym host z tamtej chwili dziś nie odpowiada.', 'Colour: hosts up in that run. Outline: a block where a host from then is silent today.')}</p>
+    </div>
+  );
+}
+
+function SnapshotLists({ runId }: { runId: number }) {
+  const u = useUrlState();
+  const tab = u.get('list', 'hosts');
+  const limit = 25;
+  const offset = Number(u.get('offset', '0'));
+  const status = u.get('hstatus');
+  const state = u.get('sstate');
+  const sev = u.get('fsev');
+  const hosts = useItem<Page<AtHost>>('/timeline/at/hosts', { run_id: runId, limit, offset, status }, { enabled: tab === 'hosts' });
+  const services = useItem<Page<AtService>>('/timeline/at/services', { run_id: runId, limit, offset, state }, { enabled: tab === 'services' });
+  const findings = useItem<Page<AtFinding>>('/timeline/at/findings', { run_id: runId, limit, offset, severity: sev }, { enabled: tab === 'findings' });
+  const hCols: Col<AtHost>[] = [
+    { id: 'ip', header: 'IP', cell: (h) => <Link to={'/hosts/' + h.id} className="mono link">{h.ip}</Link> },
+    { id: 'st', header: t('Wtedy', 'Then'), cell: (h) => <HostStatusMark status={h.status} /> },
+    { id: 'now', header: t('Dziś', 'Today'), cell: (h) => <span className={cx(h.status_now !== h.status && 'font-medium')}><HostStatusMark status={h.status_now} /></span> },
+    { id: 'ports', header: t('Porty wtedy', 'Ports then'), hide: 'md', cell: (h) => <span className="mono text-xs text-ink-2">{(h.open_ports ?? []).slice(0, 8).join(', ') || '–'}</span> },
+    { id: 'obs', header: t('Ostatnia obserwacja', 'Last observation'), hide: 'lg', cell: (h) => <span className="num text-xs text-ink-3">{fmtDateTime(h.observed_at)} · #{h.run_id}</span> },
+  ];
+  const sCols: Col<AtService>[] = [
+    { id: 'ep', header: t('Usługa', 'Service'), cell: (s) => <Link to={'/services/' + s.id} className="mono link">{s.ip}:{s.port}/{s.proto}</Link> },
+    { id: 'st', header: t('Wtedy', 'Then'), cell: (s) => <ServiceStateMark state={s.state} /> },
+    { id: 'now', header: t('Dziś', 'Today'), cell: (s) => <ServiceStateMark state={s.state_now} /> },
+    { id: 'prod', header: t('Produkt wtedy', 'Product then'), cell: (s) => <span className="text-sm">{[s.product, s.version].filter(Boolean).join(' ') || s.name || '–'}{s.changed_since ? <span className="ml-1.5 text-2xs text-st-changed">{t('zmienione od tamtej pory', 'changed since')}</span> : null}</span> },
+    { id: 'title', header: t('Tytuł', 'Title'), hide: 'lg', cell: (s) => <span className="block max-w-[260px] truncate text-xs text-ink-2">{s.title || '–'}</span> },
+  ];
+  const fCols: Col<AtFinding>[] = [
+    { id: 'sev', header: t('Waga', 'Severity'), width: 90, cell: (f) => <Sev level={f.severity} compact /> },
+    { id: 'title', header: t('Znalezisko', 'Finding'), cell: (f) => <span className="block max-w-[420px] truncate">{f.title}</span> },
+    { id: 'ep', header: t('Gdzie', 'Where'), hide: 'md', cell: (f) => <span className="mono text-xs">{f.ip}{f.port ? ':' + f.port : ''}</span> },
+    { id: 'now', header: t('Status dziś', 'Status today'), cell: (f) => <FindingStatusMark status={f.status_now} /> },
+  ];
+  const cur = tab === 'hosts' ? hosts : tab === 'services' ? services : findings;
+  return (
+    <Panel flush>
+      <Tabs value={tab} onChange={(id) => u.set({ list: id })} tabs={[
+        { id: 'hosts', label: t('Hosty', 'Hosts'), count: hosts.data?.total },
+        { id: 'services', label: t('Usługi', 'Services'), count: services.data?.total },
+        { id: 'findings', label: t('Znaleziska', 'Findings'), count: findings.data?.total },
+      ]} />
+      <FilterBar onClear={() => u.clear(['hstatus', 'sstate', 'fsev'])} active={[status, state, sev].filter(Boolean).length}>
+        {tab === 'hosts' ? <FilterField label={t('Stan wtedy', 'Status then')} width={180}><Select value={status} onChange={(v) => u.set({ hstatus: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'up', label: t('aktywne', 'up') }, { value: 'missing', label: t('bez odpowiedzi (poza nieaktywnymi)', 'silent (not down)') }, { value: 'unstable', label: t('niestabilne', 'unstable') }, { value: 'expected-offline', label: t('poza godzinami', 'expected offline') }, { value: 'down', label: t('nieaktywne', 'down') }]} /></FilterField> : null}
+        {tab === 'services' ? <FilterField label={t('Stan wtedy', 'State then')} width={180}><Select value={state} onChange={(v) => u.set({ sstate: v })} options={[{ value: '', label: t('otwarte i nieznane', 'open and unknown') }, { value: 'open', label: t('otwarte', 'open') }, { value: 'unknown', label: t('nieznane', 'unknown') }, { value: 'gone', label: t('zniknęły', 'gone') }, { value: 'all', label: t('wszystkie', 'all') }]} /></FilterField> : null}
+        {tab === 'findings' ? <FilterField label={t('Waga', 'Severity')} width={140}><Select value={sev} onChange={(v) => u.set({ fsev: v })} options={[{ value: '', label: t('dowolna', 'any') }, { value: 'high', label: t('wysoka', 'high') }, { value: 'medium', label: t('średnia', 'medium') }, { value: 'low', label: t('niska', 'low') }, { value: 'info', label: 'info' }]} /></FilterField> : null}
+      </FilterBar>
+      {tab === 'hosts' ? <DataTable rows={hosts.data?.items} cols={hCols} rowKey={(h) => h.id} loading={hosts.isPending} error={hosts.error} retry={() => hosts.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak hostów dla tych filtrów w tamtej chwili.', 'No host for these filters at that time.')}</p>} mobile={(h) => <div className="flex justify-between"><span className="mono">{h.ip}</span><HostStatusMark status={h.status} /></div>} /> : null}
+      {tab === 'services' ? <DataTable rows={services.data?.items} cols={sCols} rowKey={(s) => s.id} loading={services.isPending} error={services.error} retry={() => services.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak usług dla tych filtrów w tamtej chwili.', 'No service for these filters at that time.')}</p>} mobile={(s) => <div className="flex justify-between"><span className="mono">{s.ip}:{s.port}</span><ServiceStateMark state={s.state} /></div>} /> : null}
+      {tab === 'findings' ? <DataTable rows={findings.data?.items} cols={fCols} rowKey={(f) => f.id} loading={findings.isPending} error={findings.error} retry={() => findings.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Żadne znalezisko nie było wtedy otwarte.', 'No finding was open at that time.')}</p>} mobile={(f) => <div><Sev level={f.severity} compact /> {f.title}</div>} /> : null}
+      {cur.data ? <Pager total={cur.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null }, { keepOffset: true })} /> : null}
+    </Panel>
+  );
+}
+
+export default function TimeMachine() {
+  const u = useUrlState();
+  const tl = useItem<Timeline>('/timeline');
+  const runs = useMemo(() => tl.data?.runs ?? [], [tl.data]);
+  const wanted = Number(u.get('run', '0'));
+  const fromUrl = runs.findIndex((r) => r.run_id === wanted);
+  const [index, setIndex] = useState<number | null>(null);
+  const cur = index ?? (fromUrl >= 0 ? fromUrl : runs.length - 1);
+  const run = runs[cur];
+  const runId = useDebounced(run?.run_id ?? 0, 140);
+  useEffect(() => { if (runId && runId !== wanted) u.set({ run: runId }, { keepOffset: false }); }, [runId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const snap = useItem<Snapshot>('/timeline/at', { run_id: runId, limit: 1 }, { enabled: runId > 0, staleTime: 60_000 });
+  const latest = runs[runs.length - 1];
+  const frameRun = [...runs].reverse().find((r) => !isLight(r) && r.trigger !== 'import');
+  // Arrow keys step one run anywhere on the page, unless the focus is in a form field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (el.closest('input, textarea, select, [role=slider]')) return;
+      if (e.key === 'ArrowLeft') setIndex(Math.max(0, cur - 1));
+      if (e.key === 'ArrowRight') setIndex(Math.min(runs.length - 1, cur + 1));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [cur, runs.length]);
+
+  const header = <PageHeader title={t('Wehikuł czasu', 'Time machine')} sub={t('Sieć taka, jaka była po wybranym przebiegu: hosty, usługi i znaleziska z tamtej chwili, a obok to, co od tamtej pory zniknęło albo się zmieniło.', 'The network as it was after the chosen run: hosts, services and findings of that moment, next to what has gone or changed since.')} />;
+  if (tl.error) return <div>{header}<div className="p-4 sm:p-6">{routeMissing(tl.error) ? <Unavailable what={t('Serwer nie udostępnia jeszcze osi czasu (GET /timeline). Gdy integrator podłączy moduł, ta strona pokaże każdy przeanalizowany przebieg.', 'The server does not serve the time line yet (GET /timeline). When the integrator wires the module, this page shows every analysed run.')} /> : <ErrorState error={tl.error} retry={() => tl.refetch()} />}</div></div>;
+  if (!tl.data) return <div>{header}<SkeletonRows rows={10} /></div>;
+  if (runs.length === 0) return <div>{header}<div className="p-4 sm:p-6"><Empty icon="history" title={t('Brak przeanalizowanych przebiegów', 'No analysed run yet')} hint={t('Oś czasu zapełni się po pierwszym zakończonym skanie.', 'The time line fills after the first finished scan.')} /></div></div>;
+  const s = snap.data?.summary;
+  return (
+    <div>
+      {header}
+      <div className="space-y-4 p-4 sm:p-6">
+        <Panel title={<span>{t('Przebieg', 'Run')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
+          actions={<span className="num text-ink-3">{cur + 1} / {runs.length}{snap.data ? ' · ' + snap.data.took_ms + ' ms' : ''}</span>}>
+          <Scrubber runs={runs} index={cur} onIndex={setIndex} />
+        </Panel>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+          <Panel title={t('Stan w tamtej chwili', 'State at that moment')}>
+            {snap.error ? <ErrorState error={snap.error} retry={() => snap.refetch()} /> : !s ? <SkeletonRows rows={4} /> : (
+              <div className={cx(snap.isFetching && 'opacity-70 transition-opacity')} data-testid="tm-summary">
+                <dl className="grid grid-cols-3 gap-y-3">
+                  <Count label={t('Hosty aktywne', 'Hosts up')} value={s.hosts_up} now={latest.hosts_up} />
+                  <Count label={t('Hosty bez odpowiedzi', 'Hosts missing')} value={s.hosts_missing} now={latest.hosts_missing} />
+                  <Count label={t('Hosty nieaktywne', 'Hosts down')} value={s.hosts_down} now={latest.hosts_down} />
+                  <Count label={t('Usługi otwarte', 'Services open')} value={s.services_open} now={latest.services_open} />
+                  <Count label={t('Usługi nieznane', 'Services unknown')} value={s.services_unknown} now={latest.services_unknown} />
+                  <Count label={t('Znaleziska otwarte', 'Open findings')} value={s.findings_open} now={latest.findings_open} />
+                </dl>
+                <div className="mt-4 border-t border-rule pt-3">
+                  <p className="label mb-1.5">{t('Od tamtej chwili do dziś', 'From then to today')}</p>
+                  {(s.diff_to_now?.sentences ?? []).length ? (
+                    <ul className="space-y-1 text-sm" data-testid="tm-sentences">{(s.diff_to_now.sentences ?? []).map((x, i) => <li key={i} className="flex gap-2"><span className="mt-2 h-1 w-1 flex-none bg-ink-3" />{x}</li>)}</ul>
+                  ) : <p className="text-sm text-ink-2">{run.run_id === latest.run_id ? t('To jest najnowszy przebieg: stan bieżący.', 'This is the latest run: the current state.') : t('Od tamtej chwili nic się nie zmieniło.', 'Nothing has changed since then.')}</p>}
+                </div>
+              </div>
+            )}
+          </Panel>
+          <Panel title={t('Mapa przestrzeni adresowej wtedy', 'Address-space map then')}>{runId ? <SnapshotMap runId={runId} frameRunId={frameRun?.run_id} /> : null}</Panel>
+        </div>
+        {runId ? <SnapshotLists runId={runId} /> : null}
+      </div>
+    </div>
+  );
+}
+
+// ---------- host swim lanes and service field history ----------
+
+const laneColor: Record<string, string> = { up: 'var(--st-new)', open: 'var(--accent)', missing: 'var(--st-changed)', unknown: 'var(--ink-3)', down: 'var(--st-gone)' };
+
+function Lane({ intervals, t0, t1, height = 10 }: { intervals: LifeInterval[]; t0: number; t1: number; height?: number }) {
+  const span = Math.max(1, t1 - t0);
+  return (
+    <div className="relative w-full bg-sunk" style={{ height }}>
+      {intervals.map((iv, i) => {
+        const a = (new Date(iv.from).getTime() - t0) / span;
+        const b = ((iv.ongoing ? t1 : new Date(iv.to).getTime()) - t0) / span;
+        return <span key={i} className="absolute top-0 h-full" title={iv.state + (iv.status && iv.status !== iv.state ? ' (' + iv.status + ')' : '') + ' · ' + fmtDateTime(iv.from) + ' – ' + (iv.ongoing ? t('teraz', 'now') : fmtDateTime(iv.to)) + ' · #' + iv.from_run + '–#' + iv.to_run + ' · ' + iv.observations + ' ' + t('obs.', 'obs.')}
+          style={{ left: a * 100 + '%', width: Math.max(0.4, (b - a) * 100) + '%', background: laneColor[iv.state] ?? 'var(--ink-3)', opacity: iv.state === 'unknown' ? 0.5 : 1 }} />;
+      })}
+    </div>
+  );
+}
+
+export function HostLifePanel({ hostId }: { hostId: number }) {
+  const q = useItem<HostLife>('/timeline/hosts/' + hostId);
+  if (q.error && routeMissing(q.error)) return <Panel title={t('Życie hosta w czasie', 'Host life over time')}><Unavailable what={t('Pasma dostępności hosta i jego usług pojawią się, gdy serwer udostępni GET /timeline/hosts/{id}.', 'The availability lanes of the host and its services appear when the server serves GET /timeline/hosts/{id}.')} /></Panel>;
+  if (q.error) return <Panel title={t('Życie hosta w czasie', 'Host life over time')}><ErrorState error={q.error} retry={() => q.refetch()} /></Panel>;
+  if (!q.data) return <Panel title={t('Życie hosta w czasie', 'Host life over time')}><SkeletonRows rows={3} /></Panel>;
+  const L = q.data;
+  const t0 = new Date(L.first_seen).getTime();
+  const t1 = Math.max(Date.now(), new Date(L.last_seen).getTime());
+  return (
+    <Panel title={t('Życie hosta w czasie', 'Host life over time')} actions={<span className="num text-ink-3">{fmtDateTime(L.first_seen)} – {t('teraz', 'now')}</span>}>
+      <div className="grid grid-cols-[110px_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 text-xs" data-testid="host-lanes">
+        <span className="font-medium">{t('host', 'host')}</span><Lane intervals={L.host ?? []} t0={t0} t1={t1} height={14} />
+        {(L.services ?? []).map((s) => (
+          <FragmentLane key={s.service_id} label={<Link to={'/services/' + s.service_id} className="mono link">{s.port}/{s.proto} <span className="text-ink-3">{s.name}</span></Link>} intervals={s.intervals ?? []} versions={s.versions ?? []} t0={t0} t1={t1} />
+        ))}
+      </div>
+      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-2xs text-ink-3">
+        {[['up', t('host odpowiada', 'host answers')], ['missing', t('brak odpowiedzi', 'missing')], ['down', t('nieaktywny', 'down')], ['open', t('usługa otwarta', 'service open')], ['unknown', t('stan nieznany', 'state unknown')]].map(([k, l]) => <span key={k} className="inline-flex items-center gap-1"><span className="inline-block h-2 w-3" style={{ background: laneColor[k], opacity: k === 'unknown' ? 0.5 : 1 }} />{l}</span>)}
+        <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-px bg-ink" />{t('zmiana wersji', 'version change')}</span>
+      </p>
+    </Panel>
+  );
+}
+
+function FragmentLane({ label, intervals, versions, t0, t1 }: { label: React.ReactNode; intervals: LifeInterval[]; versions: { at: string; run_id: number; before: string; after: string }[]; t0: number; t1: number }) {
+  const span = Math.max(1, t1 - t0);
+  return (
+    <>
+      <span className="truncate">{label}</span>
+      <div className="relative">
+        <Lane intervals={intervals} t0={t0} t1={t1} />
+        {versions.map((v, i) => <span key={i} className="absolute -top-0.5 h-3.5 w-px bg-ink" style={{ left: ((new Date(v.at).getTime() - t0) / span) * 100 + '%' }} title={fmtDateTime(v.at) + ' #' + v.run_id + ': ' + (v.before || '–') + ' → ' + (v.after || '–')} />)}
+      </div>
+    </>
+  );
+}
+
+const fieldLabel = (f: string) => ({ name: t('usługa', 'service'), version: t('wersja', 'version'), title: t('tytuł', 'title'), status: t('status HTTP', 'HTTP status'), certificate: t('certyfikat', 'certificate'), headers: t('nagłówki', 'headers'), technologies: t('technologie', 'technologies') } as Record<string, string>)[f] ?? f;
+
+export function ServiceHistoryPanel({ serviceId }: { serviceId: number }) {
+  const q = useItem<ServiceHistory>('/timeline/services/' + serviceId);
+  const title = t('Historia pól', 'Field history');
+  if (q.error && routeMissing(q.error)) return <Panel title={title}><Unavailable what={t('Historia zmian pól usługi pojawi się, gdy serwer udostępni GET /timeline/services/{id}.', 'The field history of the service appears when the server serves GET /timeline/services/{id}.')} /></Panel>;
+  if (q.error) return <Panel title={title}><ErrorState error={q.error} retry={() => q.refetch()} /></Panel>;
+  if (!q.data) return <Panel title={title}><SkeletonRows rows={3} /></Panel>;
+  const h = q.data;
+  return (
+    <Panel title={title} count={h.observations} flush>
+      <div data-testid="service-fields">
+        {(h.changed ?? []).length === 0 ? <p className="px-3 py-3 text-sm text-ink-2 sm:px-4">{t('Żadne pole nie zmieniło się przez ' + h.observations + ' obserwacji.', 'No field changed over ' + h.observations + ' observations.')}</p> : (
+          <ul>
+            {(h.changed ?? []).map((f: FieldHistory) => (
+              <li key={f.field} className="border-b border-rule px-3 py-2 sm:px-4">
+                <p className="label mb-1">{fieldLabel(f.field)}</p>
+                <ol className="space-y-0.5">
+                  {f.values.map((v, i) => (
+                    <li key={i} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 text-sm">
+                      <span className={cx('mono truncate', i === f.values.length - 1 ? 'text-ink' : 'text-ink-2')} title={v.value}>{v.value || '–'}</span>
+                      <span className="num text-2xs text-ink-3">{fmtDateTime(v.from)} – {fmtDateTime(v.to)} · #{v.from_run}–#{v.to_run}</span>
+                    </li>
+                  ))}
+                </ol>
+              </li>
+            ))}
+          </ul>
+        )}
+        {h.unchanged && Object.keys(h.unchanged).length ? <p className="px-3 py-2 text-xs text-ink-3 sm:px-4">{t('Bez zmian: ', 'Unchanged: ')}{Object.entries(h.unchanged).map(([k, v]) => fieldLabel(k) + ' ' + v).join(' · ')}</p> : null}
+      </div>
+    </Panel>
+  );
+}

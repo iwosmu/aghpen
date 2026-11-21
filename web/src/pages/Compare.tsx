@@ -89,11 +89,17 @@ export default function Compare() {
               </div>
               <RunCard run={d.to} side={t('Po', 'After')} />
             </div>
-            <p className="text-sm text-ink-2">
+            <div className="flex flex-col text-sm text-ink-2">
               {all.length === 0 ? t('Między tymi skanami nie zapisano żadnej zmiany.', 'No change was recorded between these runs.') : (
-                <><span className="num text-ink">{all.filter((c) => !c.expected).length}</span> {plural(all.filter((c) => !c.expected).length, ['zmiana wymaga', 'zmiany wymagają', 'zmian wymaga'], ['change needs', 'changes need'])} {t('przeglądu', 'review')}, <span className="num text-ink">{all.filter((c) => c.expected).length}</span> {t('oczekiwanych', 'expected')}. {t('Nowych znalezisk:', 'New findings:')} <span className="num text-ink">{d.summary.findings_new}</span>.</>
+                <span><span className="num text-ink">{all.filter((c) => !c.expected).length}</span> {plural(all.filter((c) => !c.expected).length, ['zmiana wymaga', 'zmiany wymagają', 'zmian wymaga'], ['change needs', 'changes need'])} {t('przeglądu', 'review')}, <span className="num text-ink">{all.filter((c) => c.expected).length}</span> {t('oczekiwanych', 'expected')}. {t('Nowych znalezisk:', 'New findings:')} <span className="num text-ink">{d.summary.findings_new}</span>.</span>
               )}
-            </p>
+              {d.summary.hosts_missing ? (
+                <span className="mt-1 flex items-start gap-1.5 text-ink-2" data-testid="compare-missing">
+                  <Glyph name="half" tone="expected" />
+                  <span><span className="num text-ink">{d.summary.hosts_missing}</span> {plural(d.summary.hosts_missing, ['host nie odpowiedział', 'hosty nie odpowiedziały', 'hostów nie odpowiedziało'], ['host did not answer', 'hosts did not answer'])}{t(', ale nie jest jeszcze uznany za nieaktywny', ' but is not reported inactive yet')}{d.summary.services_unreachable ? <>{t('; ich ', '; their ')}<span className="num text-ink">{d.summary.services_unreachable}</span> {plural(d.summary.services_unreachable, ['usługa jest nieosiągalna', 'usługi są nieosiągalne', 'usług jest nieosiągalnych'], ['service is unreachable', 'services are unreachable'])}{t(' (stan nieznany, nie zamknięte)', ' (unknown, not closed)')}</> : null}. {t('Lista w kolumnie „Zmienione”.', 'They are listed under "Changed".')}</span>
+                </span>
+              ) : null}
+            </div>
             <div className="grid gap-4 lg:grid-cols-3">
               <Column title={t('Nowe', 'New')} glyph="plus" tone="new" items={group('new')} showExpected={showExpected} />
               <Column title={t('Zniknęły', 'Gone')} glyph="minus" tone="gone" items={group('gone')} showExpected={showExpected} />

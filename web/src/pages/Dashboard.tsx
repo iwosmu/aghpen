@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router';
+import { Link, Navigate } from 'react-router';
+import { SETUP_DONE_KEY } from './Setup';
 import { useItem, usePage } from '../api/hooks';
 import type { Change, Dashboard as Dash, RunMap, ScanProfile, ScanRun, Scope } from '../api/types';
 import { t, plural } from '../i18n';
@@ -11,6 +12,7 @@ import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, type GlyphName, t
 import { AddressMap } from '../viz/AddressMap';
 import { BarList, ProgressBar, RateGauge, TrendRows } from '../viz/charts';
 import { useSession } from '../session';
+import { ReprobePanel } from './Reprobe';
 
 function Count({ n, glyph, tone, label, to }: { n: number; glyph: GlyphName; tone: Tone; label: string; to: string }) {
   const zero = n === 0;
@@ -40,7 +42,9 @@ function Handover({ d }: { d: Dash }) {
     );
   }
   const changed = s ? s.services_changed : 0;
-  const quiet = s ? s.hosts_new + s.hosts_gone + s.services_new + s.services_gone + changed + s.hosts_unstable === 0 : true;
+  const missing = s?.hosts_missing ?? 0;
+  const unreachable = s?.services_unreachable ?? 0;
+  const quiet = s ? s.hosts_new + s.hosts_gone + s.services_new + s.services_gone + changed + s.hosts_unstable + missing === 0 : true;
   return (
     <div>
       <p className="max-w-[30ch] text-xl font-semibold tracking-[-0.015em] text-ink sm:max-w-none" data-testid="handover">
@@ -62,7 +66,7 @@ function Handover({ d }: { d: Dash }) {
           ) : t('Nic nie wymaga pilnej uwagi.', 'Nothing needs urgent attention.')}
           {' '}
           <span className="text-ink-2">
-            {t('Skan', 'Run')} <Link to={'/runs/' + run.id} className="num link">#{run.id}</Link> {t('zakończony', 'finished')} {fmtRelative(run.finished_at)}.
+            {t('Skan', 'Run')} <Link to={'/runs/' + run.id} className="num link">#{run.id}</Link>{run.profile_name ? <> ({run.profile_name})</> : null} {t('zakończony', 'finished')} {fmtRelative(run.finished_at)}.
           </span>
         </span>
       </p>
@@ -74,6 +78,8 @@ function Handover({ d }: { d: Dash }) {
           <Count n={s.services_gone} glyph="minus" tone="gone" label={plural(s.services_gone, ['usługa zniknęła', 'usługi zniknęły', 'usług zniknęło'], ['service gone', 'services gone'])} to={'/changes?run_id=' + run.id + '&kind=service_gone&expected=false'} />
           <Count n={changed} glyph="delta" tone="changed" label={plural(changed, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes'])} to={'/changes?run_id=' + run.id} />
           <Count n={s.hosts_unstable} glyph="wave" tone="unstable" label={plural(s.hosts_unstable, ['host niestabilny', 'hosty niestabilne', 'hostów niestabilnych'], ['unstable host', 'unstable hosts'])} to={'/hosts?status=unstable'} />
+          <Count n={missing} glyph="half" tone="expected" label={plural(missing, ['host bez odpowiedzi', 'hosty bez odpowiedzi', 'hostów bez odpowiedzi'], ['host missing', 'hosts missing'])} to={'/changes?run_id=' + run.id + '&kind=host_missing'} />
+          {unreachable ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap py-0.5 text-sm text-ink-3" title={t('Usługi hostów, które milczą, ale nie są jeszcze uznane za nieaktywne: stan nieznany, nie zamknięte.', 'Services of silent hosts that are not reported inactive yet: unknown, not closed.')}><span className="num text-base font-medium text-ink-2">{unreachable}</span>{plural(unreachable, ['usługa nieosiągalna', 'usługi nieosiągalne', 'usług nieosiągalnych'], ['service unreachable', 'services unreachable'])}</span> : null}
           <Count n={expected} glyph="dashring" tone="expected" label={plural(expected, ['zmiana oczekiwana', 'zmiany oczekiwane', 'zmian oczekiwanych'], ['expected change', 'expected changes'])} to={'/changes?run_id=' + run.id + '&expected=true'} />
         </div>
       ) : null}
@@ -121,6 +127,7 @@ function ActiveRun({ initial, d }: { initial: ScanRun; d: Dash }) {
   const live = useLiveRun(initial.id);
   const run = live.run.data ?? initial;
   const map = useItem<RunMap>('/runs/' + run.id + '/map', undefined, { enabled: can('scans:read') });
+  const profile = useItem<ScanProfile>('/profiles/' + run.profile_id, undefined, { enabled: Boolean(run.profile_id) && can('scans:read') });
   const s = run.stats;
   const pct = s.addresses_total ? s.addresses_done / s.addresses_total : 0;
   return (
@@ -145,7 +152,7 @@ function ActiveRun({ initial, d }: { initial: ScanRun; d: Dash }) {
             <div><dt className="text-ink-3">{t('czas', 'elapsed')}</dt><dd className="num text-sm text-ink">{fmtDuration(s.elapsed_sec)}</dd></div>
           </dl>
         </div>
-        <RateGauge current={s.current_pps} cap={Math.min(800, d.safety.max_pps)} policyCap={d.safety.max_pps} />
+        <RateGauge current={s.current_pps} cap={Math.min(profile.data?.rate.max_pps ?? d.safety.max_pps, d.safety.max_pps)} policyCap={d.safety.max_pps} />
         <div className="min-w-[150px] max-w-[320px]">
           {map.data ? <AddressMap blocks={map.data.blocks} compact /> : <div className="skeleton h-[104px] w-[220px]" />}
         </div>
@@ -270,6 +277,7 @@ function FirstRun({ d }: { d: Dash }) {
     <section aria-labelledby="first-run-title" data-testid="first-run">
       <h2 id="first-run-title" className="text-xl font-semibold tracking-[-0.015em]">{t('Czujka nie ma jeszcze danych o sieci.', 'Czujka has no data about the network yet.')}</h2>
       <p className="mt-2 max-w-[70ch] text-base text-ink-2">{t('Trzy kroki dzielą tę instalację od pierwszego obchodu. Każdy krok można wykonać teraz albo wrócić do niego później.', 'Three steps stand between this installation and its first watch. Do each step now or come back to it later.')}</p>
+      {can('targets:create') && can('scans:configure') ? <p className="mt-2 text-sm"><Link to="/setup" className="link">{t('Albo przejdź wszystko w jednym kreatorze (około 2 minuty)', 'Or go through everything in one wizard (about 2 minutes)')}</Link></p> : null}
       <ol className="mt-4 border-y border-rule">
         {steps.map((s, i) => (
           <li key={s.title} className="grid grid-cols-[28px_minmax(0,1fr)] items-start gap-x-3 gap-y-2 border-b border-rule py-3 last:border-b-0 sm:grid-cols-[28px_minmax(0,1fr)_auto]">
@@ -302,6 +310,7 @@ function FirstRun({ d }: { d: Dash }) {
 }
 
 export default function Dashboard() {
+  const { can } = useSession();
   const q = useItem<Dash>('/dashboard', undefined, { refetchInterval: 60_000 });
   const now = useNow();
   if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
@@ -311,6 +320,9 @@ export default function Dashboard() {
   const st = d.safety;
   const h0 = d.headline;
   const fresh = !d.last_run && !d.active_run && h0.hosts_up + h0.hosts_down + h0.hosts_unstable + h0.services_open + h0.findings_open + h0.changes_unacked === 0;
+  // A fresh installation with nothing configured leads the administrator into the first-run wizard once.
+  const setupDone = (() => { try { return Boolean(localStorage.getItem(SETUP_DONE_KEY)); } catch { return true; } })();
+  if (fresh && h0.addresses_in_scope === 0 && can('targets:create') && can('scans:configure') && !setupDone) return <Navigate to="/setup" replace />;
   if (fresh) {
     return (
       <div className="mx-auto max-w-[1480px] space-y-5 p-4 sm:p-6">
@@ -394,6 +406,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
+        <div className="min-w-0 space-y-4">
         <Panel title={t('Hosty niestabilne', 'Unstable hosts')} count={d.headline.hosts_unstable} flush actions={<Link to="/hosts?status=unstable" className="link">{t('Wszystkie', 'All')}</Link>}>
           {(d.unstable_hosts ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Każdy znany host odpowiada zgodnie ze swoim profilem.', 'Every known host answers as its profile predicts.')}</p> : null}
           <ul>
@@ -408,6 +421,8 @@ export default function Dashboard() {
             ))}
           </ul>
         </Panel>
+        <ReprobePanel limit={5} />
+        </div>
         <Panel title={t('Wygasające certyfikaty', 'Expiring certificates')} count={(d.certs_expiring ?? []).length} flush>
           {(d.certs_expiring ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Żaden certyfikat nie wygasa w ciągu 30 dni.', 'No certificate expires within 30 days.')}</p> : null}
           <ul>

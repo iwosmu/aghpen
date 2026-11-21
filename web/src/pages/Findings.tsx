@@ -20,7 +20,7 @@ const statusOpts = () => FINDING_STATUSES.map((s) => ({ value: s, label: finding
 const sevOpts = () => SEVERITIES.map((s) => ({ value: s, label: severityLabel(s) }));
 
 function typeLabel(x: string): string {
-  const m: Record<string, [string, string]> = { signature: ['sygnatura', 'signature'], change: ['zmiana', 'change'], tls: ['certyfikat', 'certificate'], exposure: ['ekspozycja', 'exposure'], manual: ['ręczne', 'manual'] };
+  const m: Record<string, [string, string]> = { signature: ['sygnatura', 'signature'], change: ['zmiana', 'change'], tls: ['certyfikat', 'certificate'], exposure: ['ekspozycja', 'exposure'], manual: ['ręczne', 'manual'], 'policy-violation': ['naruszenie reguły', 'rule violation'] };
   return m[x] ? t(m[x][0], m[x][1]) : x;
 }
 
@@ -56,7 +56,7 @@ function DetailDialog({ id, onClose }: { id: number; onClose: () => void }) {
             <dl>
               <KV k={t('Adres', 'Address')} mono><Link className="link" to={f.service_id ? '/services/' + f.service_id : '/hosts/' + f.host_id} onClick={onClose}>{f.ip}{f.port ? ':' + f.port : ''}</Link></KV>
               {f.url ? <KV k="URL" mono><span className="break-all text-xs">{f.url}</span></KV> : null}
-              <KV k={t('Rodzaj', 'Type')}>{typeLabel(f.type)}{f.signature ? <span className="mono ml-2 text-xs text-ink-3">{f.signature}</span> : null}</KV>
+              <KV k={t('Rodzaj', 'Type')}>{typeLabel(f.type)}{f.signature?.startsWith('policy:') ? <Link to={'/rules?slug=' + encodeURIComponent(f.signature.slice(7))} className="link mono ml-2 text-xs">{t('reguła ', 'rule ')}{f.signature.slice(7)}</Link> : f.signature ? <span className="mono ml-2 text-xs text-ink-3">{f.signature}</span> : null}</KV>
               <KV k={t('Ciekawość', 'Interest')}><InterestScore value={f.interest} /></KV>
               <KV k={t('Pierwszy raz', 'First seen')}><span className="num">{fmtDateTime(f.first_seen)}</span>{f.first_run_id ? <Link to={'/runs/' + f.first_run_id} onClick={onClose} className="num link ml-2 text-xs">#{f.first_run_id}</Link> : null}</KV>
               <KV k="DefectDojo">{f.dojo_id ? <a className="link inline-flex items-center gap-1" href={f.dojo_url} target="_blank" rel="noreferrer noopener">#{f.dojo_id}<Icon name="external" size={11} /></a> : <span className="text-ink-3">{t('nie wyeksportowano', 'not exported')}</span>}</KV>
@@ -164,7 +164,7 @@ export default function Findings() {
           <Select value={u.get('status')} onChange={(v) => u.set({ status: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'new,triaged', label: t('otwarte (nowe i w analizie)', 'open (new and triaged)') }, ...statusOpts()]} />
         </FilterField>
         <FilterField label={t('Waga', 'Severity')} width={120}><Select value={u.get('severity')} onChange={(v) => u.set({ severity: v })} options={[{ value: '', label: t('dowolna', 'any') }, ...sevOpts()]} /></FilterField>
-        <FilterField label={t('Rodzaj', 'Type')} width={130}><Select value={u.get('type')} onChange={(v) => u.set({ type: v })} options={[{ value: '', label: t('dowolny', 'any') }, ...['signature', 'exposure', 'tls', 'change', 'manual'].map((x) => ({ value: x, label: typeLabel(x) }))]} /></FilterField>
+        <FilterField label={t('Rodzaj', 'Type')} width={130}><Select value={u.get('type')} onChange={(v) => u.set({ type: v })} options={[{ value: '', label: t('dowolny', 'any') }, ...['signature', 'exposure', 'policy-violation', 'tls', 'change', 'manual'].map((x) => ({ value: x, label: typeLabel(x) }))]} /></FilterField>
         <FilterField label="DefectDojo" width={150}><Select value={u.get('exported')} onChange={(v) => u.set({ exported: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'false', label: t('niewyeksportowane', 'not exported') }, { value: 'true', label: t('wyeksportowane', 'exported') }]} /></FilterField>
       </FilterBar>
       {selected.size > 0 && (canEdit || canExport) ? (

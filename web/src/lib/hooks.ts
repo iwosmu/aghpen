@@ -69,6 +69,14 @@ export function useLiveRun(id: number | null | undefined, opts?: { withChunks?: 
         if (r && r.id) qc.setQueryData(['/runs/' + id, {}], r);
         invalidate(qc, '/runs', '/dashboard', '/changes', '/hosts', '/services', '/findings');
       },
+      // "paused" is the other final event: the run stopped (user, window, emergency stop, shutdown)
+      // and can be resumed. Close the stream; a resume reopens it through the status change.
+      paused: (r: ScanRun | null) => {
+        s.close();
+        setConnected(false);
+        if (r && r.id) qc.setQueryData(['/runs/' + id, {}], r);
+        invalidate(qc, '/runs', '/dashboard');
+      },
     }, setConnected);
     return () => { s.close(); setConnected(false); };
   }, [id, live, qc, opts?.withChunks]);

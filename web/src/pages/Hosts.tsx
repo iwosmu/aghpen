@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { NextSteps } from '../ui/NextSteps';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { get } from '../api/client';
-import { useItem, usePage } from '../api/hooks';
-import type { Host, NameCount, Page, Scope } from '../api/types';
+import { useAction, useItem, usePage } from '../api/hooks';
+import { post } from '../api/client';
+import type { Host, ManualEntryResult, NameCount, Page, Scope } from '../api/types';
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtInt, fmtRelative } from '../lib/format';
 import { useUrlState, useWidth } from '../lib/hooks';
-import { Empty, ErrorState, PageHeader, Select, SkeletonRows, Spinner, Tags } from '../ui/kit';
+import { Button, Dialog, Empty, ErrorState, Field, InlineError, PageHeader, Select, SkeletonRows, Spinner, Tags } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 import { FilterBar, FilterField, SearchField } from '../ui/table';
 import { HOST_STATUSES, HostStatusMark, InterestScore, hostStatusInfo } from '../ui/marks';
@@ -25,6 +26,8 @@ export default function Hosts() {
   const u = useUrlState();
   const navigate = useNavigate();
   const canEdit = useCan('results:update');
+  const canCreate = useCan('results:create');
+  const [manual, setManual] = useState(false);
   const query = useMemo(() => {
     const q: Record<string, string> = {};
     for (const k of FILTERS) { const v = u.get(k); if (v) q[k] = v; }
@@ -89,8 +92,9 @@ export default function Hosts() {
         title={t('Hosty', 'Hosts')}
         sub={inf.data ? <><span className="num text-ink">{fmtInt(total)}</span> {plural(total, ['host', 'hosty', 'hostów'], ['host', 'hosts'])}{active ? t(' po filtrach', ' after filters') : t(' w inwentarzu', ' in the inventory')}</> : t('Wczytywanie…', 'Loading…')}
         readOnly={!canEdit}
-        actions={<ExportButtons kind="hosts" query={query} />}
+        actions={<>{canCreate ? <Button icon="plus" onClick={() => setManual(true)} data-testid="host-manual">{t('Dodaj host ręcznie', 'Add a host by hand')}</Button> : null}<ExportButtons kind="hosts" query={query} /></>}
       />
+      {manual ? <ManualHostDialog onClose={() => setManual(false)} /> : null}
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
         <SearchField value={q} onChange={setQ} placeholder={t('IP, nazwa, etykieta', 'IP, name, label')} width={200} />
         <FilterField label={t('Stan', 'Status')} width={150}>
@@ -161,5 +165,47 @@ export default function Hosts() {
         )}
       </div>
     </div>
+  );
+}
+
+/** One service per line: "port[/proto] [name] [product version…]", e.g. "443/tcp https nginx 1.24". */
+export function parseServiceLines(text: string): { services: { port: number; proto: string; name: string; product: string; version: string }[]; bad: string[] } {
+  const services: { port: number; proto: string; name: string; product: string; version: string }[] = [];
+  const bad: string[] = [];
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    const m = line.match(/^(\d{1,5})(?:\/(tcp|udp))?(?:\s+(\S+))?(?:\s+(\S+))?(?:\s+(.+))?$/i);
+    const port = m ? Number(m[1]) : 0;
+    if (!m || port < 1 || port > 65535) { bad.push(line); continue; }
+    services.push({ port, proto: (m[2] ?? 'tcp').toLowerCase(), name: m[3] ?? '', product: m[4] ?? '', version: m[5] ?? '' });
+  }
+  return { services, bad };
+}
+
+function ManualHostDialog({ onClose }: { onClose: () => void }) {
+  const navigate = useNavigate();
+  const [ip, setIp] = useState('');
+  const [names, setNames] = useState('');
+  const [svc, setSvc] = useState('');
+  const parsed = parseServiceLines(svc);
+  const ipOk = /^(\d{1,3})(\.\d{1,3}){3}$/.test(ip.trim()) && ip.trim().split('.').every((x) => Number(x) <= 255);
+  const add = useAction(() => post<ManualEntryResult>('/hosts', { ip: ip.trim(), hostnames: names.split(/[\s,]+/).filter(Boolean), up: true, services: parsed.services }), {
+    invalidate: ['/hosts', '/services', '/runs', '/dashboard', '/changes'], silent: true, success: t('Host dodany', 'Host added'),
+    onSuccess: (r) => { onClose(); if (r?.host?.id) navigate('/hosts/' + r.host.id); },
+  });
+  return (
+    <Dialog open onClose={onClose} width={540} title={t('Dodaj host ręcznie', 'Add a host by hand')}
+      footer={<><Button onClick={onClose}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="plus" busy={add.isPending} disabled={!ipOk || parsed.bad.length > 0} onClick={() => add.mutate(undefined)} data-testid="host-manual-save">{t('Dodaj host', 'Add the host')}</Button></>}>
+      <div className="space-y-3">
+        <p className="text-sm text-ink-2">{t('Dla urządzeń, których skaner nie widzi (za zaporą, wyłączone na noc). Wpis przechodzi przez tę samą analizę co skan, jako osobny przebieg „wpis ręczny”. Usług, których nie wpiszesz, Czujka nie uzna za zniknięte.', 'For devices the scanner cannot see (behind a firewall, off at night). The entry goes through the same analysis as a scan, as its own "manual entry" run. Services that you do not enter are not marked gone.')}</p>
+        <Field label={t('Adres IP', 'IP address')} error={ip && !ipOk ? t('to nie jest adres IPv4', 'this is not an IPv4 address') : undefined}><input className="field mono" autoFocus value={ip} onChange={(e) => setIp(e.target.value)} placeholder="10.66.20.15" data-testid="host-manual-ip" /></Field>
+        <Field label={t('Nazwy hosta', 'Host names')} hint={t('oddzielone spacją lub przecinkiem', 'separated by a space or a comma')}><input className="field mono" value={names} onChange={(e) => setNames(e.target.value)} placeholder="drukarka-b1.lab.czujka.test" /></Field>
+        <Field label={t('Usługi', 'Services')} hint={t('jedna w wierszu: port[/proto] nazwa produkt wersja, np. 443/tcp https nginx 1.24', 'one per line: port[/proto] name product version, for example 443/tcp https nginx 1.24')} error={parsed.bad.length ? t('Nie rozumiem: ', 'Cannot read: ') + parsed.bad.join(', ') : undefined}>
+          <textarea className="field mono" rows={4} value={svc} onChange={(e) => setSvc(e.target.value)} placeholder={'22/tcp ssh OpenSSH 9.6\n443/tcp https nginx 1.24'} data-testid="host-manual-services" />
+        </Field>
+        <InlineError error={add.error} />
+      </div>
+    </Dialog>
   );
 }

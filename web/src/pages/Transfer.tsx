@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useAction, usePage } from '../api/hooks';
 import { download, qs, upload, type Query } from '../api/client';
-import type { ImportReport, ScanRun } from '../api/types';
+import type { FindingsImportReport, ImportReport, ScanRun } from '../api/types';
 import { t } from '../i18n';
 import { fmtBytes, fmtDateTime, fmtInt } from '../lib/format';
 import { Button, Field, InlineError, KV, PageHeader, Panel, Select, toast, toastError } from '../ui/kit';
@@ -37,6 +37,65 @@ function ExportRow({ kind, title, hint, filter, runs }: { kind: Kind; title: str
         <Button icon="download" busy={busy === 'json'} onClick={() => run('json')}>JSON</Button>
       </div>
     </li>
+  );
+}
+
+function FindingsImport() {
+  const [f, setF] = useState<File | null>(null);
+  const [rep, setRep] = useState<FindingsImportReport | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const imp = useAction((file: File) => { const fd = new FormData(); fd.append('file', file); return upload<FindingsImportReport>('/import/findings', fd); }, {
+    invalidate: ['/findings', '/hosts', '/runs', '/dashboard'], silent: true,
+    onSuccess: (r) => { setRep(r); setF(null); if (input.current) input.current.value = ''; },
+  });
+  return (
+    <div className="space-y-3">
+      <Field label={t('Plik ze znaleziskami', 'Findings file')} hint={t('DefectDojo Generic Findings (JSON albo CSV), lista znalezisk z API DefectDojo albo eksport znalezisk Czujki. Format rozpoznajemy sami. Ponowny import aktualizuje znaleziska zamiast je dublować.', 'DefectDojo Generic Findings (JSON or CSV), a findings list from the DefectDojo API, or a Czujka findings export. The format is detected. A second import updates the findings instead of duplicating them.')}>
+        <input ref={input} data-testid="findings-import-file" type="file" accept=".json,.csv,application/json,text/csv" className="field py-1" onChange={(e) => { setF(e.target.files?.[0] ?? null); setRep(null); }} />
+      </Field>
+      <Button variant="primary" icon="upload" busy={imp.isPending} disabled={!f} onClick={() => f && imp.mutate(f)}>{t('Importuj znaleziska', 'Import the findings')}</Button>
+      <InlineError error={imp.error} />
+      {rep ? (
+        <div className="border border-rule p-3" data-testid="findings-import-report">
+          <p className="flex items-center gap-2 text-sm font-medium"><Glyph name={rep.skipped ? 'delta' : 'check'} tone={rep.skipped ? 'changed' : 'new'} />{t('Wczytano ' + fmtInt(rep.findings) + ' znalezisk', 'Read ' + fmtInt(rep.findings) + ' findings')}</p>
+          <dl className="mt-2">
+            <KV k={t('Rozpoznany format', 'Detected format')} mono>{rep.format}</KV>
+            <KV k={t('Nowe', 'Created')}><span className="num">{fmtInt(rep.created)}</span></KV>
+            <KV k={t('Zaktualizowane', 'Updated')}><span className="num">{fmtInt(rep.updated)}</span></KV>
+            <KV k={t('Hosty dopisane ręcznie', 'Hosts entered by hand')}><span className="num">{fmtInt(rep.hosts_created)}</span></KV>
+            <KV k={t('Pominięte', 'Skipped')}><span className="num">{fmtInt(rep.skipped)}</span></KV>
+            {rep.run_id ? <KV k={t('Przebieg', 'Run')}><Link className="num link" to={'/runs/' + rep.run_id}>#{rep.run_id}</Link></KV> : null}
+          </dl>
+          {(rep.invalid ?? []).length ? (
+            <ul className="mt-2 max-h-[140px] overflow-auto border-t border-rule">
+              {(rep.invalid ?? []).map((l, i) => <li key={i} className="grid grid-cols-[64px_minmax(0,1fr)] gap-x-2 border-b border-rule py-1 text-xs"><span className="num text-ink-3">{t('poz.', 'item')} {l.line}</span><span><span className="mono">{l.value}</span> <span className="text-danger">{l.reason}</span></span></li>)}
+            </ul>
+          ) : null}
+          <p className="mt-2 text-xs"><Link to="/findings" className="link">{t('Przejdź do znalezisk', 'Go to the findings')}</Link></p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DojoExportRow() {
+  const [busy, setBusy] = useState('');
+  const run = async (fmt: 'json' | 'csv') => {
+    setBusy(fmt);
+    try { const size = await download('/export/findings.dojo.' + fmt, 'czujka-findings.dojo.' + fmt); toast(t('Pobrano czujka-findings.dojo.' + fmt + ' (' + fmtBytes(size) + ')', 'Downloaded czujka-findings.dojo.' + fmt + ' (' + fmtBytes(size) + ')')); } catch (e) { toastError(e); }
+    setBusy('');
+  };
+  return (
+    <div className="mt-3 grid gap-x-4 gap-y-2 border-t border-rule pt-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+      <div>
+        <div className="text-sm font-medium">{t('Znaleziska w formacie DefectDojo', 'Findings in DefectDojo format')}</div>
+        <div className="text-xs text-ink-3">{t('Generic Findings Import: wgraj plik w DefectDojo bez integracji sieciowej. Plik wraca też do Czujki przez import znalezisk.', 'Generic Findings Import: upload the file in DefectDojo without a network integration. The file also imports back into Czujka.')}</div>
+      </div>
+      <div className="flex gap-1.5">
+        <Button icon="download" busy={busy === 'json'} onClick={() => run('json')} data-testid="dojo-export-json">JSON</Button>
+        <Button icon="download" busy={busy === 'csv'} onClick={() => run('csv')}>CSV</Button>
+      </div>
+    </div>
   );
 }
 
@@ -95,6 +154,8 @@ export default function Transfer() {
           ) : <p className="text-sm text-ink-2">{t('Twoja rola nie może importować wyników (uprawnienie results:create).', 'Your role cannot import results (the results:create permission).')}</p>}
         </Panel>
 
+        {canImport ? <Panel title={t('Import znalezisk', 'Import findings')}><FindingsImport /></Panel> : null}
+
         <Panel title={t('Eksport danych', 'Export data')}>
           {canExport ? (
             <>
@@ -112,6 +173,7 @@ export default function Transfer() {
                 <label className="block"><span className="label mb-1 block">{t('Skan', 'Run')}</span><Select value={chosenRun} onChange={setRunId} options={runOpts} /></label>
                 <Button icon="download" busy={xmlBusy} disabled={!chosenRun} onClick={nmapXml}>XML</Button>
               </div>
+              <DojoExportRow />
             </>
           ) : <p className="text-sm text-ink-2">{t('Twoja rola nie może eksportować danych (uprawnienie export:run).', 'Your role cannot export data (the export:run permission).')}</p>}
         </Panel>
