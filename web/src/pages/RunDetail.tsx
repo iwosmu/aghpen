@@ -41,6 +41,7 @@ export default function RunDetail() {
   const id = Number(useParams().id);
   const navigate = useNavigate();
   const canRun = useCan('scans:run');
+  const canExport = useCan('export:run');
   const { run: runQ, recent, connected } = useLiveRun(id, { withChunks: true });
   const run = runQ.data;
   const chunks = useItem<Chunk[]>('/runs/' + id + '/chunks', undefined, { enabled: Boolean(run) });
@@ -107,6 +108,7 @@ export default function RunDetail() {
             {['running', 'paused', 'queued'].includes(run.status) ? <Button variant="danger" icon="x" onClick={() => setConfirmCancel(true)}>{t('Anuluj skan', 'Cancel the scan')}</Button> : null}
             {run.status === 'completed' && run.summary?.prev_run_id ? <Button icon="compare" onClick={() => navigate('/changes/compare?from=' + run.summary!.prev_run_id + '&to=' + run.id)}>{t('Porównaj z poprzednim', 'Compare with the previous')}</Button> : null}
             {reportReady ? <ReportButtons onOpen={openReport} /> : null}
+            {run.status === 'completed' && canExport ? <DojoRunButton runId={run.id} /> : null}
           </>
         ) : (
           <>
@@ -307,4 +309,33 @@ export function phaseText(s: ScanRun['stats'], chunks: number, addrs: number): s
   if (s.http_requests > 0) return t('Rozpoznawanie usług WWW i wykrywanie hostów w ', 'Identifying web services and discovering hosts in ') + where;
   if (s.services_open > 0) return t('Wykrywanie hostów i usług w ', 'Discovering hosts and services in ') + where;
   return t('Wykrywanie hostów w ', 'Discovering hosts in ') + where + t('. Postęp rośnie po zakończeniu każdej podgrupy.', '. Progress grows as each chunk finishes.');
+}
+
+interface DojoRunResult { test_id: number; test_url: string; reimport: boolean; created: number; closed: number; reactivated: number; untouched: number; total: number }
+
+/** Uploads the nmap XML of a completed run to DefectDojo as an "Nmap Scan" import (a second upload re-imports into the same test). */
+export function DojoRunButton({ runId }: { runId: number }) {
+  const [res, setRes] = useState<DojoRunResult | null>(null);
+  const send = useAction(() => post<DojoRunResult>('/runs/' + runId + '/export/defectdojo'), { silent: true, onSuccess: setRes });
+  return (
+    <>
+      <Button icon="upload" busy={send.isPending} onClick={() => send.mutate(undefined)} data-testid="run-dojo" title={t('Wyślij wynik przebiegu do DefectDojo jako import „Nmap Scan”', 'Send the run result to DefectDojo as an "Nmap Scan" import')}>{t('Do DefectDojo', 'To DefectDojo')}</Button>
+      <Dialog open={res !== null || Boolean(send.error)} onClose={() => { setRes(null); send.reset(); }} width={480} title={t('Przebieg w DefectDojo (Nmap Scan)', 'The run in DefectDojo (Nmap Scan)')}
+        footer={<Button variant="primary" onClick={() => { setRes(null); send.reset(); }}>{t('Gotowe', 'Done')}</Button>}>
+        {res ? (
+          <div className="space-y-3 text-sm" data-testid="run-dojo-result">
+            <p className="flex items-center gap-2"><Glyph name="check" tone="new" />{res.reimport ? t('Ponowny import do tego samego testu.', 'Re-imported into the same test.') : t('Nowy test w DefectDojo.', 'A new test in DefectDojo.')}</p>
+            <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1">
+              <dt className="text-ink-2">{t('Nowe obserwacje', 'New findings')}</dt><dd className="num">{res.created}</dd>
+              <dt className="text-ink-2">{t('Zamknięte (zniknęły)', 'Closed (gone)')}</dt><dd className="num">{res.closed}</dd>
+              <dt className="text-ink-2">{t('Otwarte ponownie', 'Reopened')}</dt><dd className="num">{res.reactivated}</dd>
+              <dt className="text-ink-2">{t('Bez zmian', 'Unchanged')}</dt><dd className="num">{res.untouched}</dd>
+              <dt className="text-ink-2">{t('Razem w teście', 'Total in the test')}</dt><dd className="num">{res.total}</dd>
+            </dl>
+            <a className="link inline-flex items-center gap-1" href={res.test_url} target="_blank" rel="noreferrer noopener">{t('Otwórz test', 'Open the test')} #{res.test_id}<Icon name="external" size={11} /></a>
+          </div>
+        ) : <InlineError error={send.error} />}
+      </Dialog>
+    </>
+  );
 }
