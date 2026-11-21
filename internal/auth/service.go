@@ -444,9 +444,15 @@ func (s *Service) SetPasswordByEmail(ctx context.Context, email, password string
 
 var slugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,48}$`)
 
+// polishASCII transliterates the Polish letters (and a few common Latin
+// letters with diacritics) so a role named "Dyżurny zmian" gets the slug
+// "dyzurny-zmian" and not "dy-urny-zmian".
+var polishASCII = strings.NewReplacer("ą", "a", "ć", "c", "ę", "e", "ł", "l", "ń", "n", "ó", "o", "ś", "s", "ź", "z", "ż", "z",
+	"ä", "a", "ö", "o", "ü", "u", "é", "e", "è", "e", "á", "a", "í", "i", "ú", "u", "č", "c", "š", "s", "ž", "z", "ř", "r", "ý", "y", "ß", "ss")
+
 func slugify(name string) string {
 	var b strings.Builder
-	for _, r := range strings.ToLower(strings.TrimSpace(name)) {
+	for _, r := range polishASCII.Replace(strings.ToLower(strings.TrimSpace(name))) {
 		switch {
 		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
 			b.WriteRune(r)

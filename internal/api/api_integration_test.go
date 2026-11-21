@@ -68,9 +68,13 @@ func setup(t *testing.T, mutate func(*Deps)) *env {
 	if mutate != nil {
 		mutate(&d)
 	}
+	return &env{t: t, st: st, srv: newTestServer(t, d, mgr), mgr: mgr}
+}
+
+func newTestServer(t *testing.T, d Deps, mgr *runner.Manager) *httptest.Server {
 	srv := httptest.NewServer(New(d).Handler())
 	t.Cleanup(func() { srv.Close(); mgr.Shutdown(context.Background()); mgr.Wait() })
-	return &env{t: t, st: st, srv: srv, mgr: mgr}
+	return srv
 }
 
 // client is one signed-in user.
@@ -351,7 +355,6 @@ func TestNotWiredRoutesAnswer501(t *testing.T) {
 		{"POST", fmt.Sprintf("/api/v1/profiles/%d/estimate", p.ID), nil, ""},
 		{"POST", "/api/v1/runs", map[string]any{"profile_id": p.ID}, ""},
 		{"POST", "/api/v1/settings/defectdojo/test", map[string]any{"url": "https://dojo.example.org"}, ""},
-		{"GET", fmt.Sprintf("/api/v1/export/runs/%d.xml", r1.ID), nil, ""},
 		{"POST", "/api/v1/import/results", &buf, mw.FormDataContentType()},
 	}
 	for _, c := range cases {
@@ -500,10 +503,13 @@ func TestRunOverAPIWithSSE(t *testing.T) {
 	if runs.Total != 1 {
 		t.Fatalf("runs: %+v", runs)
 	}
-	// Run export: JSON and CSV work without other workers.
+	// Run export: the interchange formats work without other workers.
 	resp2, raw := admin.raw("GET", fmt.Sprintf("/api/v1/export/runs/%d.json", run.ID), nil, nil)
-	var results []model.HostResult
-	if err := json.Unmarshal(raw, &results); err != nil || resp2.StatusCode != 200 || len(results) != 2 || len(results[0].Services) != 1 {
+	var doc struct {
+		Format string             `json:"format"`
+		Hosts  []model.HostResult `json:"hosts"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil || resp2.StatusCode != 200 || doc.Format != "czujka-json" || len(doc.Hosts) != 2 || len(doc.Hosts[0].Services) != 1 {
 		t.Fatalf("run export: %d %s", resp2.StatusCode, raw)
 	}
 }
