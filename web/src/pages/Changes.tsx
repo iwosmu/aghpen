@@ -14,12 +14,17 @@ import { DataTable, FilterBar, FilterField, Pager, SearchField, type Col } from 
 import { CHANGE_KINDS, ChangeMark, Glyph, SEVERITIES, Sev, changeKindInfo, severityLabel } from '../ui/marks';
 import { ExportButtons, useDraft } from '../ui/edit';
 import { useCan } from '../session';
+import { changeSummary } from '../lib/changeText';
 
 const FILTERS = ['q', 'run_id', 'kind', 'severity', 'acked', 'expected', 'host_id'];
 
 export function BeforeAfter({ c }: { c: Change }) {
-  const b = c.field ? fieldValue(c.field, c.before) : show(c.before), a = c.field ? fieldValue(c.field, c.after) : show(c.after);
+  // response_recovered: before is the slow answer (or none) it recovers from, not the usual time
+  const before = c.kind === 'response_recovered' && c.before && typeof c.before === 'object' && 'ms' in c.before ? { ms: (c.before as { ms: number | null }).ms } : c.before;
+  const b = c.field ? fieldValue(c.field, before) : show(before), a = c.field ? fieldValue(c.field, c.after) : show(c.after);
   if (!b && !a) return null;
+  // never two equal values with an arrow
+  if (b && a && b === a) return <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs">{c.field ? <span className="text-ink-3" title={c.field}>{fieldLabel(c.field)}:</span> : null}<span className="mono text-ink">{a}</span></span>;
   return (
     <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs">
       {c.field ? <span className="text-ink-3" title={c.field}>{fieldLabel(c.field)}:</span> : null}
@@ -55,7 +60,7 @@ export default function Changes() {
   const cols: Col<Change>[] = [
     { id: 'kind', header: t('Rodzaj', 'Kind'), cell: (c) => <ChangeMark kind={c.kind} expected={c.expected} /> },
     { id: 'what', header: t('Co się zmieniło', 'What changed'), wrap: true, cell: (c) => (
-      <div className="min-w-[220px] py-1"><div className={c.expected ? 'text-ink-2' : ''}>{c.summary}</div><BeforeAfter c={c} /></div>
+      <div className="min-w-[220px] py-1"><div className={c.expected ? 'text-ink-2' : ''}>{changeSummary(c)}</div><BeforeAfter c={c} /></div>
     ) },
     { id: 'addr', header: t('Adres', 'Address'), sort: 'ip', cell: (c) => <Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link">{c.ip}{c.port ? ':' + c.port : ''}</Link> },
     { id: 'sev', header: t('Waga', 'Severity'), sort: 'severity', hide: 'md', cell: (c) => c.expected ? <span className="text-xs text-ink-3">{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} /> },
@@ -74,7 +79,7 @@ export default function Changes() {
         actions={<><ExportButtons kind="changes" query={filters} /><LinkButton to="/changes/compare" icon="compare">{t('Porównaj dwa skany', 'Compare two runs')}</LinkButton></>}
       />
       <div className="flex flex-wrap items-center gap-1.5 border-b border-rule px-4 py-2 sm:px-6" role="group" aria-label={t('Szybkie filtry', 'Quick filters')} data-testid="change-quick">
-        {(['service_gone', 'service_returned', 'service_new', 'response_slower', 'response_recovered'] as const).map((k) => {
+        {(['service_gone', 'host_missing', 'service_unreachable', 'service_returned', 'service_new', 'response_slower', 'response_recovered'] as const).map((k) => {
           const i = changeKindInfo(k);
           const on = u.get('kind') === k;
           return (
@@ -119,7 +124,7 @@ export default function Changes() {
         mobile={(c) => (
           <div>
             <div className="flex items-center justify-between gap-2"><ChangeMark kind={c.kind} expected={c.expected} /><span className="num text-xs text-ink-3">#{c.run_id}</span></div>
-            <div className="mt-0.5 text-sm">{c.summary}</div>
+            <div className="mt-0.5 text-sm">{changeSummary(c)}</div>
             <div className="mono mt-0.5 text-xs text-ink-3">{c.ip}{c.port ? ':' + c.port : ''}</div>
           </div>
         )}

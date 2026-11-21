@@ -9,6 +9,19 @@ Otwórz `http://127.0.0.1:8080` i naciśnij **„Ten komputer”**, potem **„U
 
 Wynik: usługi na portach tego komputera, także kontenery Dockera z opublikowanymi portami, z wersjami, tytułami stron i czasem odpowiedzi. Kolejny skan pokazuje, co zniknęło, co wróciło i co zwolniło.
 
+### Kryterium oceny → gdzie to zobaczyć
+
+Liczby pochodzą z [`docs/WYNIKI.md`](docs/WYNIKI.md) (jedno źródło). Pełna lista wymagań z dowodami: [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md).
+
+| Waga | Kryterium | Ekran albo polecenie | Zmierzone | Dowód |
+| --- | --- | --- | --- | --- |
+| 30% | Discovery i identyfikacja usług w dużej sieci | przebieg /16 laboratorium; „Hosty”, „Usługi” | hosty 67 z 67, otwarte porty 154 ze 155, 0 fałszywych | [WYNIKI](docs/WYNIKI.md#wykrywanie-w-sieci-16), `e2e/lab-gate.sh` |
+| 20% | Uruchomienie, import/eksport, DefectDojo, dokumentacja | `docker compose up -d`; „Import / eksport”; „Znaleziska” → „Eksport do DefectDojo” | start 51–115 s; e2e 100 ze 100 kontroli | [WYNIKI](docs/WYNIKI.md#uruchomienie), `e2e/full/transcript.txt`, `web/REPORT-LAB.md` §11 |
+| 15% | Zmiany w czasie, niestabilne hosty, raport | szablon: `./quickstart.sh change` i drugi skan → „Usługa zniknęła”; `up` → „Usługa wróciła”; zatrzymany host → „nie odpowiada (niepotwierdzone)”, po około minucie „nieaktywny” | skany szablonu 18 s, 12 s, 17 s | [WYNIKI](docs/WYNIKI.md#szablon-organizatorów-jedna-maszyna), [ALGORYTMY](docs/ALGORYTMY.md) §3.4 |
+| 15% | Bezpieczeństwo, tempo skanu, czytelny pulpit | górny pasek: limit, GET/HEAD, „Stop awaryjny”; „Pulpit” | żadnej sekundy ponad limit + 10% na /16; stop w 0,09 s | [WYNIKI](docs/WYNIKI.md#tempo-i-bezpieczeństwo-skanowania), [BEZPIECZENSTWO](docs/BEZPIECZENSTWO.md) |
+| 10% | Fingerprinting, technologie, nagłówki, ciasteczka, sygnatury | usługa → „Technologie i dowody”; „Sygnatury” | technologie: precyzja 0,990, czułość 0,981; tytuły 122 ze 122 | [WYNIKI](docs/WYNIKI.md#wykrywanie-w-sieci-16), [SIGNATURES](docs/SIGNATURES.md) |
+| 10% | Role i ochrona danych | „Administracja”; `/healthz` → `"tde":true` | 4 role i własne, 22 uprawnienia; `pg_tde` i AES-256-GCM | `TestRBACMatrixCSRFAndAudit`, [BEZPIECZENSTWO](docs/BEZPIECZENSTWO.md) §2 |
+
 Zmierzone na czystej maszynie (`docker:dind`, 0 obrazów; zapis: [`deploy/e2e/fresh-clone-dind.txt`](deploy/e2e/fresh-clone-dind.txt)):
 
 | Krok | Czas |
@@ -17,7 +30,7 @@ Zmierzone na czystej maszynie (`docker:dind`, 0 obrazów; zapis: [`deploy/e2e/fr
 | `docker compose up -d` do zdrowego API (pobranie obrazów i budowa) | 51–115 s, zależnie od łącza (trzy pomiary: 79 s z Docker Hub, 115 s i 51 s przez mirror.gcr.io) |
 | zamiast tego paczka offline (`make bundle`, 354 MiB): rozpakowanie i `sh install.sh` | 26–29 s, bez sieci |
 | logowanie, „Ten komputer”, „Uruchom skan” (przeglądarka sterowana skryptem) | 9 s |
-| skan „Ten komputer” (profil domyślny: top 1000 portów i porty infrastruktury, wykrywanie usług, HTTP) | 41 s |
+| skan szablonu organizatorów („Ten komputer”, profil domyślny, czysty Ubuntu 24.04) | 18 s ([`docs/WYNIKI.md`](docs/WYNIKI.md)) |
 
 Nie trzeba `.env`: hasło bazy i klucz główny powstają przy pierwszym starcie w wolumenach, a losowe hasło administratora pojawia się raz w logu. Własne wartości: `make init` zapisuje `deploy/.env`, który `docker compose up -d` też czyta.
 
@@ -37,7 +50,7 @@ Zgłoszenie do zadania „Attack Surface Intelligence” Centrum Bezpieczeństwa
 | Film demo (około 2 minut, nagrany skryptem z prawdziwego interfejsu) | [`docs/demo/czujka-demo.mp4`](docs/demo/czujka-demo.mp4), tekst lektora [`docs/demo/lektor.txt`](docs/demo/lektor.txt) |
 | Scenariusz pokazu, notatki do slajdów, pytania | [`docs/DEMO.md`](docs/DEMO.md) |
 | Zgodność z treścią zadania: każde wymaganie, 12 punktów weryfikacji, 6 kryteriów, z dowodem | [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md) |
-| Wyniki zmierzone na laboratorium 70 hostów (precyzja, czułość, czas /16) | `docs/WYNIKI.md` (w przygotowaniu) |
+| Wyniki zmierzone na laboratorium 70 hostów (precyzja, czułość, czas /16) | [`docs/WYNIKI.md`](docs/WYNIKI.md) |
 | Działająca instancja z laboratorium 70 hostów | `https://czujka.dev`, konto do odczytu: dane logowania w zgłoszeniu |
 | Spis całej dokumentacji | [`docs/DOKUMENTACJA.md`](docs/DOKUMENTACJA.md) |
 
@@ -55,7 +68,7 @@ cd lab/jury && ./quickstart.sh up
 ```
 
 1. Otwórz `http://127.0.0.1:9180` i zaloguj się danymi z logu.
-2. Naciśnij „Ten komputer” i „Uruchom skan”. Profil domyślny obejmuje porty szablonu spoza top 1000 (`2223,5673,8474,8787,15432,15673,21000-21010`). Na komputerze z innymi programami nie skanuj `localhost` pełnym zakresem portów: sondy wykrywania wersji trafiają wtedy także w lokalne usługi tych programów.
+2. Naciśnij „Ten komputer” i „Uruchom skan”. Mały zakres (jeden komputer) profil domyślny skanuje pełnym zakresem portów, więc znajduje też porty szablonu spoza top 1000. Na komputerze z innymi programami nie skanuj `localhost` pełnym zakresem portów: sondy wykrywania wersji trafiają wtedy także w lokalne usługi tych programów.
 3. Wykonaj `./quickstart.sh change`, uruchom drugi skan („Przebiegi skanów” → „Uruchom skan”, profil „Ten komputer: …”): „Usługa …:8787 zniknęła”. Wykonaj `./quickstart.sh up`, skanuj trzeci raz: „Usługa …:8787 wróciła” z czasem nieobecności i liczbą skanów bez niej.
 
 Czas odpowiedzi: Czujka zapisuje czas odpowiedzi HTTP każdej usługi i porównuje go z jej własną bazą (mediana ostatnich 5 pomiarów). Odpowiedź co najmniej 2 razy wolniejsza i dłuższa o co najmniej 300 ms to zmiana „Wolniejsza odpowiedź”. Powrót do normy to „Odpowiedź w normie”. Na stosie `modern-proxy` skanuj raz bez opóźnienia i raz z `ENABLE_LATENCY=true` w `.env`. Port otwarty, na którym HTTP nie odpowiada w czasie, to „HTTP nie odpowiedział”, a nie zniknięcie usługi.
@@ -67,7 +80,7 @@ Usługa Czujki na porcie 9180 hosta dockera ma tag `czujka` i nie daje znalezisk
 | Funkcja | Co daje | Szczegóły |
 | --- | --- | --- |
 | Rytm hosta | Histogram 168 godzin tygodnia i model Bayesa. Brak odpowiedzi w porze, w której host zwykle milczy, nie jest alarmem. Serwer, który zawsze odpowiadał, jest zgłaszany po 2 brakach; stacja robocza w weekend wcale. | [`docs/ALGORYTMY.md`](docs/ALGORYTMY.md) §2 |
-| Ponowne sprawdzenia | Host, który zamilkł, dostaje krótkie sprawdzenia jednego adresu (po 10, 30, 90 min) albo w godzinie, w której model spodziewa się odpowiedzi. Budżet adresów na godzinę, tylko w oknie skanu. | [`docs/API.md`](docs/API.md) |
+| Ponowne sprawdzenia | Host, który zamilkł, dostaje krótkie sprawdzenia jednego adresu (po 10, 30, 90 min; host z mniej niż 8 obserwacjami po 1, 3, 10 min) albo w godzinie, w której model spodziewa się odpowiedzi. Włączone od pierwszego startu, budżet adresów na godzinę, tylko w oknie skanu. | [`docs/API.md`](docs/API.md) |
 | Wehikuł czasu | Sieć taka, jaka była w dowolnym przebiegu: hosty, usługi, znaleziska i różnica do dziś. | ekran „Wehikuł czasu” |
 | Reguły ekspozycji | Czego w sieci być nie może (albo co musi być), w YAML; sprawdzane po każdym skanie, bez pakietów. | [`docs/REGULY.md`](docs/REGULY.md) |
 | Retro-hunt i sygnatura z przykładu | Nowa sygnatura sprawdza zapisaną historię bez wysyłania sond; jeden klik na usłudze proponuje sygnaturę z jej rzadkich cech. | [`docs/SIGNATURES.md`](docs/SIGNATURES.md), [`docs/REGULY.md`](docs/REGULY.md) §10 |
@@ -80,11 +93,14 @@ Wdrożenie to jedno polecenie. Produkt to dwa kontenery: binarka z interfejsem W
 
 Produkt działa od końca do końca: `e2e/full/run.sh` przechodzi 100 ze 100 sprawdzeń przez REST API na prawdziwych usługach (zapis: `e2e/full/transcript.txt`). Interfejs sprawdzono na laboratorium /16 z 70 hostami (`web/REPORT-LAB.md`). Dokładny stan każdego wymagania: [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md).
 
-Czego jeszcze brakuje:
+Pomiary trafności, tempa i czasu startu: [`docs/WYNIKI.md`](docs/WYNIKI.md). Wysyłkę z ekranu produktu do żywego DefectDojo 3.5.202 zapisuje `web/REPORT-LAB.md` §11. Alerty: webhook po każdym przebiegu, zgodny z Slack i Mattermost, z podpisem HMAC ([`docs/API.md`](docs/API.md), „Alert webhook”).
 
-- liczb precyzji i czułości na 70 hostach (`docs/WYNIKI.md`, w toku);
-- zakresów CIDR IPv6 (pojedyncze adresy IPv6 działają);
-- zapisu wysyłki z ekranu produktu do żywego DefectDojo (pliki i API sprawdzone osobno, `docs/INTEGRACJE.md` §4.11).
+## Ograniczenia
+
+- Zakresy CIDR IPv6 są odrzucane; pojedyncze adresy IPv6 działają. Nazwy domen dają tylko adresy IPv4 (rekordy A).
+- UDP: tylko 7 portów z niegroźnymi zapytaniami (53, 123, 137, 161, 500, 1900, 5353), bez wykrywania wersji.
+- REST API działa z sesją i tokenem CSRF; nie ma tokenów API. Skrypt loguje się jak przeglądarka: [`docs/API.md`](docs/API.md), „API with curl”. Logowanie nie ma drugiego składnika.
+- Skala jest zmierzona na laboratorium /16 z 70 żywymi hostami. Czas dla większej sieci to ekstrapolacja, nie pomiar.
 
 ## Uruchomienie: szczegóły
 
@@ -98,7 +114,7 @@ curl -s http://127.0.0.1:8080/healthz
 `"tde":true` oznacza, że wszystkie tabele są zaszyfrowane. `"mode":"nmap-raw"` oznacza nmap z surowymi gniazdami w kontenerze bez roota.
 
 - Port zajęty: `CZUJKA_PORT=18080 docker compose up -d`.
-- Po zmianie kodu: `docker compose up -d --build` (samo `up -d` buduje obraz tylko wtedy, gdy go nie ma).
+- Po zmianie kodu wystarczy `docker compose up -d`: obraz Czujki ma `pull_policy: build`, więc compose buduje go przy każdym `up` (niezmienione warstwy idą z pamięci podręcznej).
 - Własne hasła i klucz: `cp deploy/.env.example deploy/.env`, potem edycja. `docker compose up -d` w katalogu głównym czyta `deploy/.env` (plik `compose.yaml` włącza `deploy/docker-compose.yml`); `docker compose -f deploy/docker-compose.yml …` działa jak dotąd.
 - Skan sieci dockerowej (na macOS host nie ma trasy do kontenerów): `CZUJKA_SCAN_NETWORK=<sieć> docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.scan-network.yml up -d --wait`.
 - Laboratorium testowe 70 hostów: `lab/lab.sh up`, stany `lab/scenario.sh t0|t1|t2` ([`lab/README.md`](lab/README.md)).
@@ -141,7 +157,7 @@ go run ./cmd/scanprobe -targets 127.0.0.1 -ports 8080 -pps 50
 | --- | --- |
 | `cmd/czujka` | binarka produktu; `cmd/scanprobe`, `cmd/fpprobe`, `cmd/dojoprobe` to narzędzia do testów modułów |
 | `internal/scan`, `probe`, `targets`, `sched`, `enginewire` | silnik skanu, nmap i prober własny, cele, harmonogram i okna, połączenie silnika z produktem |
-| `internal/httpfp`, `sig`, `sigwire`, `sigsuggest`, `signatures/` | kolektor HTTP/TLS, silnik sygnatur, sygnatury w bazie, sygnatura z przykładu, biblioteka 386 sygnatur |
+| `internal/httpfp`, `sig`, `sigwire`, `sigsuggest`, `signatures/` | kolektor HTTP/TLS, silnik sygnatur, sygnatury w bazie, sygnatura z przykładu, biblioteka 398 sygnatur |
 | `internal/analyze`, `timeline`, `reprobe`, `rules` | analiza i model dostępności, wehikuł czasu, ponowne sprawdzenia, reguły ekspozycji |
 | `internal/report`, `interchange`, `passive`, `defectdojo` | raport, formaty wymiany, źródła pasywne, klient DefectDojo |
 | `internal/store`, `crypto`, `auth`, `api`, `runner`, `wire`, `config` | baza i migracje, szyfrowanie, role, REST API, menedżer przebiegów, składanie produktu, konfiguracja |

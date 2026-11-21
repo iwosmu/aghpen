@@ -39,6 +39,11 @@ type Analysis struct {
 	log  *slog.Logger
 	Auto AutoExporter // optional
 
+	// Notify sends the alert webhook after every analysis; optional.
+	Notify interface {
+		NotifyRun(ctx context.Context, runID int64)
+	}
+
 	// SelfPort is the port the docker host publishes Czujka's UI on. On the
 	// docker host (targets.HostGateway) the service on it is Czujka itself:
 	// tagged, no findings.
@@ -253,7 +258,7 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 			pairs[id] = p.ServiceRun // a silent host carries its last known services forward
 		}
 	}
-	prevSvcs, _, err := a.st.RunServiceResults(ctx, pairs)
+	prevSvcs, prevIDs, err := a.st.RunServiceResults(ctx, pairs)
 	if err != nil {
 		return nil, err
 	}
@@ -298,13 +303,18 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 		}
 		cur.Hosts = append(cur.Hosts, hs)
 		if p, ok := prevHosts[h.HostID]; ok && prev != nil {
-			prev.Hosts = append(prev.Hosts, analyze.HostSnapshot{HostID: h.HostID, IP: h.IP, Up: p.Up, Status: statusOr(p.Status, p.Up), Services: prevSvcs[h.HostID]})
+			prev.Hosts = append(prev.Hosts, analyze.HostSnapshot{HostID: h.HostID, IP: h.IP, Up: p.Up, Status: statusOr(p.Status, p.Up), Services: prevSvcs[h.HostID], ServiceIDs: prevIDs[h.HostID]})
 		}
 	}
-	// Scope of the ports: an explicit port list of the profile limits "gone".
-	// An imported file is a full view of the hosts it lists.
+	// Scope of the ports. A profile scan follows the store: the ingest marked
+	// gone exactly the unlisted services on ports the run covered on each host
+	// (HostResult.Coverage: the profile's list, plus the dense or full-range
+	// pass when it finished), and carried the others into this run unchanged.
+	// Partial data (re-probes) does not mark at ingest: the profile's port
+	// list (for a re-probe, the probed ports) limits "gone". An imported file
+	// is a full view of the hosts it lists.
 	var opts analyze.DiffOptions
-	if hasProf {
+	if hasProf && partialData(run.Trigger) {
 		opts.PortInScope = a.portScope(ctx, prof)
 	}
 	changes, dsum := analyze.Diff(prev, cur, opts)
@@ -480,6 +490,9 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 	}
 	if a.Auto != nil {
 		a.Auto.AutoExport(ctx, runID)
+	}
+	if a.Notify != nil {
+		a.Notify.NotifyRun(ctx, runID)
 	}
 	return &sum, nil
 }

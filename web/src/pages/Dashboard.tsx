@@ -8,16 +8,19 @@ import { cx, fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtSigned } 
 import { useLiveRun, useNow } from '../lib/hooks';
 import { ErrorState, Panel, SkeletonRows } from '../ui/kit';
 import { Icon } from '../ui/Icon';
-import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, type GlyphName, type Tone } from '../ui/marks';
+import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, changeKindInfo, type GlyphName, type Tone } from '../ui/marks';
 import { AddressMap } from '../viz/AddressMap';
 import { BarList, PacketCount, ProgressBar, RateGauge, TrendRows } from '../viz/charts';
 import { useSession } from '../session';
 import { RunStory } from '../ui/RunStory';
-import { RunPasses } from '../ui/RunPasses';
+import { useHostVerdicts } from '../ui/MissingHosts';
+import { PartialNote, RunPasses } from '../ui/RunPasses';
+import { useArrivalOrder } from '../ui/arrivalOrder';
 import { SMALL_RUN } from './RunDetail';
 import { serviceName } from '../lib/serviceName';
 import { ReprobePanel } from './Reprobe';
 import { ATTENTION_INTEREST, adminPanelNames, adminPanelServiceNames, changeParts, isFullRun, lastFullPair, partialRunPhrase } from '../lib/headline';
+import { changeSummary } from '../lib/changeText';
 
 function Count({ n, glyph, tone, label, to }: { n: number; glyph: GlyphName; tone: Tone; label: string; to: string }) {
   const zero = n === 0;
@@ -40,6 +43,13 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   const run = full === undefined ? (partial ? null : last) : full;
   const s = run?.summary;
   const expected = (d.recent_changes ?? []).filter((c) => c.expected).length;
+  // Hosts that did not answer in this run, and what the confirmation probe decided since.
+  const missingQ = useItem<Page<Change>>('/changes', { run_id: run?.id, kind: 'host_missing,service_unreachable', limit: 500 }, { enabled: Boolean(run?.id) && (s?.hosts_missing ?? 0) > 0 });
+  const missingItems = missingQ.data?.items ?? [];
+  const verdicts = useHostVerdicts(missingItems.filter((c) => c.kind === 'host_missing'));
+  // services of hosts the confirmation probe has decided about are no longer "not answering"
+  const decidedServices = missingItems.filter((c) => c.kind === 'service_unreachable' && verdicts.has(c.host_id)).length;
+  const confirmedGone = [...verdicts.values()].filter((v) => v.kind === 'host_gone').length;
   if (!run && partial) {
     return (
       <div>
@@ -59,22 +69,23 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   }
   const baseline = Boolean(s) && !s!.prev_run_id;
   const changed = s ? s.services_changed : 0;
-  const missing = s?.hosts_missing ?? 0;
-  const unreachable = s?.services_unreachable ?? 0;
+  const missing = Math.max(0, (s?.hosts_missing ?? 0) - verdicts.size);
+  const unreachable = Math.max(0, (s?.services_unreachable ?? 0) - decidedServices);
   const added = s ? s.hosts_new + s.services_new : 0;
   const gone = s ? s.hosts_gone + s.services_gone : 0;
   const returned = s?.services_returned ?? 0;
   const slower = s?.responses_slower ?? 0;
-  const quiet = s ? added + gone + changed + s.hosts_unstable + missing + returned + slower === 0 : true;
+  const recovered = s?.by_kind?.response_recovered ?? 0;
+  const quiet = s ? added + gone + changed + s.hosts_unstable + missing + confirmedGone + returned + slower + recovered === 0 : true;
   const open = (d.top_findings ?? []).filter((f) => f.status === 'new' || f.status === 'triaged');
   const important = open.filter((f) => f.severity === 'high' || f.interest >= ATTENTION_INTEREST);
   const panels = adminPanelNames(open);
   const attention = h.admin_panels > 0 || h.findings_high > 0 || important.length > 0;
   const named = (panels.length ? panels : adminPanelServiceNames(d.top_services ?? [])).slice(0, 2);
-  const parts = s ? changeParts({ added, gone, changed, missing, unstable: s.hosts_unstable, returned, slower }, getLang(), plural) : [];
+  const parts = s ? changeParts({ added, gone, changed, missing, unstable: s.hosts_unstable, returned, slower, recovered, confirmedGone }, getLang(), plural) : [];
   const headline = baseline
     ? t('Pierwszy obraz sieci: ' + fmtInt(h.hosts_up) + ' ' + plural(h.hosts_up, ['aktywny host', 'aktywne hosty', 'aktywnych hostów'], ['', '']) + ', ' + fmtInt(h.services_open) + ' ' + plural(h.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['', '']) + '.',
-      'First picture of the network: ' + fmtInt(h.hosts_up) + ' hosts up, ' + fmtInt(h.services_open) + ' open services.')
+      'First picture of the network: ' + fmtInt(h.hosts_up) + ' ' + (h.hosts_up === 1 ? 'host' : 'hosts') + ' up, ' + fmtInt(h.services_open) + ' open ' + (h.services_open === 1 ? 'service' : 'services') + '.')
     : quiet
       ? t('Bez zmian od poprzedniego skanu.', 'No change since the previous scan.')
       : t('Od poprzedniego skanu: ', 'Since the previous scan: ') + parts.join(', ') + '.';
@@ -125,8 +136,9 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
           {s.responses_slower ? <Count n={s.responses_slower} glyph="slow" tone="changed" label={plural(s.responses_slower, ['wolniejsza odpowiedź', 'wolniejsze odpowiedzi', 'wolniejszych odpowiedzi'], ['slower response', 'slower responses'])} to={'/changes?run_id=' + run.id + '&kind=response_slower'} /> : null}
           <Count n={changed} glyph="delta" tone="changed" label={plural(changed, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes'])} to={'/changes?run_id=' + run.id} />
           <Count n={s.hosts_unstable} glyph="wave" tone="unstable" label={plural(s.hosts_unstable, ['host niestabilny', 'hosty niestabilne', 'hostów niestabilnych'], ['unstable host', 'unstable hosts'])} to={'/hosts?status=unstable'} />
-          <Count n={missing} glyph="half" tone="expected" label={plural(missing, ['host bez odpowiedzi', 'hosty bez odpowiedzi', 'hostów bez odpowiedzi'], ['host missing', 'hosts missing'])} to={'/changes?run_id=' + run.id + '&kind=host_missing'} />
-          {unreachable ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap py-0.5 text-sm text-ink-3" title={t('Usługi hostów, które milczą, ale nie są jeszcze uznane za nieaktywne: stan nieznany, nie zamknięte.', 'Services of silent hosts that are not reported inactive yet: unknown, not closed.')}><span className="num text-base font-medium text-ink-2">{unreachable}</span>{plural(unreachable, ['usługa nieosiągalna', 'usługi nieosiągalne', 'usług nieosiągalnych'], ['service unreachable', 'services unreachable'])}</span> : null}
+          <Count n={missing} glyph="half" tone="expected" label={plural(missing, ['host nie odpowiada (niepotwierdzone)', 'hosty nie odpowiadają (niepotwierdzone)', 'hostów nie odpowiada (niepotwierdzone)'], ['host not answering (unconfirmed)', 'hosts not answering (unconfirmed)'])} to={'/changes?run_id=' + run.id + '&kind=host_missing'} />
+          {unreachable ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap py-0.5 text-sm text-ink-3" title={t('Usługi hostów, które milczą, ale nie są jeszcze uznane za nieaktywne: stan nieznany, nie zamknięte.', 'Services of silent hosts that are not reported inactive yet: unknown, not closed.')}><span className="num text-base font-medium text-ink-2">{unreachable}</span>{plural(unreachable, ['usługa nie odpowiada (niepotwierdzone)', 'usługi nie odpowiadają (niepotwierdzone)', 'usług nie odpowiada (niepotwierdzone)'], ['service not answering (unconfirmed)', 'services not answering (unconfirmed)'])}</span> : null}
+          {confirmedGone ? <Count n={confirmedGone} glyph="minus" tone="gone" label={plural(confirmedGone, ['host zniknął (potwierdzone)', 'hosty zniknęły (potwierdzone)', 'hostów zniknęło (potwierdzone)'], ['host gone (confirmed)', 'hosts gone (confirmed)'])} to={'/changes?kind=host_gone'} /> : null}
           <Count n={expected} glyph="dashring" tone="expected" label={plural(expected, ['zmiana oczekiwana', 'zmiany oczekiwane', 'zmian oczekiwanych'], ['expected change', 'expected changes'])} to={'/changes?run_id=' + run.id + '&expected=true'} />
         </div>
       ) : null}
@@ -174,8 +186,9 @@ function Inventory({ d, pair }: { d: Dash; pair?: { full?: ScanRun; prev?: ScanR
 
 /** The open ports a one-machine run has found so far (polled), instead of the address map. */
 function LivePorts({ runId }: { runId: number }) {
-  const q = useItem<Page<Service>>('/services', { run_id: runId, limit: 500 }, { refetchInterval: 3000 });
-  const items = [...(q.data?.items ?? [])].sort((a, b) => a.port - b.port);
+  const q = useItem<Page<Service>>('/services', { run_id: runId, limit: 500 }, { refetchInterval: 1500 });
+  const byPort = (a: Service, b: Service) => a.port - b.port;
+  const { rows: items } = useArrivalOrder('live-ports-' + runId, q.data?.items ?? [], true, byPort, byPort);
   return (
     <div data-testid="live-ports">
       <p className="text-xs text-ink-3">{t('Otwarte porty do tej pory', 'Open ports so far')} <span className="num text-ink-2">{items.length}</span></p>
@@ -196,6 +209,7 @@ function ActiveRun({ initial, d }: { initial: ScanRun; d: Dash }) {
   const profile = useItem<ScanProfile>('/profiles/' + run.profile_id, undefined, { enabled: Boolean(run.profile_id) && can('scans:read') });
   const s = run.stats;
   const pct = s.addresses_total ? s.addresses_done / s.addresses_total : 0;
+  const small = s.addresses_total > 0 && s.addresses_total <= SMALL_RUN;
   return (
     <Panel
       title={<><RunStatusMark status={run.status} pauseReason={run.pause_reason} /> <span className="font-normal text-ink-2">· {t('skan', 'run')} <span className="num">#{run.id}</span> · {run.profile_name}</span></>}
@@ -204,11 +218,14 @@ function ActiveRun({ initial, d }: { initial: ScanRun; d: Dash }) {
       <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
         <div>
           <div className="flex items-baseline justify-between gap-3">
-            <span><span className="num text-lg font-semibold">{fmtPct(pct)}</span> <span className="text-xs text-ink-3">{t('adresów', 'of addresses')}</span></span>
-            <span className="text-xs text-ink-2">{run.status === 'analyzing' ? t('analiza zmian…', 'analysing changes…') : <>{t('pozostało', 'remaining')} <span className="num text-ink">{fmtDuration(s.eta_sec)}</span></>}</span>
+            {small
+              ? <span><span className="num text-lg font-semibold">{fmtInt(s.services_open)}</span> <span className="text-xs text-ink-3">{plural(s.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['open service', 'open services'])} {t('do tej pory', 'so far')}</span></span>
+              : <span><span className="num text-lg font-semibold">{fmtPct(pct)}</span> <span className="text-xs text-ink-3">{t('adresów', 'of addresses')}</span></span>}
+            <span className="text-xs text-ink-2">{run.status === 'analyzing' ? t('analiza zmian…', 'analysing changes…') : s.eta_sec > 0 ? <>{t('pozostało', 'remaining')} <span className="num text-ink">{fmtDuration(s.eta_sec)}</span></> : null}</span>
           </div>
           <div className="mt-1.5"><ProgressBar value={s.addresses_done} max={s.addresses_total} active={(map.data?.blocks ?? []).filter((b) => b.status === 'running').reduce((a, b) => a + b.size, 0)} label={t('Postęp skanu', 'Scan progress')} /></div>
           <RunPasses passes={s.passes} className="mt-1.5" />
+          <PartialNote run={run} className="mt-2" />
           <div className="mt-1 flex justify-between text-2xs text-ink-3">
             <span className="num">{fmtInt(s.addresses_done)} / {fmtInt(s.addresses_total)}</span>
             <span>{t('podgrupy', 'chunks')} <span className="num text-ink-2">{s.chunks_done}/{s.chunks_total}</span></span>
@@ -222,7 +239,7 @@ function ActiveRun({ initial, d }: { initial: ScanRun; d: Dash }) {
         </div>
         <RateGauge current={s.current_pps} cap={Math.min(profile.data?.rate.max_pps ?? d.safety.max_pps, d.safety.max_pps)} policyCap={d.safety.max_pps} basis={s.current_pps_basis} />
         <div className="min-w-[150px] max-w-[320px]">
-          {s.addresses_total > 0 && s.addresses_total <= SMALL_RUN ? <LivePorts runId={run.id} /> : map.data ? <AddressMap blocks={map.data.blocks} compact /> : <div className="skeleton h-[104px] w-[220px]" />}
+          {small ? <LivePorts runId={run.id} /> : map.data ? <AddressMap blocks={map.data.blocks} compact /> : <div className="skeleton h-[104px] w-[220px]" />}
         </div>
       </div>
     </Panel>
@@ -257,9 +274,9 @@ function RecentChanges({ changes }: { changes: Change[] }) {
       <ul>
         {list.map((c) => (
           <Row key={c.id} to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id}>
-            <span className="mt-0.5"><Glyph name={c.expected ? 'dashring' : (c.kind.endsWith('_new') ? 'plus' : c.kind.endsWith('_gone') ? 'minus' : c.kind === 'host_unstable' ? 'wave' : c.kind === 'host_back' ? 'back' : 'delta')} tone={c.expected ? 'expected' : (c.kind.endsWith('_new') || c.kind === 'host_back' ? 'new' : c.kind.endsWith('_gone') ? 'gone' : c.kind === 'host_unstable' ? 'unstable' : 'changed')} /></span>
+            <span className="mt-0.5"><Glyph name={c.expected ? 'dashring' : changeKindInfo(c.kind).glyph} tone={c.expected ? 'expected' : changeKindInfo(c.kind).tone} /></span>
             <span className="min-w-0 flex-1">
-              <span className={cx('block text-sm', c.expected ? 'text-ink-2' : 'text-ink')}>{c.summary}</span>
+              <span className={cx('block text-sm', c.expected ? 'text-ink-2' : 'text-ink')}>{changeSummary(c)}</span>
               <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
                 <span className="mono">{c.ip}{c.port ? ':' + c.port : ''}</span>
                 {c.expected ? <span>{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} />}

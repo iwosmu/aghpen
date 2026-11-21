@@ -50,7 +50,7 @@ Base path `/api/v1`. JSON bodies use the types of `internal/model/types.go` (the
 | GET `/hosts/{id}/services` | results:read | → `Service[]` |
 | GET `/hosts/{id}/availability` | results:read | → `AvailabilityProfile` |
 | GET `/hosts/{id}/changes` | results:read | → `Page<Change>` |
-| GET `/services` | results:read | filters `host_id, port, state, name, tech, class, tag, group_key, min_interest, tls, run_id` → `Page<Service>`. Default order: interest, highest first, where a service that is not `open` (gone, unknown, filtered) counts as interest 0, so open services come first (the same with `sort=-interest`; the returned `interest` is unchanged). No default state filter |
+| GET `/services` | results:read | filters `host_id, port, state, name, tech, class, tag, group_key, min_interest, tls, run_id` → `Page<Service>`. With `run_id`, each item also has `carried: true` when that run did not scan the service's port (see Port coverage). Default order: interest, highest first, where a service that is not `open` (gone, unknown, filtered) counts as interest 0, so open services come first (the same with `sort=-interest`; the returned `interest` is unchanged). No default state filter |
 | GET `/services/{id}` | results:read | → `Service` with `latest` |
 | PATCH `/services/{id}` | results:update | `name, product, version, note, tags, classes` |
 | DELETE `/services/{id}` | results:delete | |
@@ -86,13 +86,14 @@ Base path `/api/v1`. JSON bodies use the types of `internal/model/types.go` (the
 | GET `/settings/passive` · PUT | integrations:manage | `{crtsh_enabled}` (default false) |
 | GET `/tags` | results:read | → `NameCount[]` |
 | POST `/import/results` | results:create | multipart `file` (nmap XML, Czujka JSON, CSV; the format is detected), optional `scope_id` → `ImportReport`. Imported hosts take the same ingest and analysis as scanned ones (run with `trigger: "import"`). `hosts` counts answering hosts, `hosts_down` the hosts that the file reports as down (a known one is a miss for the availability model, an unknown one is not stored); `skipped` counts only unusable rows. A known host that the file does not name is not a miss. With `scope_id`, the answering hosts that the scope does not cover become IP targets of that scope (`source: "import"`, allowed networks apply; their count is `targets`) |
-| GET `/export/{kind}.{fmt}` | export:run | kind `hosts, services, findings, changes, signatures`; fmt `json, csv`; list filters apply; `/export/runs/{id}.{json,csv,xml}`: json = Czujka JSON (lossless `HostResult` records), csv = one row per service, xml = nmap XML (for DefectDojo "Nmap Scan"); all three are written by `internal/interchange` (one CSV dialect) and import again through `/import/results` |
+| GET `/export/{kind}.{fmt}` | export:run | kind `hosts, services, findings, changes, signatures`; fmt `json, csv`; list filters apply; `/export/runs/{id}.{json,csv,xml}`: json = Czujka JSON (lossless `HostResult` records), csv = one row per service, xml = nmap XML (for DefectDojo "Nmap Scan"); all three are written by `internal/interchange` (one CSV dialect) and import again through `/import/results`. A service the run did not scan is marked: JSON `carried: true`, CSV column `carried` = `true`, nmap XML port `reason="czujka-not-scanned"`; an import skips such services (they were not observed) |
 | GET `/dashboard` | results:read | → `Dashboard`. `last_run`, `headline.new_since_last_run`, `gone_since_last_run`, `hosts_missing` and `trend` come only from full runs: completed runs of a profile over its whole scope (trigger `manual` or `schedule`; not ad hoc, `reprobe`, `import` or `manual-entry`). `trend` holds the full runs of the profile of the last full run, so the deltas of two neighbouring points compare two full runs of one profile. `headline.last_partial` = `{run_id, trigger, addresses, at}` of the newest completed partial run when it is newer than the last full run, else `null`; show it on its own line. The counts (`hosts_up`, `services_open`, …) are the current inventory |
 | GET `/settings/safety` | scans:read | → `SafetyPolicy` |
 | PUT `/settings/safety` | safety:manage | `SafetyPolicy` (a partial body keeps the other fields). Only the fields the request changes are validated, so a value stored before a rule (or before the lock) does not block other edits. 422 messages are Polish, code `validation`. `allowed_networks` (IP or CIDR list; empty = no limit): a target outside it is refused at entry (`/scopes/{id}/targets`, `/targets/preview`, imports, ad-hoc runs) with a Polish reason in `invalid`; a domain is allowed only when every address it resolves to is inside; the runner checks again when it builds the plan and drops what is outside. `operator_networks` is read only: the operator lock from `CZUJKA_ALLOWED_NETWORKS`. Every new entry of `allowed_networks` must lie inside it (else 422); targets, ad-hoc runs and re-probes outside it are refused. At start, the stored `allowed_networks` are intersected with the lock: a network inside stays, a wider one is replaced by the lock networks inside it, one with nothing in common is dropped; a change is logged and audited (action `safety.lock_clamp`, by `system`, detail `{lock, before, after, dropped, narrowed}`) |
 | POST `/emergency-stop` | safety:stop | → `SafetyPolicy` (sets the flag; every running run stops at once and becomes `paused` with `pause_reason: "emergency_stop"`; its SSE stream sends `paused`, not `done`: the run is not finished and can be resumed after the release; new runs, ad-hoc runs and resumes answer 409 `emergency_stop`) |
 | POST `/emergency-stop/release` | safety:manage | → `SafetyPolicy` (clears the flag; paused runs stay paused until someone calls `/runs/{id}/resume`) |
 | GET `/settings/defectdojo` · PUT · POST `/settings/defectdojo/test` | integrations:manage | `DefectDojoSettings` → `{ok, message, version}`. `link_url`: the public base of every DefectDojo link that Czujka stores and shows (`dojo_url` of findings, `test_url`, product and engagement links); empty = `url`. Set it when Czujka reaches DefectDojo at an address a browser cannot open (for example `url: http://host.docker.internal:18080`, `link_url: https://dojo.example.org`). It must be an http or https address with a host (else 422). `scope_mappings: [{scope_id, product_type_name, product_name, engagement_name}]` (each scope at most once; the scope must exist). `status_sync`: after every analysed run, close resolved findings in DefectDojo, reopen observed ones and apply the status pull (result in the audit log, action `finding.sync.defectdojo`) |
+| GET `/settings/webhook` · PUT · POST `/settings/webhook/test` | integrations:manage | `WebhookSettings` `{enabled, url, min_severity, secret (write-only), secret_set, ui_url}`; PUT also takes `clear_secret: true`. `url` must be http or https with a host (else 422); it is stored encrypted together with `secret`. An empty `secret` keeps the stored one. `min_severity`: `info`, `low`, `medium` (default) or `high`. `ui_url`: the public address of Czujka for the links; empty = the address the settings were saved from. The test sends one message with `event: "test"` and answers `{ok, status, ms, error}` (always 200; `ok: false` on failure). It uses the stored settings; `url` and `secret` in the body override them, so a form can test before saving. See "Alert webhook" below |
 | GET `/healthz` | public | → `{status, version, db, tde, tde_detail, field_encryption, engine, probe: {prober, mode, raw_sockets}}`; `host_gateway`: the IPv4 address loopback targets are scanned as (empty when the mapping is off); `probe.mode` is `nmap-raw` (SYN scan, ICMP/ARP discovery), `nmap-connect` (no raw sockets: `-sT`) or `native` (Go TCP connect, no nmap) |
 | GET `/doctor` | safety:manage | → `{ok, version, checks: [{name, title, status: ok|warn|fail, detail, fix}]}`: the installation check of `czujka doctor` (database, pg_tde, master key, nmap version, raw sockets, DNS, free disk, pg_dump/pg_restore, routes to the scan networks of enabled scopes; no packet is sent). `fix` is a Polish instruction |
 
@@ -108,7 +109,66 @@ Base path `/api/v1`. JSON bodies use the types of `internal/model/types.go` (the
 - **Loopback targets and the docker host.** In a container with a host gateway (`CZUJKA_HOST_GATEWAY`, default the IPv4 address of `host.docker.internal`), the targets `localhost`, a single `127.x` and `::1` are scanned as the gateway. `Target.maps_to` (preview, target list, save, PATCH) gives that address; it is absent when the target is scanned as itself. Exclusions and the operator lock apply to the mapped address. The host is stored under the gateway address with the hostname `localhost` and the label "Host dockera (ten komputer)" (only when it has no label). Czujka's own UI on that host (`CZUJKA_PUBLISHED_PORT`, title "Czujka") gets the tag `czujka` and produces no findings; the same holds for `127.0.0.1` in host-network mode.
 - **service_returned.** A service (same host, port, protocol) that was open in an earlier run, not open in the previous one, and is open now: kind `service_returned` (low; medium for sensitive classes), `field: "state"`, `before: {state: "gone", last_open_run_id, last_open_at, away_seconds, runs_away}`, `after: "open"`. A service seen open before is never `service_new`. `summary.services_returned` counts them.
 - **Response time.** Every service observation keeps the time of the first HTTP request (`result.http.response_ms`). Baseline: the median of the last 5 answered observations that were not slow themselves (one is enough). `response_slower` (low) when the time is at least 2× the baseline and at least 300 ms above it, or when the port is open and HTTP no longer answers; `response_recovered` (info) when a slow service is back to normal. Reported on the transition only. `field: "http.response_ms"`, `before: {baseline_ms, ms}`, `after: {ms}` or `{ms: null, error: "no_answer"}`. `summary.responses_slower` counts them. Service items carry `response_ms` (latest observation, null without an HTTP answer) and `response_slow` (that observation was slow).
+- **Port coverage.** The engine reports, per host, the ports a run covered: the profile's list, plus the full-range or dense pass when it finished for that host, plus the UDP ports. A complete run marks a service `gone` (and reports `service_gone`) only on a covered port. A service on a port outside the coverage (full range skipped: more than 16 hosts, stopped, timed out) keeps its state, and the run stores a copy of its last observation with `result.carried = true`; no change is reported, the next run compares with that copy, and the response-time series skips copies. `RunStats.services_open` and `http_services` count only the services the run saw (no carried ones); the run report prints the carried count next to that figure and marks carried rows "nie skanowana w tym przebiegu". The time machine's `services_open` is the inventory as of the run, carried services included.
 - **Sub-routers.** Other packages can mount routes under `/api/v1` through `Deps.Mounts` (`api.Mount{Pattern, Router func(guard api.Guard) http.Handler}`). `api.Guard` is the permission middleware of this router (`guard(model.PermResultsRead)`); `api.WriteJSON` and `api.WriteError` write answers in the format above.
+
+## API with curl
+
+There are no API tokens. A script logs in like the browser: a session cookie, and the CSRF token from the login answer in the `X-CSRF-Token` header of every request that changes data (POST, PUT, PATCH, DELETE). A missing or wrong token answers 403; no session answers 401. Checked against a running server on 21.11.2026.
+
+```sh
+# 1. Log in. The session cookie goes to the jar; the answer carries the CSRF token.
+C=http://127.0.0.1:8080/api/v1
+CSRF=$(curl -s -c jar.txt -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.org","password":"..."}' $C/auth/login | jq -r .csrf_token)
+
+# 2. Read: only the cookie.
+curl -s -b jar.txt "$C/profiles" | jq '.items[] | {id, name}'
+
+# 3. Change: the cookie and the X-CSRF-Token header. Start a run of profile 1.
+RUN=$(curl -s -b jar.txt -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' \
+  -d '{"profile_id":1}' $C/runs | jq -r .id)
+curl -s -b jar.txt "$C/runs/$RUN" | jq '{id, status, stats}'
+
+# 4. Export the run and the findings.
+curl -s -b jar.txt -o run-$RUN.json "$C/export/runs/$RUN.json"
+curl -s -b jar.txt -o findings.csv "$C/export/findings.csv"
+
+# 5. Log out.
+curl -s -b jar.txt -H "X-CSRF-Token: $CSRF" -X POST $C/auth/logout
+```
+
+- The profile needs a scope: a profile without one answers 422 `profil nie ma zakresu`. „Ten komputer” in the UI creates a profile with a scope.
+- The session lasts `CZUJKA_SESSION_TTL` (default 12 h). Logins are rate limited (`CZUJKA_LOGIN_RATE_PER_MIN`) and locked after `CZUJKA_LOGIN_MAX_FAILURES` failures.
+- Use an account with only the permissions the script needs (for example a custom role with `scans:run` and `export:run`).
+
+## Alert webhook
+
+After every analysed run (scan, re-probe, import, manual entry), Czujka sends one `POST` to the configured URL, when the webhook is enabled and the run has at least one change or new finding at `min_severity` or above. Otherwise it sends nothing.
+
+- Headers: `Content-Type: application/json`, `User-Agent: Czujka/1.0 (webhook)`, `X-Czujka-Event: run.analyzed` (or `test`), and with a secret `X-Czujka-Signature: sha256=<hex HMAC-SHA256(secret, raw body)>`.
+- One attempt, 10 s timeout, no retry, redirects not followed. A status outside 2xx is a failure. Every delivery (and every test) writes an audit entry `integration.webhook.send` with `{run_id, status, ms, changes, findings, error}`.
+- Body:
+
+```json
+{
+  "event": "run.analyzed",
+  "run_id": 12,
+  "run_url": "https://czujka.example/runs/12",
+  "trigger": "manual",
+  "scope": "profil dmz",
+  "finished_at": "2026-11-21T18:00:00Z",
+  "counts": {"service_new": 1, "service_gone": 1, "host_missing": 1, "findings_new": 1},
+  "changes": [{"kind": "service_new", "severity": "medium", "ip": "10.0.0.1", "port": 8080,
+               "summary": "Nowa usługa 10.0.0.1:8080 (Jenkins)", "url": "https://czujka.example/services/9"}],
+  "findings": [{"kind": "finding", "severity": "high", "ip": "10.0.0.1", "port": 8080,
+                "summary": "Panel administracyjny: Jenkins", "interest": 80, "url": "https://czujka.example/hosts/1"}],
+  "text": "*Czujka: przebieg #12 przeanalizowany* (profil dmz)\nnowe usługi: 1, ...\n• [wysoka] Panel administracyjny: Jenkins (10.0.0.1:8080) https://czujka.example/hosts/1\n...\nPrzebieg: https://czujka.example/runs/12"
+}
+```
+
+- `counts` is `summary.by_kind` of the run plus `findings_new`. `changes` (at most 10, highest severity first) holds the kinds `host_new`, `service_new`, `host_gone`, `service_gone`, `host_missing`, `service_unreachable`, `host_back`, `service_returned` and `response_slower` at `min_severity` or above; expected changes are left out. `findings` (at most 5) are the findings first seen in this run, by severity and interest.
+- `text` is a Polish plain-text message with bare URLs. Slack and Mattermost incoming webhooks render it as is; other receivers read the JSON fields.
 
 ## Exposure rules and signature from an example
 
@@ -164,7 +224,7 @@ Routes of `internal/timeline`. `Page<T>` lists take `limit` (default 50, max 100
 
 Model-driven confirmation probes (`internal/reprobe`). When a host goes `host_missing`, Czujka probes only that address and its known ports again after 10, 30 and 90 minutes (configurable), so a host that really went away becomes `host_gone` without a full scan, and a host that was only briefly silent returns to `up`. Hosts that answer irregularly get a probe in an hour when the availability model expects them up.
 
-**Off by default.** A fresh installation stores `enabled: false`: traffic that the scanner starts on its own needs the consent of an administrator. The first-run wizard offers it (checked by default); `PUT /settings/reprobe {"enabled": true}` turns it on.
+**On by default.** A fresh installation stores `enabled: true`. Re-probing sends the profile's own safe probes to single addresses that a scan already found, within the hourly budget, the scan windows, the safety policy and the emergency stop. `PUT /settings/reprobe {"enabled": false}` turns it off.
 
 | Method and path | Permission | Body → answer |
 | --- | --- | --- |
@@ -178,7 +238,7 @@ A re-probe is a normal run: `trigger: "reprobe"`, `profile_id: null`, `ad_hoc` =
 
 - **Runs on the time line**: analysed runs (`runs.summary IS NOT NULL`), ordered by id. "As of run R" means every observation of a run with id ≤ R. A run's time is `finished_at`, else `started_at`, else `created_at`.
 - **Host as of R**: the state of its latest observation as of R: `up`, or the status the availability model gave it then (`unstable`, `expected-offline`, `down`, `unknown`).
-- **Service as of R**: its latest observation as of R (product, version, title, HTTP status, TLS, technologies and classes from that observation). It is `gone` when its host answered in a later run (≤ R) that did not see it, `unknown` when its host was silent in every later run, `open` otherwise. A service not probed in R keeps its last earlier observation. `changed_since` is true when product, version or title differ today.
+- **Service as of R**: its latest observation as of R (product, version, title, HTTP status, TLS, technologies and classes from that observation). It is `gone` when its host answered in a later run (≤ R) that did not see it, `unknown` when its host was silent in every later run, `open` otherwise. A run that did not cover the service's port stores a carried copy, so the service stays `open` and `carried` is true when that copy is the observation used. A service not probed in R keeps its last earlier observation. `changed_since` is true when product, version or title differ today.
 - **Finding open at R**: first seen in a run ≤ R and before R's time, and not resolved before R (a resolved finding keeps its `last_run_id`). The past triage status is not stored; `status_now` is today's.
 
 ### Time machine and re-probing: types
@@ -189,7 +249,7 @@ RunPoint     {run_id, at, trigger, status, profile_name,
               probed, probed_up, changes, changes_expected, changes_by_kind}                        // what the run did
 AtHost       {id, ip, hostnames, label, status, up, observed_at, run_id, status_now, open_ports}
 AtService    {id, host_id, ip, port, proto, state, name, product, version, title, http_status, tls,
-              technologies, classes, observed_at, run_id, state_now, changed_since}
+              technologies, classes, observed_at, run_id, state_now, changed_since, carried}
 AtFinding    {id, key, type, title, severity, interest, host_id, ip, port, first_seen, last_seen,
               first_run_id, last_run_id, status_now}
 summary      {hosts_up, hosts_missing, hosts_down, services_open, services_unknown, findings_open,
@@ -211,7 +271,7 @@ Settings     {enabled: false (fresh installation), budget_per_hour: 200, backoff
 ### Re-probing rules (`reprobe.Build`, a pure function)
 
 - Candidates: hosts with status `unstable` or `expected-offline` whose latest observation is a miss. `down` hosts wait for the next full scan.
-- **Confirm**: a host that went `host_missing` (status `unstable`, answered before) gets probes at `first miss + backoff_minutes[k]`, k = reprobes already recorded since the first miss. An overdue step is due now. A miss streak older than the last step plus 12 hours is not confirmed any more.
+- **Confirm**: a host that went `host_missing` (status `unstable`, answered before) gets probes at `first miss + backoff_minutes[k]`, k = reprobes already recorded since the first miss. An overdue step is due now. A miss streak older than the last step plus 12 hours is not confirmed any more. A host with fewer than 8 observations (no rhythm learned yet) uses the steps 1, 3 and 10 minutes instead (`reprobe.YoungBackoffMinutes`), so a host seen in one scan and silent in the next is confirmed inactive about a minute later.
 - **Likely up**: other candidates (and confirm hosts after the last step) are probed 5 minutes into the next hour whose model up-rate (`analyze.UpRates`) is at least `likely_up_rate`, where the host really answered on the same type of day (weekday or weekend, hour ±1), after its latest observation or reprobe. It needs at least 8 observations (`analyze.MinObsForExpected`).
 - **Safety**: never when `enabled` is false or the emergency stop is set; never an address in the policy exclusions (IP, CIDR, range); the time moves to the next open window of the host's profile (`sched.NextAllowed`), and a likely-up hour without an open window is skipped; at most `budget_per_hour` addresses per hour, counting the reprobes of the last hour (`reprobe_log`); later probes move to the next hour with a note. The engine applies the safety policy again (ports, rates, exclusions).
 - The executor (`reprobe.Executor`) runs every minute, starts the due probes as one targeted run per profile with trigger `reprobe`, records them in `reprobe_log`, and starts nothing while a reprobe run is still queued, running or analysing.

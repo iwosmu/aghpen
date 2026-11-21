@@ -59,8 +59,8 @@ func TestSampleContent(t *testing.T) {
 		for _, want := range []string{
 			"Raport z przebiegu #42",
 			"Przybyło: 1 host i 5 usług. Ubyło: 1 host i 3 usługi.",
-			"Bez odpowiedzi w tym przebiegu: 1 host (2 usługi bez potwierdzenia)",
-			"Host 10.66.1.80 nie odpowiedział w tym przebiegu (w poprzednim aktywny, 2 otwarte usługi)",
+			"Nie odpowiada (niepotwierdzone): 1 host, z nimi 2 usługi",
+			"Host 10.66.1.80 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 2 otwarte usługi",
 			"Najpierw sprawdź 5 zmian o wadze średniej lub wysokiej.",
 			"Co nowego", "Co zniknęło", "Co się zmieniło",
 			"Nowa usługa 10.66.3.17:8080 (Jetty 10.0.20)",
@@ -126,8 +126,8 @@ func TestSameContentInBothFormats(t *testing.T) {
 			}
 		}
 	}
-	if n != 17 {
-		t.Errorf("sample has %d listed changes, want 17", n)
+	if n != 19 {
+		t.Errorf("sample has %d listed changes, want 19", n)
 	}
 	for _, f := range d.Findings {
 		if !strings.Contains(md, "`"+f.Addr+"`") {
@@ -327,5 +327,26 @@ func TestTimesUseTheGivenZone(t *testing.T) {
 	in := Input{Location: warsaw, Run: model.ScanRun{ID: 5, StartedAt: &start, FinishedAt: &end}}
 	if md := Markdown(in); !strings.Contains(md, "21.11.2026 02:00 – 22.11.2026 04:00") {
 		t.Errorf("times are not in Europe/Warsaw:\n%s", md[:300])
+	}
+}
+
+// A service the run did not scan (carried) never looks freshly observed:
+// its row says so, and the open-services figure names how many are left out.
+func TestCarriedServicesAreMarked(t *testing.T) {
+	prev := int64(7)
+	in := Input{Run: model.ScanRun{ID: 8, Status: model.RunCompleted, Stats: model.RunStats{HostsUp: 1, ServicesOpen: 1}},
+		Summary: model.RunDiffSummary{PrevRunID: &prev, ByKind: map[string]int{}}, Carried: 1,
+		Services: []model.Service{
+			{IP: "10.0.0.5", Port: 80, Product: "nginx", Interest: 20},
+			{IP: "10.0.0.5", Port: 8787, Product: "nginx", Interest: 10, Carried: true},
+		}}
+	md := Markdown(in)
+	for _, want := range []string{"10.0.0.5:8787", "nie skanowana w tym przebiegu", "bez 1 usługi nieskanowanej w tym przebiegu (stan zachowany)"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("%q is missing:\n%s", want, md)
+		}
+	}
+	if strings.Count(md, "nie skanowana w tym przebiegu") != 1 {
+		t.Error("only the carried row is marked")
 	}
 }

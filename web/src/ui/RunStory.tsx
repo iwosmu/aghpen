@@ -5,6 +5,7 @@ import { t, plural } from '../i18n';
 import { awayText, responseDelta } from '../lib/changeText';
 import { serviceName } from '../lib/serviceName';
 import { Glyph, changeKindInfo } from './marks';
+import { MissingHostLines } from './MissingHosts';
 
 /** The change kinds a person reads as the story of a run, in reading order. */
 const STORY: { kind: string; one: [string, string]; few: [string, string]; many: [string, string]; en: [string, string] }[] = [
@@ -37,15 +38,17 @@ export function RunStory({ runId, className, testId = 'run-story' }: { runId: nu
 /** The story lines for a list of changes (a run, or the diff of two runs). */
 export function StoryList({ changes, runId, className, testId = 'run-story' }: { changes: Change[]; runId?: number; className?: string; testId?: string }) {
   const items = changes.filter((c) => !c.expected && STORY.some((s) => s.kind === c.kind));
+  const anyMissing = changes.some((c) => c.kind === 'host_missing' && !c.expected);
   const hosts = [...new Set(items.map((c) => c.host_id))];
   const oneHost = hosts.length === 1 ? hosts[0] : 0;
   const svcQ = usePage<Service>('/services', { host_id: oneHost || undefined, limit: 500 }, oneHost > 0);
-  if (!items.length) return null;
+  if (!items.length && !anyMissing) return null;
   const svc = new Map<string, Service>();
   for (const s of svcQ.data?.items ?? []) svc.set(s.host_id + ':' + s.port, s);
   const showIp = hosts.length > 1;
   return (
     <ul className={className ?? 'space-y-1'} data-testid={testId}>
+      <MissingHostLines changes={changes} />
       {STORY.map((st) => {
         const list = items.filter((c) => c.kind === st.kind);
         if (!list.length) return null;

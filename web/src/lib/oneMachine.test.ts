@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Change, ScanProfile } from '../api/types';
+import type { Change, RunPass, ScanProfile, ScanRun } from '../api/types';
 import { setLang } from '../i18n';
-import { awayText, responseDelta, awaySeconds } from './changeText';
+import { awayText, responseDelta, awaySeconds, changeSummary } from './changeText';
 import { defaultProfile, isLoopback, loopbackLine } from './thisComputer';
 import { isSelf, serviceName } from './serviceName';
 import { fieldValue } from './fields';
-import { passState } from '../ui/RunPasses';
+import { partialText, passState } from '../ui/RunPasses';
 
 const ch = (x: Partial<Change>) => ({ id: 1, run_id: 6, prev_run_id: 5, at: '2026-11-21T16:15:12Z', kind: 'service_returned', severity: 'low', host_id: 1, ip: '192.168.65.254', service_id: 3, port: 8787, summary: '', field: 'state', before: null, after: null, expected: false, acked_by: '', acked_at: null, ...x }) as Change;
 
@@ -45,7 +45,7 @@ describe('returned and slower', () => {
     setLang('pl');
     expect(responseDelta(ch({ kind: 'response_slower', field: 'http.response_ms', before: { baseline_ms: 120, ms: 118 }, after: { ms: 640 } }))).toBe('120 ms → 640 ms');
     expect(responseDelta(ch({ kind: 'response_slower', before: { baseline_ms: 120 }, after: { ms: null, error: 'no_answer' } }))).toBe('120 ms → brak odpowiedzi HTTP');
-    expect(responseDelta(ch({ kind: 'response_recovered', before: { baseline_ms: 120, ms: 640 }, after: { ms: 1300 } }))).toBe('120 ms → 1,3 s');
+    expect(responseDelta(ch({ kind: 'response_recovered', before: { baseline_ms: 120, ms: 640 }, after: { ms: 1300 } }))).toBe('640 ms → 1,3 s');
     expect(responseDelta(ch({ before: null, after: null }))).toBe('');
   });
   it('shows change values in words', () => {
@@ -78,5 +78,55 @@ describe('port passes', () => {
     expect(passState({ name: 'top_ports', state: 'done', hosts: 1, ports_total: 1000, ports_done: 1000 })).toBe('gotowe');
     expect(passState({ name: 'full_range', state: 'running', hosts: 1, ports_total: 65535, ports_done: 21000 })).toMatch(/^32/);
     expect(passState({ name: 'full_range', state: 'pending', hosts: 1, ports_total: 65535, ports_done: 0 })).toBe('czeka');
+  });
+});
+
+
+describe('partialText', () => {
+  const stats = (passes: RunPass[]) => ({ passes } as unknown as ScanRun['stats']);
+  it('says the result is not final while the full range runs', () => {
+    setLang('pl');
+    const s = stats([{ name: 'top_ports', state: 'done', hosts: 1, ports_total: 1000, ports_done: 1000 }, { name: 'full_range', state: 'running', hosts: 1, ports_total: 64535, ports_done: 20651 }]);
+    expect(partialText({ status: 'running', stats: s })).toBe('Skan trwa: sprawdzono najczęstsze porty, pełny zakres 1-65535 w toku (32%). Wynik nie jest jeszcze ostateczny; zmiany i zniknięte usługi pokażą się po końcu skanu.');
+    setLang('en');
+    expect(partialText({ status: 'running', stats: s })).toContain('Scan in progress: top ports checked, full range 1-65535 running (32%)');
+    setLang('pl');
+  });
+  it('is silent before the first pass ends, after the run, and for one pass', () => {
+    const first = stats([{ name: 'top_ports', state: 'running', hosts: 1, ports_total: 1000, ports_done: 10 }, { name: 'full_range', state: 'pending', hosts: 0, ports_total: 0, ports_done: 0 }]);
+    expect(partialText({ status: 'running', stats: first })).toBeNull();
+    const done = stats([{ name: 'top_ports', state: 'done', hosts: 1, ports_total: 1, ports_done: 1 }, { name: 'full_range', state: 'done', hosts: 1, ports_total: 1, ports_done: 1 }]);
+    expect(partialText({ status: 'running', stats: done })).toBeNull();
+    expect(partialText({ status: 'completed', stats: first })).toBeNull();
+    expect(partialText({ status: 'running', stats: stats([]) })).toBeNull();
+  });
+});
+
+describe('recovered and English summaries', () => {
+  const mk = (kind: string, before: unknown, after: unknown) => ({ id: 1, kind, ip: '172.18.0.1', port: 9090, before, after, summary: 'PL', field: 'http.response_ms' } as unknown as Change);
+  it('shows the slow answer it recovers from', () => {
+    setLang('pl');
+    expect(responseDelta(mk('response_recovered', { baseline_ms: 1, ms: 901 }, { ms: 1 }))).toBe('901 ms → 1 ms');
+    expect(responseDelta(mk('response_recovered', { baseline_ms: 0, ms: null }, { ms: 0 }))).toBe('nie odpowiadała → 0 ms');
+    expect(fieldValue('http.response_ms', { ms: 901 })).toBe('901 ms');
+  });
+  it('writes English summaries for the new kinds and keeps the Polish one in PL', () => {
+    setLang('en');
+    expect(changeSummary(mk('response_slower', { baseline_ms: 1, ms: 1 }, { ms: 901 }))).toBe('Service 172.18.0.1:9090 responds slower: 901 ms (usually 1 ms)');
+    expect(changeSummary(mk('service_returned', { state: 'gone', away_seconds: 313, runs_away: 1 }, 'open'))).toBe('Service 172.18.0.1:9090 is back after 5 min 13 s (away in 1 scan)');
+    setLang('pl');
+    expect(changeSummary(mk('service_returned', {}, 'open'))).toBe('PL');
+  });
+});
+
+describe('no equal values with an arrow', () => {
+  const mk = (kind: string, before: unknown, after: unknown) => ({ id: 1, kind, ip: 'x', port: 1, before, after, summary: '', field: 'http.response_ms' } as unknown as Change);
+  it('prints only the current value when both are equal', () => {
+    setLang('pl');
+    expect(responseDelta(mk('response_recovered', { baseline_ms: 1, ms: 1 }, { ms: 1 }))).toBe('teraz 1 ms');
+    expect(responseDelta(mk('response_slower', { baseline_ms: 5, ms: 5 }, { ms: 5 }))).toBe('teraz 5 ms');
+    setLang('en');
+    expect(responseDelta(mk('response_recovered', { baseline_ms: 0, ms: null }, { ms: 0 }))).toBe('no answer → 0 ms');
+    setLang('pl');
   });
 });

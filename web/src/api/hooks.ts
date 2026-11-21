@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import { get, type Query } from './client';
 import type { Page } from './types';
 import { toast, toastError } from '../ui/kit';
@@ -7,7 +7,7 @@ export function usePage<T>(path: string, q?: Query, enabled = true) {
   return useQuery<Page<T>>({ queryKey: [path, q ?? {}], queryFn: () => get<Page<T>>(path, q), placeholderData: keepPreviousData, enabled });
 }
 
-export function useItem<T>(path: string, q?: Query, opts?: { enabled?: boolean; refetchInterval?: number | false; staleTime?: number }) {
+export function useItem<T>(path: string, q?: Query, opts?: { enabled?: boolean; refetchInterval?: UseQueryOptions<T>['refetchInterval']; staleTime?: number }) {
   return useQuery<T>({ queryKey: [path, q ?? {}], queryFn: () => get<T>(path, q), enabled: opts?.enabled ?? true, refetchInterval: opts?.refetchInterval, staleTime: opts?.staleTime });
 }
 

@@ -205,3 +205,52 @@ Also in this round: a service name is never empty (fallback "nierozpoznana"); Cz
 
 **Safety note.** From 17:16 the coordinator forbade range scans of the Mac (nmap `-sV` probes hit local tools). Before that I ran 7 top-1000 scans of host.docker.internal from `czuiz`/`czuiy`. After the notice both stacks have `allowed_ports` set to the template ports plus my own published ports, and every profile on them scans only that list. Run #4 above used that list. The "Ten komputer" quick start copies the seeded default profile, as agreed; that is correct on a jury machine, but on a developer's Mac it scans the Mac's own ports.
 
+## 15. One machine in a dind "jury machine": staged full range, partial result, fixes
+
+Where: a `docker:28-dind` container (`czui-dind`). Czujka (image built from this branch after merging the coordinator's a5a3025: gated engine 4d39252 with staged results) and the target containers run inside it. Only Czujka's UI is published, to 127.0.0.1:18640 on the Mac. `localhost` maps to the dind bridge gateway 172.18.0.1, so no scan reaches the Mac. Targets: nginx :8787, Python HTTP with a set delay :9090, redis :6379, httpd :8080; dind's own docker :2375 and Czujka :18080 also answer.
+
+**Fresh install, measured with Playwright (`dind-pl-1..5`, `dind-en-1..5`), the same in PL and EN:**
+
+| Step | Time after login | Clicks |
+| --- | --- | --- |
+| Wizard, quick start | 0.8 s | 0 |
+| "Ten komputer (localhost)": "localhost = host Dockera 172.18.0.1" | 1.5 s | 1 |
+| "Uruchom skan": run page | 2.2 s | 2 |
+| Passes line and partial note ("najczęstsze porty: gotowe · pełny zakres 1-65535: 1%") | 4.5 s | 2 |
+| First services on screen (2 rows: redis, Czujka) | 11.1 s | 2 |
+| Run done, 6 services, full range 1-65535 done | 119 s | 2 |
+
+Where the 9 s from the click to the first row go (API polled every 0.4 s, engine branch before the merge): the top-ports pass ends 2.3 s after the start; `/services?run_id` gives the first rows at 8.5 s, after the HTTP fingerprinting of that pass. Before the merge the UI showed them at 12.6 s with a 3 s poll; with a5a3025 and a 1.5 s poll it shows them at 11.1 s. The engine worker measured 4.1 s on its own one-IP host; in this dind it is about 9 s after the click. Rows keep their arrival order while the run is live (0 order changes in both runs; one remount had moved a row before the per-run order cache).
+
+**Partial result.** While the full-range pass runs, the run page and the dashboard say "Skan trwa: sprawdzono najczęstsze porty, pełny zakres 1-65535 w toku (N%). Wynik nie jest jeszcze ostateczny; zmiany i zniknięte usługi pokażą się po końcu skanu." The live table shows the state of this run ("otwarta"), not the inventory state. Changes exist only after the run ends. The dashboard box of a one-host run counts open services instead of "0% adresów" and hides "pozostało 0 s".
+
+**Gone, slower, returned, recovered (runs #2 and #3 on the first stack):** run #2 (nginx stopped, 900 ms delay) gave `service_gone` :8787 and `response_slower` :9090 "1 ms → 901 ms". Run #3 gave `service_returned` :8787 "away for 5 min 13 s (1 scan)" and `response_recovered` :9090 "901 ms → 1 ms" (it showed "1 ms → 1 ms" before this fix). Dashboard "Najnowsze zmiany" uses the returned glyph. The response-time chart scales to the API's slow threshold (2× and +300 ms: 301 ms here), so 1 ms → 3 ms stays flat. Only points with `slow=true` are highlighted. Compare of two consecutive runs uses the run's change log, so nginx shows as "returned", not "new".
+
+**English.** The new strings show in EN (`dind-*-en`). The API writes change summaries in Polish; for `service_returned`, `response_slower` and `response_recovered` the EN view builds its own sentence. Other kinds keep the API's Polish text. Mobile, live run: `dind-m1-run-live-en`.
+
+**Profile editor and estimate** (`dind-14-estimate-pl/en`). The text comes from ScanEstimate: `full_range_max_hosts` 16, `full_range_max_addresses` 256, `full_range_ports` 64 484, `est_full_range_sec_per_host` 85.3. "Drugi etap trwa około 1 min 25 s dla 1 hosta i około 22 min 45 s dla 16 hostów, przy tempie 1 000 pps." The ports field says when the full range applies; an explicit list is scanned as written.
+
+## 16. Vanished host and alert webhook (dind, merged f4e6710 and 07738a6)
+
+**Juror's test, in dind.** Lab network `czui-lab` 172.30.5.0/28 inside the jury machine: `lab-web` (nginx, .2), `lab-cache` (redis, .3), Czujka joined at .14. Profile "Laboratorium" copied from the default profile, re-probing on (fresh install). Run #1: 4 hosts, 8 services, 5 min 47 s. Then `docker stop lab-cache` and run #2 (4 min 24 s). Playwright kept the dashboard and the run page open and did not click or reload.
+
+| Time after run #2 ended | Dashboard and run page |
+| --- | --- |
+| 0 s (`vanish-pl-1-dashboard-unconfirmed`, `vanish-pl-2-run-unconfirmed`) | "Od poprzedniego skanu: 1 host nie odpowiada (niepotwierdzone)." and "Host 172.30.5.3 nie odpowiada (niepotwierdzone), miał 1 usługę: :6379 Redis key-value store. Czujka sprawdzi go ponownie za kilka minut i pokaże tu wynik." |
+| about 88 s (`vanish-pl-3-dashboard-confirmed`, `vanish-pl-4-run-confirmed`) | "Od poprzedniego skanu: 1 host zniknął (potwierdzone)." and "Host 172.30.5.3 zniknął (potwierdzone 20:58), miał 1 usługę: :6379 Redis key-value store". The counts row shows "1 host zniknął (potwierdzone)"; "nie odpowiada" drops to 0. |
+
+The re-probe plan put the first confirmation at 1 min after the miss (`kind: confirm, step 1 of 3`). Run #3 (trigger reprobe) wrote `host_gone` and `service_gone` 88 s after run #2 ended. The page found them by itself: while a host of the last run has no verdict, it polls `/changes?kind=host_gone,host_back` every 5 s and then refreshes the dashboard, runs, hosts and services. EN: `vanish-3-dashboard-confirmed-en`, `vanish-4-run-confirmed-en`, `vanish-5-changes-en` (the change log with the new kinds and the EN sentences for `host_missing`, `service_unreachable`, `host_gone` and `service_gone`).
+
+**Alert webhook** (Administracja → "DefectDojo i webhook", panel "Webhook alertów", permission `integrations:manage`). Receiver: a container `hook` (python:3.13 alpine, `http.server`) on its own network inside dind; it logs the headers and the body and answers 200. Form: enabled, `http://hook:8000/czujka`, minimum severity "niska i wyżej", secret set, save, "Wyślij test" → "Odbiornik przyjął test: HTTP 200 · 1 ms" (`webhook-form-pl`, `webhook-form-en`, `webhook-form-mobile-pl`, no horizontal scroll at 390 px). The test reached the receiver with `X-Czujka-Event: test` and a signature. After run #4 the receiver got one `run.analyzed` POST; `X-Czujka-Signature` matches HMAC-SHA256 of the raw body with the secret (checked with Python `hmac`).
+
+Received body of the run (shortened `text`):
+
+```json
+{"event":"run.analyzed","run_id":4,"run_url":"http://127.0.0.1:15640/runs/4","trigger":"manual",
+ "scope":"profil Laboratorium: Domyślny (bezpieczne rozpoznanie)","finished_at":null,
+ "counts":{"findings_new":1,"host_back":1,"host_missing":1,"service_gone":1,"service_new":1,"service_unreachable":1},
+ "changes":[{"kind":"host_missing","severity":"medium","ip":"172.30.5.14","summary":"Host 172.30.5.14 nie odpowiada (niepotwierdzone): …","url":"http://127.0.0.1:15640/hosts/8"}, …],
+ "findings":[],"text":"*Czujka: przebieg #4 przeanalizowany* (…)\nnowe usługi: 1, …\nPrzebieg: http://127.0.0.1:15640/runs/4"}
+```
+
+Limits seen: `finished_at` is `null` in the run message (backend, reported to the integrator). The changes of run #4 are a lab artefact: after a container restart Czujka rejoined `czui-lab` without a fixed IP and took .3, so .14 went missing and .3 "came back" with port 8080 (Czujka itself); `lab-cache` could not start on its taken IP. The webhook delivery and the signature do not depend on that.

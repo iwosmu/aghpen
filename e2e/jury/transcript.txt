@@ -1,0 +1,208 @@
+=== Czujka on the organisers' template (lab/jury), 2026-11-21 19:55 UTC ===
+Czujka {"version":"jury","engine":true,"tde":true}; docker host aarch64; target localhost
+{"allowed_ports":"","max_pps":1000,"operator_networks":["172.18.0.1/32","172.31.250.10/32"]}
+{"valid":["localhost"],"invalid":[]}
+[19:55:11] Czujka http://127.0.0.1:18080: scope 1 (target localhost), profile 2 (ports 21,80,81,443,2223,3001,5673,6379,8080,8081,8085,8086,8088,8089,8090,8474,8787,8888,15432,15673,21000-21010), default profile 3
+
+=== Quickstart: the service on 8787 disappears and comes back (lab/jury/quickstart.sh) ===
+[19:55:18] quickstart: every service answers after 6 s
+[19:55:36] quickstart up: run 1 completed in 18 s (first service after 2 s): {"hosts":1,"services":5,"packets":172,"warnings":0,"passes":[]}
+  PASS                       scenario        2223   open     quickstart: open after up                        open
+  PASS                       scenario        3001   open     quickstart: open after up                        open
+  PASS                       scenario        5673   open     quickstart: open after up                        open
+  PASS                       scenario        8787   open     quickstart: open after up                        open
+  PASS                       scenario        15673  open     quickstart: open after up                        open
+[19:55:51] quickstart change: run 2 completed in 13 s (first service after 3 s): {"hosts":1,"services":4,"packets":126,"warnings":0,"passes":[]}
+  PASS                       scenario        8787   change   quickstart: 8787 gone after change               run 2 service_gone: Usługa 172.18.0.1:8787 zniknęła (nginx 1.31.9)
+  PASS                       scenario        2223   open     quickstart: still open after change              open
+  PASS                       scenario        3001   open     quickstart: still open after change              open
+  PASS                       scenario        5673   open     quickstart: still open after change              open
+  PASS                       scenario        15673  open     quickstart: still open after change              open
+[19:55:51] quickstart: every service answers after 0 s
+[19:56:09] quickstart up again: run 3 completed in 18 s (first service after 2 s): {"hosts":1,"services":5,"packets":172,"warnings":0,"passes":[]}
+  PASS                       scenario        8787   open     quickstart: 8787 open again                      open
+  PASS                       scenario        8787   change   quickstart: 8787 reported as back                run 3 service_returned: Usługa 172.18.0.1:8787 wróciła po 18 s (nie było jej w 1 skanie) (nginx 1.31.9)
+
+=== custom-network: httpbin, PostgreSQL, RabbitMQ, Gitea, nginx ===
+[19:56:12] custom-network: every service answers after 3 s
+[19:57:53] custom-network with the default profile: run 4 completed in 101 s (first service after 8 s): {"hosts":1,"services":9,"packets":65796,"warnings":0,"passes":["top_ports done 1034/1034","full_range done 64501/64501"]}
+  PASS                       juror:custom-network 8888   open     found with the default profile                   http
+  PASS                       juror:custom-network 15432  open     found with the default profile                   postgresql PostgreSQL DB 9.6.0 or later
+  PASS                       juror:custom-network 5673   open     found with the default profile                   amqp RabbitMQ 3.13.7
+  PASS                       juror:custom-network 15673  open     found with the default profile                   http
+  PASS                       juror:custom-network 3001   open     found with the default profile                   http
+  PASS                       juror:custom-network 2223   open     found with the default profile                   ssh OpenSSH 10.3
+  PASS                       juror:custom-network 8787   open     found with the default profile                   http nginx 1.31.9
+  PASS                       juror:custom-network all    open     every published port, default profile            7/7 found; other open ports: 18080 2375 
+[19:58:17] custom-network: run 5 completed in 24 s (first service after 2 s): {"hosts":1,"services":7,"packets":218,"warnings":0,"passes":[]}
+  PASS                       custom-network  8888   open     -                                                state=open http
+  PASS                       custom-network  8888   tech     httpbin@0.9.2                                    techs: Python, httpbin 0.9.2, Gunicorn 19.9.0, Swagger UI, jQuery, React
+  PASS                       custom-network  8888   finding  Środowisko testowe albo narzędzie deweloperskie Środowisko testowe albo narzędzie deweloperskie dostępne w sieci — 172.18.0.1:8888
+  PASS                       custom-network  8888   name     http                                             name=http
+  PASS                       custom-network  15432  open     -                                                state=open postgresql PostgreSQL DB 9.6.0 or later
+  PASS                       custom-network  15432  tech     PostgreSQL                                       techs: PostgreSQL 9.6.0
+  PASS                       custom-network  15432  finding  Port bazy danych otwarty na sieć skanowaną     Port bazy danych otwarty na sieć skanowaną — 172.18.0.1:15432
+  PASS                       custom-network  5673   open     -                                                state=open amqp RabbitMQ 3.13.7
+  PASS                       custom-network  5673   name     amqp                                             name=amqp
+  PASS                       custom-network  5673   notech   RabbitMQ Management                              techs: RabbitMQ 3.13.7
+  PASS                       custom-network  15673  open     -                                                state=open http
+  PASS                       custom-network  15673  tech     RabbitMQ                                         techs: RabbitMQ, Cowboy, jQuery 3.5.1, Bootstrap
+  PASS                       custom-network  15673  class    admin-panel                                      classes: admin-panel,dev-tool,login
+  PASS                       custom-network  15673  finding  Panel administracyjny poza siecią zarządzania  Panel administracyjny poza siecią zarządzania — 172.18.0.1:15673
+  PASS                       custom-network  3001   open     -                                                state=open http
+  PASS                       custom-network  3001   tech     Gitea@28.4.0                                     techs: Gitea 28.4.0
+  PASS                       custom-network  3001   sig      gitea-installer                                  matches: gitea,gitea-installer,header-login-over-http,header-login-no-csp
+  PASS                       custom-network  3001   finding  Niedokończona instalacja aplikacji              Niedokończona instalacja aplikacji — 172.18.0.1:3001
+  PASS                       custom-network  2223   open     -                                                state=open ssh OpenSSH 10.3
+  PASS                       custom-network  2223   tech     OpenSSH                                          techs: OpenSSH 10.3
+  PASS                       custom-network  8787   open     -                                                state=open http nginx 1.31.9
+  PASS                       custom-network  8787   class    default-page                                     classes: default-page
+  PASS                       custom-network  8787   finding  Domyślna strona serwera                         Domyślna strona serwera — 172.18.0.1:8787
+
+=== modern: WordPress, phpMyAdmin, Redis, Nginx Proxy Manager (and the swap from custom-network) ===
+[19:58:34] modern: every service answers after 4 s
+[20:00:03] modern with the default profile: run 6 completed in 89 s (first service after 7 s): {"hosts":1,"services":8,"packets":65888,"warnings":0,"passes":["top_ports done 1034/1034","full_range done 64501/64501"]}
+  PASS                       juror:modern    80     open     found with the default profile                   http OpenResty web app server
+  PASS                       juror:modern    81     open     found with the default profile                   http OpenResty web app server
+  PASS                       juror:modern    443    open     found with the default profile                   https openresty
+  PASS                       juror:modern    8080   open     found with the default profile                   http Apache httpd 2.4.71
+  PASS                       juror:modern    8081   open     found with the default profile                   http Apache httpd 2.4.71
+  PASS                       juror:modern    6379   open     found with the default profile                   redis Redis key-value store 7.4.12
+  PASS                       juror:modern    all    open     every published port, default profile            6/6 found; other open ports: 18080 2375 
+[20:00:31] modern: run 7 completed in 28 s (first service after 6 s): {"hosts":1,"services":6,"packets":264,"warnings":0,"passes":[]}
+  PASS                       modern          80     open     -                                                state=open http OpenResty web app server
+  PASS                       modern          80     tech     Nginx Proxy Manager                              techs: OpenResty web app server, Nginx Proxy Manager, OpenResty, nginx, Bootstrap 3.4.1
+  PASS                       modern          80     class    default-page                                     classes: default-page
+  PASS                       modern          80     finding  Domyślna strona serwera                         Domyślna strona serwera — 172.18.0.1:80
+  PASS                       modern          81     open     -                                                state=open http OpenResty web app server
+  PASS                       modern          81     tech     Nginx Proxy Manager                              techs: OpenResty web app server, Nginx Proxy Manager, OpenResty, nginx
+  PASS                       modern          81     class    admin-panel                                      classes: admin-panel,login
+  PASS                       modern          81     finding  Panel administracyjny poza siecią zarządzania  Panel administracyjny poza siecią zarządzania — 172.18.0.1:81
+  PASS                       modern          81     finding  login-plain-http                                 Logowanie przez nieszyfrowane HTTP: Nginx Proxy Manager (172.18.0.1:81)
+  PASS                       modern          443    open     -                                                state=open https openresty
+  PASS                       modern          443    name     https                                            name=https
+  PASS                       modern          8080   open     -                                                state=open http Apache httpd 2.4.71
+  PASS                       modern          8080   tech     WordPress@7.1.5                                  techs: Apache HTTP Server 2.4.71, WordPress 7.1.5, PHP 8.3.37, jQuery
+  PASS                       modern          8080   sig      wordpress-installer                              matches: wordpress-installer,apache,header-version-powered-by,header-version-server,php,jquery,wordpress
+  PASS                       modern          8080   class    install-page                                     classes: admin-panel,install-page
+  PASS                       modern          8080   finding  Niedokończona instalacja aplikacji              Niedokończona instalacja aplikacji — 172.18.0.1:8080
+  PASS                       modern          8081   open     -                                                state=open http Apache httpd 2.4.71
+  PASS                       modern          8081   tech     phpMyAdmin                                       techs: PHP 8.3.37, phpMyAdmin 5.2.3, Apache HTTP Server 2.4.71, Bootstrap, jQuery
+  PASS                       modern          8081   class    admin-panel                                      classes: admin-panel,database,login
+  PASS                       modern          8081   finding  Panel administracyjny poza siecią zarządzania  Panel administracyjny poza siecią zarządzania — 172.18.0.1:8081
+  PASS                       modern          6379   open     -                                                state=open redis Redis key-value store 7.4.12
+  PASS                       modern          6379   tech     Redis@7.4.12                                     techs: Redis 7.4.12
+  PASS                       modern          6379   sig      redis-no-auth                                    matches: redis,redis-no-auth
+  PASS                       modern          6379   finding  Port bazy danych otwarty na sieć skanowaną     Port bazy danych otwarty na sieć skanowaną — 172.18.0.1:6379
+  FAIL                       scenario        8787   change   swap: custom-network 8787 gone                   changes on this port in run 7: none
+  PASS                       scenario        3001   change   swap: custom-network 3001 gone                   run 6 service_gone: Usługa 172.18.0.1:3001 zniknęła (http)
+  PASS                       scenario        8080   change   swap: modern 8080 new                            run 6 service_new: Nowa usługa 172.18.0.1:8080 (Apache httpd 2.4.71)
+
+=== version change: modern with redis:6 instead of redis:7 (a copy under e2e/jury/compose) ===
+[20:00:49] modern-redis6: every service answers after 4 s
+[20:01:18] modern with redis:6: run 8 completed in 29 s (first service after 6 s): {"hosts":1,"services":6,"packets":264,"warnings":0,"passes":[]}
+  PASS                       scenario        6379   change   version: Redis 7.4.12 -> 6.x                     run 8 tech_version: Zmiana wersji Redis na 172.18.0.1:6379: 7.4.12 → 6.2.24
+  PASS                       version         6379   tech     Redis                                            techs: Redis 6.2.24
+
+=== vulnerable: vsftpd, WordPress 4.7, Adminer, DVWA ===
+[20:01:36] vulnerable: every service answers after 4 s
+[20:03:15] vulnerable with the default profile: run 9 completed in 99 s (first service after 3 s): {"hosts":1,"services":17,"packets":66302,"warnings":0,"passes":["top_ports done 1034/1034","full_range done 64501/64501"]}
+  PASS                       juror:vulnerable 21     open     found with the default profile                   ftp
+  PASS                       juror:vulnerable 21000  open     found with the default profile                   tcpwrapped
+  PASS                       juror:vulnerable 21010  open     found with the default profile                   tcpwrapped
+  PASS                       juror:vulnerable 8088   open     found with the default profile                   http Apache httpd 2.4.10
+  PASS                       juror:vulnerable 8089   open     found with the default profile                   http
+  PASS                       juror:vulnerable 8090   open     found with the default profile                   http Apache httpd 2.4.25
+  PASS                       juror:vulnerable all    open     every published port, default profile            15/15 found; other open ports: 18080 2375 
+[20:03:59] vulnerable: run 10 completed in 44 s (first service after 14 s): {"hosts":1,"services":16,"packets":10706,"warnings":0,"passes":["top_ports done 31/31","dense done 9982/9982"]}
+  PASS                       vulnerable      21     open     -                                                state=open ftp
+  PASS                       vulnerable      21     name     ftp                                              name=ftp
+  PASS                       vulnerable      21     finding  Telnet albo FTP dostępny w sieci                Telnet albo FTP dostępny w sieci — 172.18.0.1:21
+  GAP (platform)             vulnerable      21     tech     vsftpd                                           techs: 
+  PASS                       vulnerable      21000  open     -                                                state=open tcpwrapped
+  PASS                       vulnerable      21010  open     -                                                state=open tcpwrapped
+  PASS                       vulnerable      8088   open     -                                                state=open http Apache httpd 2.4.10
+  PASS                       vulnerable      8088   tech     WordPress@4.7.5                                  techs: Apache HTTP Server 2.4.10, WordPress 4.7.5, PHP 5.6.30, jQuery
+  PASS                       vulnerable      8088   sig      wordpress-installer                              matches: wordpress-installer,apache,header-version-powered-by,header-version-server,php,jquery,wordpress
+  PASS                       vulnerable      8088   finding  Przestarzała główna wersja CMS                Przestarzała główna wersja CMS — 172.18.0.1:8088
+  PASS                       vulnerable      8088   class    install-page                                     classes: admin-panel,install-page
+  PASS                       vulnerable      8088   finding  Niedokończona instalacja aplikacji              Niedokończona instalacja aplikacji — 172.18.0.1:8088
+  PASS                       vulnerable      8089   open     -                                                state=open http
+  PASS                       vulnerable      8089   tech     Adminer                                          techs: Adminer 6.3.0, PHP 8.4.28
+  PASS                       vulnerable      8089   finding  Panel administracyjny poza siecią zarządzania  Panel administracyjny poza siecią zarządzania — 172.18.0.1:8089
+  PASS                       vulnerable      8090   open     -                                                state=open http Apache httpd 2.4.25
+  PASS                       vulnerable      8090   tech     DVWA (Damn Vulnerable Web Application)@1.10      techs: Apache HTTP Server 2.4.25, DVWA (Damn Vulnerable Web Application) 1.10, PHP
+  PASS                       vulnerable      8090   class    staging                                          classes: dev-tool,login,staging
+  PASS                       vulnerable      8090   finding  Środowisko testowe albo narzędzie deweloperskie Środowisko testowe albo narzędzie deweloperskie dostępne w sieci — 172.18.0.1:8090
+
+=== modern-proxy: WordPress behind Traefik and Toxiproxy; then the four toxics ===
+[20:04:26] proxy: every service answers after 4 s
+[20:05:58] proxy with the default profile: run 11 completed in 92 s (first service after 7 s): {"hosts":1,"services":5,"packets":65703,"warnings":0,"passes":["top_ports done 1034/1034","full_range done 64501/64501"]}
+  PASS                       juror:proxy     8085   open     found with the default profile                   http Apache httpd 2.4.71
+  PASS                       juror:proxy     8086   open     found with the default profile                   http Golang net/http server
+  PASS                       juror:proxy     8474   open     found with the default profile                   http
+  PASS                       juror:proxy     all    open     every published port, default profile            3/3 found; other open ports: 18080 2375 
+[20:06:17] proxy, no toxic: run 12 completed in 19 s (first service after 7 s): {"hosts":1,"services":3,"packets":126,"warnings":0,"passes":[]}
+  PASS                       proxy           8085   open     -                                                state=open http Apache httpd 2.4.71
+  PASS                       proxy           8085   tech     WordPress@7.1.5                                  techs: Apache HTTP Server 2.4.71, WordPress 7.1.5, PHP 8.3.37, jQuery
+  PASS                       proxy           8085   sig      wordpress-installer                              matches: wordpress-installer,apache,header-version-powered-by,header-version-server,php,jquery,wordpress
+  PASS                       proxy           8085   class    install-page                                     classes: admin-panel,install-page
+  PASS                       proxy           8085   finding  Niedokończona instalacja aplikacji              Niedokończona instalacja aplikacji — 172.18.0.1:8085
+  PASS                       proxy           8086   open     -                                                state=open http Golang net/http server
+  PASS                       proxy           8086   tech     Traefik                                          techs: Traefik 3.1.7, Go
+  PASS                       proxy           8086   sig      traefik-api-insecure                             matches: traefik-proxy,traefik-api-insecure,traefik-dashboard,golang-http
+  PASS                       proxy           8086   class    unauth-control-api                               classes: admin-panel,api,dev-tool,unauth-control-api
+  PASS                       proxy           8086   finding  API sterujące bez uwierzytelniania              API sterujące bez uwierzytelniania — 172.18.0.1:8086
+  PASS                       proxy           8474   open     -                                                state=open http
+  PASS                       proxy           8474   tech     Toxiproxy@2.12.0                                 techs: Toxiproxy 2.12.0
+  PASS                       proxy           8474   sig      toxiproxy-api                                    matches: toxiproxy-api
+  PASS                       proxy           8474   class    api                                              classes: admin-panel,api,dev-tool,error-page,unauth-control-api
+  PASS                       proxy           8474   class    unauth-control-api                               classes: admin-panel,api,dev-tool,error-page,unauth-control-api
+  PASS                       proxy           8474   finding  API sterujące bez uwierzytelniania              API sterujące bez uwierzytelniania — 172.18.0.1:8474
+[20:06:17] 8085 response time without a toxic: 18 ms
+[20:06:26] toxics now: [{"type":"latency","attributes":{"latency":500,"jitter":50}}]
+[20:06:44] proxy, toxic latency: run 13 completed in 18 s (first service after 6 s): {"hosts":1,"services":3,"packets":126,"warnings":0,"passes":[]}
+  PASS                       scenario        8085   run      toxic latency: the scan completes                run 13 completed
+  PASS                       scenario        8085   open     toxic latency: 8085 still open                   open
+[20:06:44] 8085 response time with latency: 487 ms (without: 18 ms)
+  PASS                       scenario        8085   rt       latency 500 ms: response time recorded           response_ms 18 -> 487
+  PASS                       scenario        8085   change   latency 500 ms: reported as slower               run 13 response_slower: Usługa 172.18.0.1:8085 odpowiada wolniej: 487 ms (zwykle 15 ms)
+[20:06:54] toxics now: [{"type":"timeout","attributes":{"timeout":1000}}]
+[20:07:16] proxy, toxic timeout: run 14 completed in 22 s (first service after 6 s): {"hosts":1,"services":3,"packets":80,"warnings":0,"passes":[]}
+  PASS                       scenario        8085   run      toxic timeout: the scan completes                run 14 completed
+  PASS                       scenario        8085   open     toxic timeout: 8085 still open                   open
+[20:07:16] 8085 response time with timeout: 1024 ms (without: 18 ms)
+  PASS                       scenario        8085   http     timeout 1 s: failing or slow answer recorded     http status 502, response_ms 1024
+[20:07:25] toxics now: [{"type":"bandwidth","attributes":{"rate":100}}]
+[20:07:43] proxy, toxic bandwidth: run 15 completed in 18 s (first service after 6 s): {"hosts":1,"services":3,"packets":126,"warnings":0,"passes":[]}
+  PASS                       scenario        8085   run      toxic bandwidth: the scan completes              run 15 completed
+  PASS                       scenario        8085   open     toxic bandwidth: 8085 still open                 open
+[20:07:43] 8085 response time with bandwidth: 12 ms (without: 18 ms)
+[20:07:52] toxics now: [{"type":"slow_close","attributes":{"delay":1000}}]
+[20:08:11] proxy, toxic slowclose: run 16 completed in 19 s (first service after 7 s): {"hosts":1,"services":3,"packets":126,"warnings":0,"passes":[]}
+  PASS                       scenario        8085   run      toxic slowclose: the scan completes              run 16 completed
+  PASS                       scenario        8085   open     toxic slowclose: 8085 still open                 open
+[20:08:11] 8085 response time with slowclose: 8 ms (without: 18 ms)
+
+=== a host disappears: a second target, a container on its own docker network in the jury machine ===
+{"valid":["172.31.250.10"],"invalid":[]}
+[20:08:19] second host up: run 17 completed in 6 s (first service after 4 s): {"hosts":1,"services":1,"packets":3,"warnings":0,"passes":[]}
+  PASS                       host-gone       80     open     second host: nginx on 172.31.250.10:80           state=open
+[20:08:25] second host stopped: run 18 completed in 6 s (first service after ? s): {"hosts":0,"services":0,"packets":7,"warnings":0,"passes":[]}
+  PASS                       host-gone       80     change   stopped: host_missing in the scan after the stop run 18 host_missing: Host 172.31.250.10 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 1 otwartą usługę: 80/tcp http; model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku
+  PASS                       host-gone       80     change   stopped: service_unreachable in the scan after the stop run 18 service_unreachable: Usługa 172.31.250.10:80 (http) nie odpowiada (niepotwierdzone): host nie odpowiedział w tym przebiegu
+[20:10:10] runs after the stop (no scan started by this script): 19 reprobe completed
+  PASS                       host-gone       80     change   without another scan: host_gone within 150 s     run 19 host_gone: Host 172.31.250.10 zgłoszony jako nieaktywny: nie odpowiada w godzinach, w których zwykle odpowiadał; model: p_alive 0,19 after 105 s
+  PASS                       host-gone       80     change   without another scan: service_gone within 150 s  run 19 service_gone: Usługa 172.31.250.10:80 zniknęła (http): host zgłoszony jako nieaktywny after 105 s
+
+=== Summary ===
+      1 FAIL
+      1 GAP
+    139 PASS
+PASS: 139  FAIL: 1  GAP: 1  GAP CLOSED: 0
+Default profile on target localhost (the juror flow), per stack:
+  stack            published found  first service (s)  last template port (s)   run finished (s)  run
+  custom-network   7/7              8                  101 (port 15432)         101               4
+  modern           6/6              7                  10 (port 443)            89                6
+  vulnerable       15/15            3                  99 (port 21000)          99                9
+  proxy            3/3              7                  92 (port 8474)           92                11

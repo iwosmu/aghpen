@@ -63,7 +63,11 @@ type Input struct {
 
 	Findings []model.Finding // candidates for "top findings"; the report sorts and cuts
 	Services []model.Service // candidates for "top services by interest"
-	Hosts    []model.Host    // unstable, expected-offline and inactive hosts
+	// Carried counts the services this run did not scan (their ports were
+	// outside the run's coverage); they keep the state of an earlier run and
+	// are not in Run.Stats.ServicesOpen.
+	Carried int
+	Hosts   []model.Host // unstable, expected-offline and inactive hosts
 
 	Limits Limits
 }
@@ -253,7 +257,7 @@ var findingStatusPL = map[model.FindingStatus]string{
 
 var kindPL = map[model.ChangeKind]string{
 	model.ChangeHostNew: "Nowy host", model.ChangeHostGone: "Host nieaktywny", model.ChangeHostBack: "Host znów odpowiada",
-	model.ChangeHostUnstable: "Host niestabilny", model.ChangeHostMissing: "Host bez odpowiedzi", model.ChangeServiceNew: "Nowa usługa", model.ChangeServiceGone: "Usługa zniknęła",
+	model.ChangeHostUnstable: "Host niestabilny", model.ChangeHostMissing: "Nie odpowiada (niepotwierdzone)", model.ChangeServiceUnreachable: "Usługa nie odpowiada (niepotwierdzone)", model.ChangeServiceNew: "Nowa usługa", model.ChangeServiceGone: "Usługa zniknęła",
 	model.ChangeServiceChanged: "Zmiana usługi", model.ChangeTechNew: "Nowa technologia", model.ChangeTechGone: "Technologia zniknęła",
 	model.ChangeTechVersion: "Zmiana wersji", model.ChangeTitle: "Zmiana tytułu", model.ChangeHTTPStatus: "Zmiana statusu HTTP",
 	model.ChangeCert: "Zmiana certyfikatu", model.ChangeHeaders: "Zmiana nagłówków", model.ChangeCookies: "Zmiana ciasteczek",
@@ -323,7 +327,7 @@ func changeGroup(k model.ChangeKind) int {
 	switch k {
 	case model.ChangeHostNew, model.ChangeHostBack, model.ChangeServiceNew, model.ChangeServiceReturned:
 		return 0
-	case model.ChangeHostGone, model.ChangeServiceGone, model.ChangeHostMissing:
+	case model.ChangeHostGone, model.ChangeServiceGone, model.ChangeHostMissing, model.ChangeServiceUnreachable:
 		return 1
 	}
 	return 2
@@ -525,11 +529,11 @@ func build(in Input) doc {
 			parts = append(parts, "Ubyło: "+joinAnd(gone)+".")
 		}
 		if s.HostsMissing > 0 {
-			miss := "Bez odpowiedzi w tym przebiegu: " + nHosts(s.HostsMissing)
+			miss := "Nie odpowiada (niepotwierdzone): " + nHosts(s.HostsMissing)
 			if s.ServicesUnreachable > 0 {
-				miss += " (" + nServices(s.ServicesUnreachable) + " bez potwierdzenia)"
+				miss += ", z nimi " + nServices(s.ServicesUnreachable)
 			}
-			parts = append(parts, miss+"; to jeszcze nie jest zgłoszenie nieaktywności.")
+			parts = append(parts, miss+". Ponowne sondowanie potwierdzi, czy wróciły, czy zniknęły.")
 		}
 		if s.HostsBack > 0 {
 			parts = append(parts, "Powroty po nieaktywności: "+nHosts(s.HostsBack)+".")
@@ -681,6 +685,9 @@ func build(in Input) doc {
 			what = sv.Hostname + " · " + what
 		}
 		row.What = oneLine(what, 140)
+		if sv.Carried {
+			row.What += " · nie skanowana w tym przebiegu (stan z wcześniejszego)"
+		}
 		for j, w := range sv.InterestWhy {
 			if j == 2 {
 				if rest := len(sv.InterestWhy) - j; rest > 0 {
@@ -773,7 +780,18 @@ func build(in Input) doc {
 		return "+" + num(int64(plus)) + " / −" + num(int64(minus))
 	}
 	fig(int64(st.HostsUp), plural(st.HostsUp, "aktywny host", "aktywne hosty", "aktywnych hostów"), delta(s.HostsNew+s.HostsBack, s.HostsGone))
-	fig(int64(st.ServicesOpen), plural(st.ServicesOpen, "otwarta usługa", "otwarte usługi", "otwartych usług"), delta(s.ServicesNew, s.ServicesGone))
+	// Run.Stats.ServicesOpen counts the open services this run saw; services
+	// it did not scan (carried) are named in the note, not counted.
+	svcNote := delta(s.ServicesNew, s.ServicesGone)
+	if in.Carried > 0 {
+		c := "bez " + num(int64(in.Carried)) + " " + plural(in.Carried, "usługi nieskanowanej", "usług nieskanowanych", "usług nieskanowanych") + " w tym przebiegu (stan zachowany)"
+		if svcNote != "" {
+			svcNote += "; " + c
+		} else {
+			svcNote = c
+		}
+	}
+	fig(int64(st.ServicesOpen), plural(st.ServicesOpen, "otwarta usługa", "otwarte usługi", "otwartych usług"), svcNote)
 	fig(int64(st.HTTPServices), plural(st.HTTPServices, "usługa WWW", "usługi WWW", "usług WWW"), "")
 	exNote := ""
 	if nExpected > 0 {

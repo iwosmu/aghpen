@@ -485,6 +485,41 @@ type HostResult struct {
 	// (the engine's quick path). The final result of the same run replaces
 	// it. The store keeps the service's change hash and its known fields.
 	Interim bool `json:"interim,omitempty"`
+	// Coverage: the ports the scan covered on this host (the profile's list,
+	// plus the dense or full-range pass when it finished for the host). A
+	// service of the host outside it keeps its state and is not reported
+	// gone. Nil: unknown (imports, older engines): every unlisted service of
+	// an answering host counts as gone. Engine to store only, not serialized.
+	Coverage *PortCoverage `json:"-"`
+}
+
+// PortRange is an inclusive range of ports.
+type PortRange struct {
+	Lo int `json:"lo"`
+	Hi int `json:"hi"`
+}
+
+// PortCoverage is the set of ports one run scanned on one host.
+type PortCoverage struct {
+	TCP []PortRange `json:"tcp"`
+	UDP []PortRange `json:"udp"`
+}
+
+// Has reports whether the port was scanned. A nil coverage covers every port.
+func (c *PortCoverage) Has(proto string, port int) bool {
+	if c == nil {
+		return true
+	}
+	rs := c.TCP
+	if proto == "udp" {
+		rs = c.UDP
+	}
+	for _, r := range rs {
+		if port >= r.Lo && port <= r.Hi {
+			return true
+		}
+	}
+	return false
 }
 
 // VendorForMAC returns the vendor to show for a MAC address. A locally
@@ -549,6 +584,9 @@ type ScriptResult struct {
 }
 
 type ServiceResult struct {
+	// Carried: not scanned in this run (outside the run's coverage of the
+	// host); the store copied the last observation and kept the state.
+	Carried      bool             `json:"carried,omitempty"`
 	Port         int              `json:"port"`
 	Proto        string           `json:"proto"` // tcp | udp
 	State        string           `json:"state"` // open | closed | filtered
@@ -828,6 +866,10 @@ type Service struct {
 	// slow against the service's own baseline (analyze.ResponseSeries).
 	ResponseMs   *int `json:"response_ms"`
 	ResponseSlow bool `json:"response_slow"`
+	// Carried is set only in a list for one run (run_id): the run did not
+	// scan this port on the host (outside its coverage), so the service's
+	// state and data come from an earlier run.
+	Carried bool `json:"carried,omitempty"`
 }
 
 type InterestReason struct {
@@ -860,25 +902,28 @@ type ServiceGroup struct {
 type ChangeKind string
 
 const (
-	ChangeHostNew        ChangeKind = "host_new"
-	ChangeHostGone       ChangeKind = "host_gone"     // reported inactive
-	ChangeHostBack       ChangeKind = "host_back"     // was inactive, answers again
-	ChangeHostUnstable   ChangeKind = "host_unstable" // started to flap
-	ChangeHostMissing    ChangeKind = "host_missing"  // answered in the previous run, silent now, not yet reported inactive
-	ChangeServiceNew     ChangeKind = "service_new"
-	ChangeServiceGone    ChangeKind = "service_gone"
-	ChangeServiceChanged ChangeKind = "service_changed" // product, version, banner
-	ChangeTechNew        ChangeKind = "tech_new"
-	ChangeTechGone       ChangeKind = "tech_gone"
-	ChangeTechVersion    ChangeKind = "tech_version"
-	ChangeTitle          ChangeKind = "title_changed"
-	ChangeHTTPStatus     ChangeKind = "status_changed"
-	ChangeCert           ChangeKind = "cert_changed"
-	ChangeHeaders        ChangeKind = "headers_changed"
-	ChangeCookies        ChangeKind = "cookies_changed"
-	ChangeContent        ChangeKind = "content_changed" // body differs strongly (simhash distance)
-	ChangeRedirect       ChangeKind = "redirect_changed"
-	ChangeClass          ChangeKind = "class_changed" // for example became an admin panel
+	ChangeHostNew      ChangeKind = "host_new"
+	ChangeHostGone     ChangeKind = "host_gone"     // reported inactive
+	ChangeHostBack     ChangeKind = "host_back"     // was inactive, answers again
+	ChangeHostUnstable ChangeKind = "host_unstable" // started to flap
+	ChangeHostMissing  ChangeKind = "host_missing"  // answered in the previous run, silent now, not yet reported inactive
+	// ChangeServiceUnreachable: an open service of a host_missing host. Its
+	// state is unknown in this run, not gone; a confirmation probe decides.
+	ChangeServiceUnreachable ChangeKind = "service_unreachable"
+	ChangeServiceNew         ChangeKind = "service_new"
+	ChangeServiceGone        ChangeKind = "service_gone"
+	ChangeServiceChanged     ChangeKind = "service_changed" // product, version, banner
+	ChangeTechNew            ChangeKind = "tech_new"
+	ChangeTechGone           ChangeKind = "tech_gone"
+	ChangeTechVersion        ChangeKind = "tech_version"
+	ChangeTitle              ChangeKind = "title_changed"
+	ChangeHTTPStatus         ChangeKind = "status_changed"
+	ChangeCert               ChangeKind = "cert_changed"
+	ChangeHeaders            ChangeKind = "headers_changed"
+	ChangeCookies            ChangeKind = "cookies_changed"
+	ChangeContent            ChangeKind = "content_changed" // body differs strongly (simhash distance)
+	ChangeRedirect           ChangeKind = "redirect_changed"
+	ChangeClass              ChangeKind = "class_changed" // for example became an admin panel
 	// ChangeServiceReturned: a service reported gone (or missing from the
 	// previous run) is open again. Before holds {state, last_open_run_id,
 	// last_open_at, away_seconds, runs_away}; After is "open".
@@ -1055,6 +1100,23 @@ type RetroHuntResult struct {
 }
 
 // ---------- Integrations ----------
+
+// WebhookSettings configure the alert webhook: one POST with a JSON summary
+// to the operator's own endpoint after every analysed run.
+type WebhookSettings struct {
+	Enabled bool `json:"enabled"`
+	// URL is the endpoint (http or https). Stored encrypted: Slack and
+	// Mattermost URLs carry their token in the path.
+	URL string `json:"url"`
+	// MinSeverity: a run sends the POST only when a change or a new finding
+	// has at least this severity (info, low, medium, high; default medium).
+	MinSeverity Severity `json:"min_severity"`
+	Secret      string   `json:"secret,omitempty"` // write-only HMAC-SHA256 key; GET returns SecretSet
+	SecretSet   bool     `json:"secret_set"`
+	// UIURL is the public address of Czujka for the links in the message.
+	// Empty: the address the settings were saved from.
+	UIURL string `json:"ui_url"`
+}
 
 type DefectDojoSettings struct {
 	Enabled         bool   `json:"enabled"`

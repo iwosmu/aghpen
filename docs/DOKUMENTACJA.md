@@ -8,10 +8,11 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 | --- | --- | --- |
 | [`README.md`](../README.md) | polski | każdy: czym jest Czujka, szybki start |
 | [`docs/ZGODNOSC.md`](ZGODNOSC.md) | polski | jury: wymagania zadania, stan i dowody |
+| [`docs/TEST-JURY.md`](TEST-JURY.md) | polski | jury: test na szablonie organizatorów `lab/jury`, wyniki na każdym stosie, jedna komenda |
 | [`docs/slides/czujka.pdf`](slides/czujka.pdf) | polski | jury: prezentacja, 10 slajdów |
 | [`docs/DEMO.md`](DEMO.md) | polski | jury, zespół: lista ujęć, pokaz, notatki do slajdów, przygotowanie, pytania |
 | [`docs/demo/README.md`](demo/README.md) | polski | zespół: nagrywanie filmu demo jednym poleceniem |
-| `docs/WYNIKI.md` (w przygotowaniu) | polski | jury: pomiary na laboratorium 70 hostów |
+| [`docs/WYNIKI.md`](WYNIKI.md) | polski | jury: pomiary na laboratorium 70 hostów |
 | [`docs/WDROZENIE.md`](WDROZENIE.md) | polski | administrator |
 | [`docs/BEZPIECZENSTWO.md`](BEZPIECZENSTWO.md) | polski | jury, administrator, zespół bezpieczeństwa |
 | [`docs/ALGORYTMY.md`](ALGORYTMY.md) | polski | jury, opiekunowie kodu |
@@ -32,7 +33,7 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 
 **[demo/](demo/README.md): film.** `record.mjs` nagrywa film z prawdziwego interfejsu (Playwright, każda klatka z Chromium, cięcie w ffmpeg), z napisami i tekstem lektora z kodami czasu; `record.sh` robi to jednym poleceniem.
 
-**WYNIKI.md: wyniki (w przygotowaniu).** Precyzja i czułość wykrycia hostów, usług i technologii na laboratorium 70 hostów, czas skanu /16. Pisze zespół dokładności.
+**WYNIKI.md: wyniki.** Precyzja i czułość wykrycia hostów, usług i technologii na laboratorium 70 hostów, tempo zmierzone na przewodzie, czas skanu /16, czas uruchomienia, szablon organizatorów.
 
 **[WDROZENIE.md](WDROZENIE.md): wdrożenie.** Wymagania, start przez `docker compose`, wszystkie zmienne `CZUJKA_*`, pierwsze logowanie, konta, kopia zapasowa i odtwarzanie, rotacja klucza, aktualizacja, dołączanie skanera do sieci, rozwiązywanie problemów. Polecenia zostały wykonane; miejsca niesprawdzone są oznaczone.
 
@@ -46,7 +47,7 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 
 **[REGULY.md](REGULY.md): reguły ekspozycji.** „Powierzchnia ataku jako kod”: pola reguły, warunki, asercje, walidator, próba na sucho, cykl życia naruszeń, pakiet startowy 14 reguł. Rozdział 10: sygnatura z przykładu.
 
-**[INTEGRACJE.md](INTEGRACJE.md): integracje.** Import wyników (nmap XML, JSON, CSV) z tabelą nazw kolumn, eksport, sprawdzenie w obie strony. Pasywne źródła danych: pliki, odwrotny DNS, crt.sh. DefectDojo: ustawienia, mapowanie pól, eksport bez duplikatów. Lokalne laboratorium DefectDojo i narzędzie `dojoprobe`.
+**[INTEGRACJE.md](INTEGRACJE.md): integracje.** Import wyników (nmap XML, JSON, CSV) z tabelą nazw kolumn, eksport, sprawdzenie w obie strony. Pasywne źródła danych: pliki, odwrotny DNS, crt.sh. DefectDojo: ustawienia, mapowanie pól, eksport bez duplikatów. Lokalne laboratorium DefectDojo i narzędzie `dojoprobe`. Webhook alertów po każdym przebiegu opisuje `docs/API.md` („Alert webhook”).
 
 **[ARCHITECTURE.md](ARCHITECTURE.md): architektura i kontrakt (po angielsku).** Kryteria oceny przełożone na decyzje projektowe, schemat komponentów, przepływ danych jednego przebiegu, lista pakietów, opis algorytmów, ochrona danych, role, konwencje. Dokument powstał przed kodem jako kontrakt dla zespołu; tam, gdzie różni się od kodu, obowiązuje kod i `ZGODNOSC.md`.
 
@@ -81,6 +82,5 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 
 ## Czego brakuje w dokumentacji
 
-- `docs/WYNIKI.md`: pomiary trafności (w przygotowaniu).
 - Instrukcja użytkownika interfejsu ekran po ekranie.
 - Polska wersja `ARCHITECTURE.md` i `API.md`.

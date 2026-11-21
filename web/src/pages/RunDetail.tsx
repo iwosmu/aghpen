@@ -16,7 +16,8 @@ import { AddressMap } from '../viz/AddressMap';
 import { PacketCount, ProgressBar, RateGauge } from '../viz/charts';
 import { useCan } from '../session';
 import { RunStory } from '../ui/RunStory';
-import { RunPasses } from '../ui/RunPasses';
+import { PartialNote, RunPasses } from '../ui/RunPasses';
+import { useArrivalOrder } from '../ui/arrivalOrder';
 import { ResponseCell, SelfTag } from '../ui/serviceBits';
 
 /** A run over this many addresses or fewer is a "one machine" run: the page shows its services instead of the address map. */
@@ -24,9 +25,12 @@ export const SMALL_RUN = 4;
 
 /** The services of one run, as they arrive (polled while the run is live). */
 function RunServices({ run, live }: { run: ScanRun; live: boolean }) {
-  const q = useItem<Page<Service>>('/services', { run_id: run.id, limit: 500 }, { refetchInterval: live ? 3000 : false });
-  // Open services first, then the ones that are gone now; by address and port.
-  const items = [...(q.data?.items ?? [])].sort((a, b) => Number(a.state !== 'open') - Number(b.state !== 'open') || a.ip.localeCompare(b.ip, undefined, { numeric: true }) || a.port - b.port);
+  const q = useItem<Page<Service>>('/services', { run_id: run.id, limit: 500 }, { refetchInterval: live ? 1500 : false }); // one small run: cheap to poll often
+  // While the run is live, rows keep their arrival order: a service of the
+  // first pass never moves when a later pass adds more. When the run is over:
+  // open services first, then the ones that are gone now; by address and port.
+  const byAddr = (a: Service, b: Service) => a.ip.localeCompare(b.ip, undefined, { numeric: true }) || a.port - b.port;
+  const { rows: items, fresh } = useArrivalOrder('run-services-' + run.id, q.data?.items ?? [], live, byAddr, (a, b) => Number(a.state !== 'open') - Number(b.state !== 'open') || byAddr(a, b));
   const hosts = [...new Set(items.map((s) => s.host_id))];
   const anyTime = items.some((s) => s.response_ms !== undefined);
   return (
@@ -40,18 +44,18 @@ function RunServices({ run, live }: { run: ScanRun; live: boolean }) {
             <thead><tr className="border-b border-rule-strong text-left text-xs text-ink-3">
               {hosts.length > 1 ? <th className="h-[30px] px-3 font-medium">IP</th> : null}
               <th className="h-[30px] px-3 font-medium">{t('Port', 'Port')}</th>
-              <th className="px-3 font-medium" title={t('Stan usługi dziś, po najnowszym skanie', 'The state of the service today, after the latest scan')}>{t('Stan dziś', 'State now')}</th>
+              <th className="px-3 font-medium" title={live ? t('Port otwarty w tym przebiegu; zniknięcia pokażą się po końcu skanu', 'Port open in this run; gone services show when the scan ends') : t('Stan usługi dziś, po najnowszym skanie', 'The state of the service today, after the latest scan')}>{live ? t('Stan', 'State') : t('Stan dziś', 'State now')}</th>
               <th className="px-3 font-medium">{t('Usługa', 'Service')}</th>
               <th className="px-3 font-medium">{t('Produkt', 'Product')}</th>
               <th className="hidden px-3 font-medium md:table-cell">{t('Tytuł strony', 'Page title')}</th>
               {anyTime ? <th className="px-3 text-right font-medium">{t('Czas odpowiedzi', 'Response time')}</th> : null}
             </tr></thead>
             <tbody>
-              {items.map((s, i) => (
-                <tr key={s.id} className="border-b border-rule last:border-b-0" style={live && i === items.length - 1 ? { animation: 'rise-in 240ms var(--ease-out-expo)' } : undefined}>
+              {items.map((s) => (
+                <tr key={s.id} className="border-b border-rule last:border-b-0" style={fresh.has(s.id) ? { animation: 'rise-in 240ms var(--ease-out-expo)' } : undefined}>
                   {hosts.length > 1 ? <td className="mono h-[30px] whitespace-nowrap px-3">{s.ip}</td> : null}
                   <td className="h-[30px] whitespace-nowrap px-3"><Link to={'/services/' + s.id} className="mono link">{s.port}/{s.proto}</Link></td>
-                  <td className="whitespace-nowrap px-3"><ServiceStateMark state={s.state} /></td>
+                  <td className="whitespace-nowrap px-3"><ServiceStateMark state={live ? 'open' : s.state} /></td>
                   <td className="whitespace-nowrap px-3">{serviceName(s)}{isSelf(s) ? <SelfTag /> : null}</td>
                   <td className="whitespace-nowrap px-3 text-ink-2">{[s.product, s.version].filter(Boolean).join(' ') || '–'}</td>
                   <td className="hidden max-w-[320px] truncate px-3 text-ink-2 md:table-cell">{s.title || '–'}</td>
@@ -242,6 +246,7 @@ export default function RunDetail() {
             </div>
             <div className="mt-2"><ProgressBar value={s.addresses_done} max={s.addresses_total} active={isLive ? runningAddrs : 0} label={t('Postęp skanu', 'Scan progress')} /></div>
             <RunPasses passes={s.passes} className="mt-1.5" />
+            <PartialNote run={run} className="mt-2" />
             {run.status === 'running' && runningChunks > 0 ? (
               <p className="mt-1.5 flex items-center gap-2 text-xs text-ink-2" data-testid="run-phase">
                 <span className="bar-active inline-block h-1.5 w-4" aria-hidden="true" />
@@ -342,7 +347,7 @@ export default function RunDetail() {
                   ['plus', 'new', t('nowe hosty', 'new hosts'), run.summary.hosts_new], ['plus', 'new', t('nowe usługi', 'new services'), run.summary.services_new], ['back', 'new', t('hosty wróciły', 'hosts back'), run.summary.hosts_back], ['returned', 'new', t('usługi wróciły', 'services back'), run.summary.services_returned ?? 0], ['slow', 'changed', t('wolniejsze odpowiedzi', 'slower responses'), run.summary.responses_slower ?? 0],
                   ['minus', 'gone', t('hosty nieaktywne', 'hosts inactive'), run.summary.hosts_gone], ['minus', 'gone', t('usługi zniknęły', 'services gone'), run.summary.services_gone], ['wave', 'unstable', t('hosty niestabilne', 'hosts unstable'), run.summary.hosts_unstable],
                   ['delta', 'changed', t('zmienione usługi', 'changed services'), run.summary.services_changed], ['dot', 'accent', t('nowe znaleziska', 'new findings'), run.summary.findings_new],
-                  ['ring', 'changed', t('hosty bez odpowiedzi', 'hosts missing'), run.summary.hosts_missing ?? 0], ['ring', 'expected', t('usługi nieosiągalne', 'services unreachable'), run.summary.services_unreachable ?? 0],
+                  ['half', 'changed', t('hosty nie odpowiadają (niepotwierdzone)', 'hosts not answering (unconfirmed)'), run.summary.hosts_missing ?? 0], ['half', 'changed', t('usługi nie odpowiadają (niepotwierdzone)', 'services not answering (unconfirmed)'), run.summary.services_unreachable ?? 0],
                 ] as const).map(([g, tone, label, n]) => (
                   <div key={label} className="flex items-center justify-between gap-2 border-b border-rule py-1.5">
                     <dt className="flex items-center gap-1.5 text-sm text-ink-2"><Glyph name={g} tone={n ? tone : 'expected'} />{label}</dt>

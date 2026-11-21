@@ -18,6 +18,7 @@ import (
 	"github.com/iwosmu/aghpen/internal/sigsuggest"
 	"github.com/iwosmu/aghpen/internal/sigwire"
 	"github.com/iwosmu/aghpen/internal/store"
+	"github.com/iwosmu/aghpen/internal/webhook"
 	"github.com/iwosmu/aghpen/web"
 )
 
@@ -68,6 +69,8 @@ func Build(cfg config.Config, st *store.Store, log *slog.Logger) *Wiring {
 	an.Auto = dojo
 	pol := rules.New(st, log)
 	an.Policy = pol
+	alert := &webhook.Notifier{St: st, Log: log}
+	an.Notify = alert
 	sugg := sigsuggest.New(st, log)
 	ic := Interchange{st: st}
 	w := &Wiring{
@@ -103,6 +106,7 @@ func Build(cfg config.Config, st *store.Store, log *slog.Logger) *Wiring {
 			ProfileChanged:    enginewire.ProfileChanged(st, log),
 		},
 	}
+	w.API.Routes = append(w.API.Routes, func(r chi.Router, can api.Guard) { alert.Register(r, webhook.Middleware(can)) })
 	if web.Embedded {
 		w.API.WebFS = web.FS()
 	}

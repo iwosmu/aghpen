@@ -192,9 +192,10 @@ Wszystkie stałe są w `stability.go` i `diff.go`, każda z komentarzem. Zmiana 
 
 ### 2.9 Ponowne sondowanie sterowane modelem
 
-Pakiet `internal/reprobe` dopytuje hosty, o których model wie za mało. Szczegóły tras są w `docs/API-time.md`.
+Pakiet `internal/reprobe` dopytuje hosty, o których model wie za mało. Mechanizm jest włączony od pierwszego startu. Trasy: [`docs/API.md`](API.md) (`/reprobe/plan`, `/settings/reprobe`).
 
 - **Potwierdzenie.** Host dostał `host_missing` (status `unstable`, wcześniej odpowiadał). Czujka sprawdza go ponownie 10, 30 i 90 minut po pierwszym braku odpowiedzi (`backoff_minutes`). Seria starsza niż ostatni krok plus 12 godzin nie jest już potwierdzana.
+- **Szybkie potwierdzenie młodego hosta.** Host z mniej niż 8 obserwacjami (`MinObsForExpected`, rytm jeszcze nieznany) jest sprawdzany 1, 3 i 10 minut po pierwszym braku (`reprobe.YoungBackoffMinutes`). Dla hosta widzianego raz model zgłasza nieaktywność po drugim braku z rzędu (`p_alive` 0,36, potem 0,19 < 0,2). Pierwsza sonda potwierdzająca daje więc `host_gone` i `service_gone` po około 1–2 minutach od drugiego skanu: krok wynosi 1 minutę od pierwszego braku, a wykonawca (`reprobe.Executor`) sprawdza plan raz na minutę, potem sonda sama trwa kilkanaście sekund (zmierzone w maszynie jury: 105–110 s od skanu do `host_gone`). Test: `TestVanishedHostInTwoScans` (`internal/wire`, prawdziwa baza).
 - **Prawdopodobnie aktywny.** Host niestabilny jest sprawdzany 5 minut po początku najbliższej godziny, w której model daje częstość odpowiedzi co najmniej `likely_up_rate` (domyślnie 0,6). Warunek: co najmniej 8 obserwacji i prawdziwa odpowiedź w tym samym typie dnia (dzień roboczy albo weekend, godzina ±1).
 - **Bezpieczeństwo.** Sondy działają tylko w oknach skanowania profilu (`sched.NextAllowed`) i pod polityką bezpieczeństwa: wykluczenia, limity pakietów i HTTP, wyłącznik awaryjny. Budżet to 200 adresów na godzinę (`budget_per_hour`), liczony razem dla wszystkich sond z ostatniej godziny. Nadmiar przechodzi na następną godzinę. Sonda sprawdza najwyżej 32 znane porty hosta.
 - Wykonawca startuje co minutę. Zbiera należne sondy w jeden przebieg na profil (`trigger = reprobe`) i nie startuje nowego, dopóki poprzedni trwa.
@@ -227,6 +228,8 @@ Każda zmiana silnika przechodzi przez `e2e/lab-gate.sh` (pełny /16 laboratoriu
 **Szybka ścieżka.** Grupa z co najwyżej 32 otwartymi portami TCP (wszystkie hosty razem) nie czeka na wykrywanie wersji całej grupy. Dla każdego portu działa osobny proces `nmap -sV` (najwyżej 8 naraz), a obok niego etap HTTP. Wykrywanie wersji każdego portu trwa do końca (limit 3 min jak na zwykłej ścieżce, liczony od startu procesu tego portu, nie od wejścia do kolejki; Prometheus potrzebuje 66 s, bo nmap rozpoznaje go dopiero późną sondą FourOhFourRequest), także gdy port już odpowiedział na GET. Dzięki temu wynik końcowy ma produkt i wersję z nmap i nie zależy od tego, który etap skończył się pierwszy: dwa skany niezmienionej usługi dają ten sam zestaw technologii. Wcześniejsza wersja przerywała `-sV` po odpowiedzi HTTP i traciła 17 z 32 wersji usług w laboratorium. Gdy żadna sonda nmap nie pasuje, nmap podaje nazwę z tablicy portów (`method="table"`, np. `ibm-db2` dla 50000); jeśli port odpowiedział na GET, nazwę daje odpowiedź HTTP. Wersję brokera AMQP (port 5672 albo port nazwany `amqp` w tablicy portów nmap) czytamy z ramki `Connection.Start` po 8-bajtowym nagłówku protokołu, gdy nmap nie nazwał portu w ciągu 3 s: nmap dochodzi do swojej sondy AMQP dopiero po 22 s (szczegóły w `BEZPIECZENSTWO.md`). Pomiar na jednym hoście z 7 usługami (nginx, Apache, RabbitMQ AMQP i panel, Gitea, PostgreSQL, OpenSSH): `nmap -sV` na porcie Gitea (3000) trwa 42 s przy każdej intensywności 0–9, bo nmap najpierw wysyła sondy przypisane do portu 3000, a Gitea na nie nie odpowiada (5 s oczekiwania na każdą). Kolektor HTTP rozpoznaje Gitea w mniej niż 1 s. Etap HTTP pomija porty protokołów, które nigdy nie mówią HTTP (ssh, postgresql, amqp, mysql, redis ...), chyba że mają tunel TLS. Druga runda ścieżek sygnatur nie pobiera ponownie strony głównej.
 
 **Pełny zakres portów.** Zakres do 256 adresów z profilem z listą rankingową (`top-N`) albo z `1-65535` dostaje drugi przebieg: reszta zakresu 1-65535 dla żywych hostów, najwyżej 16 w całym przebiegu. Skan reszty zaczyna się zaraz po skanie portów z listy, obok opisu tych portów, z 90 % szybkości grupy. Pozostałe 10 % zostaje dla wykrywania wersji. Jawna lista portów (`80,443,8080`) jest skanowana tak, jak ją zapisano. Oba przebiegi respektują `allowed_ports` i `denied_ports` polityki. Gdy reszta zakresu nie skończy się (limit czasu nmap), host dostaje `ports_unknown`: usługi spoza listy nie znikają. Gdy aktywnych hostów jest więcej niż 16, grupa, która nie mieści się w limicie, dostaje tylko porty z profilu. Przebieg `full_range` podaje wtedy `hosts_skipped`, a przebieg dostaje notatkę (`RunStats.notes`, np. „pełny zakres portów (1-65535) objął 16 z 23 aktywnych hostów; pozostałe: porty z profilu").
+
+**Pokrycie portów hosta.** Wynik końcowy każdego hosta niesie pokrycie (`HostResult.Coverage`): porty z listy profilu, plus reszta zakresu albo porty 1-10000 (host gęsty), gdy ten przebieg skończył się dla tego hosta, plus porty UDP. Baza oznacza jako zniknętą tylko usługę na porcie z pokrycia, a analiza zgłasza dokładnie te usługi jako `service_gone`. Usługa na porcie spoza pokrycia (pełny zakres pominięty: ponad 16 hostów, stop, limit czasu) zachowuje stan. Przebieg dostaje kopię jej ostatniej obserwacji z flagą `carried`: widok przebiegu dalej ją pokazuje, następny przebieg porównuje się z nią, nie powstaje żadna zmiana, a seria czasów odpowiedzi pomija kopie. Zmiana stanu w bazie zawsze ma swój wiersz zmiany. Widok usług przebiegu (`run_id`) i maszyna czasu oznaczają taką usługę polem `carried`; eksport przebiegu też (JSON `carried`, kolumna CSV `carried`, w nmap XML `reason="czujka-not-scanned"`), a import ją pomija. Licznik `services_open` przebiegu liczy tylko usługi widziane w tym przebiegu; raport podaje obok liczbę usług nieskanowanych i oznacza ich wiersze „nie skanowana w tym przebiegu”. `services_open` maszyny czasu to stan inwentarza po przebiegu, z usługami przeniesionymi. Przykład z szablonu organizatorów: port 8787 spoza listy znajduje tylko pełny zakres; po `quickstart change` kolejny skan profilem domyślnym zgłasza „Usługa …:8787 zniknęła”, po `quickstart up` „wróciła”. Test: `TestFullRangeOnlyPortGoneAndBack` (`internal/wire`, prawdziwa baza).
 
 **Wyniki częściowe.** Na szybkiej ścieżce opisane usługi trafiają do bazy co 2 s, zanim przebieg się skończy. Wynik częściowy ma `ports_unknown`, więc baza nie oznacza żadnej innej usługi hosta jako zniknętej. Liczniki `services_open` i `http_services` rosną od razu; wynik końcowy zastępuje w nich częściowy. Porównanie z poprzednim przebiegiem, ustalenia i reguły powstają raz, na końcu przebiegu.
 
@@ -307,15 +310,15 @@ Jury robi co najmniej dwa przebiegi i może zatrzymać kontener między nimi. Ho
 
 | Profil | Przebieg 1 | Przebieg 2 | Zmiany po przebiegu 2 | Liczniki |
 | --- | --- | --- | --- | --- |
-| `down_after_misses = 0` (model) | host i 3 usługi | brak odpowiedzi | `host_missing` (średnia) | `hosts_missing 1`, `services_unreachable 3` |
+| `down_after_misses = 0` (model) | host i 3 usługi | brak odpowiedzi | `host_missing` (średnia) + 3 × `service_unreachable` (niska); po sondzie potwierdzającej (1 min) `host_gone` + 3 × `service_gone` | `hosts_missing 1`, `services_unreachable 3` |
 | `down_after_misses = 1` | host i 3 usługi | brak odpowiedzi | `host_gone` + 3 × `service_gone` | `hosts_gone 1`, `services_gone 3` |
-| `down_after_misses = 2` | host i 3 usługi | brak odpowiedzi | `host_missing`; `host_gone` po trzecim przebiegu | `hosts_missing 1` |
+| `down_after_misses = 2` | host i 3 usługi | brak odpowiedzi | `host_missing` + 3 × `service_unreachable`; `host_gone` po sondzie potwierdzającej | `hosts_missing 1` |
 
 Zdania z testu `TestTwoPassMissingHost` (`go test ./internal/analyze -run TwoPass -v`):
 
 ```text
 jedna wcześniejsza obserwacja, model:
-  Host 10.66.3.17 nie odpowiedział w tym przebiegu (w poprzednim aktywny, 3 otwarte usługi); model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku
+  Host 10.66.3.17 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 3 otwarte usługi: 22/tcp ssh OpenSSH, 80/tcp http nginx, 8080/tcp http Jenkins; model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku
 40 obserwacji, zawsze odpowiadał, model:
   … model: p_alive 0,26, zgłoszenie nieaktywności po kolejnym braku
 reguła N = 1:
@@ -326,7 +329,7 @@ reguła N = 2:
 
 Bez reguły model zgłasza nieaktywność po drugim braku z rzędu: jeden brak nigdy nie wystarcza (`ε = 0,10`, rozdz. 2.3). Liczby `p_alive` i „po kolejnym braku" trafiają do zdania, gdy wywołujący wypełni migawkę przez `HostSnapshot.SetAssessment`. Brak, który tłumaczy rytm hosta, zostaje zmianą oczekiwaną (`host_gone` z `expected = true`), nie `host_missing`.
 
-Raport z przebiegu mówi to w zdaniu wstępnym: „Bez odpowiedzi w tym przebiegu: 1 host (2 usługi bez potwierdzenia); to jeszcze nie jest zgłoszenie nieaktywności." Wiersz zmiany stoi w sekcji „Co zniknęło".
+Każda otwarta usługa takiego hosta dostaje zmianę `service_unreachable` („Usługa … nie odpowiada (niepotwierdzone)”): drugi skan pokazuje, co zniknęło razem z hostem, zanim sonda potwierdzi stan. Raport z przebiegu mówi to w zdaniu wstępnym: „Nie odpowiada (niepotwierdzone): 1 host, z nimi 2 usługi. Ponowne sondowanie potwierdzi, czy wróciły, czy zniknęły.” Wiersze stoją w sekcji „Co zniknęło”.
 
 ## 4. Pewność identyfikacji technologii
 

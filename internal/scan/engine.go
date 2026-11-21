@@ -119,6 +119,9 @@ type run struct {
 	hostSem  chan struct{}
 	paths    []string
 	udpPorts []int // allow-listed UDP ports to probe; empty: no UDP stage
+	// covered holds, per host IP, the extra TCP ports a finished dense or
+	// full-range pass scanned (*probe.PortSet); see coverage.
+	covered sync.Map
 
 	hostnames map[string][]string
 	hints     map[string]model.HostHint
@@ -493,6 +496,9 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 	if status != model.ChunkDeferred {
 		// hosts first, then the chunk state: a chunk marked done has its results stored
 		for _, h := range gs.hosts {
+			if h.Up && !h.PortsUnknown && !h.Interim {
+				h.Coverage = r.coverage(h.IP)
+			}
 			if err := r.sink.OnHost(r.sinkCtx, h); err != nil {
 				r.log.Warn("sink OnHost failed", "ip", h.IP, "error", err.Error())
 				r.stats.update(func(s *model.RunStats) { s.Errors++ })

@@ -42,7 +42,7 @@ func (s *Store) ServiceHistories(ctx context.Context, runID int64, serviceIDs []
 				WHERE ho.host_id = s.host_id AND ho.up AND ho.run_id > lo.run_id AND ho.run_id < $2 AND `+finishedScan+`) END AS runs_away,
 			COALESCE((SELECT array_agg(x.v ORDER BY x.at, x.id) FROM (SELECT * FROM (SELECT DISTINCT ON (o.run_id) o.id, o.at, `+responseExpr+` AS v
 				FROM service_observations o JOIN host_observations ho ON ho.host_id = o.host_id AND ho.run_id = o.run_id
-				WHERE o.service_id = s.id AND o.run_id < $2 AND o.state = 'open' AND `+finishedScan+` ORDER BY o.run_id, o.at DESC, o.id DESC) r
+				WHERE o.service_id = s.id AND o.run_id < $2 AND o.state = 'open' AND NOT COALESCE((o.result->>'carried')::boolean, false) AND `+finishedScan+` ORDER BY o.run_id, o.at DESC, o.id DESC) r
 				ORDER BY r.at DESC, r.id DESC LIMIT $3) x), '{}') AS response
 			FROM services s
 			LEFT JOIN LATERAL (SELECT o.run_id, o.at FROM service_observations o WHERE o.service_id = s.id AND o.run_id < $2 AND o.state = 'open'
@@ -74,7 +74,7 @@ func (s *Store) ResponseSeries(ctx context.Context, serviceID int64, limit int) 
 	out := []ResponsePoint{}
 	err := eachJSON(ctx, s.db, wrapJSON(`SELECT * FROM (SELECT * FROM (SELECT DISTINCT ON (o.run_id) o.run_id, o.at, `+responseExpr+` AS ms FROM service_observations o
 		JOIN host_observations ho ON ho.host_id = o.host_id AND ho.run_id = o.run_id
-		WHERE o.service_id = $1 AND o.state = 'open' AND `+finishedScan+` ORDER BY o.run_id, o.at DESC, o.id DESC) r ORDER BY r.at DESC LIMIT $2) x ORDER BY x.at, x.run_id`), []any{serviceID, limit},
+		WHERE o.service_id = $1 AND o.state = 'open' AND NOT COALESCE((o.result->>'carried')::boolean, false) AND `+finishedScan+` ORDER BY o.run_id, o.at DESC, o.id DESC) r ORDER BY r.at DESC LIMIT $2) x ORDER BY x.at, x.run_id`), []any{serviceID, limit},
 		func(p *ResponsePoint) error {
 			out = append(out, *p)
 			return nil

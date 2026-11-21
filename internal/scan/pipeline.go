@@ -819,8 +819,73 @@ func (r *run) densePass(ctx context.Context, g *group, scanned map[string]*probe
 		scanned[h.IP] = &cp
 		added += len(h.Ports)
 	}
+	timedOut := map[string]bool{}
+	for _, h := range res.Hosts {
+		if h.TimedOut {
+			timedOut[h.IP] = true
+		}
+	}
+	for _, ip := range dense {
+		if !timedOut[ip] {
+			r.cover(ip, rest)
+		}
+	}
 	r.log.Info("wide port pass for dense hosts", "group", g.id, "hosts", len(dense), "ports", rest.Count(), "new_open", added)
 	return nil
+}
+
+// cover records that a finished pass scanned the ports of extra on host ip.
+func (r *run) cover(ip string, extra *probe.PortSet) {
+	set := &probe.PortSet{}
+	if v, ok := r.covered.Load(ip); ok {
+		*set = *v.(*probe.PortSet)
+	}
+	for _, p := range extra.List() {
+		set.Add(p)
+	}
+	r.covered.Store(ip, set)
+}
+
+// coverage is what the run scanned on host ip: the profile's ports, the
+// ports of a dense or full-range pass that finished for the host, and the
+// UDP ports of the UDP stage. Nil when the port list is unknown.
+func (r *run) coverage(ip string) *model.PortCoverage {
+	if r.ports == nil {
+		return nil
+	}
+	set := *r.ports
+	if v, ok := r.covered.Load(ip); ok {
+		for _, p := range v.(*probe.PortSet).List() {
+			set.Add(p)
+		}
+	}
+	c := &model.PortCoverage{TCP: portRanges(&set), UDP: []model.PortRange{}}
+	udp := append([]int(nil), r.udpPorts...)
+	sort.Ints(udp)
+	for _, p := range udp {
+		if n := len(c.UDP); n > 0 && c.UDP[n-1].Hi == p-1 {
+			c.UDP[n-1].Hi = p
+		} else {
+			c.UDP = append(c.UDP, model.PortRange{Lo: p, Hi: p})
+		}
+	}
+	return c
+}
+
+// portRanges turns a port set into sorted inclusive ranges.
+func portRanges(s *probe.PortSet) []model.PortRange {
+	out := []model.PortRange{}
+	for p := 1; p <= 65535; p++ {
+		if !s.Has(p) {
+			continue
+		}
+		if n := len(out); n > 0 && out[n-1].Hi == p-1 {
+			out[n-1].Hi = p
+		} else {
+			out = append(out, model.PortRange{Lo: p, Hi: p})
+		}
+	}
+	return out
 }
 
 // A small run (few open TCP ports in the group) takes the quick path:
@@ -1184,6 +1249,7 @@ func (r *run) claimFullRange(hosts []probe.Host, scanned map[string]*probe.Host)
 
 // fullScan is the outcome of the full-range port scan.
 type fullScan struct {
+	rest  *probe.PortSet // the ports of the pass
 	res   *probe.Result
 	err   error
 	ports int
@@ -1214,7 +1280,7 @@ func (r *run) fullRangeScan(ctx context.Context, g *group, up []probe.Host, rate
 	endPass()
 	end()
 	r.account(gs, ps, t0)
-	return fullScan{res: ps, err: err, ports: rest.Count(), start: t0}
+	return fullScan{rest: rest, res: ps, err: err, ports: rest.Count(), start: t0}
 }
 
 // fullRangeFinish describes the new open ports of the full-range scan and
@@ -1243,6 +1309,17 @@ func (r *run) fullRangeFinish(ctx context.Context, g *group, up []probe.Host, re
 		}
 		r.stats.warn("Pełny zakres portów nie został przeskanowany (błąd nmap). Usługi spoza listy portów profilu są w tym przebiegu nieznane.")
 		return nil
+	}
+	timedOut := map[string]bool{}
+	for _, h := range ps.Hosts {
+		if h.TimedOut {
+			timedOut[h.IP] = true
+		}
+	}
+	for _, ip := range ips {
+		if !timedOut[ip] && fs.rest != nil {
+			r.cover(ip, fs.rest) // every port of 1-65535 the policy allows was scanned on this host
+		}
 	}
 	var more []probe.Host
 	for _, h := range ps.Hosts {

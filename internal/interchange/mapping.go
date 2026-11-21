@@ -54,6 +54,8 @@ const (
 	FReason      Field = "reason"
 	FConfidence  Field = "confidence"
 	FObservedAt  Field = "observed_at"
+	// FCarried: the run did not scan this port; the row repeats an earlier observation.
+	FCarried Field = "carried"
 )
 
 // FieldMapping is the one table that maps column names (CSV) and keys (flat
@@ -100,6 +102,7 @@ var FieldMapping = []struct {
 	{FReason, []string{"reason", "host_reason"}},
 	{FConfidence, []string{"confidence", "conf"}},
 	{FObservedAt, []string{"observed_at", "timestamp", "time", "date", "datetime", "scan_time", "scanned_at", "last_seen", "seen_at", "czas", "data"}},
+	{FCarried, []string{"carried", "not_scanned"}},
 }
 
 var fieldByName = func() map[string]Field {

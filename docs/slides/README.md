@@ -24,4 +24,4 @@ Skrypt wypisuje liczbę słów każdego slajdu i kończy się kodem 1, gdy na kt
 
 Slajd to jeden obraz z podpisem. Szczegóły, które nie mieszczą się w limicie, są w notatkach do slajdów (`docs/DEMO.md` rozdział 2) i w `docs/ZGODNOSC.md`. Źródło każdej liczby jest w komentarzu HTML przy slajdzie, nigdy na slajdzie.
 
-Dwa miejsca oznaczone `DO UZUPEŁNIENIA` czekają na pomiary: slajd 3, czas przebiegu /16 na obecnym silniku (w podpisie, klasa `slotin`), i slajd 10, precyzja (klasa `slotnum`). Wpisz liczbę w miejsce `?`, usuń znacznik i zbuduj ponownie.
+Jedno miejsce oznaczone `DO UZUPEŁNIENIA` czeka na pomiar: slajd 3, czas przebiegu /16 na silniku po zamrożeniu (w podpisie, klasa `slotin`). Liczba pochodzi z `docs/WYNIKI.md`. Wpisz ją w miejsce `?`, usuń znacznik i zbuduj ponownie. Precyzja na slajdzie 10 jest już wpisana (klasa `slotnum` zostaje w stylach).

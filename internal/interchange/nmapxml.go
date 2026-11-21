@@ -214,7 +214,7 @@ func convertNmapHost(x *xHost, runStart time.Time, opts Options) (model.HostResu
 		svc := model.ServiceResult{
 			Port: port, Proto: firstNonEmpty(p.Protocol, "tcp"), State: firstNonEmpty(p.State.State, "open"),
 			Name: p.Service.Name, Product: p.Service.Product, Version: p.Service.Version, ExtraInfo: p.Service.ExtraInfo,
-			Tunnel: p.Service.Tunnel,
+			Tunnel: p.Service.Tunnel, Carried: p.State.Reason == ReasonCarried,
 		}
 		for _, c := range p.Service.CPE {
 			if c = strings.TrimSpace(c); c != "" {
@@ -384,7 +384,7 @@ func (x *xmlWriter) WriteHost(h model.HostResult) error {
 	for i := range h.Services {
 		s := &h.Services[i]
 		fmt.Fprintf(w, "\n<port protocol=%s portid=\"%d\"><state state=%s reason=\"%s\" reason_ttl=\"0\"/>",
-			attr(firstNonEmpty(s.Proto, "tcp")), s.Port, attr(firstNonEmpty(s.State, "open")), portReason(s.State))
+			attr(firstNonEmpty(s.Proto, "tcp")), s.Port, attr(firstNonEmpty(s.State, "open")), portReason(s.State, s.Carried))
 		if s.Name != "" || s.Product != "" {
 			fmt.Fprintf(w, "<service name=%s", attr(firstNonEmpty(s.Name, "unknown")))
 			for _, kv := range [][2]string{{"product", s.Product}, {"version", s.Version}, {"extrainfo", s.ExtraInfo}, {"tunnel", s.Tunnel}} {
@@ -431,7 +431,14 @@ func (x *xmlWriter) WriteHost(h model.HostResult) error {
 	return w.Flush()
 }
 
-func portReason(state string) string {
+// ReasonCarried is the nmap XML port reason of a service the run did not
+// scan: its state and data repeat an earlier observation.
+const ReasonCarried = "czujka-not-scanned"
+
+func portReason(state string, carried bool) string {
+	if carried {
+		return ReasonCarried
+	}
 	switch state {
 	case "closed":
 		return "conn-refused"

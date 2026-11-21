@@ -27,6 +27,7 @@ Uwagi:
 - Kolektor HTTP łączy się zawsze z adresem IP ze skanu. Nazwa hosta trafia tylko do nagłówka `Host` i SNI (test `TestHostnameIsHostHeaderAndStaysOnTheIP`).
 - Kolektor nie odrzuca niepoprawnych certyfikatów (`InsecureSkipVerify`). To celowe: wygasły albo samopodpisany certyfikat jest informacją. Kolektor nie wysyła przy tym żadnych danych.
 - Każde żądanie ma nagłówek `User-Agent: Czujka/1.0 (attack surface inventory; safe detection only)`. Administrator badanego hosta widzi, kto pyta. Wartość ustawia polityka.
+- **Integracje to nie skanowanie.** Webhook alertów (`POST` z podsumowaniem przebiegu) i eksport do DefectDojo idą tylko na adresy, które administrator wpisał w ustawieniach integracji (uprawnienie `integrations:manage`). Nie trafiają do badanych celów. Reguła „tylko GET i HEAD” dotyczy celów skanowania i się nie zmienia. Webhook: jedna próba, limit 10 s, bez ponowień, bez podążania za przekierowaniem, wynik w dzienniku audytu (`integration.webhook.send`). Adres i klucz HMAC są zaszyfrowane w `settings.secret`.
 
 ### 1.2 Limity tempa i miejsce egzekwowania
 
@@ -176,7 +177,7 @@ AES-256-GCM w schemacie kopertowym (`internal/crypto`):
 
 | Kolumna | Zawartość |
 | --- | --- |
-| `settings.secret` | klucz API DefectDojo; wartość kontrolna klucza głównego |
+| `settings.secret` | klucz API DefectDojo; adres i klucz HMAC webhooka; wartość kontrolna klucza głównego |
 | `service_observations.secret` | wartości ciasteczek, fragment treści odpowiedzi, fragmenty odpowiedzi ze ścieżek sygnatur |
 | `findings.evidence_enc` | dowody obserwacji |
 | `findings.note_enc` | notatka analityka do obserwacji |
@@ -262,7 +263,7 @@ Uprawnienia sprawdza API. Interfejs tylko ukrywa to, czego użytkownik nie może
 | `signatures:update` | edycja sygnatur | ✓ | ✓ | ✓ | – |
 | `signatures:delete` | usuwanie sygnatur | ✓ | ✓ | – | – |
 | `export:run` | eksport danych, wysyłka do DefectDojo | ✓ | ✓ | ✓ | – |
-| `integrations:manage` | ustawienia integracji | ✓ | – | – | – |
+| `integrations:manage` | ustawienia integracji (DefectDojo, webhook, źródła pasywne) | ✓ | – | – | – |
 | `safety:manage` | polityka bezpieczeństwa, zwolnienie blokady | ✓ | – | – | – |
 | `safety:stop` | awaryjne zatrzymanie | ✓ | ✓ | ✓ | – |
 | `users:manage` | użytkownicy | ✓ | – | – | – |
