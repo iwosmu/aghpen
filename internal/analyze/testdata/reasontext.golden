@@ -1,0 +1,70 @@
+signature +38
+  pl: Sygnatura: Adminer
+admin-panel +30
+  pl: Panel administracyjny dostępny z sieci
+database +25
+  pl: Baza danych dostępna z sieci: http
+rare-tech +10
+  pl: Rzadka technologia w tej sieci: 1 z 87 usług
+scope-criticality +10
+  pl: Krytyczny zakres (5/5)
+login-plain-http +25
+  pl: Logowanie bez szyfrowania (HTTP)
+missing-security-headers +5
+  pl: Strona logowania bez nagłówków bezpieczeństwa: brak Content-Security-Policy / X-Frame-Options
+scope-criticality +5
+  pl: Krytyczny zakres: 4/5
+staging +20
+  pl: Środowisko testowe
+debug-page +25
+  pl: Strona diagnostyczna lub tryb debug
+iot +20
+  pl: Urządzenie IoT
+dev-tool +20
+  pl: Narzędzie deweloperskie
+database +25
+  pl: Baza danych dostępna z sieci: MariaDB 11.4.13
+database +25
+  pl: Baza danych dostępna z sieci: redis
+remote-access-plaintext +25
+  pl: Zdalny dostęp bez szyfrowania: telnet
+remote-desktop +20
+  pl: Zdalny pulpit: ms-wbt-server
+remote-access +5
+  pl: Usługa zdalnego dostępu
+expired-cert +15
+  pl: Przeterminowany certyfikat TLS: ważny do 2026-11-20
+cert-expiring +5
+  pl: Certyfikat TLS wkrótce wygaśnie: za 5 dni
+cert-expiring +5
+  pl: Certyfikat TLS wkrótce wygaśnie: za 1 dzień
+self-signed-cert +10
+  pl: Samopodpisany certyfikat TLS
+hostname-mismatch +5
+  pl: Certyfikat TLS nie pasuje do nazwy hosta
+login +10
+  pl: Strona logowania
+missing-security-headers +5
+  pl: Strona logowania bez nagłówków bezpieczeństwa: brak Content-Security-Policy / X-Frame-Options, Strict-Transport-Security
+signature +18
+  pl: Sygnatura: Wersja oprogramowania w X-Powered-By
+sensitive-header +2
+  pl: Nagłówek ujawnia szczegóły oprogramowania: X-Powered-By, Server
+interesting-cookie +5
+  pl: Ciasteczko sesyjne bez flag bezpieczeństwa: JSESSIONID, auth_token
+signature +5
+  pl: Sygnatura: Ciasteczko sesji Laravel
+directory-listing +15
+  pl: Listing katalogu
+default-page +5
+  pl: Strona domyślna serwera
+new-exposure +15
+  pl: Nowa ekspozycja
+new-exposure +15
+  pl: Nowa ekspozycja
+signature +40
+  pl: Sygnatura: Symfony – profiler i pasek debugowania
+debug-page +25
+  pl: Strona diagnostyczna lub tryb debug
+outdated +10
+  pl: Przestarzała wersja oprogramowania: Stopka ACME 3.1

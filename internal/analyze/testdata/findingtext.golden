@@ -1,0 +1,100 @@
+admin-panel
+  pl.title: Panel administracyjny: Adminer (10.66.3.17:8083)
+  pl.desc:  Pod tym adresem odpowiada panel administracyjny. Sprawdź, czy musi być dostępny z tej sieci.
+  pl.evidence: title=Adminer | title=Adminer | url:http://x/=HTTP 200
+login-plain-http
+  pl.title: Logowanie bez szyfrowania (HTTP): Zaloguj się (10.66.3.17:8084)
+  pl.desc:  Strona logowania działa bez TLS. Hasło można podsłuchać w sieci.
+  pl.evidence: title=Zaloguj się | url:http://x/=HTTP 200
+staging
+  pl.title: Środowisko testowe: Sklep [staging] (10.66.3.17:8086)
+  pl.desc:  Usługa wygląda na środowisko testowe. Sprawdź, czy musi być dostępna z tej sieci.
+  pl.evidence: title=Sklep [staging] | url:http://x/=HTTP 200
+debug-page
+  pl.title: Strona diagnostyczna lub tryb debug: phpinfo() (10.66.3.17:8087)
+  pl.desc:  Strona może ujawniać konfigurację i ścieżki aplikacji.
+  pl.evidence: title=phpinfo() | title=phpinfo() | url:http://x/=HTTP 200
+iot-device
+  pl.title: Urządzenie IoT: Kamera IP (10.66.3.17:8088)
+  pl.desc:  Pod tym adresem odpowiada urządzenie IoT. Sprawdź, czy jego interfejs musi być dostępny z tej sieci.
+  pl.evidence: title=Kamera IP | url:http://x/=HTTP 200
+dev-tool
+  pl.title: Narzędzie deweloperskie: Gitea (10.66.3.17:8089)
+  pl.desc:  Pod tym adresem odpowiada narzędzie deweloperskie. Takie narzędzia mają dostęp do kodu i sekretów.
+  pl.evidence: title=Gitea | url:http://x/=HTTP 200
+database-exposed
+  pl.title: Baza danych dostępna z sieci: MariaDB 11.4.13 (10.66.3.17:3306)
+  pl.desc:  Port bazy danych przyjmuje połączenia z sieci, z której wykonano skan.
+  pl.evidence: port:3306/tcp=MariaDB 11.4.13
+database-exposed
+  pl.title: Baza danych dostępna z sieci: redis (10.66.3.17:6379)
+  pl.desc:  Port bazy danych przyjmuje połączenia z sieci, z której wykonano skan.
+  pl.evidence: port:6379/tcp=redis
+remote-access-exposed
+  pl.title: Usługa zdalnego dostępu: telnet (10.66.3.17:23)
+  pl.desc:  Usługa zdalnego dostępu przyjmuje połączenia z sieci, z której wykonano skan.
+  pl.evidence: port:23/tcp=telnet
+remote-access-exposed
+  pl.title: Usługa zdalnego dostępu: ms-wbt-server (10.66.3.17:3389)
+  pl.desc:  Usługa zdalnego dostępu przyjmuje połączenia z sieci, z której wykonano skan.
+  pl.evidence: port:3389/tcp=ms-wbt-server
+remote-access-exposed
+  pl.title: Usługa zdalnego dostępu: OpenSSH 9.6 (10.66.3.17:22)
+  pl.desc:  Usługa zdalnego dostępu przyjmuje połączenia z sieci, z której wykonano skan.
+  pl.evidence: port:22/tcp=OpenSSH 9.6
+expired-cert
+  pl.title: Przeterminowany certyfikat TLS: portal.example (10.66.3.17:8443)
+  pl.desc:  Certyfikat TLS stracił ważność 2026-11-20.
+  pl.evidence: tls:certificate=CN=portal.example; wystawca=R3; ważny do 2026-11-20; sha256=abcdef0123456789…
+cert-expiring
+  pl.title: Certyfikat TLS wkrótce wygaśnie: portal.example (10.66.3.17:8444)
+  pl.desc:  Certyfikat TLS wygasa 2026-11-26 (za 5 dni).
+  pl.evidence: tls:certificate=CN=portal.example; wystawca=R3; ważny do 2026-11-26; sha256=abcdef0123456789…
+cert-expiring
+  pl.title: Certyfikat TLS wkrótce wygaśnie: portal.example (10.66.3.17:8445)
+  pl.desc:  Certyfikat TLS wygasa 2026-11-22 (za 1 dzień).
+  pl.evidence: tls:certificate=CN=portal.example; wystawca=R3; ważny do 2026-11-22; sha256=abcdef0123456789…
+self-signed-cert
+  pl.title: Samopodpisany certyfikat TLS: portal.example (10.66.3.17:8446)
+  pl.desc:  Certyfikat TLS jest samopodpisany. Klient nie może sprawdzić tożsamości serwera.
+  pl.evidence: tls:certificate=CN=portal.example; wystawca=R3; ważny do 2027-12-26; sha256=abcdef0123456789…
+hostname-mismatch
+  pl.title: Certyfikat TLS nie pasuje do nazwy hosta: portal.example (10.66.3.17:8447)
+  pl.desc:  Nazwa w certyfikacie (CN, SAN) nie pasuje do nazwy, pod którą usługa odpowiada: other.example, www.other.example.
+  pl.evidence: tls:certificate=CN=portal.example; wystawca=R3; ważny do 2027-12-26; sha256=abcdef0123456789…
+interesting-header
+  pl.title: Nagłówki HTTP: X-Powered-By, Server; Wersja oprogramowania w X-Powered-By (10.66.3.17:8081)
+  pl.desc:  Server: nginx/1.24.0; X-Powered-By: PHP/7.4.3
+  pl.evidence: header:X-Powered-By=PHP/7.4.3 | header:Server=nginx/1.24.0
+interesting-cookie
+  pl.title: Ciasteczka: JSESSIONID, auth_token, wordpress_logged_in; Ciasteczko sesji Laravel (10.66.3.17:8082)
+  pl.desc:  Ciasteczka wskazują technologię albo są sesyjne bez flag Secure i HttpOnly. laravel_session
+  pl.evidence: cookie:JSESSIONID=wskazuje technologię Java; brak flagi HttpOnly; brak flagi Secure | cookie:auth_token=brak flagi HttpOnly; brak flagi Secure; wartość wygląda na token JWT | cookie:wordpress_logged_in=wskazuje technologię WordPress | cookie:laravel_session=laravel_session
+directory-listing
+  pl.title: Listing katalogu: Index of /backup (10.66.3.17:8090)
+  pl.desc:  Serwer pokazuje listę plików katalogu. Listing może ujawniać kopie zapasowe i pliki konfiguracyjne.
+  pl.evidence: title=Index of /backup | url:http://x/=HTTP 200
+default-page
+  pl.title: Strona domyślna serwera: Welcome to nginx! (10.66.3.17:8091)
+  pl.desc:  Serwer pokazuje stronę domyślną. To zwykle zapomniana lub nieskonfigurowana instalacja.
+  pl.evidence: title=Welcome to nginx! | url:http://x/=HTTP 200
+new-exposure
+  pl.title: Nowa ekspozycja: Nowa (10.66.3.17:8092)
+  pl.desc:  Usługa nie była widoczna w poprzednich skanach. Sprawdź, czy jej wystawienie jest zamierzone.
+  pl.evidence: title=Nowa | url:http://x/=HTTP 200
+new-exposure
+  pl.title: Nowa ekspozycja: port 9999 (10.66.3.17:9999)
+  pl.desc:  Usługa nie była widoczna w poprzednich skanach. Sprawdź, czy jej wystawienie jest zamierzone.
+  pl.evidence: 
+debug-page
+  pl.title: Strona diagnostyczna lub tryb debug: x (10.66.3.17:8085)
+  pl.desc:  Strona może ujawniać konfigurację i ścieżki aplikacji.
+  pl.evidence: header:X-Debug-Token=a1b2c3 | title=x | url:http://x/=HTTP 200
+signature
+  pl.title: Dopasowanie sygnatury: Stopka ACME 3.1 (10.66.3.17:8085)
+  pl.desc:  Sygnatura „acme-footer” pasuje do tej usługi (pewność 80%).
+  pl.evidence: body=Powered by ACME 3.1
+signature
+  pl.title: Dopasowanie sygnatury: Symfony – profiler i pasek debugowania (10.66.3.17:8085)
+  pl.desc:  Sygnatura „symfony-profiler” pasuje do tej usługi (pewność 90%).
+  pl.evidence: header:X-Debug-Token=a1b2c3
