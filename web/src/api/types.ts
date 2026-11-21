@@ -104,6 +104,8 @@ export interface RunStats {
   addresses_total: number; addresses_done: number; chunks_total: number; chunks_done: number;
   hosts_up: number; services_open: number; http_services: number; packets_sent: number; http_requests: number;
   current_pps: number; avg_pps: number; elapsed_sec: number; eta_sec: number; retried: number; errors: number;
+  /** engine sanity checks that failed: the run ended, but its result is not complete (Polish text) */
+  warnings?: string[]; ports_unknown?: number;
 }
 
 export interface RunDiffSummary {
