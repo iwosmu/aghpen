@@ -5,8 +5,9 @@
 #   KEEP=1 ./e2e/engine/run.sh   leave the lab running
 #
 # It creates the lab (lab.sh): network 10.77.0.0/22 with seven hosts, a
-# router to a second network, and an empty /20 for the chunk-size test. It builds scanprobe for linux and runs it in a
-# container that has nmap. Nothing outside these docker networks is scanned.
+# router to a second network, and an empty /20 for the chunk-size test. It
+# builds scanprobe for linux and runs it in a container that has nmap.
+# Nothing outside these docker networks is scanned.
 #
 # Two scanner positions:
 #   l2      the scanner sits in the lab network (10.77.0.2): nmap uses ARP
