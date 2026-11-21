@@ -118,7 +118,12 @@ func (f *fakeNet) PortScan(ctx context.Context, req probe.PortScanRequest) (*pro
 		h.Responded = ok
 		for _, p := range ports {
 			if req.Ports.Has(p) {
-				h.Ports = append(h.Ports, probe.Port{Port: p, Proto: "tcp", State: "open", Reason: "syn-ack", Name: "unknown", Confidence: 0.3})
+				// like nmap: the port table names the well-known ports (method="table")
+				name := map[int]string{22: "ssh", 80: "http", 443: "https"}[p]
+				if name == "" {
+					name = "unknown"
+				}
+				h.Ports = append(h.Ports, probe.Port{Port: p, Proto: "tcp", State: "open", Reason: "syn-ack", Name: name, Confidence: 0.3})
 			}
 		}
 		res.Hosts = append(res.Hosts, h)
@@ -560,7 +565,7 @@ func (f *fakeFP) Fingerprint(_ context.Context, req model.FingerprintRequest) (*
 		h.Paths = append(h.Paths, model.PathProbe{Path: p, Status: 404})
 	}
 	var tl *model.TLSInfo
-	if req.TLSHint {
+	if req.TLSHint || req.NameHint == "https" { // like httpfp's tlsFirst
 		h.Scheme = "https"
 		tl = &model.TLSInfo{SubjectCN: "x"}
 	}
@@ -619,8 +624,10 @@ func TestHTTPAndSignatureStage(t *testing.T) {
 		if !reflect.DeepEqual(r.Paths, []string{"/login", "/admin"}) {
 			t.Errorf("paths must be capped by the policy: %v", r.Paths)
 		}
-		if r.TLSHint != (r.Port == 443) {
-			t.Errorf("TLS hint on %d = %v", r.Port, r.TLSHint)
+		// small run: the HTTP stage runs before version detection, so the
+		// hint is the port table's name ("https"); otherwise nmap's tunnel
+		if hint := r.TLSHint || r.NameHint == "https"; hint != (r.Port == 443) {
+			t.Errorf("TLS hint on %d = %v (%q)", r.Port, r.TLSHint, r.NameHint)
 		}
 	}
 	for _, s := range h.Services {
@@ -890,6 +897,58 @@ func TestNotHTTPSkipsKnownProtocolsOnly(t *testing.T) {
 	} {
 		if got := notHTTP(&c.s); got != c.want {
 			t.Errorf("%+v: %v, want %v", c.s, got, c.want)
+		}
+	}
+}
+
+// slowSV is a network whose version detection hangs on HTTP ports, like
+// nmap's -sV on Gitea (42 s for one port).
+type slowSV struct{ *fakeNet }
+
+func (s slowSV) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*probe.Result, error) {
+	for _, hp := range req.Hosts {
+		for _, p := range hp.Ports {
+			if p == 80 {
+				select {
+				case <-ctx.Done():
+					return nil, context.Cause(ctx)
+				case <-time.After(20 * time.Second):
+				}
+			}
+		}
+	}
+	return s.fakeNet.ServiceScan(ctx, req)
+}
+
+func TestQuickPathHTTPStopsSlowVersionDetection(t *testing.T) {
+	netw := slowSV{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 80}}}}
+	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	plan.Policy.MaxPerHostRPS = 100
+	start := time.Now()
+	sink := newSink()
+	out := e.Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	if d := time.Since(start); d > 10*time.Second {
+		t.Errorf("run took %v: the HTTP answer must stop version detection on port 80", d)
+	}
+	h := sink.host("10.7.0.5")
+	if h == nil || len(h.Services) != 2 {
+		t.Fatalf("host = %+v", h)
+	}
+	for _, s := range h.Services {
+		switch s.Port {
+		case 22:
+			if s.Name != "ssh" || s.Product != "OpenSSH" || s.HTTP != nil {
+				t.Errorf("ssh = %+v", s)
+			}
+		case 80:
+			if s.Name != "http" || s.HTTP == nil {
+				t.Errorf("http = %+v", s)
+			}
 		}
 	}
 }

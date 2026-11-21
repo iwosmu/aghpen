@@ -360,6 +360,10 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 		up = append(up, h)
 	}
 
+	if r.quickEligible(up) {
+		return r.quickHosts(ctx, g, up, attempts, rate, gs, found, unknown)
+	}
+
 	if r.plan.Profile.ServiceDetection {
 		var hp []probe.HostPorts
 		for _, h := range up {
@@ -472,6 +476,15 @@ func toService(p probe.Port) model.ServiceResult {
 // buildHost turns a probed host into a HostResult. For every open TCP port
 // it calls the fingerprinter (HTTP and TLS) and then the signature engine.
 func (r *run) buildHost(ctx context.Context, h probe.Host, attempts int) model.HostResult {
+	res := r.newHostResult(h, attempts)
+	r.httpHost(ctx, &res, nil)
+	r.finishHost(&res)
+	return res
+}
+
+// newHostResult is the host as the port scan (and version detection, when
+// it ran before) saw it, without the HTTP stage.
+func (r *run) newHostResult(h probe.Host, attempts int) model.HostResult {
 	res := model.HostResult{
 		RunID: r.plan.RunID, IP: h.IP, Hostnames: r.names(h.IP), Up: true, Reason: h.Reason, RTTMs: h.RTTMs,
 		Attempts: attempts, MAC: h.MAC, Vendor: h.Vendor, ObservedAt: r.e.now().UTC(),
@@ -485,46 +498,66 @@ func (r *run) buildHost(ctx context.Context, h probe.Host, attempts int) model.H
 	for i, p := range h.Ports {
 		res.Services[i] = toService(p)
 	}
+	return res
+}
 
-	if r.e.deps.Fingerprinter != nil && r.plan.Profile.HTTP.Enabled && len(res.Services) > 0 {
-		// One limiter per host: every request to this address takes a token,
-		// whichever service it goes to.
-		perHost := r.lim.PerHostRPS
-		if d := r.lim.PerHostDelay; d > 0 && 1/d.Seconds() < perHost {
-			perHost = 1 / d.Seconds()
-		}
-		hostLim := probe.NewLimiter(perHost, 1)
-		sem := make(chan struct{}, r.lim.PerHostConc)
-		hostname := ""
-		if len(res.Hostnames) > 0 {
-			hostname = res.Hostnames[0]
-		}
-		var wg sync.WaitGroup
-		for i := range res.Services {
-			svc := &res.Services[i]
-			if svc.Proto != "tcp" || svc.State != "open" {
-				continue
-			}
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				select {
-				case sem <- struct{}{}:
-				case <-ctx.Done():
-					return
-				}
-				defer func() { <-sem }()
-				r.httpStage(ctx, hostLim, &res, svc, hostname)
-			}()
-		}
-		wg.Wait()
+// httpHost runs the HTTP stage on the open TCP services of one host. done,
+// when set, is called after each service's stage.
+func (r *run) httpHost(ctx context.Context, res *model.HostResult, done func(*model.ServiceResult)) {
+	if r.e.deps.Fingerprinter == nil || !r.plan.Profile.HTTP.Enabled || len(res.Services) == 0 {
+		return
 	}
+	// One limiter per host: every request to this address takes a token,
+	// whichever service it goes to.
+	perHost := r.lim.PerHostRPS
+	if d := r.lim.PerHostDelay; d > 0 && 1/d.Seconds() < perHost {
+		perHost = 1 / d.Seconds()
+	}
+	hostLim := probe.NewLimiter(perHost, 1)
+	sem := make(chan struct{}, r.lim.PerHostConc)
+	hostname := ""
+	if len(res.Hostnames) > 0 {
+		hostname = res.Hostnames[0]
+	}
+	var wg sync.WaitGroup
+	for i := range res.Services {
+		svc := &res.Services[i]
+		if svc.Proto != "tcp" || svc.State != "open" {
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+			defer func() { <-sem }()
+			r.httpStage(ctx, hostLim, res, svc, hostname)
+			if done != nil {
+				done(svc)
+			}
+		}()
+	}
+	wg.Wait()
+}
 
+// finishHost names every service and runs the signature engine.
+func (r *run) finishHost(res *model.HostResult) {
 	for i := range res.Services {
 		nameService(&res.Services[i])
 		r.match(&res.Services[i], res.Hostnames)
 	}
-	return res
+}
+
+func containsStr(xs []string, s string) bool {
+	for _, x := range xs {
+		if x == s {
+			return true
+		}
+	}
+	return false
 }
 
 // nameService gives every service a name: nmap's name, else "http" or
@@ -545,15 +578,6 @@ func nameService(s *model.ServiceResult) {
 	default:
 		s.Name = "unknown"
 	}
-}
-
-func containsStr(xs []string, s string) bool {
-	for _, x := range xs {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }
 
 // emitHost counts one host and keeps it until its group ends. A host goes
@@ -673,4 +697,155 @@ func (r *run) densePass(ctx context.Context, g *group, scanned map[string]*probe
 	}
 	r.log.Info("wide port pass for dense hosts", "group", g.id, "hosts", len(dense), "ports", rest.Count(), "new_open", added)
 	return nil
+}
+
+// A small run (few open TCP ports in the group) takes the quick path:
+// version detection runs per port, in parallel with the HTTP stage, and a
+// port that answered HTTP stops its version detection. nmap's -sV is slow on
+// HTTP servers that ignore its non-HTTP probes: Gitea on port 3000 took 42 s
+// for one port (probes listing port 3000 first, 5 s wait each), while the
+// HTTP collector reads it in under a second. Measured on one host with 7
+// ports: 68 s before, mostly -sV (43 s) and then the HTTP stage (24 s).
+const (
+	quickMaxPairs       = 32               // open TCP ports in a group, all hosts together
+	quickServiceTimeout = 30 * time.Second // bound for one port's version detection
+	quickMaxProcs       = 8                // nmap processes at one time on the quick path
+)
+
+func (r *run) quickEligible(up []probe.Host) bool {
+	if !r.plan.Profile.ServiceDetection || r.e.deps.Fingerprinter == nil || !r.plan.Profile.HTTP.Enabled {
+		return false
+	}
+	n := 0
+	for _, h := range up {
+		for _, p := range h.Ports {
+			if p.Proto == "" || p.Proto == "tcp" {
+				n++
+			}
+		}
+	}
+	return n > 0 && n <= quickMaxPairs
+}
+
+func (r *run) quickHosts(ctx context.Context, g *group, up []probe.Host, attempts, rate int, gs *groupStats, found, unknown map[string]bool) error {
+	// UDP runs beside the TCP work on its own copy of the hosts.
+	udpUp := make([]probe.Host, len(up))
+	for i, h := range up {
+		udpUp[i] = probe.Host{IP: h.IP}
+		found[h.IP] = true
+	}
+	udpDone := make(chan error, 1)
+	if len(r.udpPorts) > 0 {
+		go func() { udpDone <- r.udpStage(ctx, g, udpUp, rate, gs) }()
+	} else {
+		udpDone <- nil
+	}
+	procs := make(chan struct{}, quickMaxProcs)
+	share := max(1, rate/quickMaxProcs)
+	results := make([]model.HostResult, len(up))
+	var wg sync.WaitGroup
+	for i, h := range up {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results[i] = r.quickHost(ctx, h, attempts, share, procs, gs, g.v6)
+		}()
+	}
+	wg.Wait()
+	if err := <-udpDone; err != nil {
+		return err
+	}
+	if ctx.Err() != nil {
+		return context.Cause(ctx)
+	}
+	for i := range results {
+		res := results[i]
+		for _, p := range udpUp[i].Ports {
+			s := toService(p)
+			nameService(&s)
+			r.match(&s, res.Hostnames)
+			res.Services = append(res.Services, s)
+		}
+		if unknown[res.IP] {
+			res.PortsUnknown, res.Reason = true, model.ReasonPortsUnknown
+		}
+		r.emitHost(g, gs, res)
+	}
+	return nil
+}
+
+// quickHost runs version detection per open TCP port and the HTTP stage at
+// the same time. A port whose HTTP stage got a page cancels its version
+// detection (the page names it); the others keep nmap's answer, bounded by
+// quickServiceTimeout.
+func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, procs chan struct{}, gs *groupStats, v6 bool) model.HostResult {
+	res := r.newHostResult(h, attempts)
+	cancels := map[int]context.CancelFunc{}
+	var mu sync.Mutex
+	detected := map[int]probe.Port{}
+	var svwg sync.WaitGroup
+	for _, p := range h.Ports {
+		if (p.Proto != "" && p.Proto != "tcp") || p.State != "open" {
+			continue
+		}
+		port := p.Port
+		pctx, cancel := context.WithTimeout(ctx, quickServiceTimeout)
+		cancels[port] = cancel
+		svwg.Add(1)
+		go func() {
+			defer svwg.Done()
+			defer cancel()
+			select {
+			case procs <- struct{}{}:
+			case <-pctx.Done():
+				return
+			}
+			defer func() { <-procs }()
+			t0 := r.e.now()
+			sv, err := r.prober.ServiceScan(pctx, probe.ServiceRequest{
+				Hosts: []probe.HostPorts{{IP: h.IP, Ports: []int{port}}}, Intensity: r.plan.Profile.VersionIntensity,
+				MaxRate: rate, HostTimeout: quickServiceTimeout, IPv6: v6,
+			})
+			r.account(gs, sv, t0)
+			if err != nil || sv == nil || pctx.Err() != nil {
+				return
+			}
+			for _, sh := range sv.Hosts {
+				for _, d := range sh.Ports {
+					if d.Port == port {
+						mu.Lock()
+						detected[port] = d
+						mu.Unlock()
+					}
+				}
+			}
+		}()
+	}
+	r.httpHost(ctx, &res, func(svc *model.ServiceResult) {
+		if svc.HTTP != nil {
+			if c := cancels[svc.Port]; c != nil {
+				c()
+			}
+		}
+	})
+	svwg.Wait()
+	for i := range res.Services {
+		s := &res.Services[i]
+		d, ok := detected[s.Port]
+		if !ok || s.Proto != "tcp" {
+			continue
+		}
+		if d.Name != "" {
+			s.Name = d.Name
+		}
+		s.Product, s.Version, s.ExtraInfo, s.Banner, s.Confidence = d.Product, d.Version, d.ExtraInfo, d.Banner, d.Confidence
+		if d.CPE != nil {
+			s.CPE = d.CPE
+		}
+		if d.Tunnel != "" {
+			s.Tunnel = d.Tunnel
+		}
+	}
+	r.finishHost(&res)
+	return res
 }
