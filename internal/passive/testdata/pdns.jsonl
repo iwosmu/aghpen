@@ -1,0 +1,6 @@
+{"rrname":"ci.kampus.example.","rrtype":"A","rdata":"10.66.3.17","time_first":1761465600,"time_last":1763686800,"count":412,"sensor_id":"dns-1"}
+{"rrname":"lab-nowy.kampus.example.","rrtype":"A","rdata":["10.66.3.200","10.66.3.201"],"time_first":1763600000,"time_last":1763686800,"count":9,"sensor_id":"dns-1"}
+{"rrname":"kampus.example.","rrtype":"NS","rdata":"ns1.kampus.example.","time_first":1761465600,"time_last":1763686800,"count":5000}
+{"rrname":"cdn.kampus.example.","rrtype":"CNAME","rdata":"kampus.cdn.example.net.","time_first":1761465600,"time_last":1763686800,"count":77}
+{"rrname":"obcy.example.org.","rrtype":"A","rdata":"198.51.100.7","time_first":1761465600,"time_last":1763686800,"count":1}
+to nie jest JSON
