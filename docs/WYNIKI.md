@@ -89,11 +89,12 @@ Usługa na porcie, którego dany skan nie objął, zachowuje stan i dostaje znac
 
 Środowisko z `lab/jury/` uruchamiamy razem z Czujką w kontenerze `docker:dind`, żeby skan nie dotykał niczego poza szablonem. Tabela kontroli, czasy każdego stosu i sposób odtworzenia: [`docs/TEST-JURY.md`](TEST-JURY.md), zapis w `e2e/jury/transcript.txt`.
 
-- Cel `localhost`, profil domyślny, żadnej listy portów szablonu: 31 z 31 opublikowanych portów we wszystkich czterech stosach.
+- Cel `localhost`, profil domyślny, żadnej listy portów szablonu: 31 z 31 opublikowanych portów we wszystkich czterech stosach. Pierwsza usługa na liście po 3–8 s, koniec skanu wszystkich 65 535 portów po 88–101 s.
+- 159 kontroli zaliczonych, 0 niezaliczonych. Jedna znana luka: wersja vsftpd na maszynach arm64, gdzie obraz amd64 działa przez emulację.
 - Scenariusz z README organizatorów na profilu domyślnym: po zatrzymaniu usługi na porcie 8787 „Usługa 172.18.0.1:8787 zniknęła (nginx 1.31.9)”, po jej przywróceniu „wróciła po 1 min (nie było jej w 1 skanie)”.
 - Zamiana stosu `custom-network` na `modern`: dwie usługi zgłoszone jako zniknięte, jedna jako nowa.
 - Opóźnienie 500 ms z Toxiproxy: „odpowiada wolniej”, z czasem zwykłym i zmierzonym. Limit czasu 1 s za Traefikiem: zapisany kod HTTP 502 po około 1000 ms.
-- Host zatrzymany między skanami: „nie odpowiada (niepotwierdzone)” z listą jego usług od razu po skanie, „zniknął (potwierdzone)” po 96 s, bez kolejnego skanu.
+- Host zatrzymany między skanami: „nie odpowiada (niepotwierdzone)” z listą jego usług od razu po skanie, „zniknął (potwierdzone)” po 110 s, bez kolejnego skanu.
 - Poza listą szablonu skan pełnego zakresu znalazł port 2375: demon Dockera maszyny testowej bez TLS.
 
 To samo na zwykłej maszynie z Ubuntu 24.04 (świeża kopia repozytorium, szablon organizatorów `quickstart.sh`, sześć portów podanych z nazwy):
