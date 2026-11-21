@@ -259,7 +259,7 @@ export default function TimeMachine() {
         {header}
         <div className="space-y-4 p-4 sm:p-6">
           <Panel title={<span>{t('Skan', 'Scan')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
-            actions={<span className="num text-ink-3">{cur + 1} / {runs.length}{snap.data ? ' · ' + snap.data.took_ms + ' ms' : ''}</span>}>
+            actions={<span className="num text-ink-3">{cur + 1} / {runs.length}</span>}>
             <Scrubber runs={runs} index={cur} onIndex={setIndex} />
           </Panel>
           <Panel title={t('Od tamtej chwili do dziś', 'From then to today')}>
@@ -278,7 +278,7 @@ export default function TimeMachine() {
       {header}
       <div className="space-y-4 p-4 sm:p-6">
         <Panel title={<span>{t('Skan', 'Scan')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
-          actions={<span className="num text-ink-3">{cur + 1} / {runs.length}{snap.data ? ' · ' + snap.data.took_ms + ' ms' : ''}</span>}>
+          actions={<span className="num text-ink-3">{cur + 1} / {runs.length}</span>}>
           <Scrubber runs={runs} index={cur} onIndex={setIndex} />
         </Panel>
         <Panel title={t('Stan w tamtej chwili', 'Status at that moment')}>

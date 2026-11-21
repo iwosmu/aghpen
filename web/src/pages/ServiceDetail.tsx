@@ -15,6 +15,8 @@ import { ServiceHistoryPanel } from './TimeMachine';
 import { ServiceStory, ResponseTimeChart } from '../ui/ServiceStory';
 import { serviceName, isSelf } from '../lib/serviceName';
 import { SelfTag } from '../ui/serviceBits';
+import { shownProduct } from '../lib/shownProduct';
+import { FromSignature } from '../ui/ProductValue';
 
 function Flag({ on, label, bad }: { on: boolean; label: string; bad?: boolean }) {
   return (
@@ -202,6 +204,7 @@ export default function ServiceDetail() {
   const s = q.data;
   const r = s.latest?.result;
   const ov = s.overrides ?? {};
+  const sig = shownProduct(s);
   return (
     <div>
       <PageHeader
@@ -225,11 +228,11 @@ export default function ServiceDetail() {
                 <OverrideNote o={ov.name} canEdit={canEdit} onRevert={() => save.mutate({ name: null })} />
               </KV>
               <KV k={t('Produkt', 'Product')}>
-                <InlineText label={t('Produkt', 'Product')} value={s.product} canEdit={canEdit} placeholder={t('nie rozpoznano', 'not recognised')} onSave={(v) => save.mutate({ product: v })} />
+                <InlineText label={t('Produkt', 'Product')} value={s.product} canEdit={canEdit} placeholder={t('nie rozpoznano', 'not recognised')} display={sig.fromSignature ? <span className="text-ink">{sig.product}<FromSignature /></span> : undefined} onSave={(v) => save.mutate({ product: v })} />
                 <OverrideNote o={ov.product} canEdit={canEdit} onRevert={() => save.mutate({ product: null })} />
               </KV>
               <KV k={t('Wersja', 'Version')}>
-                <InlineText label={t('Wersja', 'Version')} mono value={s.version} canEdit={canEdit} placeholder="–" onSave={(v) => save.mutate({ version: v })} />
+                <InlineText label={t('Wersja', 'Version')} mono value={s.version} canEdit={canEdit} placeholder="–" display={sig.fromSignature && sig.version ? <span className="text-ink">{sig.version}<FromSignature /></span> : undefined} onSave={(v) => save.mutate({ version: v })} />
                 <OverrideNote o={ov.version} canEdit={canEdit} onRevert={() => save.mutate({ version: null })} />
               </KV>
               <KV k={t('Klasy', 'Classes')}>
@@ -250,7 +253,7 @@ export default function ServiceDetail() {
           {r?.tls ? <Panel title={t('Certyfikat TLS', 'TLS certificate')}><TlsPanel c={r.tls} /></Panel> : null}
 
           <ServiceHistoryPanel serviceId={s.id} />
-          <Panel title={t('Historia obserwacji', 'Observation history')} count={obs.data?.total} flush>
+          <Panel title={t('Obserwacje', 'Observations')} count={obs.data?.total} flush>
             {obs.error ? <ErrorState error={obs.error} retry={() => obs.refetch()} /> : !obs.data ? <SkeletonRows rows={4} /> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

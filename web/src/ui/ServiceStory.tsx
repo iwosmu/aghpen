@@ -19,7 +19,7 @@ export function ServiceStory({ s }: { s: Service }) {
   const hasStory = events.some((c) => c.kind !== 'service_new');
   if (!hasStory) return null;
   return (
-    <Panel title={t('Czas odpowiedzi', 'Response time')} flush>
+    <Panel title={t('Historia', 'History')} flush>
       <ol className="divide-y divide-rule" data-testid="service-story">
         <li className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-start gap-x-2 px-3 py-1.5 text-sm">
           <span className="mt-[3px]"><Glyph name="plus" tone="new" /></span>

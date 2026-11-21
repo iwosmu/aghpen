@@ -11,7 +11,7 @@ import { Icon } from '../ui/Icon';
 import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, changeKindInfo, type GlyphName, type Tone } from '../ui/marks';
 import { BarList, ProgressBar, TrendRows } from '../viz/charts';
 import { useSession } from '../session';
-import { RunStory } from '../ui/RunStory';
+import { RunStory, useRunStoryShown } from '../ui/RunStory';
 import { useHostVerdicts } from '../ui/MissingHosts';
 import { PartialNote } from '../ui/RunPasses';
 import { useArrivalOrder } from '../ui/arrivalOrder';
@@ -50,6 +50,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   // services of hosts the confirmation probe has decided about are no longer "not answering"
   const decidedServices = missingItems.filter((c) => c.kind === 'service_unreachable' && verdicts.has(c.host_id)).length;
   const confirmedGone = [...verdicts.values()].filter((v) => v.kind === 'host_gone').length;
+  const storyShown = useRunStoryShown(run?.id);
   if (!run && partial) {
     return (
       <div>
@@ -110,7 +111,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
         </p>
       ) : null}
       {s && !baseline ? <RunStory runId={run.id} className="mt-3 space-y-1" testId="handover-story" /> : null}
-      {s && !baseline && !(quiet && !expected && !unreachable) ? (
+      {s && !baseline && storyShown === false && !(quiet && !expected && !unreachable) ? (
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-0.5 border-t border-rule pt-2.5" data-testid="handover-counts">
           <Count n={s.hosts_new} glyph="plus" tone="new" label={plural(s.hosts_new, ['nowy host', 'nowe hosty', 'nowych hostów'], ['new host', 'new hosts'])} to={'/changes?run_id=' + run.id + '&kind=host_new'} />
           <Count n={s.services_new} glyph="plus" tone="new" label={plural(s.services_new, ['nowa usługa', 'nowe usługi', 'nowych usług'], ['new service', 'new services'])} to={'/changes?run_id=' + run.id + '&kind=service_new'} />
