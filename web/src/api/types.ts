@@ -96,6 +96,13 @@ export interface ScanProfile {
   next_run_at: string | null; last_run_id: number | null; created_at: string; updated_at: string;
 }
 
+/** GET/PUT /settings/webhook. secret is write-only: the server answers secret_set. */
+export interface WebhookSettings {
+  enabled: boolean; url: string; min_severity: 'info' | 'low' | 'medium' | 'high'; secret_set: boolean; ui_url: string;
+}
+/** POST /settings/webhook/test: always 200; status 0 = no answer. */
+export interface WebhookTestResult { ok: boolean; status: number; ms: number; error?: string }
+
 export interface ScanEstimate {
   addresses: number; chunks: number; est_packets: number; est_duration_sec: number; effective_pps: number;
   fits_window: boolean; window_sec: number; based_on_history: boolean; expected_live_rate: number;

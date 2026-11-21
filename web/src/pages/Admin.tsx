@@ -2,8 +2,9 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useAction, useItem, usePage } from '../api/hooks';
 import { ApiError, del, patch, post, put } from '../api/client';
-import type { AuditEntry, DefectDojoSettings, DojoPullResult, DojoScopeMapping, DojoSyncResult, DojoTestResult, Permission, PermissionInfo, Role, SafetyPolicy, Scope, User } from '../api/types';
+import type { WebhookSettings, WebhookTestResult, AuditEntry, DefectDojoSettings, DojoPullResult, DojoScopeMapping, DojoSyncResult, DojoTestResult, Permission, PermissionInfo, Role, SafetyPolicy, Scope, User } from '../api/types';
 import { t, getLang, plural } from '../i18n';
+import { routeMissing } from '../lib/route';
 
 /** The heading of a permission group ("targets" → "Cele"). */
 function permGroupLabel(g: string): string {
@@ -290,6 +291,56 @@ function SafetyTab() {
   );
 }
 
+// ---------- Alert webhook ----------
+const SEV_OPTS = () => [
+  { value: 'info', label: t('informacyjna i wyżej', 'info and above') },
+  { value: 'low', label: t('niska i wyżej', 'low and above') },
+  { value: 'medium', label: t('średnia i wyżej', 'medium and above') },
+  { value: 'high', label: t('tylko wysoka', 'high only') },
+];
+function WebhookPanel() {
+  const q = useItem<WebhookSettings>('/settings/webhook');
+  const [f, setF] = useState<WebhookSettings | null>(null);
+  const [secret, setSecret] = useState('');
+  const [clear, setClear] = useState(false);
+  const [test, setTest] = useState<WebhookTestResult | null>(null);
+  useEffect(() => { if (q.data) setF(q.data); }, [q.data]);
+  const save = useAction(() => put<WebhookSettings>('/settings/webhook', { enabled: f?.enabled, url: f?.url, min_severity: f?.min_severity, ui_url: f?.ui_url ?? '', ...(secret ? { secret } : {}), ...(clear ? { clear_secret: true } : {}) }),
+    { invalidate: ['/settings/webhook', '/audit'], silent: true, success: t('Ustawienia zapisane', 'Settings saved'), onSuccess: () => { setSecret(''); setClear(false); } });
+  const run = useAction(() => post<WebhookTestResult>('/settings/webhook/test', { url: f?.url, ...(secret ? { secret } : {}) }), { silent: true, onSuccess: setTest });
+  if (q.error && routeMissing(q.error)) return null;
+  if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
+  if (!f || !q.data) return <SkeletonRows rows={4} />;
+  const dirty = secret !== '' || clear || JSON.stringify(f) !== JSON.stringify(q.data);
+  return (
+    <Panel title={t('Webhook alertów', 'Alert webhook')} className="mt-4" actions={<Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!dirty} onClick={() => save.mutate(undefined)} data-testid="webhook-save">{t('Zapisz ustawienia', 'Save the settings')}</Button>}>
+      <div data-testid="webhook">
+        <p className="mb-3 max-w-[72ch] text-sm text-ink-2">{t('Po każdym przeanalizowanym skanie Czujka wysyła jedno podsumowanie zmian (Slack, Mattermost albo własny odbiornik).', 'After each analysed scan Czujka sends one summary of the changes (Slack, Mattermost or your own receiver).')}</p>
+        <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label={t('Webhook włączony', 'Webhook enabled')} />
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Field label={t('Adres (URL)', 'Address (URL)')}><input className="field mono" value={f.url} onChange={(e) => { setF({ ...f, url: e.target.value }); setTest(null); }} placeholder="https://hooks.slack.com/services/…" data-testid="webhook-url" /></Field>
+          <Field label={t('Minimalna waga', 'Minimum severity')}><Select value={f.min_severity} onChange={(v) => setF({ ...f, min_severity: v as WebhookSettings['min_severity'] })} options={SEV_OPTS()} /></Field>
+          <Field label={t('Sekret HMAC (opcjonalnie)', 'HMAC secret (optional)')} hint={f.secret_set && !clear ? t('Sekret jest zapisany i zaszyfrowany. Wpisz nowy tylko, aby go zmienić. Podpis w nagłówku X-Czujka-Signature.', 'A secret is stored and encrypted. Type a new one only to replace it. The signature is in the X-Czujka-Signature header.') : t('Bez sekretu wiadomości nie są podpisywane.', 'Without a secret the messages are not signed.')}>
+            <input className="field mono" type="password" autoComplete="off" value={secret} disabled={clear} onChange={(e) => { setSecret(e.target.value); setTest(null); }} placeholder={f.secret_set ? '••••••••••••••••' : ''} data-testid="webhook-secret" />
+          </Field>
+          <Field label={t('Adres Czujki w odnośnikach', 'Czujka address in the links')} hint={t('Puste: adres, z którego zapisano ustawienia.', 'Empty: the address the settings were saved from.')}><input className="field mono" value={f.ui_url} onChange={(e) => setF({ ...f, ui_url: e.target.value })} placeholder={typeof window !== 'undefined' ? window.location.origin : ''} /></Field>
+        </div>
+        {f.secret_set ? <div className="mt-2"><Check checked={clear} onChange={(v) => { setClear(v); if (v) setSecret(''); }} label={t('Usuń zapisany sekret', 'Remove the stored secret')} /></div> : null}
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-rule pt-3">
+          <Button icon="link" busy={run.isPending} disabled={!f.url} onClick={() => run.mutate(undefined)} data-testid="webhook-test-button">{t('Wyślij test', 'Send a test')}</Button>
+          {test ? (
+            <span className="inline-flex items-start gap-2 text-sm" role="status" data-testid="webhook-test">
+              <span className="mt-0.5"><Glyph name={test.ok ? 'check' : 'x'} tone={test.ok ? 'new' : 'gone'} /></span>
+              <span>{test.ok ? t('Odbiornik przyjął test: ', 'The receiver took the test: ') : t('Test nieudany: ', 'The test failed: ')}<span className="mono">{test.status ? 'HTTP ' + test.status : t('brak odpowiedzi', 'no answer')} · {fmtInt(test.ms)} ms</span>{test.error ? <span className="block text-xs text-ink-2">{test.error}</span> : null}</span>
+            </span>
+          ) : <span className="text-xs text-ink-3">{t('Test używa adresu i sekretu z formularza, także niezapisanych.', 'The test uses the address and secret in the form, saved or not.')}</span>}
+        </div>
+        <div className="mt-2"><InlineError error={save.error ?? run.error} /></div>
+      </div>
+    </Panel>
+  );
+}
+
 // ---------- DefectDojo ----------
 function DojoTab() {
   const q = useItem<DefectDojoSettings>('/settings/defectdojo');
@@ -409,6 +460,7 @@ function DojoTab() {
           {sync ? <p className="mt-2 text-sm" data-testid="dojo-sync-result">{t('Zamknięte: ' + sync.closed + ', ponownie otwarte: ' + sync.reopened + ', pominięte: ' + sync.skipped + (count(sync.errors) ? ', błędy: ' + count(sync.errors) : '') + '.', 'Closed: ' + sync.closed + ', reopened: ' + sync.reopened + ', skipped: ' + sync.skipped + (count(sync.errors) ? ', errors: ' + count(sync.errors) : '') + '.')}</p> : null}
         </div>
       </Panel>
+      <WebhookPanel />
     </div>
   );
 }
@@ -421,7 +473,7 @@ export default function Admin() {
     { id: 'roles', label: t('Role i uprawnienia', 'Roles and permissions') },
     can('audit:read') ? { id: 'audit', label: t('Dziennik audytu', 'Audit log') } : null,
     can('scans:read') ? { id: 'safety', label: t('Bezpieczeństwo', 'Safety') } : null,
-    can('integrations:manage') ? { id: 'defectdojo', label: 'DefectDojo' } : null,
+    can('integrations:manage') ? { id: 'defectdojo', label: t('DefectDojo i webhook', 'DefectDojo and webhook') } : null,
   ].filter((x): x is { id: string; label: string } => x !== null);
   const tab = tabs.some((x) => x.id === u.get('tab')) ? u.get('tab') : tabs[0]?.id;
   if (!tab) return <NoAccess />;
