@@ -29,7 +29,8 @@ fi
 
 log "starting the zoo machine $N (docker:28-dind)"
 docker rm -f -v "$N" >/dev/null 2>&1 || true
-docker run -d --name "$N" --privileged -e DOCKER_TLS_CERTDIR= -p "127.0.0.1:$UI:18080" docker:28-dind >/dev/null || exit 1
+# --cpus 3: the zoo machine shares the owner's laptop; keep it from taking every core.
+docker run -d --name "$N" --privileged --cpus "${ZOO_CPUS:-3}" -e DOCKER_TLS_CERTDIR= -p "127.0.0.1:$UI:18080" docker:28-dind >/dev/null || exit 1
 for i in $(seq 1 60); do inner 'docker info >/dev/null 2>&1' && break; sleep 1; done
 inner 'apk add -q --no-cache bash curl jq >/dev/null' || exit 1
 COPYFILE_DISABLE=1 tar --exclude='._*' --exclude='e2e/zoo/out' -c deploy e2e/zoo | docker exec -i "$N" sh -c 'mkdir -p /work && tar -x -C /work'
