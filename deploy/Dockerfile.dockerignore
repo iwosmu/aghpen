@@ -1,0 +1,8 @@
+.git
+bin
+**/node_modules
+web/dist
+deploy/.env
+**/*.key
+docs
+e2e
