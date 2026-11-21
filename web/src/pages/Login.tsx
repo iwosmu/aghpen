@@ -25,7 +25,7 @@ export default function Login() {
     e.preventDefault();
     if (!email || !password) {
       setMissing(true);
-      setError(new Error(t('Wpisz adres e-mail i hasło.', 'Enter the e-mail address and the password.')));
+      setError(new Error(t('Wpisz e-mail i hasło.', 'Enter your e-mail and password.')));
       return;
     }
     setMissing(false);
@@ -39,8 +39,8 @@ export default function Login() {
       const from = (loc.state as { from?: string } | null)?.from;
       navigate(from && from !== '/login' ? from : '/', { replace: true });
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) setError(new Error(t('Nieprawidłowy adres e-mail lub hasło.', 'Wrong e-mail address or password.')));
-      else if (err instanceof ApiError && err.status === 429) setError(new Error(t('Zbyt wiele nieudanych prób. Logowanie jest chwilowo zablokowane, spróbuj ponownie za kilka minut.', 'Too many failed attempts. Sign-in is locked for a while, try again in a few minutes.')));
+      if (err instanceof ApiError && err.status === 401) setError(new Error(t('Błędny e-mail lub hasło.', 'Wrong e-mail or password.')));
+      else if (err instanceof ApiError && err.status === 429) setError(new Error(t('Zbyt wiele nieudanych prób. Spróbuj ponownie za kilka minut.', 'Too many failed attempts. Try again in a few minutes.')));
       else setError(err);
     } finally {
       setBusy(false);
@@ -93,7 +93,7 @@ export default function Login() {
                   ) : expired ? (
                     <p role="status" data-testid="session-expired" className="flex items-start gap-2.5 text-sm text-ink-2">
                       <Icon name="clock" size={14} className="mt-[3px] flex-none text-ink-3" />
-                      {t('Sesja wygasła. Zaloguj się ponownie, a wrócisz do tej samej strony.', 'The session has expired. Sign in again and you return to the same page.')}
+                      {t('Sesja wygasła. Zaloguj się ponownie.', 'Session expired. Sign in again.')}
                     </p>
                   ) : null}
                 </div>
