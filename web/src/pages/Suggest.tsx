@@ -19,11 +19,11 @@ export function SuggestButton({ serviceId }: { serviceId: number }) {
   const go = () => { if (s?.yaml) { sessionStorage.setItem(SUGGEST_KEY, s.yaml); navigate('/signatures/new?suggest=1'); } };
   return (
     <>
-      <Button icon="signatures" onClick={() => { setOpen(true); run.mutate(undefined); }} data-testid="suggest-signature">{t('Zaproponuj sygnaturę', 'Suggest a signature')}</Button>
-      <Dialog open={open} onClose={() => setOpen(false)} width={720} title={t('Sygnatura z przykładu', 'Signature from an example')}
-        footer={<><Button onClick={() => setOpen(false)}>{t('Zamknij', 'Close')}</Button>{s?.ok && s.yaml ? <Button variant="primary" icon="edit" onClick={go}>{t('Otwórz w edytorze', 'Open in the editor')}</Button> : null}</>}>
+      <Button icon="signatures" onClick={() => { setOpen(true); run.mutate(undefined); }} data-testid="suggest-signature">{t('Zaproponuj sygnaturę', 'Suggest signature')}</Button>
+      <Dialog open={open} onClose={() => setOpen(false)} width={720} title={t('Propozycja sygnatury', 'Suggested signature')}
+        footer={<><Button onClick={() => setOpen(false)}>{t('Zamknij', 'Close')}</Button>{s?.ok && s.yaml ? <Button variant="primary" icon="edit" onClick={go}>{t('Otwórz w edytorze', 'Open in editor')}</Button> : null}</>}>
         <div className="space-y-3" data-testid="suggest-result">
-          {run.isPending ? <p className="text-sm text-ink-2">{t('Szukam cech, które odróżniają tę usługę od pozostałych…', 'Looking for features that set this service apart from the others…')}</p> : null}
+          {run.isPending ? <p className="text-sm text-ink-2">{t('Szukanie cech tej usługi…', 'Looking for distinctive features…')}</p> : null}
           {run.error ? (routeMissing(run.error) ? <Unavailable what={t('Propozycje sygnatur wymagają POST /signatures/suggest. Moduł nie jest jeszcze podłączony.', 'Signature suggestions need POST /signatures/suggest. The module is not wired yet.')} /> : <InlineError error={run.error} />) : null}
           {s ? (
             <>
@@ -32,7 +32,7 @@ export function SuggestButton({ serviceId }: { serviceId: number }) {
                 <>
                   {(s.rules ?? []).length ? (
                     <div>
-                      <p className="label mb-1">{t('Dlaczego te reguły', 'Why these rules')}</p>
+                      <p className="label mb-1">{t('Uzasadnienie', 'Reasons')}</p>
                       <ul className="space-y-1 text-sm">{(s.rules ?? []).map((r, i) => <li key={i} className="grid grid-cols-[90px_minmax(0,1fr)] gap-x-2"><span className="mono text-xs text-ink-3">{r.kind}</span><span>{r.explanation}</span></li>)}</ul>
                     </div>
                   ) : null}
