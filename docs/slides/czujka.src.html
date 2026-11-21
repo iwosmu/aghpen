@@ -70,6 +70,8 @@ p { margin: 0; }
 .num { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .slotnum { border: 4px dashed var(--st-changed); border-radius: 2px; padding: 24px 56px 32px; background: rgba(201,133,0,0.05); }
 .slotnum .big { color: var(--st-changed); }
+.slotin { color: var(--st-changed); border: 3px dashed var(--st-changed); border-radius: 2px; padding: 0 16px; font-family: var(--mono); }
+.slotin small { font-size: 24px; letter-spacing: 0.08em; margin-left: 10px; }
 .slotnum .tag { font-family: var(--mono); font-size: 28px; letter-spacing: 0.08em; color: var(--st-changed); margin-bottom: 8px; }
 code.one { font-family: var(--mono); font-size: 72px; color: var(--ink); background: var(--sunk); border: 1px solid var(--rule); border-radius: 2px; padding: 40px 64px; white-space: nowrap; }
 .mark { display: inline-block; vertical-align: -6px; margin-right: 12px; }
@@ -111,15 +113,16 @@ code.one { font-family: var(--mono); font-size: 72px; color: var(--ink); backgro
   <div class="foot">2 / 10</div>
 </section></div>
 
-<!-- 3. Scale. Screenshot: web/screenshots/lab/47-run-completed-pl-dark-1440.png (run #2, lab 10.66.0.0/16): 65 535 addresses, 7 min 24 s,
-     66 hosts up, 71 services, average 1 091 pps under the 2 000 pps policy cap, 256 /24 blocks in 108 work groups. Crop: the address map. -->
+<!-- 3. Scale. Screenshot: web/screenshots/lab/47-run-completed-pl-dark-1440.png (run #2, lab 10.66.0.0/16, before the ARP-first engine).
+     Crop: the address map only. The run time is an open slot: the old 7 min 24 s came from the engine before the change; fill it with the
+     current lab gate run of the /16 (e2e/lab-gate.sh) when the coordinator confirms it. -->
 <div class="frame"><section class="slide" id="s3">
   <h1>Cała sieć /16 w&nbsp;jednym przebiegu.</h1>
   <div class="body">
     <div class="shot" style="--x:237; --y:333; --z:1.12; width:656px; height:600px;">
       <img src="../../web/screenshots/lab/47-run-completed-pl-dark-1440.png" alt="Mapa 256 bloków /24 po pełnym przebiegu">
     </div>
-    <p class="cap">65&nbsp;535 adresów w&nbsp;7&nbsp;min 24&nbsp;s.</p>
+    <p class="cap">65&nbsp;535 adresów w&nbsp;<span class="slotin">?<small>DO UZUPEŁNIENIA</small></span></p>
   </div>
   <div class="foot">3 / 10</div>
 </section></div>
@@ -177,15 +180,15 @@ code.one { font-family: var(--mono); font-size: 72px; color: var(--ink); backgro
   <div class="foot">7 / 10</div>
 </section></div>
 
-<!-- 8. Safety. Emergency stop: the API call took 0.06 s and no nmap process was alive 1 s later (e2e/full/transcript.txt section 17).
-     The packet counts in that transcript are unverified (tcpdump -Q out misses nmap's raw-socket packets): open slot until re-measured.
-     GET and HEAD only: docs/BEZPIECZENSTWO.md §1.1. -->
+<!-- 8. Safety. e2e/full/transcript.txt section 17 (PASS: 100 FAIL: 0, capture by source that sees nmap's raw packets):
+     the stop call took 0.092635 s; no nmap process 1 s later; 5 IP packets after the stop, 0 of them later than 1 s (the last at +0.01 s);
+     the kernel still sent 3 ARP neighbour retries (last at +1.9 s), which are not IP packets. -->
 <div class="frame"><section class="slide" id="s8">
   <h1>Bezpieczny z&nbsp;konstrukcji: tylko GET i&nbsp;HEAD.</h1>
   <div class="body">
     <div class="nums" style="align-items:center;">
-      <div class="num"><span class="big">0,06&nbsp;s</span><span class="biglabel">stop awaryjny</span></div>
-      <div class="num slotnum"><span class="tag">DO UZUPEŁNIENIA</span><span class="big">?</span><span class="biglabel">pakietów po stopie</span></div>
+      <div class="num"><span class="big">0,09&nbsp;s</span><span class="biglabel">stop awaryjny</span></div>
+      <div class="num"><span class="big">0</span><span class="biglabel">pakietów IP po 1&nbsp;s</span></div>
     </div>
   </div>
   <div class="foot">8 / 10</div>
@@ -203,13 +206,13 @@ code.one { font-family: var(--mono); font-size: 72px; color: var(--ink); backgro
   <div class="foot">9 / 10</div>
 </section></div>
 
-<!-- 10. Results. 52/52: e2e/full/transcript.txt ("PASS: 52  FAIL: 0"). 46 s: czujka.dev stack built and healthy on 4 vCPU / 8 GB,
+<!-- 10. Results. 100/100: e2e/full/transcript.txt ("PASS: 100  FAIL: 0", coordinator branch 839012d). 46 s: czujka.dev stack built and healthy on 4 vCPU / 8 GB,
      coordinator measurement 2026-11-21. Precision: open slot until docs/WYNIKI.md. -->
 <div class="frame"><section class="slide" id="s10">
   <h1>Zmierzone. Działa na czujka.dev.</h1>
   <div class="body">
     <div class="nums">
-      <div class="num"><span class="big" style="font-size:160px;">52/52</span><span class="biglabel">kontroli e2e</span></div>
+      <div class="num"><span class="big" style="font-size:160px;">100/100</span><span class="biglabel">kontroli e2e</span></div>
       <div class="num"><span class="big" style="font-size:160px;">46&nbsp;s</span><span class="biglabel">start stosu</span></div>
       <div class="num slotnum"><span class="tag">DO UZUPEŁNIENIA</span><span class="big" style="font-size:160px;">?</span><span class="biglabel">precyzja</span></div>
     </div>
