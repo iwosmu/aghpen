@@ -50,10 +50,10 @@ function Editor({ rule, onSaved }: { rule: ExposureRule | null; onSaved: (r: Exp
       <Panel title={rule ? rule.name : t('Nowa reguła', 'New rule')} actions={editable ? (
         <span className="flex gap-2">
           {rule && !rule.builtin && canDelete ? <Button size="sm" variant="danger" icon="trash" busy={remove.isPending} onClick={() => remove.mutate(undefined)}>{t('Usuń', 'Delete')}</Button> : null}
-          <Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!v?.ok || pending} onClick={() => save.mutate(undefined)}>{t('Zapisz regułę', 'Save the rule')}</Button>
+          <Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!v?.ok || pending} onClick={() => save.mutate(undefined)}>{t('Zapisz regułę', 'Save rule')}</Button>
         </span>
       ) : undefined}>
-        {rule?.builtin ? <p className="mb-2 text-xs text-ink-3">{t('Reguła wbudowana: tekst jest stały, możesz ją tylko włączyć albo wyłączyć. Skopiuj ją do nowej reguły, aby zmienić warunki.', 'A built-in rule: the text is fixed, you can only switch it on or off. Copy it into a new rule to change the conditions.')}</p> : null}
+        {rule?.builtin ? <p className="mb-2 text-xs text-ink-3">{t('Reguła wbudowana. Można ją tylko włączyć albo wyłączyć.', 'Built-in rule. It can only be switched on or off.')}</p> : null}
         <textarea className="field mono min-h-[260px] text-xs leading-5" spellCheck={false} value={yaml} readOnly={!editable} onChange={(e) => setYaml(e.target.value)} data-testid="rule-yaml" aria-label={t('Treść reguły (YAML)', 'Rule text (YAML)')} />
         <div className="mt-2 min-h-[44px]" data-testid="rule-dryrun" aria-live="polite">
           {dry.error ? (routeMissing(dry.error) ? <Unavailable what={t('Walidacja i próba na sucho wymagają POST /rules/dry-run.', 'Validation and the dry run need POST /rules/dry-run.')} /> : <InlineError error={dry.error} />) : null}
@@ -75,7 +75,7 @@ function Editor({ rule, onSaved }: { rule: ExposureRule | null; onSaved: (r: Exp
       </Panel>
       {rule ? (
         <Panel title={t('Bieżące naruszenia', 'Current violations')} count={violations.data?.total} flush>
-          {violations.error ? <ErrorState error={violations.error} retry={() => violations.refetch()} /> : !violations.data ? <SkeletonRows rows={3} /> : violations.data.items.length === 0 ? <p className="px-3 py-3 text-sm text-ink-2 sm:px-4">{t('Ta reguła nie ma teraz naruszeń.', 'This rule has no violation now.')}</p> : (
+          {violations.error ? <ErrorState error={violations.error} retry={() => violations.refetch()} /> : !violations.data ? <SkeletonRows rows={3} /> : violations.data.items.length === 0 ? <p className="px-3 py-3 text-sm text-ink-2 sm:px-4">{t('Brak naruszeń.', 'No violations.')}</p> : (
             <ul className="divide-y divide-rule">
               {violations.data.items.map((f) => (
                 <li key={f.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-1.5 text-sm sm:px-4">
@@ -124,7 +124,7 @@ export default function Rules() {
               </li>
             ))}
           </ul>
-          {items.length === 0 ? <p className="p-4 text-sm text-ink-2">{t('Brak reguł.', 'No rule yet.')}</p> : null}
+          {items.length === 0 ? <p className="p-4 text-sm text-ink-2">{t('Brak reguł.', 'No rules yet.')}</p> : null}
         </Panel>
         <Editor rule={sel === 'new' ? null : one.data ?? rule} onSaved={(r) => u.set({ rule: r ? r.id : null })} />
       </div>
