@@ -854,3 +854,22 @@ func TestDenseHostGetsAWidePortPass(t *testing.T) {
 		t.Fatalf("sparse host = %+v, want only port 22", h)
 	}
 }
+
+func TestNameServiceNeverEmpty(t *testing.T) {
+	for _, c := range []struct {
+		in   model.ServiceResult
+		want string
+	}{
+		{model.ServiceResult{Name: "ssh"}, "ssh"},
+		{model.ServiceResult{Name: "tcpwrapped"}, "tcpwrapped"},
+		{model.ServiceResult{Name: "tcpwrapped", HTTP: &model.HTTPFingerprint{}}, "http"},
+		{model.ServiceResult{}, "unknown"},
+		{model.ServiceResult{Name: "unknown", HTTP: &model.HTTPFingerprint{}}, "http"},
+		{model.ServiceResult{HTTP: &model.HTTPFingerprint{}, Tunnel: "ssl"}, "https"},
+	} {
+		s := c.in
+		if nameService(&s); s.Name != c.want {
+			t.Errorf("%+v: %q, want %q", c.in, s.Name, c.want)
+		}
+	}
+}

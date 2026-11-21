@@ -807,3 +807,39 @@ func TestWaitHookCanStopRequests(t *testing.T) {
 		t.Errorf("a refusing limiter must stop every request: fp=%v hits=%d", fp, hits)
 	}
 }
+
+// A TLS port that answers a plain request with nginx's 400 page and then
+// fails the TLS handshake: no HTTP title from the 400 page, the note says TLS.
+func TestTLSPortWithFailedHandshake(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				buf := make([]byte, 1)
+				if _, err := c.Read(buf); err != nil || buf[0] == 0x16 {
+					return // a TLS ClientHello: close it, like a server without a certificate for this name
+				}
+				body := "<html><head><title>400 The plain HTTP request was sent to HTTPS port</title></head><body>The plain HTTP request was sent to HTTPS port</body></html>"
+				fmt.Fprintf(c, "HTTP/1.1 400 Bad Request\r\nServer: openresty\r\nContent-Type: text/html\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", len(body), body)
+			}(conn)
+		}
+	}()
+	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
+	port, _ := strconv.Atoi(portStr)
+	fp, _, err := New().Fingerprint(context.Background(), model.FingerprintRequest{IP: "127.0.0.1", Port: port, Opts: model.HTTPOpts{TimeoutMs: 2000}})
+	if err != nil || fp == nil {
+		t.Fatalf("fp=%v err=%v", fp, err)
+	}
+	if fp.Title != "" || !strings.Contains(fp.Error, "TLS, handshake failed") {
+		t.Errorf("title %q, note %q", fp.Title, fp.Error)
+	}
+}

@@ -398,6 +398,9 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 				for i := range up {
 					for j, p := range up[i].Ports {
 						if d, ok := detected[up[i].IP][p.Port]; ok {
+							if d.Name == "" {
+								d.Name = p.Name // version detection named nothing: keep the port table's name
+							}
 							up[i].Ports[j] = d
 						}
 					}
@@ -518,9 +521,30 @@ func (r *run) buildHost(ctx context.Context, h probe.Host, attempts int) model.H
 	}
 
 	for i := range res.Services {
+		nameService(&res.Services[i])
 		r.match(&res.Services[i], res.Hostnames)
 	}
 	return res
+}
+
+// nameService gives every service a name: nmap's name, else "http" or
+// "https" when the HTTP stage got an answer, else "unknown" (the UI shows it
+// as "nierozpoznana"). An empty name looked like a broken scan in the list.
+func nameService(s *model.ServiceResult) {
+	// "tcpwrapped" means nmap's probes got the connection closed on them;
+	// when our GET got a page, the service is HTTP (the template's httpbin
+	// on 8888 behind Gunicorn showed as tcpwrapped).
+	if s.Name != "" && s.Name != "unknown" && !(s.Name == "tcpwrapped" && s.HTTP != nil) {
+		return
+	}
+	switch {
+	case s.HTTP != nil && (s.TLS != nil || s.Tunnel == "ssl"):
+		s.Name = "https"
+	case s.HTTP != nil:
+		s.Name = "http"
+	default:
+		s.Name = "unknown"
+	}
 }
 
 func containsStr(xs []string, s string) bool {

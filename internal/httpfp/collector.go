@@ -316,8 +316,12 @@ func (c *Collector) Fingerprint(ctx context.Context, req model.FingerprintReques
 
 	var fp, plainMisdirected *model.HTTPFingerprint
 	var scheme string
+	var tlsErr error
 	for _, sch := range order {
 		got, misdirected, err := s.root(ctx, sch)
+		if sch == "https" && err != nil {
+			tlsErr = err
+		}
 		if ctx.Err() != nil {
 			return nil, s.tlsInfo(), ctx.Err()
 		}
@@ -340,8 +344,19 @@ func (c *Collector) Fingerprint(ctx context.Context, req model.FingerprintReques
 			return nil, s.tlsInfo(), nil
 		}
 	}
-	if fp == nil {
+	if fp == nil && plainMisdirected != nil {
+		// The port speaks TLS (it said so to the plain request), but the
+		// handshake failed: no certificate for this name, a client
+		// certificate required, an old protocol. Say that instead of keeping
+		// the "plain HTTP request was sent to HTTPS port" page as the title
+		// (the template's Nginx Proxy Manager on 443).
 		fp, scheme = plainMisdirected, "http"
+		fp.Title = ""
+		note := "TLS, handshake failed"
+		if tlsErr != nil {
+			note += ": " + shortErr(tlsErr)
+		}
+		fp.Error = strings.TrimPrefix(fp.Error+"; "+note, "; ")
 	}
 	if fp == nil {
 		return nil, s.tlsInfo(), nil
