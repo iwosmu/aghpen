@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"time"
 
 	"github.com/iwosmu/aghpen/internal/auth"
 	"github.com/iwosmu/aghpen/internal/model"
@@ -43,14 +44,36 @@ type TargetParser interface {
 	Excluded(targets []model.Target, exclusions []string) int64
 }
 
-// Importer turns a result file (nmap XML, Czujka JSON, CSV) into host results. Implemented by internal/interchange.
+// Importer turns a result file (nmap XML, Czujka JSON, CSV; auto-detected) into
+// host results. The report carries the format, the invalid rows and the
+// skipped count. Implemented by internal/wire over internal/interchange.
 type Importer interface {
-	ParseResults(filename string, data []byte) (format string, hosts []model.HostResult, invalid []model.InvalidLine, err error)
+	ParseResults(ctx context.Context, filename string, data []byte) (hosts []model.HostResult, report model.ImportReport, err error)
 }
 
-// Exporter writes the results of one run as nmap XML (for the DefectDojo "Nmap Scan" import). Implemented by internal/interchange.
+// ResultWriter streams the host results of one run in an exchange format.
+type ResultWriter interface {
+	WriteHost(h model.HostResult) error
+	Close() error
+}
+
+// Exporter writes the results of one run as "xml" (nmap XML), "json" (Czujka
+// JSON, lossless) or "csv". Files in these formats import again through
+// Importer. Implemented by internal/wire over internal/interchange.
 type Exporter interface {
-	NmapXML(w io.Writer, run model.ScanRun, hosts []model.HostResult) error
+	RunWriter(w io.Writer, format string, run model.ScanRun) (ResultWriter, error)
+}
+
+// DojoUpload is the outcome of the upload of a run's nmap XML to DefectDojo.
+type DojoUpload struct {
+	TestID      int64  `json:"test_id"`
+	TestURL     string `json:"test_url"`
+	Reimport    bool   `json:"reimport"` // the test existed and was updated
+	Created     int    `json:"created"`
+	Closed      int    `json:"closed"`
+	Reactivated int    `json:"reactivated"`
+	Untouched   int    `json:"untouched"`
+	Total       int    `json:"total"`
 }
 
 // DojoLink ties an exported finding to its DefectDojo record.
@@ -64,6 +87,8 @@ type DojoLink struct {
 type DojoClient interface {
 	Test(ctx context.Context, settings model.DefectDojoSettings) (ok bool, message, version string)
 	Export(ctx context.Context, settings model.DefectDojoSettings, findings []model.Finding) (model.DojoExportResult, []DojoLink, error)
+	// UploadNmap sends the nmap XML of one run as an "Nmap Scan" import; the same title re-imports into the same test.
+	UploadNmap(ctx context.Context, settings model.DefectDojoSettings, title string, xml io.Reader, scanDate time.Time) (DojoUpload, error)
 }
 
 // SignatureValidator parses and checks signature YAML. meta holds the fields

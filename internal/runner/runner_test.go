@@ -48,6 +48,8 @@ type fakeEngine struct {
 	outcome  *model.RunOutcome
 	started  chan struct{}
 	runCount atomic.Int32
+	// cancelledAt is when the engine saw its context cancelled (unix nanoseconds).
+	cancelledAt atomic.Int64
 }
 
 func newFake() *fakeEngine {
@@ -81,6 +83,7 @@ func (f *fakeEngine) Run(ctx context.Context, plan model.ScanPlan, sink model.Re
 			select {
 			case <-f.release:
 			case <-ctx.Done():
+				f.cancelledAt.Store(time.Now().UnixNano())
 				c.Status = model.ChunkDeferred
 				_ = sink.OnChunk(ctx, c)
 				return model.RunOutcome{Status: model.RunPaused, Stats: stats}
@@ -307,9 +310,17 @@ func TestEmergencyStop(t *testing.T) {
 	run, _ := e.m.Start(ctx, e.p.ID, nil, "manual")
 	<-e.eng.started
 	waitStatus(t, e.st, run.ID, model.RunRunning)
+	t0 := time.Now()
 	policy, err := e.m.EmergencyStop(ctx)
+	total := time.Since(t0)
 	if err != nil || !policy.EmergencyStop {
 		t.Fatalf("emergency stop: %+v %v", policy, err)
+	}
+	// Traffic must stop at once: the engine context is cancelled before any database work.
+	toCancel := time.Unix(0, e.eng.cancelledAt.Load()).Sub(t0)
+	t.Logf("emergency stop: engine context cancelled after %s, call returned after %s", toCancel, total)
+	if e.eng.cancelledAt.Load() == 0 || toCancel > 100*time.Millisecond || total > time.Second {
+		t.Fatalf("emergency stop is too slow: cancel after %s, return after %s", toCancel, total)
 	}
 	stopped, _ := e.st.GetRun(ctx, run.ID)
 	if stopped.Status != model.RunPaused || stopped.PauseReason != model.PauseEmergency {
@@ -396,6 +407,16 @@ func TestWindowClosedFailureAndNotWired(t *testing.T) {
 	e.m.Wait()
 	if p.PauseReason != model.PauseWindowClosed || p.ResumeAt == nil || !p.ResumeAt.Equal(next) || p.WindowEnd == nil || !e.eng.plans[0].WindowEnd.Equal(end) {
 		t.Fatalf("window pause: %+v", p)
+	}
+	// A run that its window paused is analysed for what it probed so far.
+	e.an.mu.Lock()
+	analysed := len(e.an.runs) == 1 && e.an.runs[0] == run.ID
+	e.an.mu.Unlock()
+	if !analysed || p.Summary == nil || p.Summary.HostsNew != 3 {
+		t.Fatalf("a window-paused run must be analysed: analysed=%v summary=%+v", analysed, p.Summary)
+	}
+	if paused, err := e.st.WindowPausedRuns(ctx); err != nil || len(paused) != 1 || paused[0].ID != run.ID || paused[0].ResumeAt == nil {
+		t.Fatalf("window paused runs: %+v %v", paused, err)
 	}
 	if ids, _ := e.m.ResumeDue(ctx, time.Now()); len(ids) != 0 {
 		t.Fatalf("not due yet: %v", ids)

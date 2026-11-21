@@ -184,8 +184,14 @@ func serve() error {
 		log.Warn("CZUJKA_ADMIN_EMAIL is not set: no administrator is created at start; use 'czujka user create'")
 	}
 
+	if seeded, err := st.SeedDefaults(ctx); err != nil {
+		return fmt.Errorf("seed defaults: %w", err)
+	} else if seeded {
+		log.Info("first start: stored the default safety policy and the default scan profile")
+	}
+
 	bus := runner.NewBus()
-	w := wire(cfg, st, log)
+	w := wire2(cfg, st, log)
 	mgr := runner.New(st, runner.Options{Engine: w.Engine, Analyzer: w.RunAnalyzer, Window: w.Window, Bus: bus, IngestBatch: cfg.IngestBatch, Logger: log})
 	if recovered, err := mgr.Recover(ctx, cfg.AutoResume); err != nil {
 		log.Error("recover interrupted runs", "err", err)

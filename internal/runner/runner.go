@@ -325,11 +325,27 @@ func (m *Manager) execute(ctx context.Context, a *activeRun, p model.ScanProfile
 			a.run.Error = fmt.Sprintf("the engine returned status %q", outcome.Status)
 		}
 	}
-	status := a.run.Status
+	status, reason := a.run.Status, a.run.PauseReason
 	a.mu.Unlock()
 
 	if status != model.RunAnalyzing {
+		partial := status == model.RunPaused && reason == model.PauseWindowClosed && m.opt.Analyzer != nil
+		if partial {
+			// A run that its scan window stopped is analysed for what it probed so
+			// far. The analysis reads only stored observations, so an address the
+			// run did not reach is not a miss. The resumed run is analysed again.
+			if summary, err := m.analyze(bg, run.ID); err != nil {
+				m.log.Error("analysis of a partial run failed", "run", run.ID, "err", err)
+			} else {
+				a.mu.Lock()
+				a.run.Summary = summary
+				a.mu.Unlock()
+			}
+		}
 		m.save(a, EventDone)
+		if partial {
+			m.publishResults(bg, run.ID)
+		}
 		return
 	}
 	m.save(a, EventProgress)
@@ -346,21 +362,23 @@ func (m *Manager) runEngine(ctx context.Context, plan model.ScanPlan, sink model
 	return m.opt.Engine.Run(ctx, plan, sink)
 }
 
+// analyze calls the analysis hook and turns a panic into an error.
+func (m *Manager) analyze(ctx context.Context, runID int64) (summary *model.RunDiffSummary, err error) {
+	if m.opt.Analyzer == nil {
+		return nil, nil
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("analysis panic: %v", r)
+		}
+	}()
+	return m.opt.Analyzer.AnalyzeRun(ctx, runID)
+}
+
 // finish runs the analysis hook and completes the run.
 func (m *Manager) finish(ctx context.Context, a *activeRun, p *model.ScanProfile) {
 	run := a.snapshot()
-	var summary *model.RunDiffSummary
-	var aerr error
-	if m.opt.Analyzer != nil {
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					aerr = fmt.Errorf("analysis panic: %v", r)
-				}
-			}()
-			summary, aerr = m.opt.Analyzer.AnalyzeRun(ctx, run.ID)
-		}()
-	}
+	summary, aerr := m.analyze(ctx, run.ID)
 	end := time.Now().UTC()
 	a.mu.Lock()
 	a.run.Status, a.run.FinishedAt, a.run.Summary = model.RunCompleted, &end, summary
@@ -501,13 +519,23 @@ func (m *Manager) Cancel(ctx context.Context, runID int64) (model.ScanRun, error
 }
 
 // EmergencyStop sets the emergency stop flag and stops every running run. The
-// runs become paused with reason "emergency_stop", so no result is lost and an
-// operator can resume them after the release.
+// context of every engine is cancelled at once, before anything else is
+// awaited, so traffic stops as fast as the engine honours its context. The
+// runs become paused with reason "emergency_stop": no result is lost and an
+// operator can resume them after the release. No analysis runs here.
 func (m *Manager) EmergencyStop(ctx context.Context) (model.SafetyPolicy, error) {
-	policy, err := m.st.SetEmergencyStop(ctx, true)
-	if err != nil {
-		return policy, err
+	// First cancel the engines: this needs no database round trip.
+	m.mu.Lock()
+	for _, a := range m.active {
+		a.mu.Lock()
+		if a.intent == "" {
+			a.intent = "emergency"
+		}
+		a.mu.Unlock()
+		a.cancel()
 	}
+	m.mu.Unlock()
+	policy, err := m.st.SetEmergencyStop(ctx, true)
 	var wg sync.WaitGroup
 	for _, id := range m.ActiveRunIDs() {
 		wg.Add(1)
@@ -517,7 +545,7 @@ func (m *Manager) EmergencyStop(ctx context.Context) (model.SafetyPolicy, error)
 		}(id)
 	}
 	wg.Wait()
-	return policy, nil
+	return policy, err
 }
 
 // ReleaseEmergencyStop clears the emergency stop flag. Paused runs stay paused until someone resumes them.
