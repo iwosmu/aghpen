@@ -106,7 +106,12 @@ rate() {
   echo "$js" | jq -r --arg id "$id" --arg drop "$CAP_DROPPED" '"  run \($id) on the wire (tcpdump, kernel drops \($drop)): nmap raw packets per second max \(.raw_max_per_s), p99 \(.raw_p99_per_s), avg \(.raw_avg_per_s) over \(.seconds) s, top5 \(.raw_top5), seconds over the cap \(.raw_seconds_over_cap); all sent packets max \(.all_max_per_s)/s; totals \(.total | to_entries | map("\(.key)=\(.value)") | join(" "))"'
   checkge "run $id: the capture holds nmap's raw SYN probes (a blind capture must fail)" "$(echo "$js" | jq '.total.raw_syn // 0')" 1000
   check "run $id: tcpdump lost no packet" "$CAP_DROPPED" "0"
-  checkle "run $id: per-second maximum of nmap raw packets on the wire under the cap" "$(echo "$js" | jq .raw_max_per_s)" $MAXPPS
+  # nmap's own packets (paced by the engine at the cap minus an HTTP reserve) stay strictly under the cap.
+  checkle "run $id: per-second maximum of nmap raw packets on the wire strictly under the cap" "$(echo "$js" | jq .raw_max_per_s)" $((MAXPPS - 1))
+  # All sent packets include kernel TCP (ACKs of page bodies during version detection, HTTP):
+  # they may pass the cap by at most ALLTOL percent in a second (the tolerance docs/WYNIKI.md states).
+  echo "  run $id: seconds where all sent packets passed the cap: $(echo "$js" | jq .all_seconds_over_cap) of $(echo "$js" | jq .seconds)"
+  checkle "run $id: per-second maximum of all sent packets within the cap + $ALLTOL%" "$(echo "$js" | jq .all_max_per_s)" $((MAXPPS * (100 + ALLTOL) / 100))
 }
 mem_sampler() { # samples the memory of the Czujka container every 2 s while $TMP/mem.on exists
   touch "$TMP/mem.on"
@@ -142,7 +147,7 @@ hm() { printf "%02d:%02d" $(( ($1 / 60) % 24 )) $(( $1 % 60 )); }
 
 step "0. Preconditions"
 for tool in docker curl jq awk go; do command -v $tool >/dev/null || { echo "missing tool: $tool"; exit 2; }; done
-MAXPPS=800; HTTPRPS=20
+MAXPPS=800; HTTPRPS=20; ALLTOL=10
 PPSBINS="$TMP/ppsbins"; go build -o "$PPSBINS" ./e2e/ppsbins || { echo "cannot build e2e/ppsbins"; exit 2; }
 echo "docker $(docker version --format '{{.Server.Version}}'); scope: $NET $P.0.0/22 (created by this script)"
 
