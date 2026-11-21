@@ -49,6 +49,8 @@ services:
     build:
       context: ./db
     image: czujka-db:17
+    # Always build from this checkout (cached, a few seconds): an image left by an older checkout must not be reused.
+    pull_policy: build
     restart: unless-stopped
     depends_on:
       secrets:
@@ -81,6 +83,7 @@ services:
       args:
         VERSION: ${CZUJKA_VERSION:-dev}
     image: czujka:${CZUJKA_VERSION:-dev}
+    pull_policy: build
     restart: unless-stopped
     depends_on:
       db:

@@ -24,7 +24,7 @@ awk '
   /^    build:/ { skip = 1; next }
   skip && /^      / { next }
   { skip = 0; print }
-' deploy/docker-compose.yml | sed -e "s|image: czujka:\${CZUJKA_VERSION:-dev}|image: czujka:\${CZUJKA_VERSION:-$VERSION}|" > "$OUT/docker-compose.yml"
+' deploy/docker-compose.yml | grep -v 'pull_policy: build' | grep -v 'Always build from this checkout' | sed -e "s|image: czujka:\${CZUJKA_VERSION:-dev}|image: czujka:\${CZUJKA_VERSION:-$VERSION}|" > "$OUT/docker-compose.yml"
 cp deploy/docker-compose.scan-network.yml deploy/init.sh "$OUT/"
 sed -e "s|^CZUJKA_VERSION=.*|CZUJKA_VERSION=$VERSION|" deploy/.env.example > "$OUT/.env.example"
 cat > "$OUT/install.sh" <<'EOF'

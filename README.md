@@ -1,7 +1,7 @@
 # Czujka: skaner, który rozumie czas
 
 ```sh
-git clone <adres repozytorium> czujka && cd czujka
+git clone https://github.com/iwosmu/aghpen.git czujka && cd czujka
 docker compose up -d
 ```
 
@@ -48,7 +48,7 @@ Skanuj tylko sieci, do których masz uprawnienia.
 Szablon `lab/jury` to jedna maszyna z usługami w Dockerze na portach hosta. Czujka działa w kontenerze, więc cel `localhost` (także `127.0.0.1` i `::1`) skanuje hosta dockera (`host.docker.internal`), a nie własny kontener. Podgląd celu pokazuje adres, pod którym cel jest skanowany. Szablon zajmuje port 8080, dlatego Czujka dostaje port 9180.
 
 ```sh
-git clone <adres repozytorium> czujka && cd czujka
+git clone https://github.com/iwosmu/aghpen.git czujka && cd czujka
 CZUJKA_PORT=9180 docker compose up -d
 docker compose logs czujka | grep -A3 "first administrator"
 cd lab/jury && ./quickstart.sh up
