@@ -166,6 +166,10 @@ type SafetyPolicy struct {
 	EmergencyStop   bool      `json:"emergency_stop"`  // when true no run may start and running runs are cancelled
 	UserAgent       string    `json:"user_agent"`      // identifies the scanner to administrators of scanned hosts
 	UpdatedAt       time.Time `json:"updated_at"`
+	// AllowedNetworks are CIDRs. When not empty, every address that Czujka
+	// scans must be inside one of them: a target outside is rejected at
+	// entry and dropped again when the run is planned.
+	AllowedNetworks []string `json:"allowed_networks"`
 }
 
 // ---------- Scan configuration ----------
@@ -348,6 +352,19 @@ type ScanRun struct {
 	Summary     *RunDiffSummary `json:"summary"` // filled after analysis
 	Error       string          `json:"error"`
 	ImportFile  string          `json:"import_file"`
+	Note        string          `json:"note"`             // analyst note, editable with PATCH /runs/{id}
+	Label       string          `json:"label"`            // short analyst label, editable with PATCH /runs/{id}
+	AdHoc       *AdHocScope     `json:"ad_hoc,omitempty"` // set for a run on chosen addresses and ports (trigger reprobe)
+}
+
+// AdHocScope is the scope of a run that scans chosen addresses and ports
+// instead of the targets of a profile, for example a model-driven re-probe.
+// The run uses the rate limits and options of ProfileID.
+type AdHocScope struct {
+	ProfileID int64    `json:"profile_id"`
+	Addresses []string `json:"addresses"` // IPs or CIDRs
+	Ports     string   `json:"ports"`     // nmap port spec; empty: the ports of the profile
+	Reason    string   `json:"reason"`
 }
 
 type ChunkStatus string
@@ -905,6 +922,20 @@ type DefectDojoSettings struct {
 	VerifyTLS       bool   `json:"verify_tls"`
 	AutoExport      bool   `json:"auto_export"` // push new findings after each run
 	MinInterest     int    `json:"min_interest"`
+	// StatusSync runs after each analysed run: it closes in DefectDojo the
+	// exported findings that Czujka resolved, reopens the ones seen again, and
+	// applies the status changes made in DefectDojo (status pull).
+	StatusSync    bool               `json:"status_sync"`
+	ScopeMappings []DojoScopeMapping `json:"scope_mappings"` // per-scope product and engagement
+}
+
+// DojoScopeMapping sends the findings of one scope to its own DefectDojo
+// product and engagement. Empty names fall back to the global ones.
+type DojoScopeMapping struct {
+	ScopeID         int64  `json:"scope_id"`
+	ProductTypeName string `json:"product_type_name"`
+	ProductName     string `json:"product_name"`
+	EngagementName  string `json:"engagement_name"`
 }
 
 type DojoExportResult struct {
@@ -917,13 +948,14 @@ type DojoExportResult struct {
 }
 
 type ImportReport struct {
-	Format   string        `json:"format"` // nmap-xml | czujka-json | csv | targets-csv | targets-json
-	RunID    *int64        `json:"run_id"`
-	Hosts    int           `json:"hosts"`
-	Services int           `json:"services"`
-	Targets  int           `json:"targets"`
-	Skipped  int           `json:"skipped"`
-	Invalid  []InvalidLine `json:"invalid"`
+	Format    string        `json:"format"` // nmap-xml | czujka-json | csv | targets-csv | targets-json
+	RunID     *int64        `json:"run_id"`
+	Hosts     int           `json:"hosts"`
+	Services  int           `json:"services"`
+	Targets   int           `json:"targets"`
+	Skipped   int           `json:"skipped"`
+	Invalid   []InvalidLine `json:"invalid"`
+	HostsDown int           `json:"hosts_down"` // hosts the file reports as down that the analysis uses (known addresses)
 }
 
 // ---------- Dashboard ----------
@@ -977,6 +1009,7 @@ type Headline struct {
 	GoneSinceLastRun int   `json:"gone_since_last_run"`
 	AdminPanels      int   `json:"admin_panels"`
 	StagingEnvs      int   `json:"staging_envs"`
+	HostsMissing     int   `json:"hosts_missing"` // hosts with a host_missing change in the last completed run
 }
 
 // Page is the envelope of every list endpoint.

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/iwosmu/aghpen/internal/model"
+	"github.com/iwosmu/aghpen/internal/probe"
 	"github.com/iwosmu/aghpen/internal/runner"
 	"github.com/iwosmu/aghpen/internal/store"
 )
@@ -123,11 +124,24 @@ func (s *Server) checkProfile(r *http.Request, p *model.ScanProfile) error {
 		return invalid("http.max_redirects must be between 0 and 10")
 	case p.Schedule.IntervalMinutes < 0:
 		return invalid("schedule.interval_minutes must not be negative")
+	case p.UDP.Enabled && strings.ContainsAny(p.UDP.Ports, " ;|&$`'\"\\\n"):
+		return invalid("udp.ports must be an nmap port list")
 	case p.Discovery.Mode != "" && p.Discovery.Mode != model.DiscoveryFast && p.Discovery.Mode != model.DiscoveryBalanced && p.Discovery.Mode != model.DiscoveryThorough:
 		return invalid("discovery.mode must be fast, balanced or thorough")
 	}
 	if strings.ContainsAny(p.Ports, " ;|&$`'\"\\\n") {
 		return invalid("ports must be an nmap port list such as top-100 or 22,80,443,8000-8100")
+	}
+	if p.UDP.Enabled {
+		// The UDP stage probes only the allow-list of harmless protocol queries
+		// (probe.UDPServices); a port outside it is a mistake, not a wish.
+		ports, err := probe.UDPPorts(p.UDP.Ports, policy.AllowedPorts, policy.DeniedPorts)
+		if err != nil {
+			return invalid("udp.ports: %v", err)
+		}
+		if len(ports) == 0 {
+			return invalid("udp.ports leaves no UDP port of the allow-list (53, 123, 137, 161, 500, 1900, 5353)")
+		}
 	}
 	if _, err := time.LoadLocation(p.Schedule.Timezone); err != nil {
 		return invalid("schedule.timezone %q is not an IANA timezone", p.Schedule.Timezone)
@@ -147,7 +161,7 @@ func (s *Server) checkProfile(r *http.Request, p *model.ScanProfile) error {
 	return nil
 }
 
-var profileFields = []string{"name", "description", "scope_ids", "ports", "discovery", "service_detection", "version_intensity", "http", "rate",
+var profileFields = []string{"name", "description", "scope_ids", "ports", "discovery", "service_detection", "version_intensity", "http", "udp", "rate",
 	"chunking", "retry", "schedule", "enabled"}
 
 func (s *Server) createProfile(w http.ResponseWriter, r *http.Request) {
@@ -441,7 +455,7 @@ func newSSE(w http.ResponseWriter) *sse {
 }
 
 func (e *sse) send(event string, data any) error {
-	b, err := json.Marshal(data)
+	b, err := encodeJSON(data)
 	if err != nil {
 		return err
 	}
@@ -481,7 +495,11 @@ func (s *Server) runEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if finished(run.Status) {
-		_ = stream.send(runner.EventDone, run)
+		ev := runner.EventDone
+		if run.Status == model.RunPaused {
+			ev = runner.EventPaused
+		}
+		_ = stream.send(ev, run)
 		return
 	}
 	tick := time.NewTicker(15 * time.Second)
@@ -491,7 +509,7 @@ func (s *Server) runEvents(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case ev := <-events:
-			if err := stream.send(ev.Type, ev.Data); err != nil || ev.Type == runner.EventDone {
+			if err := stream.send(ev.Type, ev.Data); err != nil || ev.Type == runner.EventDone || ev.Type == runner.EventPaused {
 				return
 			}
 		case <-tick.C:

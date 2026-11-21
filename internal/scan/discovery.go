@@ -134,11 +134,12 @@ func (r *run) onLink(g *group) bool {
 // each /24 block where a host answered or a hint exists, in fast mode only
 // the hinted hosts.
 func (r *run) discover(ctx context.Context, g *group, tgts []string, rate int, gs *groupStats) ([]probe.Host, error) {
+	arpOnly := r.disc.ARP && r.prober.Privileged() && r.onLink(g) // ARP answers for the whole segment in one pass
 	pass := func(tg []string, o model.DiscoveryOpts, retries int) ([]probe.Host, error) {
 		t0 := r.e.now()
 		end := r.stats.begin(rate)
 		res, err := r.prober.Discover(ctx, probe.DiscoverRequest{
-			Targets: tg, Opts: o, MaxRate: rate, MaxRetries: retries, HostTimeout: discoveryHostTimeout, IPv6: g.v6,
+			Targets: tg, Opts: o, MaxRate: rate, MaxRetries: retries, HostTimeout: discoveryHostTimeout, IPv6: g.v6, ARPOnly: arpOnly,
 		})
 		end()
 		r.account(gs, res, t0)
@@ -148,8 +149,11 @@ func (r *run) discover(ctx context.Context, g *group, tgts []string, rate int, g
 		return res.Hosts, nil
 	}
 	first, rest, ok := splitDiscovery(r.disc, r.prober.Privileged())
-	arpOnly := r.disc.ARP && r.prober.Privileged() && r.onLink(g) // ARP answers for the whole segment in one pass
-	if r.mode == model.DiscoveryThorough || !ok || g.v6 || arpOnly {
+	if arpOnly {
+		// Two retries: an ARP request costs one small frame per address.
+		return pass(tgts, r.disc, 2)
+	}
+	if r.mode == model.DiscoveryThorough || !ok || g.v6 {
 		return pass(tgts, r.disc, 1)
 	}
 
@@ -198,9 +202,26 @@ func (r *run) discover(ctx context.Context, g *group, tgts []string, rate int, g
 	if err != nil {
 		return nil, err
 	}
-	live = append(live, more...)
+	live = mergeHosts(live, more)
 	sort.SliceStable(live, func(i, j int) bool { return ipLess(live[i].IP, live[j].IP) })
 	return live, nil
+}
+
+// mergeHosts adds the hosts of a later discovery pass that an earlier pass
+// did not report. A prober may answer for an address twice (overlapping
+// specs, a host that answers both probe sets); a duplicate would count the
+// host twice and scan its ports twice.
+func mergeHosts(live, more []probe.Host) []probe.Host {
+	seen := make(map[string]bool, len(live)+len(more))
+	out := live[:0:0]
+	for _, h := range append(live, more...) {
+		if seen[h.IP] {
+			continue
+		}
+		seen[h.IP] = true
+		out = append(out, h)
+	}
+	return out
 }
 
 func ipLess(a, b string) bool {

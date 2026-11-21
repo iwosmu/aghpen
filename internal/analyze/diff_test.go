@@ -80,7 +80,10 @@ func TestDiffHostTransitions(t *testing.T) {
 			[]string{"host_gone(expected)"}, "Host 10.0.0.2 nie odpowiada, zgodnie z profilem dostępności (zwykle aktywny pn–pt 08–16)", model.SevInfo},
 		{"expected back", ptr(host("10.0.0.2", model.HostExpectedOffline)), host("10.0.0.2", model.HostUp),
 			[]string{"host_back(expected)"}, "zgodnie z profilem", model.SevInfo},
-		{"unstable to up is silent", ptr(host("10.0.0.2", model.HostUnstable, httpSvc(80, "a", 200))), host("10.0.0.2", model.HostUp, httpSvc(80, "a", 200)), nil, "", ""},
+		{"back after a short miss", ptr(host("10.0.0.2", model.HostUnstable, httpSvc(80, "a", 200))), host("10.0.0.2", model.HostUp, httpSvc(80, "a", 200)),
+			[]string{"host_back"}, "Host 10.0.0.2 znów odpowiada po chwilowym braku odpowiedzi", model.SevInfo},
+		{"irregular host back is expected", ptr(host("10.0.0.2", model.HostUnstable)), HostSnapshot{IP: "10.0.0.2", Up: true, Status: model.HostUp, Stability: 0.5, Observations: 40},
+			[]string{"host_back(expected)"}, "po chwilowym braku odpowiedzi", model.SevInfo},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -151,11 +154,12 @@ func TestDiffSilentHostServicesAreUnknownNotGone(t *testing.T) {
 	if len(cs) != 0 {
 		t.Fatalf("out-of-scope port reported: %v", kinds(cs))
 	}
-	// The host came back from a silent run without a carried baseline: no service noise.
+	// The host came back from a silent run without a carried baseline: no
+	// service noise, only the return of the host itself.
 	silent := snap(2, host("10.0.0.3", model.HostUnstable))
 	cs, _ = Diff(&silent, snap(3, host("10.0.0.3", model.HostUp, httpSvc(80, "a", 200))), DiffOptions{})
-	if len(cs) != 0 {
-		t.Fatalf("no baseline, want no changes, got %v", kinds(cs))
+	if strings.Join(kinds(cs), ",") != "host_back" {
+		t.Fatalf("no baseline, want only host_back, got %v", kinds(cs))
 	}
 }
 

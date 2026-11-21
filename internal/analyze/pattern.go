@@ -52,6 +52,9 @@ func Pattern(b [168]model.AvailBucket) string {
 	if share >= AlwaysOnRate {
 		return fmt.Sprintf("odpowiada stale (%d%% skanów)", int(math.Round(share*100)))
 	}
+	if !clock.IsDefault() {
+		return clockPattern(b, share)
+	}
 
 	if float64(all)/float64(cells) >= MinCellObs {
 		if s := weeklyPattern(b); s != "" {
@@ -241,4 +244,21 @@ func hourText(hours [24]bool) string {
 		end -= 24
 	}
 	return fmt.Sprintf("%02d–%02d", start, end)
+}
+
+// clockPattern describes a histogram under a lab clock: the share of answers
+// and the buckets in which the host is usually off.
+func clockPattern(b [168]model.AvailBucket, share float64) string {
+	var off []string
+	for i := 0; i < clock.Buckets(); i++ {
+		n := b[i].Up + b[i].Down
+		if n > 0 && float64(b[i].Up)/float64(n) <= PatternOffRate {
+			off = append(off, fmt.Sprint(i))
+		}
+	}
+	s := fmt.Sprintf("odpowiada w ok. %d%% skanów (zegar laboratoryjny: %v × %d)", int(math.Round(share*100)), clock.Width, clock.Buckets())
+	if len(off) > 0 {
+		s += ", zwykle nieaktywny w kubełkach " + strings.Join(off, ",")
+	}
+	return s
 }

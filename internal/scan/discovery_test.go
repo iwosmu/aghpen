@@ -196,3 +196,21 @@ func TestSplitDiscoveryAndCost(t *testing.T) {
 		t.Errorf("estimated seconds fast/balanced/thorough = %v", sec)
 	}
 }
+
+func TestMergeHostsDropsDuplicates(t *testing.T) {
+	live := []probe.Host{{IP: "10.0.0.7", Up: true}, {IP: "10.0.0.9", Up: true}}
+	more := []probe.Host{{IP: "10.0.0.7", Up: true}, {IP: "10.0.0.8", Up: true}}
+	got := mergeHosts(live, more)
+	if len(got) != 3 {
+		t.Fatalf("merged = %+v, want 3 distinct hosts", got)
+	}
+	ips := map[string]int{}
+	for _, h := range got {
+		ips[h.IP]++
+	}
+	for ip, n := range ips {
+		if n != 1 {
+			t.Errorf("%s appears %d times", ip, n)
+		}
+	}
+}

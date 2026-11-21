@@ -33,6 +33,9 @@ func (x Interchange) ParseResults(ctx context.Context, filename string, data []b
 			down = append(down, strings.TrimSpace(hosts[i].IP))
 		}
 	}
+	// Every host that the file reports as down counts as a down host of the
+	// report, kept or not; it is not a skipped (bad) row.
+	rep.HostsDown = len(down)
 	if len(down) > 0 && x.st != nil {
 		known, err := x.st.KnownIPs(ctx, down)
 		if err != nil {
@@ -42,8 +45,6 @@ func (x Interchange) ParseResults(ctx context.Context, filename string, data []b
 		for i := range hosts {
 			if hosts[i].Up || known[strings.TrimSpace(hosts[i].IP)] {
 				kept = append(kept, hosts[i])
-			} else {
-				rep.Skipped++
 			}
 		}
 		hosts = kept

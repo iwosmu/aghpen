@@ -11,7 +11,8 @@ const (
 	EventProgress = "progress" // model.ScanRun
 	EventChunk    = "chunk"    // model.Chunk
 	EventHost     = "host"     // HostEvent
-	EventDone     = "done"     // model.ScanRun
+	EventDone     = "done"     // model.ScanRun: completed, failed or cancelled; the stream ends
+	EventPaused   = "paused"   // model.ScanRun: paused (window closed, manual pause, emergency stop); resumable, the stream ends
 	EventRun      = "run"      // model.ScanRun (status changed)
 	EventChange   = "change"   // model.Change
 	EventFinding  = "finding"  // model.Finding

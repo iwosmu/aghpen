@@ -226,6 +226,7 @@ func (r *run) retryRound(ctx context.Context, g *group, missing []model.HostHint
 		t0 := r.e.now()
 		res, err := r.prober.Discover(ctx, probe.DiscoverRequest{
 			Targets: rediscover, Opts: r.disc, MaxRate: rate, MaxRetries: 2, HostTimeout: discoveryHostTimeout, IPv6: g.v6,
+			ARPOnly: r.disc.ARP && r.prober.Privileged() && r.onLink(g),
 		})
 		r.account(gs, res, t0)
 		if err != nil {
@@ -264,6 +265,38 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 	scanned := map[string]*probe.Host{}
 	for i := range ps.Hosts {
 		scanned[ps.Hosts[i].IP] = &ps.Hosts[i]
+	}
+	// A host that discovery found but that gave the port scan no answer at
+	// all (not even a closed port) lost its probes, usually its neighbour
+	// resolution under load: nmap then marks it down and reports no port.
+	// Scan those hosts once more before their ports are recorded as none.
+	var silent []string
+	for _, h := range hosts {
+		if p := scanned[h.IP]; h.Up && (p == nil || !p.Responded) {
+			silent = append(silent, h.IP)
+		}
+	}
+	if len(silent) > 0 && ctx.Err() == nil {
+		t1 := r.e.now()
+		end := r.stats.begin(rate)
+		again, err := r.prober.PortScan(ctx, probe.PortScanRequest{
+			Hosts: silent, Ports: r.ports, MaxRate: rate, MaxRetries: 3, HostTimeout: portScanHostTimeout, IPv6: g.v6,
+		})
+		end()
+		r.account(gs, again, t1)
+		if err == nil {
+			n := 0
+			for i := range again.Hosts {
+				if again.Hosts[i].Responded {
+					scanned[again.Hosts[i].IP] = &again.Hosts[i]
+					n++
+				}
+			}
+			r.stats.update(func(s *model.RunStats) { s.Retried += len(silent) })
+			r.log.Info("port scan retried for silent hosts", "group", g.id, "hosts", len(silent), "answered", n)
+		} else if ctx.Err() != nil {
+			return context.Cause(ctx)
+		}
 	}
 	var up []probe.Host
 	for _, h := range hosts {

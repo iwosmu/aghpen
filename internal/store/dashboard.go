@@ -59,6 +59,7 @@ func (s *Store) Dashboard(ctx context.Context) (model.Dashboard, error) {
 			if sum := runs[0].Summary; sum != nil {
 				h.NewSinceLastRun = sum.HostsNew + sum.ServicesNew
 				h.GoneSinceLastRun = sum.HostsGone + sum.ServicesGone
+				h.HostsMissing = sum.HostsMissing
 			}
 		}
 		d.Headline = h
