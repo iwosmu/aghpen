@@ -88,6 +88,7 @@ func (s *Server) routes() http.Handler {
 		r.Get("/healthz", s.healthz)
 		r.Post("/auth/login", s.login)
 		r.With(session).Post("/auth/logout", s.logout)
+		r.With(session).Post("/auth/password", s.changePassword)
 		r.With(session).Get("/me", s.me)
 		r.With(session).Get("/permissions", s.permissions)
 		r.With(session).Get("/roles", s.listRoles)

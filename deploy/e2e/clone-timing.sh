@@ -22,7 +22,7 @@ one() { # dir build-flags
   docker image inspect czujka-db:17 >/dev/null 2>&1 || docker build -q -t czujka-db:17 deploy/db >/dev/null
   dc up -d --no-build --wait >/dev/null 2>&1 || { echo "up failed"; dc ps; return 1; }
   t2=$(date +%s)
-  echo "$dir: clone+init $((t1 - t0)) s, build+start $((t2 - t1)) s, total $((t2 - t0)) s; healthz: $(curl -sS http://127.0.0.1:18501/healthz | jq -c '{status, tde, engine}')"
+  echo "$dir: clone+init $((t1 - t0)) s, build+start $((t2 - t1)) s, total $((t2 - t0)) s; healthz: $(curl -sS http://127.0.0.1:18501/healthz | jq -c '{status, version}')"
   dc down -v --remove-orphans >/dev/null 2>&1
   cd "$SRC"
 }
