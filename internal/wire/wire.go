@@ -8,7 +8,7 @@ import (
 
 	"github.com/iwosmu/aghpen/internal/api"
 	"github.com/iwosmu/aghpen/internal/config"
-	"github.com/iwosmu/aghpen/internal/httpfp"
+	"github.com/iwosmu/aghpen/internal/enginewire"
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/runner"
 	"github.com/iwosmu/aghpen/internal/scan"
@@ -28,10 +28,9 @@ type Wiring struct {
 	PauseCause  func(reason string) error // scan.PauseCause: pause reasons reach the engine as cancel causes
 	API         api.Deps                  // seams of the REST API
 
-	cfg   config.Config
-	st    *store.Store
-	log   *slog.Logger
-	sched *SchedBackend
+	cfg config.Config
+	st  *store.Store
+	log *slog.Logger
 }
 
 // Build is the single place where the packages are connected. It does no
@@ -51,13 +50,14 @@ func Build(cfg config.Config, st *store.Store, log *slog.Logger) *Wiring {
 		loc = time.UTC
 	}
 	sw := sigwire.New(st, log)
-	eng := scan.New(scan.Deps{
-		Fingerprinter: httpfp.New(),
-		Signatures:    sw.Engine(), // the same pointer for the whole process; Reload swaps its set in place
-		Logger:        log,
-		NmapPath:      cfg.NmapPath,
-		ForceNative:   cfg.ForceNative,
-	})
+	// enginewire builds the engine with the real HTTP/TLS collector, whose
+	// requests wait for the engine's per-host and global limiters (scan.HTTPWait).
+	eng, _ := enginewire.New(enginewire.Deps{
+		Signatures:  sw.Engine(), // the same pointer for the whole process; Reload swaps its set in place
+		Logger:      log,
+		NmapPath:    cfg.NmapPath,
+		ForceNative: cfg.ForceNative,
+	}).(*scan.Engine)
 	an := NewAnalysis(st, loc, log)
 	dojo := Dojo{st: st, log: log}
 	an.Auto = dojo
@@ -67,8 +67,8 @@ func Build(cfg config.Config, st *store.Store, log *slog.Logger) *Wiring {
 		Scan:        eng,
 		Signatures:  sw,
 		RunAnalyzer: matchCounts{an: an, sw: sw, log: log},
-		Window:      Window,
-		PauseCause:  scan.PauseCause,
+		Window:      enginewire.Window,
+		PauseCause:  enginewire.PauseCause,
 		cfg:         cfg, st: st, log: log,
 	}
 	w.API = api.Deps{
@@ -76,7 +76,7 @@ func Build(cfg config.Config, st *store.Store, log *slog.Logger) *Wiring {
 		Importer:     ic,
 		Exporter:     ic,
 		Dojo:         dojo,
-		TargetParser: TargetParser{},
+		TargetParser: enginewire.TargetParser{},
 		Signatures:   sw,
 		RetroHunter:  sw,
 		SigImporter:  SigImporter{sw: sw},
@@ -85,11 +85,7 @@ func Build(cfg config.Config, st *store.Store, log *slog.Logger) *Wiring {
 		EngineInfo:   func() map[string]any { return EngineInfo(eng) },
 		Hooks: api.Hooks{
 			SignaturesChanged: sw.Changed,
-			ProfileChanged: func(ctx context.Context, p model.ScanProfile, deleted bool) {
-				if w.sched != nil {
-					w.sched.ProfileChanged(ctx, p, deleted)
-				}
-			},
+			ProfileChanged:    enginewire.ProfileChanged(st, log),
 		},
 	}
 	if web.Embedded {
@@ -107,14 +103,9 @@ func (w *Wiring) Start(ctx context.Context, mgr *runner.Manager) error {
 	}
 	info := EngineInfo(w.Scan) // runs "nmap --version" once and logs the mode
 	w.log.Info("scan engine wired", "prober", info["prober"], "mode", info["mode"])
-	w.sched = &SchedBackend{Store: w.st, Runner: mgr}
-	if profiles, err := w.st.ScheduledProfiles(ctx); err == nil {
-		for _, p := range profiles {
-			_ = w.sched.SetNextRun(ctx, p)
-		}
-	}
-	s := sched.New(*w.sched, sched.Options{Interval: w.cfg.SchedInterval, Logger: w.log})
-	go s.Run(ctx)
+	b := enginewire.NewBackend(w.st, mgr, w.log)
+	s := &enginewire.Scheduler{Scheduler: sched.New(b, sched.Options{Interval: w.cfg.SchedInterval, Logger: w.log}), Backend: b}
+	go s.Run(ctx) // refreshes the next planned starts once, then ticks
 	return nil
 }
 

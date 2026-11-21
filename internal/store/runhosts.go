@@ -268,13 +268,6 @@ func (s *Store) AddHostnames(ctx context.Context, ip string, names []string) (ch
 	return tag.RowsAffected() > 0, nil
 }
 
-// ProfileHasActiveRun reports whether a run of the profile is queued, running, analysing or paused.
-func (s *Store) ProfileHasActiveRun(ctx context.Context, profileID int64) (bool, error) {
-	var ok bool
-	err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM runs WHERE profile_id = $1 AND status IN ('queued', 'running', 'analyzing', 'paused'))`, profileID).Scan(&ok)
-	return ok, mapErr(err)
-}
-
 // WindowPausedRuns returns the runs that a closed scan window paused, with
 // their resume_at, the earliest first.
 func (s *Store) WindowPausedRuns(ctx context.Context) ([]model.ScanRun, error) {

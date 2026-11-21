@@ -8,7 +8,7 @@ DEV_DB_NAME ?= czujka-dev-pg
 DEV_DB_PORT ?= 55432
 DEV_DB_URL  ?= postgres://czujka:czujka@127.0.0.1:$(DEV_DB_PORT)/czujka?sslmode=disable
 
-.PHONY: help dev dev-db dev-db-stop test test-integration bench build web fmt up down logs clean e2e-core
+.PHONY: help dev dev-db dev-db-stop test test-integration bench build web fmt up down logs clean e2e-core e2e-full
 
 help:
 	@echo "make dev              start the dev database and run czujka on http://127.0.0.1:8080"
@@ -17,7 +17,8 @@ help:
 	@echo "make bench            ingest benchmark: 10 000 hosts x 3 services"
 	@echo "make build            build the UI (when web/ exists) and bin/czujka"
 	@echo "make up / down / logs the product stack from deploy/docker-compose.yml"
-	@echo "make e2e-core         end-to-end check without an engine: import, analysis, diff, DefectDojo, exports (needs lab/defectdojo)"
+	@echo "make e2e-core         end-to-end check without a scan: import, analysis, diff, DefectDojo, exports (needs lab/defectdojo)"
+	@echo "make e2e-full         full end-to-end check: real scans of a docker lab through the REST API (e2e/full)"
 
 dev-db:
 	@docker image inspect czujka-db:17 >/dev/null 2>&1 || docker build -t czujka-db:17 deploy/db
@@ -72,6 +73,9 @@ logs:
 
 e2e-core:
 	bash deploy/e2e-core.sh
+
+e2e-full:
+	bash e2e/full/run.sh
 
 clean:
 	rm -rf bin .dev-master.key
