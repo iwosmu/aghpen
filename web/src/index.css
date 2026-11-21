@@ -323,7 +323,8 @@ html[data-present] { zoom: 1.125; }
   color: var(--lgn-ink); text-shadow: 0 2px 40px rgb(2 4 12 / 0.35);
   user-select: none; transform: translateX(-0.04em); padding-bottom: 0.12em;
 }
-.lgn-main { grid-column: 3; grid-row: 2; align-self: center; display: flex; justify-content: flex-end; padding-bottom: 4vh; }
+/* the top edge is fixed, so a status line grows the panel down and the fields stay put */
+.lgn-main { grid-column: 3; grid-row: 2; align-self: start; margin-top: max(24px, calc(50dvh - 270px)); display: flex; justify-content: flex-end; }
 
 .lgn-panel {
   width: 100%; max-width: 420px; padding: 28px; border-radius: 30px;
@@ -380,7 +381,7 @@ html[data-present] { zoom: 1.125; }
   .lgn { grid-template-columns: 20px minmax(0, 1fr) 20px; grid-template-rows: auto 1fr auto auto; column-gap: 0; padding: 16px 0 20px; }
   .lgn-top, .lgn-word, .lgn-main { grid-column: 2; }
   .lgn-word { grid-row: 2; align-self: end; font-size: clamp(72px, 24vw, 140px); margin-bottom: 24px; }
-  .lgn-main { grid-row: 3; justify-content: stretch; }
+  .lgn-main { grid-row: 3; justify-content: stretch; margin-top: 0; }
   .lgn-panel { max-width: none; padding: 22px; border-radius: 26px; }
 }
 @media (prefers-reduced-motion: reduce) {

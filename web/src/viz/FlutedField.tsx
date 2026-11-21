@@ -239,7 +239,7 @@ export function FlutedField({ className }: { className?: string }) {
     // Test hook: ?still=<seconds> draws one fixed frame (screenshots, the film).
     const still = Number(new URLSearchParams(window.location.search).get('still') ?? NaN);
     let raf = 0, last = 0, elapsed = 0, prev = 0;
-    const FRAME_MS = 1000 / 30; // the motion is slow; 30 frames a second is plenty
+    const FRAME_MS = 1000 / 20; // the drift moves less than a pixel a frame; 20 frames a second look smooth
 
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
