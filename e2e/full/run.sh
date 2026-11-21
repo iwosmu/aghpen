@@ -106,7 +106,12 @@ rate() {
   echo "$js" | jq -r --arg id "$id" --arg drop "$CAP_DROPPED" '"  run \($id) on the wire (tcpdump, kernel drops \($drop)): nmap raw packets per second max \(.raw_max_per_s), p99 \(.raw_p99_per_s), avg \(.raw_avg_per_s) over \(.seconds) s, top5 \(.raw_top5), seconds over the cap \(.raw_seconds_over_cap); all sent packets max \(.all_max_per_s)/s; totals \(.total | to_entries | map("\(.key)=\(.value)") | join(" "))"'
   checkge "run $id: the capture holds nmap's raw SYN probes (a blind capture must fail)" "$(echo "$js" | jq '.total.raw_syn // 0')" 1000
   check "run $id: tcpdump lost no packet" "$CAP_DROPPED" "0"
-  checkle "run $id: per-second maximum of nmap raw packets on the wire under the cap" "$(echo "$js" | jq .raw_max_per_s)" $MAXPPS
+  # nmap's own packets (paced by the engine at the cap minus an HTTP reserve) stay strictly under the cap.
+  checkle "run $id: per-second maximum of nmap raw packets on the wire strictly under the cap" "$(echo "$js" | jq .raw_max_per_s)" $((MAXPPS - 1))
+  # All sent packets include kernel TCP (ACKs of page bodies during version detection, HTTP):
+  # they may pass the cap by at most ALLTOL percent in a second (the tolerance docs/WYNIKI.md states).
+  echo "  run $id: seconds where all sent packets passed the cap: $(echo "$js" | jq .all_seconds_over_cap) of $(echo "$js" | jq .seconds)"
+  checkle "run $id: per-second maximum of all sent packets within the cap + $ALLTOL%" "$(echo "$js" | jq .all_max_per_s)" $((MAXPPS * (100 + ALLTOL) / 100))
 }
 mem_sampler() { # samples the memory of the Czujka container every 2 s while $TMP/mem.on exists
   touch "$TMP/mem.on"
@@ -142,9 +147,26 @@ hm() { printf "%02d:%02d" $(( ($1 / 60) % 24 )) $(( $1 % 60 )); }
 
 step "0. Preconditions"
 for tool in docker curl jq awk go; do command -v $tool >/dev/null || { echo "missing tool: $tool"; exit 2; }; done
-MAXPPS=800; HTTPRPS=20
+MAXPPS=800; HTTPRPS=20; ALLTOL=10
 PPSBINS="$TMP/ppsbins"; go build -o "$PPSBINS" ./e2e/ppsbins || { echo "cannot build e2e/ppsbins"; exit 2; }
 echo "docker $(docker version --format '{{.Server.Version}}'); scope: $NET $P.0.0/22 (created by this script)"
+# The neighbour table of the docker host (the Docker VM on macOS) is one table
+# for all network namespaces; gc_thresh3 bounds all of them together. When
+# other containers fill it, ARP answers are lost and a run finds hosts without
+# ports or no host at all: such a run says nothing about the product, so stop
+# here. NEIGH_NEED is the free room this scan needs (2 x the /22).
+neigh() { # prints "entries gc_thresh3 table_fulls" of the docker host
+  docker run --rm --net=host alpine sh -c 'awk "NR==2 {print \$1, \$13}" /proc/net/stat/arp_cache | { read e f; echo $((0x$e)) $(cat /proc/sys/net/ipv4/neigh/default/gc_thresh3) $((0x$f)); }' 2>/dev/null
+}
+NEIGH_NEED=2048
+read -r NE NT NF0 <<< "$(neigh)"
+echo "neighbour table of the docker host: $NE entries, gc_thresh3 $NT, table_fulls so far $NF0"
+if [ -z "$NT" ] || [ $((NT - NE)) -lt $NEIGH_NEED ]; then
+  echo "INVALID ENVIRONMENT: the neighbour table of the docker host has $((NT - NE)) free entries, this scan needs $NEIGH_NEED."
+  echo "Other containers fill it (ARP answers would be lost). Raise the limits of the docker host and rerun:"
+  echo "  docker run --rm --privileged --net=host alpine sysctl -w net.ipv4.neigh.default.gc_thresh1=16384 net.ipv4.neigh.default.gc_thresh2=65536 net.ipv4.neigh.default.gc_thresh3=131072"
+  exit 3
+fi
 
 step "1. Target network with real services"
 e2e/full/lab.sh up
@@ -500,6 +522,10 @@ for r in "$RUN1:$D1" "$RUN2:$D2"; do
   [ -f "$TMP/rate.$id.json" ] && jq -r --arg id "$id" --arg eng "$(api GET /runs/$id | jq .stats.packets_sent)" '"  run \($id) on the wire: nmap raw packets \([.total.arp, .total.raw_syn, .total.icmp, .total.udp_probe] | map(. // 0) | add) (engine counter \($eng)); max \(.raw_max_per_s)/s, p99 \(.raw_p99_per_s)/s, avg \(.raw_avg_per_s)/s"' "$TMP/rate.$id.json"
 done
 echo "  memory of the Czujka container during the scans: max $(mem_max) MiB over $(wc -l < $TMP/mem.txt | tr -d ' ') samples"
+
+read -r NE2 NT2 NF1 <<< "$(neigh)"
+echo "  neighbour table of the docker host after the run: $NE2 entries, gc_thresh3 $NT2"
+check "the docker host's neighbour table never overflowed during the run (else the run is invalid)" "$((NF1 - NF0))" "0"
 
 step "Result"
 echo "PASS: $PASSES  FAIL: $FAILS"
