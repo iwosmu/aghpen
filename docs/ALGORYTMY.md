@@ -235,15 +235,15 @@ Każda zmiana silnika przechodzi przez `e2e/lab-gate.sh` (pełny /16 laboratoriu
 
 **`RunStats.passes`.** Tablica jest obecna tylko wtedy, gdy przebieg ma więcej niż jeden przebieg portów: `top_ports` i `full_range` (mały zakres) albo `top_ports` i `dense` (/16). `ports_total` i `ports_done` liczą pary host-port. W trakcie skanu `ports_done` wynika z przypiętej szybkości nmap (`--min-rate` = `--max-rate`); po skanie jest dokładne. Szacunek przebiegu (`full_range_max_hosts`) liczy pakiety drugiego przebiegu.
 
-Pomiar na hoście „jury" (jeden adres w sieci laboratorium, 7 usług, limit 1000 pps, `e2e/small-bench.sh`):
+Pomiar na hoście „jury" (jeden adres w sieci laboratorium, 7 usług, limit 1000 pps, `e2e/small-bench.sh`, wersja 6f39557):
 
 | profil | przed: czas przebiegu | po: pierwsza usługa | po: czas przebiegu | porty |
 | --- | --- | --- | --- | --- |
-| 7 portów z nazwy | 68 s | 3,6 s | 23,6 s | 7 |
-| top-1000 | 63 s | 4,2 s | 117 s | 1-65535 (dwa przebiegi) |
-| profil domyślny | — | 4,1 s | 87 s | 1-65535 (dwa przebiegi) |
+| 7 portów z nazwy | 68 s | 3,5 s | 43,4 s | 7 |
+| top-1000 | 63 s | 4,0 s | 222 s | 1-65535 (dwa przebiegi) |
+| profil domyślny | — | 4,6 s | 137 s | 1-65535 (dwa przebiegi) |
 
-Czas „7 portów" ogranicza wykrywanie wersji AMQP (RabbitMQ odpowiada na sondę AMQP nmap dopiero po 22 s). Etap HTTP przy domyślnej polityce (2 żądania/s na host) opisuje 4 usługi WWW w około 20 s.
+Pierwsza usługa pojawia się po 3,5–4,6 s (wyniki częściowe). Czas do końca przebiegu wyznacza `nmap -sV`: „7 portów" to Gitea na porcie 3000 (42 s), „top-1000" to port 25672 (dystrybucja Erlanga), na którym sam `nmap -sV` pracuje 135 s i kończy wynikiem „unknown". Wynik końcowy czeka na nmap tak samo jak zwykłe `nmap -sV`; w zamian ma wszystkie wersje usług (Gitea „Golang net/http server", panel RabbitMQ „Cowboy httpd", AMQP RabbitMQ 4.3.8, epmd). Szczytowy ruch: 101, 853 i 866 pakietów/s przy limicie 1000, 0 sekund ponad limit.
 
 ## 3. Wykrywanie zmian
 

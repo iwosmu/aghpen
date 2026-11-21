@@ -16,9 +16,9 @@ Numery zrzutów (`40`, `47` …) to pliki w `web/screenshots/lab/`. „Krok N”
 
 | Status | Znaczenie | Wierszy |
 | --- | --- | --- |
-| **udowodnione** | Działa w produkcie. Dowód z działającego produktu: zapis testu e2e, raport z laboratorium, zrzut na prawdziwych danych albo test integracyjny przez REST API na PostgreSQL z `pg_tde`. | 85 |
+| **udowodnione** | Działa w produkcie. Dowód z działającego produktu: zapis testu e2e, raport z laboratorium, zrzut na prawdziwych danych albo test integracyjny przez REST API na PostgreSQL z `pg_tde`. | 86 |
 | **gotowe** | Działa w produkcie i ma testy, ale brak zapisu przebiegu na prawdziwych danych albo dowód jest do powtórzenia. | 9 |
-| **częściowe** | Działa tylko część wymagania albo brakuje pomiaru, o który pyta wymaganie. | 2 |
+| **częściowe** | Działa tylko część wymagania albo brakuje pomiaru, o który pyta wymaganie. | 1 |
 | **brak** | Nie ma tego w kodzie. | 0 |
 
 Razem 96 wierszy.
@@ -132,7 +132,7 @@ Razem 96 wierszy.
 | --- | --- | --- | --- |
 | Repozytorium kodu źródłowego | to repozytorium; `go build ./...` przechodzi | `README.md` | **udowodnione** |
 | Dokumentacja techniczna | spis w `docs/DOKUMENTACJA.md`; wdrożenie, bezpieczeństwo, algorytmy, sygnatury, reguły, integracje, API | `docs/` | **gotowe** |
-| Prezentacja do 10 slajdów | 10 slajdów, PDF i HTML. Każdy slajd to jeden obraz z podpisem: tytuł do 8 słów i najwyżej 12 słów poza nim; `docs/slides/build.mjs` pilnuje limitu i wypisuje liczbę słów. Szczegóły są w notatkach do slajdów (`docs/DEMO.md` rozdz. 2). 1 miejsce czeka na pomiar (`DO UZUPEŁNIENIA`, slajd 3): czas przebiegu /16 na silniku po zamrożeniu. | `docs/slides/czujka.pdf` | **częściowe** |
+| Prezentacja do 10 slajdów | 10 slajdów, PDF i HTML. Każdy slajd to jeden obraz z podpisem: tytuł do 8 słów i najwyżej 12 słów poza nim; `docs/slides/build.mjs` pilnuje limitu i wypisuje liczbę słów. Szczegóły są w notatkach do slajdów (`docs/DEMO.md` rozdz. 2). Każda liczba na slajdach pochodzi z `docs/WYNIKI.md`; nie ma miejsc do uzupełnienia. | `docs/slides/czujka.pdf` | **udowodnione** |
 | Działające demo, lokalnie lub w środowisku testowym | Stos startuje jednym poleceniem; laboratorium 70 hostów lokalnie; publiczna instancja `https://czujka.dev` z laboratorium i zaplanowanym skanem. Film 2:09 nagrany skryptem z prawdziwego interfejsu (`docs/demo/record.mjs`): kreator na świeżej instalacji, skan /16 na żywo (fragment w ×8, oznaczony), porównanie dwóch skanów, host niestabilny, wehikuł czasu, reguła, sygnatura z przykładu, stop awaryjny. Pierwsza wersja z lokalnego stosu (21.11.2026); wersja końcowa 22.11 rano na danych z nocy, tym samym poleceniem. Głos lektora nagrywa się osobno (`docs/demo/lektor.txt`). | `docs/demo/czujka-demo.mp4`; `docs/DEMO.md`; `https://czujka.dev` | **udowodnione** |
 | Technologie bezpłatne i open-source | Go, PostgreSQL (Percona z `pg_tde`), nmap, chi, pgx, React, Vite. Bez płatnych API. | `go.mod`, `web/package.json` | **udowodnione** |
 | Język o niskim zużyciu zasobów | Go; obraz 107 MB (`docker images`, 2026-11-21); najwyżej 90,7 MiB pamięci kontenera w czasie skanów | `e2e/full/transcript.txt` krok 18 | **udowodnione** |
@@ -160,7 +160,7 @@ Razem 96 wierszy.
 | --- | --- | --- | --- |
 | 30% | Skuteczność discovery i identyfikacji usług w dużej infrastrukturze | /16 (65 535 adresów) w jednym przebiegu przy limicie 1000 pps: hosty 67 z 67, otwarte porty 154 ze 155, technologie precyzja 0,990 i czułość 0,981. Czas skanu i pełne tabele: `docs/WYNIKI.md`. | **udowodnione** |
 | 15% | Zmiany w czasie, niestabilne hosty, raportowanie | Zmiany i porównanie udowodnione w e2e. Ponowne sprawdzenia, wehikuł czasu i reguły udowodnione zrzutami na laboratorium (`90`–`97`). Model rytmu: testy i scenariusze w `docs/ALGORYTMY.md` §2.6. Host zatrzymany między dwoma skanami: drugi skan pokazuje go z usługami jako „nie odpowiada (niepotwierdzone)”, sonda potwierdzająca daje „nieaktywny” po około minucie (`docs/ALGORYTMY.md` §3.4). | **udowodnione** |
-| 20% | Jakość techniczna, dokumentacja, prezentacja, uruchomienie, import/eksport, DefectDojo | Jedno polecenie (czas: `docs/WYNIKI.md`, „Uruchomienie”); e2e 100 ze 100; czujka.dev działa; import i eksport udowodnione; DefectDojo z ekranu produktu udowodnione (`web/REPORT-LAB.md` §11); webhook alertów; prezentacja z 1 miejscem na czas /16. | **gotowe** |
+| 20% | Jakość techniczna, dokumentacja, prezentacja, uruchomienie, import/eksport, DefectDojo | Jedno polecenie (czas: `docs/WYNIKI.md`, „Uruchomienie”); e2e 100 ze 100; czujka.dev działa; import i eksport udowodnione; DefectDojo z ekranu produktu udowodnione (`web/REPORT-LAB.md` §11); webhook alertów; prezentacja 10 slajdów bez otwartych miejsc. | **gotowe** |
 | 15% | Bezpieczeństwo, kontrola intensywności, przejrzystość dashboardu | Mechanizmy udowodnione (krok 14, 16, 17); pulpit na danych laboratorium. Tempo na łączu zmierzone przy pełnym skanie /16: żadnej sekundy ponad limit + 10% (`docs/WYNIKI.md`); po stopie żaden pakiet IP później niż 1 s. | **udowodnione** |
 | 10% | Fingerprinting, technologie, CMS, nagłówki, ciasteczka, sygnatury | 398 sygnatur, wersje z dowodami, własne sygnatury i sygnatura z przykładu; trafność technologii w `docs/WYNIKI.md`. | **udowodnione** |
 | 10% | Role i zabezpieczenie danych | 4 role i własne role, 22 uprawnienia, `pg_tde` i AES-256-GCM, audyt. Kopia zapasowa szyfrowana (`czujka backup`). | **udowodnione** |
