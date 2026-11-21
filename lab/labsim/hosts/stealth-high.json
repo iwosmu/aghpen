@@ -1,0 +1,155 @@
+{
+  "name": "stealth-high",
+  "firewall": {
+    "stealth_except": [
+      8888,
+      18443,
+      31337
+    ]
+  },
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 8888,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Monitoring UPS</title>\n</head>\n<body>\n<h1>Monitoring UPS</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 18443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "serwis.local",
+            "sans": [
+              "serwis.local"
+            ],
+            "not_before_days": -10,
+            "not_after_days": 3640
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Panel serwisowy (TLS)</title>\n</head>\n<body>\n<h1>Panel serwisowy</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 31337,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Panel serwisowy</title>\n</head>\n<body>\n<h1>Panel serwisowy</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 8888,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Monitoring UPS</title>\n</head>\n<body>\n<h1>Monitoring UPS</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 18443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "serwis.local",
+            "sans": [
+              "serwis.local"
+            ],
+            "not_before_days": -10,
+            "not_after_days": 3640
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Panel serwisowy (TLS)</title>\n</head>\n<body>\n<h1>Panel serwisowy</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 31337,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Panel serwisowy</title>\n</head>\n<body>\n<h1>Panel serwisowy</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 8888,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Monitoring UPS</title>\n</head>\n<body>\n<h1>Monitoring UPS</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 18443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "serwis.local",
+            "sans": [
+              "serwis.local"
+            ],
+            "not_before_days": -10,
+            "not_after_days": 3640
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Panel serwisowy (TLS)</title>\n</head>\n<body>\n<h1>Panel serwisowy</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

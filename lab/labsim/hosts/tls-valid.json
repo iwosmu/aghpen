@@ -1,0 +1,208 @@
+{
+  "name": "tls-valid",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "status": 301,
+                "location": "https://10.66.50.10/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"https://10.66.50.10/\">https://10.66.50.10/</a>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "ca",
+            "cn": "portal.lab.czujka.test",
+            "org": "AGH Lab",
+            "sans": [
+              "portal.lab.czujka.test",
+              "10.66.50.10"
+            ],
+            "not_before_days": -335,
+            "not_after_days": 30,
+            "key": "rsa2048"
+          },
+          "site": {
+            "server": "nginx",
+            "headers": [
+              {
+                "name": "Strict-Transport-Security",
+                "value": "max-age=31536000; includeSubDomains"
+              },
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              },
+              {
+                "name": "X-Frame-Options",
+                "value": "DENY"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "portal_session",
+                "value": "0a1b2c3d4e5f6071",
+                "secure": true,
+                "http_only": true,
+                "same_site": "Lax"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Portal Pracowniczy</title>\n</head>\n<body>\n<h1>Portal Pracowniczy</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "status": 301,
+                "location": "https://10.66.50.10/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"https://10.66.50.10/\">https://10.66.50.10/</a>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "ca",
+            "cn": "portal.lab.czujka.test",
+            "org": "AGH Lab",
+            "sans": [
+              "portal.lab.czujka.test",
+              "10.66.50.10"
+            ],
+            "not_before_days": -1,
+            "not_after_days": 364,
+            "key": "rsa2048",
+            "gen": 1
+          },
+          "site": {
+            "server": "nginx",
+            "headers": [
+              {
+                "name": "Strict-Transport-Security",
+                "value": "max-age=31536000; includeSubDomains"
+              },
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              },
+              {
+                "name": "X-Frame-Options",
+                "value": "DENY"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "portal_session",
+                "value": "0a1b2c3d4e5f6071",
+                "secure": true,
+                "http_only": true,
+                "same_site": "Lax"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Portal Pracowniczy</title>\n</head>\n<body>\n<h1>Portal Pracowniczy</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "status": 301,
+                "location": "https://10.66.50.10/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"https://10.66.50.10/\">https://10.66.50.10/</a>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "ca",
+            "cn": "portal.lab.czujka.test",
+            "org": "AGH Lab",
+            "sans": [
+              "portal.lab.czujka.test",
+              "10.66.50.10"
+            ],
+            "not_before_days": -1,
+            "not_after_days": 364,
+            "key": "rsa2048",
+            "gen": 1
+          },
+          "site": {
+            "server": "nginx",
+            "headers": [
+              {
+                "name": "Strict-Transport-Security",
+                "value": "max-age=31536000; includeSubDomains"
+              },
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              },
+              {
+                "name": "X-Frame-Options",
+                "value": "DENY"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "portal_session",
+                "value": "0a1b2c3d4e5f6071",
+                "secure": true,
+                "http_only": true,
+                "same_site": "Lax"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Portal Pracowniczy</title>\n</head>\n<body>\n<h1>Portal Pracowniczy</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

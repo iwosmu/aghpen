@@ -1,0 +1,86 @@
+{
+  "name": "tls-mismatch",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "ca",
+            "cn": "intranet.uczelnia.example",
+            "sans": [
+              "intranet.uczelnia.example",
+              "www.intranet.uczelnia.example"
+            ],
+            "not_before_days": -30,
+            "not_after_days": 335
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Intranet wydziału</title>\n</head>\n<body>\n<h1>Intranet wydziału</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "ca",
+            "cn": "intranet.uczelnia.example",
+            "sans": [
+              "intranet.uczelnia.example",
+              "www.intranet.uczelnia.example"
+            ],
+            "not_before_days": -30,
+            "not_after_days": 335
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Intranet wydziału</title>\n</head>\n<body>\n<h1>Intranet wydziału</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "ca",
+            "cn": "intranet.uczelnia.example",
+            "sans": [
+              "intranet.uczelnia.example",
+              "www.intranet.uczelnia.example"
+            ],
+            "not_before_days": -30,
+            "not_after_days": 335
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Intranet wydziału</title>\n</head>\n<body>\n<h1>Intranet wydziału</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

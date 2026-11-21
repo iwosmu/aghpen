@@ -1,0 +1,77 @@
+{
+  "name": "volatile",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Tablica ogłoszeń</title>\n</head>\n<body>\n<h1>Tablica ogłoszeń</h1>\n<p>Wygenerowano: {{NOW}}</p>\n<p>Odwiedziny: {{COUNTER}}</p>\n<input type=\"hidden\" name=\"csrf\" value=\"{{RAND}}\">\n<div class=\"ad\" data-slot=\"{{RAND}}\">Reklama {{RAND}}</div>\n</body>\n</html>\n",
+                "headers": [
+                  {
+                    "name": "X-Request-Id",
+                    "value": "{{RAND}}"
+                  }
+                ],
+                "volatile": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Tablica ogłoszeń</title>\n</head>\n<body>\n<h1>Tablica ogłoszeń</h1>\n<p>Wygenerowano: {{NOW}}</p>\n<p>Odwiedziny: {{COUNTER}}</p>\n<input type=\"hidden\" name=\"csrf\" value=\"{{RAND}}\">\n<div class=\"ad\" data-slot=\"{{RAND}}\">Reklama {{RAND}}</div>\n</body>\n</html>\n",
+                "headers": [
+                  {
+                    "name": "X-Request-Id",
+                    "value": "{{RAND}}"
+                  }
+                ],
+                "volatile": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Tablica ogłoszeń</title>\n</head>\n<body>\n<h1>Tablica ogłoszeń</h1>\n<p>Wygenerowano: {{NOW}}</p>\n<p>Odwiedziny: {{COUNTER}}</p>\n<input type=\"hidden\" name=\"csrf\" value=\"{{RAND}}\">\n<div class=\"ad\" data-slot=\"{{RAND}}\">Reklama {{RAND}}</div>\n</body>\n</html>\n",
+                "headers": [
+                  {
+                    "name": "X-Request-Id",
+                    "value": "{{RAND}}"
+                  }
+                ],
+                "volatile": true
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,312 @@
+{
+  "name": "jwt-app",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "Microsoft-IIS/8.5",
+            "headers": [
+              {
+                "name": "X-Powered-By",
+                "value": "ASP.NET"
+              },
+              {
+                "name": "X-AspNet-Version",
+                "value": "4.0.30319"
+              },
+              {
+                "name": "X-AspNetMvc-Version",
+                "value": "5.2"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "access_token",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJnb3NjIiwicm9sZSI6ImFub24iLCJpc3MiOiJsYWIuY3p1amthLnRlc3QifQ.c2lnbmF0dXJlLW5vdC1yZWFsLWxhYi1vbmx5LTAwMDAwMDAw"
+              },
+              {
+                "name": "ASP.NET_SessionId",
+                "value": "kq1x0w3n5b2m4v6c8z0a1s3d",
+                "http_only": true
+              },
+              {
+                "name": "remember_me",
+                "value": "uid=1042&exp=1795000000",
+                "max_age": 2592000
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>e-Dziennik — logowanie</title>\n</head>\n<body>\n<h1>e-Dziennik</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "dziennik.lab.czujka.test",
+            "sans": [
+              "dziennik.lab.czujka.test",
+              "10.66.60.11"
+            ],
+            "not_before_days": -200,
+            "not_after_days": 165,
+            "key": "rsa2048"
+          },
+          "site": {
+            "server": "Microsoft-IIS/8.5",
+            "headers": [
+              {
+                "name": "X-Powered-By",
+                "value": "ASP.NET"
+              },
+              {
+                "name": "X-AspNet-Version",
+                "value": "4.0.30319"
+              },
+              {
+                "name": "X-AspNetMvc-Version",
+                "value": "5.2"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "access_token",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJnb3NjIiwicm9sZSI6ImFub24iLCJpc3MiOiJsYWIuY3p1amthLnRlc3QifQ.c2lnbmF0dXJlLW5vdC1yZWFsLWxhYi1vbmx5LTAwMDAwMDAw"
+              },
+              {
+                "name": "ASP.NET_SessionId",
+                "value": "kq1x0w3n5b2m4v6c8z0a1s3d",
+                "http_only": true
+              },
+              {
+                "name": "remember_me",
+                "value": "uid=1042&exp=1795000000",
+                "max_age": 2592000
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>e-Dziennik — logowanie</title>\n</head>\n<body>\n<h1>e-Dziennik</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "Microsoft-IIS/8.5",
+            "headers": [
+              {
+                "name": "X-Powered-By",
+                "value": "ASP.NET"
+              },
+              {
+                "name": "X-AspNet-Version",
+                "value": "4.0.30319"
+              },
+              {
+                "name": "X-AspNetMvc-Version",
+                "value": "5.2"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "access_token",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJnb3NjIiwicm9sZSI6ImFub24iLCJpc3MiOiJsYWIuY3p1amthLnRlc3QifQ.c2lnbmF0dXJlLW5vdC1yZWFsLWxhYi1vbmx5LTAwMDAwMDAw"
+              },
+              {
+                "name": "ASP.NET_SessionId",
+                "value": "kq1x0w3n5b2m4v6c8z0a1s3d",
+                "http_only": true
+              },
+              {
+                "name": "remember_me",
+                "value": "uid=1042&exp=1795000000",
+                "max_age": 2592000
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>e-Dziennik — logowanie</title>\n</head>\n<body>\n<h1>e-Dziennik</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "dziennik.lab.czujka.test",
+            "sans": [
+              "dziennik.lab.czujka.test",
+              "10.66.60.11"
+            ],
+            "not_before_days": -200,
+            "not_after_days": 165,
+            "key": "rsa2048"
+          },
+          "site": {
+            "server": "Microsoft-IIS/8.5",
+            "headers": [
+              {
+                "name": "X-Powered-By",
+                "value": "ASP.NET"
+              },
+              {
+                "name": "X-AspNet-Version",
+                "value": "4.0.30319"
+              },
+              {
+                "name": "X-AspNetMvc-Version",
+                "value": "5.2"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "access_token",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJnb3NjIiwicm9sZSI6ImFub24iLCJpc3MiOiJsYWIuY3p1amthLnRlc3QifQ.c2lnbmF0dXJlLW5vdC1yZWFsLWxhYi1vbmx5LTAwMDAwMDAw"
+              },
+              {
+                "name": "ASP.NET_SessionId",
+                "value": "kq1x0w3n5b2m4v6c8z0a1s3d",
+                "http_only": true
+              },
+              {
+                "name": "remember_me",
+                "value": "uid=1042&exp=1795000000",
+                "max_age": 2592000
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>e-Dziennik — logowanie</title>\n</head>\n<body>\n<h1>e-Dziennik</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "Microsoft-IIS/8.5",
+            "headers": [
+              {
+                "name": "X-Powered-By",
+                "value": "ASP.NET"
+              },
+              {
+                "name": "X-AspNet-Version",
+                "value": "4.0.30319"
+              },
+              {
+                "name": "X-AspNetMvc-Version",
+                "value": "5.2"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "access_token",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJnb3NjIiwicm9sZSI6ImFub24iLCJpc3MiOiJsYWIuY3p1amthLnRlc3QifQ.c2lnbmF0dXJlLW5vdC1yZWFsLWxhYi1vbmx5LTAwMDAwMDAw",
+                "secure": true,
+                "http_only": true
+              },
+              {
+                "name": "ASP.NET_SessionId",
+                "value": "kq1x0w3n5b2m4v6c8z0a1s3d",
+                "http_only": true
+              },
+              {
+                "name": "remember_me",
+                "value": "uid=1042&exp=1795000000",
+                "max_age": 2592000
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>e-Dziennik — logowanie</title>\n</head>\n<body>\n<h1>e-Dziennik</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "dziennik.lab.czujka.test",
+            "sans": [
+              "dziennik.lab.czujka.test",
+              "10.66.60.11"
+            ],
+            "not_before_days": -200,
+            "not_after_days": 165,
+            "key": "rsa2048"
+          },
+          "site": {
+            "server": "Microsoft-IIS/8.5",
+            "headers": [
+              {
+                "name": "X-Powered-By",
+                "value": "ASP.NET"
+              },
+              {
+                "name": "X-AspNet-Version",
+                "value": "4.0.30319"
+              },
+              {
+                "name": "X-AspNetMvc-Version",
+                "value": "5.2"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "access_token",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJnb3NjIiwicm9sZSI6ImFub24iLCJpc3MiOiJsYWIuY3p1amthLnRlc3QifQ.c2lnbmF0dXJlLW5vdC1yZWFsLWxhYi1vbmx5LTAwMDAwMDAw",
+                "secure": true,
+                "http_only": true
+              },
+              {
+                "name": "ASP.NET_SessionId",
+                "value": "kq1x0w3n5b2m4v6c8z0a1s3d",
+                "http_only": true
+              },
+              {
+                "name": "remember_me",
+                "value": "uid=1042&exp=1795000000",
+                "max_age": 2592000
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>e-Dziennik — logowanie</title>\n</head>\n<body>\n<h1>e-Dziennik</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

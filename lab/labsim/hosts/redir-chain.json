@@ -1,0 +1,110 @@
+{
+  "name": "redir-chain",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "status": 301,
+                "location": "/start",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"/start\">/start</a>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/start",
+                "status": 302,
+                "location": "/pl/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"/pl/\">/pl/</a>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/pl/",
+                "status": 307,
+                "location": "/pl/home",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"/pl/home\">/pl/home</a>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/pl/home",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Biuro Karier — strona główna</title>\n</head>\n<body>\n<h1>Biuro Karier</h1><p>Oferty pracy i praktyk.</p>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "status": 301,
+                "location": "/start",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"/start\">/start</a>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/start",
+                "status": 302,
+                "location": "/pl/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"/pl/\">/pl/</a>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/pl/",
+                "status": 307,
+                "location": "/pl/home",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"/pl/home\">/pl/home</a>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/pl/home",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Biuro Karier — strona główna</title>\n</head>\n<body>\n<h1>Biuro Karier</h1><p>Oferty pracy i praktyk.</p>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "status": 301,
+                "location": "/start",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"/start\">/start</a>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/start",
+                "status": 302,
+                "location": "/pl/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"/pl/\">/pl/</a>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/pl/",
+                "status": 307,
+                "location": "/pl/home",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"/pl/home\">/pl/home</a>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/pl/home",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Biuro Karier — strona główna</title>\n</head>\n<body>\n<h1>Biuro Karier</h1><p>Oferty pracy i praktyk.</p>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

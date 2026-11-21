@@ -1,0 +1,68 @@
+{
+  "name": "router-2",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n<title>RouterOS router configuration page</title>\n</head>\n<body>\n<h1>RouterOS v6.49.10</h1>\n<p>You have connected to a router. Administrative access only. If this device is not in your possession, please contact your local network administrator.</p>\n<table><tr><td><a href=\"/webfig/\"><img src=\"/webfig/img/webfig.png\" alt=\"WebFig\"></a></td><td><a href=\"/webfig/\">WebFig</a></td></tr>\n<tr><td><a href=\"/help/license.html\">License</a></td><td><a href=\"/graphs/\">Graphs</a></td></tr></table>\n<div class=\"top\">mikrotik</div>\n<div class=\"footer\">&copy; mikrotik</div>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/webfig/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>WebFig</title>\n</head>\n<body>\n<div id=\"content\"><form name=\"loginForm\"><input name=\"name\"><input type=\"password\" name=\"password\"></form></div>\n<script src=\"/webfig/engine.js\"></script>\n</body>\n</html>\n"
+              }
+            ],
+            "favicon_seed": "mikrotik"
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n<title>RouterOS router configuration page</title>\n</head>\n<body>\n<h1>RouterOS v6.49.10</h1>\n<p>You have connected to a router. Administrative access only. If this device is not in your possession, please contact your local network administrator.</p>\n<table><tr><td><a href=\"/webfig/\"><img src=\"/webfig/img/webfig.png\" alt=\"WebFig\"></a></td><td><a href=\"/webfig/\">WebFig</a></td></tr>\n<tr><td><a href=\"/help/license.html\">License</a></td><td><a href=\"/graphs/\">Graphs</a></td></tr></table>\n<div class=\"top\">mikrotik</div>\n<div class=\"footer\">&copy; mikrotik</div>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/webfig/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>WebFig</title>\n</head>\n<body>\n<div id=\"content\"><form name=\"loginForm\"><input name=\"name\"><input type=\"password\" name=\"password\"></form></div>\n<script src=\"/webfig/engine.js\"></script>\n</body>\n</html>\n"
+              }
+            ],
+            "favicon_seed": "mikrotik"
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n<title>RouterOS router configuration page</title>\n</head>\n<body>\n<h1>RouterOS v6.49.10</h1>\n<p>You have connected to a router. Administrative access only. If this device is not in your possession, please contact your local network administrator.</p>\n<table><tr><td><a href=\"/webfig/\"><img src=\"/webfig/img/webfig.png\" alt=\"WebFig\"></a></td><td><a href=\"/webfig/\">WebFig</a></td></tr>\n<tr><td><a href=\"/help/license.html\">License</a></td><td><a href=\"/graphs/\">Graphs</a></td></tr></table>\n<div class=\"top\">mikrotik</div>\n<div class=\"footer\">&copy; mikrotik</div>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/webfig/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>WebFig</title>\n</head>\n<body>\n<div id=\"content\"><form name=\"loginForm\"><input name=\"name\"><input type=\"password\" name=\"password\"></form></div>\n<script src=\"/webfig/engine.js\"></script>\n</body>\n</html>\n"
+              }
+            ],
+            "favicon_seed": "mikrotik"
+          }
+        }
+      ]
+    }
+  }
+}

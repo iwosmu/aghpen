@@ -1,0 +1,155 @@
+{
+  "name": "tls-selfsigned",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "selfsigned.lab.czujka.test",
+            "sans": [
+              "selfsigned.lab.czujka.test",
+              "10.66.50.11"
+            ],
+            "not_before_days": -100,
+            "not_after_days": 265
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Archiwum dokumentów</title>\n</head>\n<body>\n<h1>Archiwum dokumentów</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 8443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "selfsigned.lab.czujka.test",
+            "sans": [
+              "selfsigned.lab.czujka.test",
+              "10.66.50.11"
+            ],
+            "not_before_days": -100,
+            "not_after_days": 265
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Archiwum dokumentów (kopia)</title>\n</head>\n<body>\n<h1>Archiwum dokumentów (kopia)</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "selfsigned.lab.czujka.test",
+            "sans": [
+              "selfsigned.lab.czujka.test",
+              "10.66.50.11"
+            ],
+            "not_before_days": -100,
+            "not_after_days": 265
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Archiwum dokumentów</title>\n</head>\n<body>\n<h1>Archiwum dokumentów</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 8443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "selfsigned.lab.czujka.test",
+            "sans": [
+              "selfsigned.lab.czujka.test",
+              "10.66.50.11"
+            ],
+            "not_before_days": -100,
+            "not_after_days": 265
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Archiwum dokumentów (kopia)</title>\n</head>\n<body>\n<h1>Archiwum dokumentów (kopia)</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "selfsigned.lab.czujka.test",
+            "sans": [
+              "selfsigned.lab.czujka.test",
+              "10.66.50.11"
+            ],
+            "not_before_days": -100,
+            "not_after_days": 265
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Archiwum dokumentów</title>\n</head>\n<body>\n<h1>Archiwum dokumentów</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 8443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "selfsigned.lab.czujka.test",
+            "sans": [
+              "selfsigned.lab.czujka.test",
+              "10.66.50.11"
+            ],
+            "not_before_days": -100,
+            "not_after_days": 265
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Archiwum dokumentów (kopia)</title>\n</head>\n<body>\n<h1>Archiwum dokumentów (kopia)</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

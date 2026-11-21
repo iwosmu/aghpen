@@ -1,0 +1,113 @@
+{
+  "name": "kiosk-2",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "ik-httpd",
+            "headers": [
+              {
+                "name": "X-InfoKiosk-Node",
+                "value": "k-c0de"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "infokiosk_sid",
+                "value": "9f2c1d7a5b3e4860",
+                "http_only": true
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Informator — kiosk k-c0de</title>\n</head>\n<body>\n<!-- InfoKiosk build 4.2.1 -->\n<main class=\"ik-screen\"><h1>Plan zajęć i komunikaty</h1><p>Dotknij ekranu, aby rozpocząć.</p></main>\n<footer class=\"ik-footer\">InfoKiosk v4.2.1 &middot; węzeł k-c0de</footer>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/kiosk/status",
+                "content_type": "application/json",
+                "body": "{\"product\":\"InfoKiosk\",\"version\":\"4.2.1\",\"node\":\"k-c0de\",\"display\":\"on\"}\n"
+              }
+            ],
+            "favicon_seed": "infokiosk"
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "ik-httpd",
+            "headers": [
+              {
+                "name": "X-InfoKiosk-Node",
+                "value": "k-c0de"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "infokiosk_sid",
+                "value": "9f2c1d7a5b3e4860",
+                "http_only": true
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Informator — kiosk k-c0de</title>\n</head>\n<body>\n<!-- InfoKiosk build 4.2.1 -->\n<main class=\"ik-screen\"><h1>Plan zajęć i komunikaty</h1><p>Dotknij ekranu, aby rozpocząć.</p></main>\n<footer class=\"ik-footer\">InfoKiosk v4.2.1 &middot; węzeł k-c0de</footer>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/kiosk/status",
+                "content_type": "application/json",
+                "body": "{\"product\":\"InfoKiosk\",\"version\":\"4.2.1\",\"node\":\"k-c0de\",\"display\":\"on\"}\n"
+              }
+            ],
+            "favicon_seed": "infokiosk"
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "ik-httpd",
+            "headers": [
+              {
+                "name": "X-InfoKiosk-Node",
+                "value": "k-c0de"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "infokiosk_sid",
+                "value": "9f2c1d7a5b3e4860",
+                "http_only": true
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Informator — kiosk k-c0de</title>\n</head>\n<body>\n<!-- InfoKiosk build 4.2.1 -->\n<main class=\"ik-screen\"><h1>Plan zajęć i komunikaty</h1><p>Dotknij ekranu, aby rozpocząć.</p></main>\n<footer class=\"ik-footer\">InfoKiosk v4.2.1 &middot; węzeł k-c0de</footer>\n</body>\n</html>\n"
+              },
+              {
+                "path": "/kiosk/status",
+                "content_type": "application/json",
+                "body": "{\"product\":\"InfoKiosk\",\"version\":\"4.2.1\",\"node\":\"k-c0de\",\"display\":\"on\"}\n"
+              }
+            ],
+            "favicon_seed": "infokiosk"
+          }
+        }
+      ]
+    }
+  }
+}

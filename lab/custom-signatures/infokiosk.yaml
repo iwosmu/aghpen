@@ -1,0 +1,36 @@
+# Przykładowa WŁASNA sygnatura dla laboratorium Czujki.
+#
+# "InfoKiosk" to wymyślony produkt wewnętrzny (hosty kiosk-1 10.66.60.12 i kiosk-2 10.66.200.200).
+# Żadna publiczna baza sygnatur go nie zna, więc wykryje go tylko sygnatura dodana przez użytkownika.
+# Sygnatura pokazuje wszystkie rodzaje bezpiecznych reguł z treści zadania:
+# nagłówek, ciasteczko, fragment HTML, hash favicony, ścieżka i wersja w stopce.
+# Składnia: docs/SIGNATURES.md (DSL modułu internal/sig). Tylko GET, bez logowania.
+#
+# Oczekiwany wynik (lab/ground-truth/*.json, pole "signatures": ["lab-infokiosk"]):
+#   t0: kiosk-1 wersja 4.2.1, kiosk-2 wersja 4.2.1
+#   t1: kiosk-1 wersja 4.3.0 (zmiana wersji), kiosk-2 bez zmian
+id: lab-infokiosk
+name: InfoKiosk
+category: other
+description: Kiosk informacyjny InfoKiosk (produkt wewnętrzny, przypadek testowy własnej sygnatury).
+tags: [lab, kiosk, custom]
+interest: 30
+requests:
+  - path: /kiosk/status
+match:
+  condition: any
+  min_confidence: 0.5
+  rules:
+    # 1. nietypowy nagłówek
+    - {type: header, name: X-InfoKiosk-Node, exists: true, weight: 0.8}
+    # 2. nietypowe ciasteczko
+    - {type: cookie, name: infokiosk_sid, weight: 0.7}
+    # 3. charakterystyczny fragment HTML
+    - {type: body, contains: '<!-- InfoKiosk build', weight: 0.6}
+    # 4. hash favicony (mmh3 w stylu Shodan; sha256: 6642a382f003e69dd241a9b0c645b0e85c6aa4eeebf09a6c4bccc20af9bd9966)
+    - {type: favicon, mmh3: [1990289189], weight: 0.9}
+    # 5. ścieżka, bez logowania
+    - {type: path, path: /kiosk/status, status: 200, contains: '"product":"InfoKiosk"', weight: 0.9}
+version:
+  # 6. wersja w stopce strony
+  - {type: body, regex: 'InfoKiosk v([0-9]+\.[0-9]+\.[0-9]+)'}
