@@ -190,6 +190,8 @@
   ::selection { background: var(--accent); color: var(--accent-ink); }
   * { caret-color: var(--accent); }
   :focus-visible { outline: 1.5px solid var(--focus); outline-offset: 2px; }
+  /* the rail stays dark in the light theme: its focus ring uses the rail ink */
+  [data-rail] :focus-visible { outline-color: var(--rail-ink); outline-offset: -2px; }
   a { color: inherit; text-decoration: none; }
   button { cursor: pointer; }
   button:disabled { cursor: not-allowed; }
