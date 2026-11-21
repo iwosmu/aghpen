@@ -211,8 +211,11 @@ export default function ServiceDetail() {
         readOnly={!canEdit}
         actions={<span className="flex items-center gap-3 text-sm text-ink-2">{canSuggest ? <SuggestButton serviceId={s.id} /> : null}<span className="flex items-center gap-2">{t('Ciekawość', 'Interest')} <InterestScore value={s.interest} /></span></span>}
       />
-      <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
-        <div className="min-w-0 space-y-4">
+      <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,400px)] xl:grid-rows-[auto_1fr]">
+        <div className="min-w-0 xl:col-start-2 xl:row-start-1">
+          <Panel title={t('Ocena ciekawości', 'Interest score')}><InterestBreakdown value={s.interest} reasons={s.interest_why} /></Panel>
+        </div>
+        <div className="min-w-0 space-y-4 xl:col-start-1 xl:row-span-2 xl:row-start-1">
           <ServiceStory s={s} />
           {r?.http || s.name === 'http' || s.name === 'https' ? <ResponseTimeChart serviceId={s.id} /> : null}
           <Panel title={t('Identyfikacja', 'Identification')} actions={<span className="flex items-center gap-2 text-ink-2">{t('pewność', 'confidence')} <Confidence value={s.confidence} width={48} /></span>}>
@@ -277,8 +280,7 @@ export default function ServiceDetail() {
           </Panel>
         </div>
 
-        <div className="min-w-0 space-y-4">
-          <Panel title={t('Ocena ciekawości', 'Interest score')}><InterestBreakdown value={s.interest} reasons={s.interest_why} /></Panel>
+        <div className="min-w-0 space-y-4 self-start xl:col-start-2 xl:row-start-2">
           <Panel title={t('Technologie i dowody', 'Technologies and evidence')} count={(s.technologies ?? []).length}><TechList s={s} matches={r?.matches ?? []} /></Panel>
           <Panel title={t('Opis analityka', 'Analyst notes')}>
             <dl>

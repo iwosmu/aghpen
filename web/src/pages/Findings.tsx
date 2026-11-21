@@ -239,7 +239,7 @@ export default function Findings() {
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
         <SearchField value={text} onChange={setText} placeholder={t('tytuł, adres, opis', 'title, address, text')} />
         <FilterField label={t('Status', 'Status')} width={170}>
-          <Select value={u.get('status', 'open')} onChange={(v) => u.set({ status: v === 'open' ? null : v })} options={[{ value: 'open', label: t('otwarte (nowe i w analizie)', 'open (new and in analysis)') }, { value: 'all', label: t('wszystkie', 'all') }, ...statusOpts()]} />
+          <Select value={u.get('status', 'open')} onChange={(v) => u.set({ status: v === 'open' ? null : v })} options={[{ value: 'open', label: t('otwarte', 'open') }, { value: 'all', label: t('wszystkie', 'all') }, ...statusOpts()]} />
         </FilterField>
         <FilterField label={t('Waga', 'Severity')} width={120}><Select value={u.get('severity')} onChange={(v) => u.set({ severity: v })} options={[{ value: '', label: t('dowolna', 'any') }, ...sevOpts()]} /></FilterField>
         <FilterField label={t('Rodzaj', 'Type')} width={130}><Select value={u.get('type')} onChange={(v) => u.set({ type: v })} options={[{ value: '', label: t('dowolny', 'any') }, ...['signature', 'exposure', 'policy-violation', 'tls', 'change', 'manual'].map((x) => ({ value: x, label: typeLabel(x) }))]} /></FilterField>

@@ -264,27 +264,35 @@ export function InterestScore({ value, reasons, showTip }: { value: number; reas
 export function InterestBreakdown({ value, reasons }: { value: number; reasons: InterestReason[] | null | undefined }) {
   const list = reasons ?? [];
   const sum = list.reduce((a, r) => a + r.points, 0);
+  // Each reason is a segment of one 0-100 bar, in list order; what goes over 100 is cut, as the score is.
+  const shade = (i: number) => Math.max(0.28, 1 - i * 0.14);
+  let used = 0;
+  const segs = list.map((r, i) => { const w = Math.max(0, Math.min(r.points, 100 - used)); used += w; return { w, i }; }).filter((x) => x.w > 0);
   return (
-    <div>
+    <div data-testid="interest-breakdown">
       <div className="flex items-baseline gap-2">
-        <span className="text-xl font-semibold leading-none text-ink">{value}</span>
-        <span className="text-xs text-ink-3">/ 100 · {t('ocena ciekawości', 'interest score')}</span>
+        <span className="font-display text-[56px] leading-[0.9] tracking-[-0.01em] text-ink">{value}</span>
+        <span className="num text-sm text-ink-3">/ 100</span>
       </div>
+      {segs.length ? (
+        <div className="mt-3 flex h-[6px] w-full gap-px overflow-hidden rounded-full bg-sunk" aria-hidden="true">
+          {segs.map((x) => <span key={x.i} className="h-full bg-accent" style={{ width: x.w + '%', opacity: shade(x.i) }} />)}
+        </div>
+      ) : null}
       {list.length === 0 ? (
-        <p className="mt-2 text-sm text-ink-2">{t('Brak czynników podnoszących ocenę.', 'No factor raises the score.')}</p>
+        <p className="mt-3 text-sm text-ink-2">{t('Brak czynników podnoszących ocenę.', 'No factor raises the score.')}</p>
       ) : (
-        <ul className="mt-2">
+        <ul className="mt-3">
           {list.map((r, i) => (
-            <li key={i} className="flex min-h-[26px] items-center gap-2 border-b border-rule py-1 last:border-b-0">
-              <span className="num w-[34px] flex-none text-right text-sm text-ink">+{r.points}</span>
-              <span className="h-[4px] flex-none bg-accent" style={{ width: Math.max(3, Math.round((r.points / Math.max(1, sum)) * 72)) }} aria-hidden="true" />
-              <span className="min-w-0 flex-1 text-sm text-ink">{r.text}</span>
-              <span className="mono hidden text-2xs text-ink-3 sm:inline">{r.code}</span>
+            <li key={i} className="grid grid-cols-[8px_36px_minmax(0,1fr)] items-baseline gap-x-2.5 border-b border-rule py-2 last:border-b-0">
+              <span className="h-[8px] w-[8px] rounded-[2px] bg-accent" style={{ opacity: shade(i) }} aria-hidden="true" />
+              <span className="num text-right text-sm text-ink">+{r.points}</span>
+              <span className="text-sm leading-snug text-ink">{r.text}</span>
             </li>
           ))}
-          {sum > 100 ? <li className="pt-1 text-xs text-ink-3">{t('Suma ' + sum + ' punktów, ograniczona do 100.', 'Sum of ' + sum + ' points, capped at 100.')}</li> : null}
         </ul>
       )}
+      {sum > 100 ? <p className="mt-2 text-xs text-ink-3">{t('Suma ' + sum + ' punktów, ograniczona do 100.', 'Sum of ' + sum + ' points, capped at 100.')}</p> : null}
     </div>
   );
 }

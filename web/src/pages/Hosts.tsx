@@ -86,7 +86,7 @@ export default function Hosts() {
     { id: 'tech', header: t('Technologie', 'Technologies'), width: 'minmax(140px, 1.2fr)', min: 1080, cell: (h) => <span className="block truncate text-ink-2">{(h.technologies ?? []).join(', ') || ((h.open_ports ?? []).length ? '–' : '')}</span> },
     { id: 'tags', header: t('Tagi', 'Tags'), width: '150px', min: 1320, cell: (h) => <Tags tags={h.tags} max={2} /> },
     { id: 'palive', header: t('Obecność', 'Presence'), width: '62px', min: 760, sort: 'p_alive', align: 'right', cell: (h) => <span className="num text-ink-2">{fmtDec(h.p_alive)}</span> },
-    { id: 'seen', header: t('Ostatnio widziany', 'Last seen'), width: '128px', min: 700, sort: 'last_seen', cell: (h) => <span className="num text-ink-2" title={fmtDateTime(h.last_seen)}>{fmtRelative(h.last_seen)}</span> },
+    { id: 'seen', header: t('Ostatnia obserwacja', 'Last seen'), width: '128px', min: 700, sort: 'last_seen', cell: (h) => <span className="num text-ink-2" title={fmtDateTime(h.last_seen)}>{fmtRelative(h.last_seen)}</span> },
     { id: 'interest', header: t('Ciekawość', 'Interest'), width: '86px', min: 0, sort: 'interest', align: 'right', cell: (h) => <InterestScore value={h.interest} /> },
   ];
   const cols = allCols.filter((c) => width === 0 || width >= c.min);
