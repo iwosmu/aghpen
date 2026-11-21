@@ -12,6 +12,7 @@ import (
 
 	"github.com/iwosmu/aghpen/internal/auth"
 	"github.com/iwosmu/aghpen/internal/model"
+	"github.com/iwosmu/aghpen/internal/passive"
 	"github.com/iwosmu/aghpen/internal/runner"
 	"github.com/iwosmu/aghpen/internal/store"
 )
@@ -103,6 +104,52 @@ type RetroHunter interface {
 	RetroHunt(ctx context.Context, yaml string, latestOnly bool) (model.RetroHuntResult, error)
 }
 
+// SignatureImportReport says what POST /signatures/import did with a file.
+type SignatureImportReport struct {
+	Created    []string                  `json:"created"`    // slugs of new custom signatures
+	Updated    []string                  `json:"updated"`    // slugs of custom signatures that were replaced
+	Skipped    []SignatureImportSkip     `json:"skipped"`    // valid signatures that were not stored, with the reason
+	Validation model.SignatureValidation `json:"validation"` // issues of the whole file (rejected signatures and why)
+}
+
+// SignatureImportSkip is one signature that the import did not store.
+type SignatureImportSkip struct {
+	Slug   string `json:"slug"`
+	Reason string `json:"reason"`
+}
+
+// SignatureImporter stores every valid signature of a file (Czujka YAML,
+// JSON, lists, passive nuclei templates) as a custom row and reloads the
+// engine. Implemented by internal/sigwire.
+type SignatureImporter interface {
+	ImportSignatures(ctx context.Context, text, author string) (SignatureImportReport, error)
+}
+
+// Reporter writes the report of one run as "html" or "md". Implemented by
+// internal/wire over internal/report.
+type Reporter interface {
+	RunReport(ctx context.Context, runID int64, format string, w io.Writer) error
+}
+
+// PassiveResult is the answer of the passive routes: candidates with their
+// source, hostname hints, facts outside the scope, and what each source did.
+type PassiveResult struct {
+	passive.Result
+	File         *passive.FileReport `json:"file,omitempty"` // POST /passive/import: rows read and rejected
+	HostsUpdated int                 `json:"hosts_updated"`  // POST /passive/ptr: known hosts that got new hostnames
+}
+
+// PassiveSources reads passive sources. Nothing is sent to a scope address.
+// Implemented by internal/wire over internal/passive.
+type PassiveSources interface {
+	// ImportFile reads a DNS zone, CSV, JSON or JSONL file; nothing is saved.
+	ImportFile(ctx context.Context, name string, data []byte) (PassiveResult, error)
+	// PTR looks up the reverse names of the known live hosts and adds them to the hosts.
+	PTR(ctx context.Context) (PassiveResult, error)
+	// CT asks crt.sh for the certificates of the scope domains; only when an admin enabled it.
+	CT(ctx context.Context) (PassiveResult, error)
+}
+
 // Analyzer is the part of internal/analyze that the API calls directly.
 type Analyzer interface {
 	// Diff compares any two runs.
@@ -140,6 +187,12 @@ type Deps struct {
 	Dojo         DojoClient
 	Signatures   SignatureValidator
 	RetroHunter  RetroHunter
+	SigImporter  SignatureImporter
+	Reporter     Reporter
+	Passive      PassiveSources
 	Analyzer     Analyzer
 	Hooks        Hooks
+
+	// EngineInfo describes the prober for /healthz (prober, mode, raw_sockets); nil omits it.
+	EngineInfo func() map[string]any
 }

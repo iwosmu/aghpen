@@ -80,6 +80,29 @@ func (s *Store) SetEmergencyStop(ctx context.Context, on bool) (model.SafetyPoli
 
 // GetDefectDojo returns the DefectDojo settings. withKey also decrypts the API
 // key (for the client); without it the key stays hidden and only APIKeySet is filled.
+const keyPassive = "passive"
+
+// PassiveSettings turn the passive sources that leave the organisation on or off.
+type PassiveSettings struct {
+	// CTEnabled lets POST /passive/crtsh send the scope domains to crt.sh, a
+	// public service outside the organisation. Off by default.
+	CTEnabled bool `json:"crtsh_enabled"`
+}
+
+// GetPassiveSettings returns the passive-source settings; the default is everything external off.
+func (s *Store) GetPassiveSettings(ctx context.Context) (PassiveSettings, error) {
+	var p PassiveSettings
+	if _, _, err := s.getSetting(ctx, keyPassive, &p); err != nil && !errors.Is(err, ErrNotFound) {
+		return p, err
+	}
+	return p, nil
+}
+
+// PutPassiveSettings stores the passive-source settings.
+func (s *Store) PutPassiveSettings(ctx context.Context, p PassiveSettings) (PassiveSettings, error) {
+	return p, s.putSetting(ctx, keyPassive, p, "")
+}
+
 func (s *Store) GetDefectDojo(ctx context.Context, withKey bool) (model.DefectDojoSettings, error) {
 	d := model.DefectDojoSettings{VerifyTLS: true}
 	secret, _, err := s.getSetting(ctx, keyDefectDojo, &d)

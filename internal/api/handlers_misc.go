@@ -443,6 +443,9 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 	out["tde_detail"] = tde
 	out["field_encryption"] = map[string]any{"algorithm": "AES-256-GCM envelope", "key_id": s.st.Keyring().CurrentID()}
 	out["engine"] = s.d.Runner != nil && s.d.Runner.EngineWired()
+	if s.d.EngineInfo != nil {
+		out["probe"] = s.d.EngineInfo()
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 

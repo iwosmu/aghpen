@@ -48,6 +48,10 @@ type Options struct {
 	IngestBatch int
 	Logger      *slog.Logger
 	StopTimeout time.Duration // how long Pause, Cancel and EmergencyStop wait for the engine; default 30s
+	// PauseCause maps a pause reason (model.Pause*) to the cancel cause the
+	// engine reads with context.Cause (internal/scan: scan.PauseCause). Nil
+	// cancels without a cause; the manager then relies on its own intent.
+	PauseCause func(reason string) error
 }
 
 // Manager runs scans. One Manager exists per process.
@@ -65,7 +69,7 @@ type activeRun struct {
 	mu     sync.Mutex
 	run    model.ScanRun
 	intent string // "", pause, cancel, emergency, shutdown
-	cancel context.CancelFunc
+	cancel context.CancelCauseFunc
 	done   chan struct{}
 }
 
@@ -103,6 +107,21 @@ func (m *Manager) SetAnalyzer(a Analyzer) { m.opt.Analyzer = a }
 
 // SetWindow connects the scan-window function of the scheduler (integration step).
 func (m *Manager) SetWindow(w WindowFunc) { m.opt.Window = w }
+
+// cause returns the cancel cause for a stop intent: a pause reason the engine
+// understands for pause and emergency, nil (a plain cancel) otherwise.
+func (m *Manager) cause(intent string) error {
+	if m.opt.PauseCause == nil {
+		return nil
+	}
+	switch intent {
+	case "pause":
+		return m.opt.PauseCause(model.PauseManual)
+	case "emergency":
+		return m.opt.PauseCause(model.PauseEmergency)
+	}
+	return nil
+}
 
 // Wait blocks until every run goroutine has ended.
 func (m *Manager) Wait() { m.wg.Wait() }
@@ -213,7 +232,7 @@ func (m *Manager) Start(ctx context.Context, profileID int64, userID *int64, tri
 }
 
 func (m *Manager) launch(run model.ScanRun, p model.ScanProfile, resume bool) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancelCause(context.Background())
 	a := &activeRun{run: run, cancel: cancel, done: make(chan struct{})}
 	m.mu.Lock()
 	m.active[run.ID] = a
@@ -222,7 +241,7 @@ func (m *Manager) launch(run model.ScanRun, p model.ScanProfile, resume bool) {
 	go func() {
 		defer m.wg.Done()
 		defer func() {
-			cancel()
+			cancel(nil)
 			m.mu.Lock()
 			delete(m.active, run.ID)
 			m.mu.Unlock()
@@ -424,8 +443,9 @@ func (m *Manager) stop(ctx context.Context, runID int64, intent string) bool {
 	if a.intent == "" || intent == "cancel" {
 		a.intent = intent
 	}
+	cause := m.cause(a.intent)
 	a.mu.Unlock()
-	a.cancel()
+	a.cancel(cause)
 	select {
 	case <-a.done:
 	case <-ctx.Done():
@@ -532,7 +552,7 @@ func (m *Manager) EmergencyStop(ctx context.Context) (model.SafetyPolicy, error)
 			a.intent = "emergency"
 		}
 		a.mu.Unlock()
-		a.cancel()
+		a.cancel(m.cause("emergency"))
 	}
 	m.mu.Unlock()
 	policy, err := m.st.SetEmergencyStop(ctx, true)
@@ -587,7 +607,7 @@ func (m *Manager) Recover(ctx context.Context, autoResume bool) (recovered []int
 		}
 		recovered = append(recovered, run.ID)
 		if run.Status == model.RunAnalyzing {
-			a := &activeRun{run: run, cancel: func() {}, done: make(chan struct{})}
+			a := &activeRun{run: run, cancel: func(error) {}, done: make(chan struct{})}
 			var p *model.ScanProfile
 			if run.ProfileID != nil {
 				if prof, err := m.st.GetProfile(ctx, *run.ProfileID); err == nil {
@@ -669,7 +689,7 @@ func (m *Manager) Import(ctx context.Context, filename string, hosts []model.Hos
 			}
 		}
 	}
-	a := &activeRun{run: run, cancel: func() {}, done: make(chan struct{})}
+	a := &activeRun{run: run, cancel: func(error) {}, done: make(chan struct{})}
 	a.run.Stats = stats
 	sink := m.st.NewSink(store.SinkOptions{BatchSize: m.opt.IngestBatch, Source: "import", MarkMissing: false})
 	for i := range hosts {

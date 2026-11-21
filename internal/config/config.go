@@ -30,6 +30,9 @@ type Config struct {
 	AutoResume    bool          // CZUJKA_AUTO_RESUME: resume runs that a restart interrupted, default true
 	TrustProxy    bool          // CZUJKA_TRUST_PROXY: take the client address from X-Forwarded-For
 	IngestBatch   int           // CZUJKA_INGEST_BATCH: hosts per database batch, default 250
+	SchedInterval time.Duration // CZUJKA_SCHED_INTERVAL: tick of the scheduler loop, default 20s
+	NmapPath      string        // CZUJKA_NMAP_PATH: nmap binary; empty means "nmap" from PATH
+	ForceNative   bool          // CZUJKA_FORCE_NATIVE: use the native Go prober even when nmap is installed
 }
 
 // Load reads the configuration from the process environment.
@@ -69,6 +72,13 @@ func FromEnv(get func(string) string) (Config, error) {
 		return c, err
 	}
 	if c.IngestBatch, err = num(get, "CZUJKA_INGEST_BATCH", 250); err != nil {
+		return c, err
+	}
+	if c.SchedInterval, err = dur(get, "CZUJKA_SCHED_INTERVAL", 20*time.Second); err != nil {
+		return c, err
+	}
+	c.NmapPath = get("CZUJKA_NMAP_PATH")
+	if c.ForceNative, err = boolean(get, "CZUJKA_FORCE_NATIVE", false); err != nil {
 		return c, err
 	}
 	if c.AutoResume, err = boolean(get, "CZUJKA_AUTO_RESUME", true); err != nil {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/iwosmu/aghpen/internal/analyze"
 	"github.com/iwosmu/aghpen/internal/model"
+	"github.com/iwosmu/aghpen/internal/probe"
 	"github.com/iwosmu/aghpen/internal/store"
 )
 
@@ -51,6 +52,32 @@ func oldestFirst(obs []model.HostObservation) []model.HostObservation {
 	out := append([]model.HostObservation(nil), obs...)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
 	return out
+}
+
+// portScope returns the ports that the profile really scans, resolved by the
+// engine's own port resolver (probe.EffectivePorts: top-N lists, ranges, the
+// allow and deny lists of the safety policy). A service on a port outside
+// this set is never reported as gone. UDP ports count only when the profile
+// names them explicitly. Nil means every port is in scope.
+func (a *Analysis) portScope(ctx context.Context, p model.ScanProfile) func(proto string, port int) bool {
+	policy, err := a.st.GetSafetyPolicy(ctx)
+	if err != nil {
+		policy = store.DefaultSafetyPolicy()
+	}
+	explicit, hasExplicit := ParsePorts(p.Ports)
+	set, err := probe.EffectivePorts(p.Ports, policy.AllowedPorts, policy.DeniedPorts)
+	if err != nil {
+		if hasExplicit {
+			return explicit
+		}
+		return nil
+	}
+	return func(proto string, port int) bool {
+		if proto == "" || proto == "tcp" {
+			return set.Has(port)
+		}
+		return hasExplicit && explicit(proto, port)
+	}
 }
 
 // ParsePorts turns an explicit port list ("22,80,443,8000-8100", "T:80,U:53")
@@ -231,9 +258,7 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 	var opts analyze.DiffOptions
 	if run.ProfileID != nil {
 		if p, err := a.st.GetProfile(ctx, *run.ProfileID); err == nil {
-			if in, ok := ParsePorts(p.Ports); ok {
-				opts.PortInScope = in
-			}
+			opts.PortInScope = a.portScope(ctx, p)
 		}
 	}
 	changes, dsum := analyze.Diff(prev, cur, opts)
@@ -464,9 +489,7 @@ func (a *Analysis) Diff(ctx context.Context, fromRunID, toRunID int64) (model.Di
 	var opts analyze.DiffOptions
 	if rep.To.ProfileID != nil {
 		if p, err := a.st.GetProfile(ctx, *rep.To.ProfileID); err == nil {
-			if in, ok := ParsePorts(p.Ports); ok {
-				opts.PortInScope = in
-			}
+			opts.PortInScope = a.portScope(ctx, p)
 		}
 	}
 	rep.Changes, rep.Summary = analyze.Diff(&from, to, opts)
