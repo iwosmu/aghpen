@@ -106,6 +106,10 @@ export interface RunStats {
   addresses_total: number; addresses_done: number; chunks_total: number; chunks_done: number;
   hosts_up: number; services_open: number; http_services: number; packets_sent: number; http_requests: number;
   current_pps: number; avg_pps: number; elapsed_sec: number; eta_sec: number; retried: number; errors: number;
+  /** The part of packets_sent that is an estimate (a stage whose nmap output had no count). */
+  packets_estimated?: number;
+  /** measured: exact counts of finished stages; pace: includes the pinned nmap pace of running stages. */
+  current_pps_basis?: 'measured' | 'pace' | '';
 }
 
 export interface RunDiffSummary {
@@ -255,6 +259,8 @@ export interface DefectDojoSettings {
   enabled: boolean; url: string; api_key?: string; api_key_set: boolean; product_name: string;
   engagement_name: string; product_type_name: string; verify_tls: boolean; auto_export: boolean; min_interest: number;
   status_sync?: boolean; scope_mappings?: DojoScopeMapping[] | null;
+  /** Public base for links to DefectDojo (dojo_url); present once the server supports it. */
+  link_url?: string;
 }
 export interface DojoScopeMapping { scope_id: number; product_type_name: string; product_name: string; engagement_name: string }
 export interface DojoPullUpdate { finding_id: number; key: string; dojo_id: number; from: string; to: string; dojo_changed_at: string | null; reason: string }

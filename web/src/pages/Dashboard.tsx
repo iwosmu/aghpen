@@ -10,7 +10,7 @@ import { ErrorState, Panel, SkeletonRows } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, type GlyphName, type Tone } from '../ui/marks';
 import { AddressMap } from '../viz/AddressMap';
-import { BarList, ProgressBar, RateGauge, TrendRows } from '../viz/charts';
+import { BarList, PacketCount, ProgressBar, RateGauge, TrendRows } from '../viz/charts';
 import { useSession } from '../session';
 import { ReprobePanel } from './Reprobe';
 import { ATTENTION_INTEREST, adminPanelNames, adminPanelServiceNames, changeParts } from '../lib/headline';
@@ -171,9 +171,10 @@ function ActiveRun({ initial, d }: { initial: ScanRun; d: Dash }) {
             <div><dt className="text-ink-3">{t('aktywne hosty', 'hosts up')}</dt><dd className="num text-sm text-ink">{fmtInt(s.hosts_up)}</dd></div>
             <div><dt className="text-ink-3">{t('usługi', 'services')}</dt><dd className="num text-sm text-ink">{fmtInt(s.services_open)}</dd></div>
             <div><dt className="text-ink-3">{t('czas', 'elapsed')}</dt><dd className="num text-sm text-ink">{fmtDuration(s.elapsed_sec)}</dd></div>
+            <div><dt className="text-ink-3">{t('pakiety prób', 'probe packets')}</dt><dd className="text-sm text-ink"><PacketCount sent={s.packets_sent} estimated={s.packets_estimated} /></dd></div>
           </dl>
         </div>
-        <RateGauge current={s.current_pps} cap={Math.min(profile.data?.rate.max_pps ?? d.safety.max_pps, d.safety.max_pps)} policyCap={d.safety.max_pps} />
+        <RateGauge current={s.current_pps} cap={Math.min(profile.data?.rate.max_pps ?? d.safety.max_pps, d.safety.max_pps)} policyCap={d.safety.max_pps} basis={s.current_pps_basis} />
         <div className="min-w-[150px] max-w-[320px]">
           {map.data ? <AddressMap blocks={map.data.blocks} compact /> : <div className="skeleton h-[104px] w-[220px]" />}
         </div>
