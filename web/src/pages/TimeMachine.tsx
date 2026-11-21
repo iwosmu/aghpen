@@ -259,7 +259,7 @@ export default function TimeMachine() {
         {header}
         <div className="space-y-4 p-4 sm:p-6">
           <Panel title={<span>{t('Skan', 'Scan')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
-            actions={<span className="num text-ink-3">{cur + 1} / {runs.length}{snap.data ? ' · ' + snap.data.took_ms + ' ms' : ''}</span>}>
+            actions={<span className="num text-ink-3">{cur + 1} / {runs.length}</span>}>
             <Scrubber runs={runs} index={cur} onIndex={setIndex} />
           </Panel>
           <Panel title={t('Od tamtej chwili do dziś', 'From then to today')}>
@@ -278,7 +278,7 @@ export default function TimeMachine() {
       {header}
       <div className="space-y-4 p-4 sm:p-6">
         <Panel title={<span>{t('Skan', 'Scan')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
-          actions={<span className="num text-ink-3">{cur + 1} / {runs.length}{snap.data ? ' · ' + snap.data.took_ms + ' ms' : ''}</span>}>
+          actions={<span className="num text-ink-3">{cur + 1} / {runs.length}</span>}>
           <Scrubber runs={runs} index={cur} onIndex={setIndex} />
         </Panel>
         <Panel title={t('Stan w tamtej chwili', 'Status at that moment')}>
@@ -343,7 +343,7 @@ export function HostLifePanel({ hostId }: { hostId: number }) {
         ))}
       </div>
       <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-2xs text-ink-3">
-        {[['up', t('host odpowiada', 'host responds')], ['not responding', t('nie odpowiada', 'not responding')], ['down', t('nieaktywny', 'down')], ['open', t('usługa otwarta', 'service open')], ['unknown', t('stan nieznany', 'status unknown')]].map(([k, l]) => <span key={k} className="inline-flex items-center gap-1"><span className="inline-block h-2 w-3" style={{ background: laneColor[k], opacity: k === 'unknown' ? 0.5 : 1 }} />{l}</span>)}
+        {[['up', t('host odpowiada', 'host responds')], ['missing', t('nie odpowiada', 'not responding')], ['down', t('nieaktywny', 'down')], ['open', t('usługa otwarta', 'service open')], ['unknown', t('stan nieznany', 'status unknown')]].map(([k, l]) => <span key={k} className="inline-flex items-center gap-1"><span className="inline-block h-2 w-3" style={{ background: laneColor[k], opacity: k === 'unknown' ? 0.5 : 1 }} />{l}</span>)}
         <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-px bg-ink" />{t('zmiana wersji', 'version change')}</span>
       </p>
     </Panel>

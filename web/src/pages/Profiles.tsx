@@ -10,6 +10,7 @@ import { Glyph } from '../ui/marks';
 import { describeWindows } from '../viz/WindowPicker';
 import { useCan } from '../session';
 import { StartRunDialog } from './Runs';
+import { portsShort } from '../lib/portsShort';
 
 export function scheduleText(p: ScanProfile): string {
   if (!p.schedule.enabled) return t('tylko ręcznie', 'manual only');
@@ -35,7 +36,7 @@ export default function Profiles() {
       </div>
     ) },
     { id: 'scopes', header: t('Zakresy', 'Scopes'), wrap: true, hide: 'lg', cell: (p) => <span className="text-ink-2">{p.scope_ids.map(scopeName).join(', ')}</span> },
-    { id: 'ports', header: t('Porty', 'Ports'), cell: (p) => <span className="mono">{p.ports}</span> },
+    { id: 'ports', header: t('Porty', 'Ports'), cell: (p) => <span className="mono" title={p.ports}>{portsShort(p.ports)}</span> },
     { id: 'rate', header: t('Tempo', 'Rate'), align: 'right', hide: 'md', cell: (p) => <span className="num">{fmtInt(p.rate.max_pps)} <span className="font-sans text-xs text-ink-3">pps</span></span> },
     { id: 'schedule', header: t('Harmonogram', 'Schedule'), wrap: true, cell: (p) => (
       <div className="py-1">
@@ -61,7 +62,7 @@ export default function Profiles() {
         mobile={(p) => (
           <div>
             <div className="text-sm font-medium">{p.name}</div>
-            <div className="mt-0.5 text-xs text-ink-3"><span className="mono">{p.ports}</span> · {scheduleText(p)}</div>
+            <div className="mt-0.5 text-xs text-ink-3"><span className="mono" title={p.ports}>{portsShort(p.ports)}</span> · {scheduleText(p)}</div>
             <div className="text-xs text-ink-3">{describeWindows(p.schedule.windows)}</div>
           </div>
         )}

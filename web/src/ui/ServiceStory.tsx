@@ -19,7 +19,7 @@ export function ServiceStory({ s }: { s: Service }) {
   const hasStory = events.some((c) => c.kind !== 'service_new');
   if (!hasStory) return null;
   return (
-    <Panel title={t('Czas odpowiedzi', 'Response time')} flush>
+    <Panel title={t('Historia', 'History')} flush>
       <ol className="divide-y divide-rule" data-testid="service-story">
         <li className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-start gap-x-2 px-3 py-1.5 text-sm">
           <span className="mt-[3px]"><Glyph name="plus" tone="new" /></span>
@@ -76,7 +76,12 @@ export function ResponseTimeChart({ serviceId }: { serviceId: number }) {
         <span className="num">#{pts[0].run_id}</span>
         <span className="num">#{last.run_id}</span>
       </div>
-      <p className="mt-1 text-2xs text-ink-3">{t('słupek: skan; wyróżniony: wolniej niż zwykle (', 'bar: scan; highlighted: slower than usual (') + String(q.data.rule.slow_factor) + '× ' + t('i', 'and') + ' +' + fmtMs(q.data.rule.slow_min_ms) + (threshold !== null ? t(', próg ', ', threshold ') + fmtMs(threshold) : '') + t('); ×: brak odpowiedzi HTTP', '); ×: no HTTP response')}</p>
+      {pts.some((p) => p.slow && p.ms !== null) || pts.some((p) => p.ms === null) ? (
+        <p className="mt-1 flex gap-4 text-2xs text-ink-3" data-testid="response-legend">
+          {pts.some((p) => p.slow && p.ms !== null) ? <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-2 bg-st-changed" aria-hidden="true" />{t('wolniej', 'slower')}</span> : null}
+          {pts.some((p) => p.ms === null) ? <span className="inline-flex items-center gap-1.5"><span className="leading-none text-st-gone" aria-hidden="true">×</span>{t('brak odpowiedzi', 'no response')}</span> : null}
+        </p>
+      ) : null}
     </Panel>
   );
 }

@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useAction, useItem, usePage } from '../api/hooks';
 import { ApiError, del, patch, post, put } from '../api/client';
-import type { WebhookSettings, WebhookTestResult, AuditEntry, DefectDojoSettings, DojoPullResult, DojoScopeMapping, DojoSyncResult, DojoTestResult, Permission, PermissionInfo, Role, SafetyPolicy, Scope, User } from '../api/types';
+import type { WebhookSettings, WebhookTestResult, AuditEntry, DefectDojoSettings, DojoPullResult, DojoScopeMapping, DojoSyncResult, DojoTestResult, KernelCap, Permission, PermissionInfo, Role, SafetyPolicy, Scope, User } from '../api/types';
 import { t, getLang, plural } from '../i18n';
 import { routeMissing } from '../lib/route';
 
@@ -53,6 +53,7 @@ function UsersTab() {
   const roles = useItem<Role[]>('/roles');
   const [add, setAdd] = useState(false);
   const [confirm, setConfirm] = useState<User | null>(null);
+  const [disableAsk, setDisableAsk] = useState<User | null>(null);
   const update = useAction((v: { id: number; body: Record<string, unknown> }) => patch<User>('/users/' + v.id, v.body), { invalidate: ['/users', '/roles', '/audit'], success: t('Zapisano', 'Saved') });
   const remove = useAction((id: number) => del('/users/' + id), { invalidate: ['/users', '/roles', '/audit'], success: t('Użytkownik usunięty', 'User deleted'), onSuccess: () => setConfirm(null) });
   const me = session.user.id;
@@ -62,7 +63,7 @@ function UsersTab() {
     ) },
     { id: 'role', header: t('Rola', 'Role'), width: 220, cell: (x) => x.id === me ? <span>{roleLabel(x.role_slug, x.role_name)}</span> : <Select label={t('Rola użytkownika ', 'Role of ') + x.email} value={String(x.role_id)} onChange={(v) => update.mutate({ id: x.id, body: { role_id: Number(v) } })} options={(roles.data ?? []).map((r) => ({ value: String(r.id), label: roleLabel(r.slug, r.name) }))} /> },
     { id: 'login', header: t('Ostatnie logowanie', 'Last login'), hide: 'md', cell: (x) => <span className="num text-ink-2" title={fmtDateTime(x.last_login_at)}>{x.last_login_at ? fmtRelative(x.last_login_at) : t('nigdy', 'never')}</span> },
-    { id: 'state', header: t('Konto włączone', 'Account enabled'), cell: (x) => <Switch checked={!x.disabled} disabled={x.id === me || update.isPending} onChange={(v) => update.mutate({ id: x.id, body: { disabled: !v } })} label={t('Konto włączone: ', 'Account enabled: ') + x.email} /> },
+    { id: 'state', header: t('Konto włączone', 'Account enabled'), cell: (x) => <span className="inline-flex" title={x.id === me ? t('Własnego konta nie można wyłączyć.', 'You cannot disable your own account.') : undefined}><Switch checked={!x.disabled} disabled={x.id === me || update.isPending} onChange={(v) => (v ? update.mutate({ id: x.id, body: { disabled: false } }) : setDisableAsk(x))} label={t('Konto włączone: ', 'Account enabled: ') + x.email} /></span> },
     { id: 'del', header: '', align: 'right', width: 44, cell: (x) => x.id === me ? null : <IconButton icon="trash" label={t('Usuń użytkownika ', 'Delete user ') + x.email} onClick={() => setConfirm(x)} /> },
   ];
   return (
@@ -74,6 +75,10 @@ function UsersTab() {
       <DataTable rows={users.data?.items} cols={cols} rowKey={(x) => x.id} loading={users.isPending} error={users.error} retry={() => users.refetch()}
         mobile={(x) => <div><div className="text-sm">{x.name || x.email}</div><div className="text-xs text-ink-3">{x.email} · {roleLabel(x.role_slug, x.role_name)}{x.disabled ? ' · ' + t('wyłączone', 'disabled') : ''}</div></div>} />
       {add && roles.data ? <UserDialog roles={roles.data} onClose={() => setAdd(false)} /> : null}
+      <Dialog open={disableAsk !== null} onClose={() => setDisableAsk(null)} width={420} title={t('Wyłączyć konto?', 'Disable the account?')}
+        footer={<><Button onClick={() => setDisableAsk(null)}>{t('Anuluj', 'Cancel')}</Button><Button variant="dangerSolid" busy={update.isPending} data-testid="user-disable-confirm" onClick={() => { if (disableAsk) update.mutate({ id: disableAsk.id, body: { disabled: true } }, { onSuccess: () => setDisableAsk(null) }); }}>{t('Wyłącz konto', 'Disable account')}</Button></>}>
+        <p className="text-sm"><span className="mono">{disableAsk?.email}</span>{t(' nie zaloguje się, dopóki konto nie zostanie włączone.', ' cannot sign in until the account is enabled again.')}</p>
+      </Dialog>
       <Dialog open={confirm !== null} onClose={() => setConfirm(null)} width={420} title={t('Usunąć użytkownika?', 'Delete user?')}
         footer={<><Button onClick={() => setConfirm(null)}>{t('Anuluj', 'Cancel')}</Button><Button variant="dangerSolid" busy={remove.isPending} onClick={() => confirm && remove.mutate(confirm.id)}>{t('Usuń konto', 'Delete account')}</Button></>}>
         <p className="text-sm"><span className="mono">{confirm?.email}</span>{t('. Konto zostanie usunięte, wpisy w dzienniku audytu zostaną.', '. The account is deleted. Its audit entries stay.')}</p>
@@ -196,6 +201,18 @@ function AuditTab() {
 }
 
 // ---------- safety ----------
+/** One line under the pps limit: the kernel's own packet cap, from the server. */
+function KernelCapLine({ k }: { k: KernelCap }) {
+  return (
+    <p className="mt-2 text-xs text-ink-2" data-testid="kernel-cap" title={k.active ? undefined : k.reason || undefined}>
+      {t('Limit w jądrze: ', 'Kernel limit: ')}
+      {k.active
+        ? <><span className="num text-ink">{fmtInt(k.pps)}</span> {t('pakietów/s', 'packets/s')}{k.dropped > 0 ? <> · {t('odrzucone: ', 'dropped: ')}<span className="num text-ink">{fmtInt(k.dropped)}</span></> : null}</>
+        : t('wyłączony', 'off')}
+    </p>
+  );
+}
+
 function SafetyTab() {
   const { can } = useSession();
   const canManage = can('safety:manage');
@@ -206,7 +223,7 @@ function SafetyTab() {
   const [confirmStop, setConfirmStop] = useState(false);
   useEffect(() => { if (q.data) { setF(q.data); setExcl((q.data.exclusions ?? []).join('\n')); setNets((q.data.allowed_networks ?? []).join('\n')); } }, [q.data]);
   const lines = (s: string) => s.split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
-  const save = useAction(() => put<SafetyPolicy>('/settings/safety', { ...f, exclusions: lines(excl), allowed_networks: lines(nets) }), { invalidate: ['/settings/safety', '/dashboard', '/audit'], silent: true, success: t('Polityka zapisana', 'Policy saved') });
+  const save = useAction(() => put<SafetyPolicy>('/settings/safety', { ...f, kernel_cap: undefined, exclusions: lines(excl), allowed_networks: lines(nets) }), { invalidate: ['/settings/safety', '/dashboard', '/audit'], silent: true, success: t('Polityka zapisana', 'Policy saved') });
   const stop = useAction(() => post<SafetyPolicy>('/emergency-stop'), { invalidate: ['/settings/safety', '/dashboard', '/runs', '/audit'], onSuccess: () => setConfirmStop(false) });
   const release = useAction(() => post<SafetyPolicy>('/emergency-stop/release'), { invalidate: ['/settings/safety', '/dashboard', '/audit'], success: t('Stop awaryjny wyłączony', 'Emergency stop is off') });
   if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
@@ -231,6 +248,7 @@ function SafetyTab() {
           {num('max_per_host_rps', t('Żądania na host', 'Requests per host'), 'rps')}
           {num('max_paths_per_host', t('Ścieżki na usługę', 'Paths per service'), t('maks.', 'max'))}
         </div>
+        {q.data.kernel_cap ? <KernelCapLine k={q.data.kernel_cap} /> : null}
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label={t('Dozwolone porty', 'Allowed ports')} hint={t('puste: wszystkie', 'empty: all')}><input className="field mono" disabled={!canManage} value={f.allowed_ports} onChange={(e) => setF({ ...f, allowed_ports: e.target.value })} /></Field>
           <Field label={t('Zabronione porty', 'Denied ports')} hint={t('np. 9100 (drukarki)', 'for example 9100 (printers)')}><input className="field mono" disabled={!canManage} value={f.denied_ports} onChange={(e) => setF({ ...f, denied_ports: e.target.value })} /></Field>

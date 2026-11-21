@@ -12,6 +12,7 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 | [`docs/slides/czujka.pdf`](slides/czujka.pdf) | polski | jury: prezentacja, 10 slajdów |
 | [`docs/DEMO.md`](DEMO.md) | polski | jury, zespół: lista ujęć, pokaz, notatki do slajdów, przygotowanie, pytania |
 | [`docs/demo/README.md`](demo/README.md) | polski | zespół: nagrywanie filmu demo jednym poleceniem |
+| [`docs/demo/LIVE.md`](demo/LIVE.md) | polski | prowadzący: ściąga pokazu na żywo, 7 przypadków w maszynie jury (`docs/demo/live/live.sh`) |
 | [`docs/WYNIKI.md`](WYNIKI.md) | polski | jury: pomiary na laboratorium 70 hostów |
 | [`docs/WDROZENIE.md`](WDROZENIE.md) | polski | administrator |
 | [`docs/BEZPIECZENSTWO.md`](BEZPIECZENSTWO.md) | polski | jury, administrator, zespół bezpieczeństwa |

@@ -3,6 +3,7 @@
 // without the pages knowing.
 
 import { parseJSON } from './normalize';
+import { getLang } from '../i18n';
 
 const BASE = '/api/v1';
 
@@ -63,6 +64,8 @@ async function refreshCsrf(): Promise<boolean> {
 async function send(method: string, path: string, body?: BodyInit | null, headers?: Record<string, string>, retried = false): Promise<Response> {
   const h = new Headers(headers);
   h.set('Accept', 'application/json');
+  // The server renders change summaries in this language (contract: ?lang=, then Accept-Language).
+  h.set('Accept-Language', getLang());
   if (method !== 'GET' && method !== 'HEAD' && csrfToken) h.set('X-CSRF-Token', csrfToken);
   const req = new Request(BASE + path, { method, body: body ?? undefined, headers: h, credentials: 'same-origin' });
   let res: Response;

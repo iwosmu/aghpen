@@ -21,6 +21,7 @@ import { useArrivalOrder } from '../ui/arrivalOrder';
 import { ResponseCell, SelfTag } from '../ui/serviceBits';
 import { NotScanned, notScannedHint, scannedFirst } from '../ui/NotScanned';
 import { runNoteText } from '../lib/runNotes';
+import { ProductValue } from '../ui/ProductValue';
 
 /** A run over this many addresses or fewer is a "one machine" run: the page shows its services instead of the address map. */
 export const SMALL_RUN = 4;
@@ -64,7 +65,7 @@ function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: nu
                   <td className="h-[30px] whitespace-nowrap px-3"><Link to={'/services/' + s.id} className="mono link">{s.port}/{s.proto}</Link></td>
                   <td className="whitespace-nowrap px-3">{s.carried ? <NotScanned /> : <ServiceStateMark state={live ? 'open' : s.state} />}</td>
                   <td className="whitespace-nowrap px-3">{serviceName(s)}{isSelf(s) ? <SelfTag /> : null}</td>
-                  <td className={cx('whitespace-nowrap px-3', !s.carried && 'text-ink-2')}>{[s.product, s.version].filter(Boolean).join(' ') || '–'}</td>
+                  <td className={cx('whitespace-nowrap px-3', !s.carried && 'text-ink-2')}><ProductValue s={s} /></td>
                   <td className="hidden max-w-[320px] truncate px-3 text-ink-2 md:table-cell">{s.title || '–'}</td>
                   {anyTime ? <td className="whitespace-nowrap px-3 text-right">{s.carried ? '–' : <ResponseCell s={s} />}</td> : null}
                 </tr>

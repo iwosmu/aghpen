@@ -33,7 +33,8 @@
   category: header
   description: Odpowiedź zawiera nagłówek debugowania (X-Debug-Token, X-Debug-Info). Aplikacja działa w trybie deweloperskim.
   interest: 60
-  classes: [staging]
+  # no class: a debug header says the application runs in debug mode, not
+  # that the host is a staging environment (the finding and its interest stay)
   match:
     rules:
       - {type: header, name_regex: '^X-Debug', exists: true, weight: 0.95}

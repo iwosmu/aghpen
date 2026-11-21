@@ -1063,26 +1063,99 @@ func TestSmallScopeGetsTheFullPortRange(t *testing.T) {
 	}
 }
 
+// The 16-host budget is claimed per host: in a group with more live hosts
+// the first 16 by address get the full range, the rest the profile's ports,
+// and the coverage the store gets says which is which.
 func TestFullRangeHostBudget(t *testing.T) {
-	hosts := map[string][]int{}
-	for i := 1; i <= 20; i++ {
-		hosts[fmt.Sprintf("10.7.0.%d", i)] = []int{80, 40000}
+	for _, n := range []int{16, 17, 40} {
+		t.Run(fmt.Sprint(n), func(t *testing.T) {
+			hosts := map[string][]int{}
+			for i := 1; i <= n; i++ {
+				hosts[fmt.Sprintf("10.7.0.%d", i)] = []int{80, 40000}
+			}
+			e := New(Deps{Prober: &fakeNet{hosts: hosts}, Logger: quiet})
+			plan := basePlan("10.7.0.0/26")
+			plan.Profile.Ports = "top-100"
+			sink := newSink()
+			out := e.Run(context.Background(), plan, sink)
+			if out.Status != model.RunCompleted {
+				t.Fatalf("outcome = %+v", out)
+			}
+			covered := min(n, fullRangeMaxHosts)
+			for i := 1; i <= n; i++ {
+				ip := fmt.Sprintf("10.7.0.%d", i)
+				h := sink.host(ip)
+				if h == nil {
+					t.Fatalf("%s missing", ip)
+				}
+				full := i <= covered // the first hosts by address
+				if got := len(h.Services) == 2; got != full {
+					t.Errorf("%s: %d services, full range %v", ip, len(h.Services), full)
+				}
+				if h.Coverage == nil || h.Coverage.Has("tcp", 40000) != full || !h.Coverage.Has("tcp", 80) {
+					t.Errorf("%s: coverage %+v, full range %v", ip, h.Coverage, full)
+				}
+			}
+			p := out.Stats.Passes
+			if len(p) != 2 || p[1].State != model.PassDone || p[1].Hosts != covered || p[1].HostsSkipped != n-covered {
+				t.Errorf("passes = %+v", p)
+			}
+			want := 0
+			if n > covered {
+				want = 1
+			}
+			if len(out.Stats.Notes) != want || (want == 1 && !strings.Contains(out.Stats.Notes[0], fmt.Sprintf("objął 16 z %d", n))) {
+				t.Errorf("notes = %q", out.Stats.Notes)
+			}
+		})
 	}
-	netw := &fakeNet{hosts: hosts}
-	e := New(Deps{Prober: netw, Logger: quiet})
-	plan := basePlan("10.7.0.0/27")
-	plan.Profile.Ports = "top-100"
-	sink := newSink()
-	out := e.Run(context.Background(), plan, sink)
-	if out.Status != model.RunCompleted {
-		t.Fatalf("outcome = %+v", out)
+}
+
+// Two groups share the budget in group order, whichever reaches the claim
+// first: the same hosts get the full range in every run.
+func TestFullRangeBudgetAcrossGroups(t *testing.T) {
+	r := &run{fullPlanned: true, stats: newStatsKeeper(nil, time.Now), log: quiet}
+	r.fullLeft.Store(fullRangeMaxHosts)
+	mk := func(third, n int) ([]probe.Host, map[string]*probe.Host) {
+		var hs []probe.Host
+		sc := map[string]*probe.Host{}
+		for i := n; i >= 1; i-- { // reverse order: the claim sorts by address
+			ip := fmt.Sprintf("10.7.%d.%d", third, i)
+			hs = append(hs, probe.Host{IP: ip, Up: true})
+			sc[ip] = &probe.Host{IP: ip, Responded: true}
+		}
+		return hs, sc
 	}
-	if h := sink.host("10.7.0.3"); h == nil || len(h.Services) != 1 {
-		t.Errorf("20 live hosts are over the budget of %d: host %+v", fullRangeMaxHosts, h)
+	h1, s1 := mk(0, 10)
+	h2, s2 := mk(1, 10)
+	got2 := make(chan map[string]bool)
+	go func() { got2 <- r.claimFullRange(context.Background(), &group{id: 2}, h2, s2) }()
+	select {
+	case <-got2:
+		t.Fatal("group 2 claimed before group 1")
+	case <-time.After(50 * time.Millisecond):
 	}
-	p := out.Stats.Passes
-	if len(p) != 2 || p[1].State != model.PassSkipped {
-		t.Errorf("passes = %+v", p)
+	c1 := r.claimFullRange(context.Background(), &group{id: 1}, h1, s1)
+	c2 := <-got2
+	if len(c1) != 10 || len(c2) != 6 {
+		t.Fatalf("group 1: %d hosts, group 2: %d", len(c1), len(c2))
+	}
+	for i := 1; i <= 6; i++ {
+		if !c2[fmt.Sprintf("10.7.1.%d", i)] {
+			t.Errorf("group 2 must cover its first 6 hosts by address: %v", c2)
+		}
+	}
+	// a third group finds the budget empty; a group that never claims
+	// (no live host) does not hold the next one
+	r.fullPass(3)
+	h4, s4 := mk(4, 3)
+	if c4 := r.claimFullRange(context.Background(), &group{id: 4}, h4, s4); len(c4) != 0 {
+		t.Errorf("group 4 = %v", c4)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if c := r.claimFullRange(ctx, &group{id: 9}, h4, s4); c != nil {
+		t.Errorf("a cancelled wait claims %v", c)
 	}
 }
 
@@ -1320,5 +1393,125 @@ func TestPortTableGuessGivesWayToTheHTTPAnswer(t *testing.T) {
 	h := sink.host("10.7.0.5")
 	if h == nil || h.Services[1].Port != 8080 || h.Services[1].Name != "http" || h.Services[0].Name != "ssh" {
 		t.Fatalf("services = %+v", h.Services)
+	}
+}
+
+// rateNet records the nmap rates in flight across all runs.
+type rateNet struct {
+	*fakeNet
+	rmu       sync.Mutex
+	cur, peak int
+}
+
+func (n *rateNet) take(rate int) func() {
+	n.rmu.Lock()
+	n.cur += rate
+	n.peak = max(n.peak, n.cur)
+	n.rmu.Unlock()
+	time.Sleep(30 * time.Millisecond) // overlap with the other run
+	return func() { n.rmu.Lock(); n.cur -= rate; n.rmu.Unlock() }
+}
+
+func (n *rateNet) Discover(ctx context.Context, req probe.DiscoverRequest) (*probe.Result, error) {
+	defer n.take(req.MaxRate)()
+	return n.fakeNet.Discover(ctx, req)
+}
+
+func (n *rateNet) PortScan(ctx context.Context, req probe.PortScanRequest) (*probe.Result, error) {
+	defer n.take(req.MaxRate)()
+	return n.fakeNet.PortScan(ctx, req)
+}
+
+func (n *rateNet) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*probe.Result, error) {
+	defer n.take(req.MaxRate)()
+	return n.fakeNet.ServiceScan(ctx, req)
+}
+
+// The safety policy's packet cap holds for every run of the engine
+// together: a scheduled scan, a re-probe and an ad-hoc run at the same time
+// do not send 3 x max_pps.
+func TestConcurrentRunsShareThePolicyBudget(t *testing.T) {
+	hosts := map[string][]int{}
+	for i := 1; i <= 40; i++ {
+		hosts[fmt.Sprintf("10.8.%d.%d", i/20, i%20+1)] = []int{22, 80}
+	}
+	netw := &rateNet{fakeNet: &fakeNet{hosts: hosts}}
+	e := New(Deps{Prober: netw, Logger: quiet})
+	plan := func(id int64, scope string) model.ScanPlan {
+		p := basePlan(scope)
+		p.RunID = id
+		p.Profile.Rate.MaxPPS = 1000 // the profile allows more than the policy
+		p.Policy.MaxPPS = 300
+		return p
+	}
+	var wg sync.WaitGroup
+	for i, scope := range []string{"10.8.0.0/24", "10.8.1.0/24", "10.8.2.0/24"} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if out := e.Run(context.Background(), plan(int64(i+1), scope), newSink()); out.Status != model.RunCompleted {
+				t.Errorf("run %d: %+v", i+1, out)
+			}
+		}()
+	}
+	wg.Wait()
+	limit := EffectiveLimits(model.ScanProfile{}, model.SafetyPolicy{MaxPPS: 300}).ProbePPS()
+	if netw.peak > limit || netw.peak == 0 {
+		t.Errorf("nmap rates in flight peaked at %d pps; the policy's budget for all runs is %d", netw.peak, limit)
+	}
+	// the engine-wide per-host request limiter is one per address
+	if a, b := e.hostLimiter("10.8.0.2", 2), e.hostLimiter("10.8.0.2", 2); a != b {
+		t.Error("two runs must share the request limiter of one address")
+	}
+}
+
+// The engine keeps to the allowed networks itself: a domain that resolves
+// outside them at scan time, a target outside the operator lock, and the
+// stored chunks of a resumed run after the lock was narrowed are not scanned.
+func TestEngineKeepsToTheAllowedNetworks(t *testing.T) {
+	hosts := map[string][]int{"10.9.0.5": {80}, "10.9.0.200": {80}, "10.9.1.1": {80}}
+	scanned := func(plan model.ScanPlan, dns fakeDNS) map[string]bool {
+		e := New(Deps{Prober: &fakeNet{hosts: hosts}, Logger: quiet, Resolver: dns})
+		sink := newSink()
+		if out := e.Run(context.Background(), plan, sink); out.Status != model.RunCompleted {
+			t.Fatalf("outcome = %+v", out)
+		}
+		got := map[string]bool{}
+		for ip := range hosts {
+			if h := sink.host(ip); h != nil && h.Up {
+				got[ip] = true
+			}
+		}
+		return got
+	}
+
+	// the name answered inside the allowed network when the runner checked it; now it answers outside
+	plan := basePlan("10.9.0.5", "panel.example.com")
+	plan.Policy.AllowedNetworks = []string{"10.9.0.0/25"}
+	if got := scanned(plan, fakeDNS{"panel.example.com": "10.9.0.200"}); !got["10.9.0.5"] || got["10.9.0.200"] {
+		t.Errorf("re-resolved domain: scanned %v", got)
+	}
+
+	// the operator lock alone, and both lists together (an address must lie in both)
+	plan = basePlan("10.9.0.0/24", "10.9.1.0/30")
+	plan.Policy.OperatorNetworks = []string{"10.9.0.0/24"}
+	if got := scanned(plan, nil); got["10.9.1.1"] || !got["10.9.0.200"] {
+		t.Errorf("operator lock: scanned %v", got)
+	}
+	plan.Policy.AllowedNetworks = []string{"10.9.0.0/25", "10.9.1.0/24"}
+	if got := scanned(plan, nil); got["10.9.1.1"] || got["10.9.0.200"] || !got["10.9.0.5"] {
+		t.Errorf("both lists: scanned %v", got)
+	}
+
+	// a resumed run: the stored chunk covers the /24, the lock is now a /25
+	plan = basePlan("10.9.0.0/24")
+	plan.Chunks = []model.Chunk{{RunID: 7, Seq: 1, Spec: []string{"10.9.0.0/24"}, Size: 256, Status: model.ChunkDeferred}}
+	plan.Policy.OperatorNetworks = []string{"10.9.0.0/25"}
+	if got := scanned(plan, nil); !got["10.9.0.5"] || got["10.9.0.200"] {
+		t.Errorf("resumed chunk: scanned %v", got)
+	}
+
+	if _, _, err := allowedScope(model.SafetyPolicy{AllowedNetworks: []string{"not-a-net"}}); err == nil {
+		t.Error("a bad allowed network must fail the run, not open it")
 	}
 }

@@ -47,7 +47,7 @@ export function fieldValue(field: string, v: unknown): string {
   }
   const s = show(v);
   if (field === 'state') return s === 'host-down' ? t('host nieaktywny', 'host down') : s === 'closed' ? t('zamknięta', 'closed') : serviceStateInfo(s).label;
-  if (field === 'status' && /^[a-z-]+$/.test(s)) return s === 'not responding' ? t('nie odpowiada', 'not responding') : hostStatusInfo(s).label;
+  if (field === 'status' && /^[a-z-]+$/.test(s)) return s === 'not responding' || s === 'missing' ? t('nie odpowiada', 'not responding') : hostStatusInfo(s).label;
   if (field === 'classes') return s.split(',').filter(Boolean).map((c) => classLabel(c.trim())).join(', ');
   return s;
 }

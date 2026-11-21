@@ -11,7 +11,7 @@ import { Icon } from '../ui/Icon';
 import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, changeKindInfo, type GlyphName, type Tone } from '../ui/marks';
 import { BarList, ProgressBar, TrendRows } from '../viz/charts';
 import { useSession } from '../session';
-import { RunStory } from '../ui/RunStory';
+import { RunStory, useRunStoryShown } from '../ui/RunStory';
 import { useHostVerdicts } from '../ui/MissingHosts';
 import { PartialNote } from '../ui/RunPasses';
 import { useArrivalOrder } from '../ui/arrivalOrder';
@@ -19,7 +19,6 @@ import { SMALL_RUN } from './RunDetail';
 import { serviceName } from '../lib/serviceName';
 import { ReprobePanel } from './Reprobe';
 import { ATTENTION_INTEREST, adminPanelNames, adminPanelServiceNames, isFullRun, lastFullPair, partialRunPhrase } from '../lib/headline';
-import { changeSummary } from '../lib/changeText';
 
 function Count({ n, glyph, tone, label, to }: { n: number; glyph: GlyphName; tone: Tone; label: string; to: string }) {
   const zero = n === 0;
@@ -50,6 +49,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   // services of hosts the confirmation probe has decided about are no longer "not answering"
   const decidedServices = missingItems.filter((c) => c.kind === 'service_unreachable' && verdicts.has(c.host_id)).length;
   const confirmedGone = [...verdicts.values()].filter((v) => v.kind === 'host_gone').length;
+  const storyShown = useRunStoryShown(run?.id);
   if (!run && partial) {
     return (
       <div>
@@ -110,7 +110,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
         </p>
       ) : null}
       {s && !baseline ? <RunStory runId={run.id} className="mt-3 space-y-1" testId="handover-story" /> : null}
-      {s && !baseline && !(quiet && !expected && !unreachable) ? (
+      {s && !baseline && storyShown === false && !(quiet && !expected && !unreachable) ? (
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-0.5 border-t border-rule pt-2.5" data-testid="handover-counts">
           <Count n={s.hosts_new} glyph="plus" tone="new" label={plural(s.hosts_new, ['nowy host', 'nowe hosty', 'nowych hostów'], ['new host', 'new hosts'])} to={'/changes?run_id=' + run.id + '&kind=host_new'} />
           <Count n={s.services_new} glyph="plus" tone="new" label={plural(s.services_new, ['nowa usługa', 'nowe usługi', 'nowych usług'], ['new service', 'new services'])} to={'/changes?run_id=' + run.id + '&kind=service_new'} />
@@ -238,7 +238,7 @@ function RecentChanges({ changes }: { changes: Change[] }) {
           <Row key={c.id} to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id}>
             <span className="mt-0.5"><Glyph name={c.expected ? 'dashring' : changeKindInfo(c.kind).glyph} tone={c.expected ? 'expected' : changeKindInfo(c.kind).tone} /></span>
             <span className="min-w-0 flex-1">
-              <span className={cx('block truncate text-sm', c.expected ? 'text-ink-2' : 'text-ink')} title={changeSummary(c)}>{changeSummary(c)}</span>
+              <span className={cx('block truncate text-sm', c.expected ? 'text-ink-2' : 'text-ink')} title={c.summary}>{c.summary}</span>
               <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
                 <span className="mono">{c.ip}{c.port ? ':' + c.port : ''}</span>
                 {c.expected ? <span>{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} />}

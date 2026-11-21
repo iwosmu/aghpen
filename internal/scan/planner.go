@@ -190,9 +190,11 @@ func buildUnits(runID int64, set targets.Set, v6 []netip.Addr, hintIPs []uint32,
 }
 
 // unitsFromChunks rebuilds units from stored chunks when a paused run
-// resumes. Done chunks are skipped. The current exclusions are applied
-// again: the policy may have changed while the run was paused.
-func unitsFromChunks(chunks []model.Chunk, exclusions targets.Set) ([]*unit, error) {
+// resumes. Done chunks are skipped. The current exclusions (with the
+// addresses outside the allowed networks) are applied again, and v6Allowed
+// filters IPv6 addresses (nil: all): the policy may have changed while the
+// run was paused.
+func unitsFromChunks(chunks []model.Chunk, exclusions targets.Set, v6Allowed func(netip.Addr) bool) ([]*unit, error) {
 	var units []*unit
 	for _, c := range chunks {
 		if c.Status == model.ChunkDone {
@@ -204,7 +206,9 @@ func unitsFromChunks(chunks []model.Chunk, exclusions targets.Set) ([]*unit, err
 		}
 		u := &unit{c: c, ranges: st.V4.Subtract(exclusions).Ranges()}
 		for _, a := range st.V6 {
-			u.v6 = append(u.v6, a.String())
+			if v6Allowed == nil || v6Allowed(a) {
+				u.v6 = append(u.v6, a.String())
+			}
 		}
 		u.c.Status = model.ChunkPending
 		u.c.Error = ""

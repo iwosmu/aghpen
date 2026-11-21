@@ -32,7 +32,7 @@ type hostMatcher interface {
 // request by request.
 type pacer struct {
 	r       *run
-	host    *probe.Limiter
+	host    hostLimits
 	prepaid atomic.Int32 // requests already paid for before the call
 	n       atomic.Int64 // HTTPWait calls of this Fingerprint call
 }
@@ -55,20 +55,24 @@ func HTTPWait(ctx context.Context, _ string) error {
 	return p.r.httpWait(ctx, p.host, 1)
 }
 
-// httpWait takes n requests from the per-host limiter and the global limiter.
-func (r *run) httpWait(ctx context.Context, host *probe.Limiter, n int) error {
+// hostLimits are the request limiters of one address: the run's own (the
+// profile's per-host delay) and the engine-wide one that every run shares.
+type hostLimits struct{ own, shared *probe.Limiter }
+
+// httpWait takes n requests from the per-host limiters, the run's limiter
+// and the engine-wide limiter.
+func (r *run) httpWait(ctx context.Context, host hostLimits, n int) error {
 	if n == 1 {
-		// both limits at the same moment: waiting for one after the other
+		// all limits at the same moment: waiting for one after the other
 		// would let requests bunch behind the slower one
-		if err := probe.WaitAll(ctx, host, r.httpLim); err != nil {
+		if err := probe.WaitAll(ctx, host.own, host.shared, r.httpLim, r.globalHTTP); err != nil {
 			return err
 		}
 	} else {
-		if err := host.WaitN(ctx, n); err != nil {
-			return err
-		}
-		if err := r.httpLim.WaitN(ctx, n); err != nil {
-			return err
+		for _, l := range []*probe.Limiter{host.own, host.shared, r.httpLim, r.globalHTTP} {
+			if err := l.WaitN(ctx, n); err != nil {
+				return err
+			}
 		}
 	}
 	r.stats.update(func(s *model.RunStats) { s.HTTPRequests += int64(n) })
@@ -80,14 +84,14 @@ func (r *run) httpWait(ctx context.Context, host *probe.Limiter, n int) error {
 // every further request itself. For any other Fingerprinter the engine
 // counts the requests in the answer and pays them after the call, so the
 // average rate still holds.
-func (r *run) fingerprint(ctx context.Context, host *probe.Limiter, req model.FingerprintRequest) (*model.HTTPFingerprint, *model.TLSInfo, error) {
+func (r *run) fingerprint(ctx context.Context, host hostLimits, req model.FingerprintRequest) (*model.HTTPFingerprint, *model.TLSInfo, error) {
 	return r.paced(ctx, host, func(ctx context.Context) (*model.HTTPFingerprint, *model.TLSInfo, error) {
 		return r.e.deps.Fingerprinter.Fingerprint(ctx, req)
 	})
 }
 
 // paced runs one collector call under the HTTP limits (see fingerprint).
-func (r *run) paced(ctx context.Context, host *probe.Limiter, call func(context.Context) (*model.HTTPFingerprint, *model.TLSInfo, error)) (*model.HTTPFingerprint, *model.TLSInfo, error) {
+func (r *run) paced(ctx context.Context, host hostLimits, call func(context.Context) (*model.HTTPFingerprint, *model.TLSInfo, error)) (*model.HTTPFingerprint, *model.TLSInfo, error) {
 	if err := r.httpWait(ctx, host, 1); err != nil {
 		return nil, nil, err
 	}
@@ -108,7 +112,7 @@ func (r *run) paced(ctx context.Context, host *probe.Limiter, call func(context.
 
 // httpStage fingerprints one open TCP service: the root page and favicon
 // first, then the extra signature paths that fit this service.
-func (r *run) httpStage(ctx context.Context, host *probe.Limiter, res *model.HostResult, svc *model.ServiceResult, hostname string) {
+func (r *run) httpStage(ctx context.Context, host hostLimits, res *model.HostResult, svc *model.ServiceResult, hostname string) {
 	if notHTTP(svc) {
 		return
 	}

@@ -4,7 +4,7 @@ import { NextSteps } from '../ui/NextSteps';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidate, useAction, useItem, usePage } from '../api/hooks';
 import { ApiError, del, patch, post } from '../api/client';
-import type { DojoExportResult, Finding, FindingStatus, Severity } from '../api/types';
+import type { DefectDojoSettings, DojoExportResult, Finding, FindingStatus, Severity } from '../api/types';
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtRelative } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
@@ -172,6 +172,9 @@ export default function Findings() {
   const { can } = useSession();
   const canEdit = can('results:update');
   const canExport = can('export:run');
+  // DefectDojo settings are readable with integrations:manage; without it the export's own error explains.
+  const dojoQ = useItem<DefectDojoSettings>('/settings/defectdojo', undefined, { enabled: canExport && can('integrations:manage') });
+  const dojoOff = dojoQ.data ? !(dojoQ.data.enabled && dojoQ.data.url && dojoQ.data.api_key_set) : false;
   const limit = 50;
   const offset = Number(u.get('offset', '0'));
   const filters = useMemo(() => {
@@ -278,8 +281,9 @@ export default function Findings() {
       {q.data ? <Pager total={q.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}</> : null}
       {open ? <DetailDialog id={open} onClose={() => u.set({ open: null }, { keepOffset: true })} /> : null}
       {manual ? <ManualDialog onClose={() => setManual(false)} /> : null}
-      <Dialog open={confirmAll} onClose={() => setConfirmAll(false)} width={460} title={t('Eksportować pasujące znaleziska?', 'Export matching findings?')}
-        footer={<><Button onClick={() => setConfirmAll(false)}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="upload" busy={exportAll.isPending} onClick={() => exportAll.mutate(undefined)} data-testid="dojo-export-filtered-go">{t('Eksportuj', 'Export')} {q.data?.total ?? 0}</Button></>}>
+      <Dialog open={confirmAll} onClose={() => setConfirmAll(false)} width={460} title={active ? t('Eksportować pasujące znaleziska?', 'Export matching findings?') : t('Eksportować wszystkie znaleziska?', 'Export all findings?')}
+        footer={<><Button onClick={() => setConfirmAll(false)}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="upload" busy={exportAll.isPending} disabled={dojoOff} onClick={() => exportAll.mutate(undefined)} data-testid="dojo-export-filtered-go">{t('Eksportuj', 'Export')} {total}</Button></>}>
+        {dojoOff ? <p className="mb-2 text-sm" data-testid="dojo-not-configured">{t('DefectDojo nie jest skonfigurowany. ', 'DefectDojo is not configured. ')}<Link to="/admin?tab=defectdojo" className="link">{t('Ustawienia DefectDojo', 'DefectDojo settings')}</Link></p> : null}
         <p className="text-sm">{active
           ? t('Do DefectDojo: ' + total + ' (pasujące do filtrów). Istniejące zostaną zaktualizowane.', total + ' matching findings go to DefectDojo. Existing ones are updated.')
           : t('Do DefectDojo: wszystkie znaleziska (' + total + '). Istniejące zostaną zaktualizowane.', 'All findings (' + total + ') go to DefectDojo. Existing ones are updated.')}</p>

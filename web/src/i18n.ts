@@ -22,6 +22,11 @@ export function setLang(l: Lang) {
   if (typeof document !== 'undefined') document.documentElement.lang = l;
   listeners.forEach((fn) => fn());
 }
+/** Runs fn after every language change; returns the unsubscribe. */
+export function onLangChange(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => { listeners.delete(fn); };
+}
 export function useLang(): Lang {
   return useSyncExternalStore((fn) => { listeners.add(fn); return () => listeners.delete(fn); }, () => lang);
 }

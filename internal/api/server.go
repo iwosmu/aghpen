@@ -148,6 +148,7 @@ func (s *Server) routes() http.Handler {
 		r.With(can(model.PermResultsRead)).Get("/technologies", s.listTechnologies)
 		r.With(can(model.PermResultsRead)).Get("/tags", s.listTags)
 		r.With(can(model.PermResultsRead)).Get("/changes", s.listChanges)
+		r.With(can(model.PermResultsRead)).Get("/changes/{id}", s.getChange)
 		r.With(can(model.PermResultsUpdate)).Post("/changes/{id}/ack", s.ackChange)
 		r.With(can(model.PermResultsUpdate)).Post("/changes/ack", s.ackChanges)
 		r.With(can(model.PermResultsRead)).Get("/diff", s.diff)

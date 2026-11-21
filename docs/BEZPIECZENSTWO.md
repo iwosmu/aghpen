@@ -36,9 +36,9 @@ Limit skuteczny to mniejsza z wartości profilu skanu i polityki bezpieczeństwa
 
 | Limit | Profil (domyślnie) | Polityka (domyślnie) | Gdzie egzekwowany |
 | --- | --- | --- | --- |
-| Pakiety sond na sekundę, wszystkie procesy jednego przebiegu razem | `rate.max_pps` (500) | `max_pps` (1000) | Jeden budżet (`scan.Budget`) na przebieg, dzielony między równoległe procesy nmap tego przebiegu. Każdy proces dostaje udział jako `--min-rate` i `--max-rate`. |
-| Żądania HTTP na sekundę, wszystkie hosty razem | `rate.http_rps` (20) | `max_http_rps` (50) | Kubełek żetonów w silniku (`probe.Limiter`). Przed wywołaniem kolektora silnik pobiera tyle żetonów, ile żądań planuje (strona + ścieżki + ikona). |
-| Żądania HTTP na sekundę do jednego hosta | – | `max_per_host_rps` (2) | Limiter na host w silniku. |
+| Pakiety sond na sekundę, wszystkie procesy razem | `rate.max_pps` (500) | `max_pps` (1000) | Dwa budżety (`scan.Budget`). Budżet globalny jest jeden dla całego procesu Czujki i dla wszystkich równoległych przebiegów (zaplanowanych, ręcznych, doraźnych, ponownych sond); jego wielkość to `max_pps` polityki. Budżet przebiegu to limit profilu wewnątrz niego. Grupa adresów bierze udział z obu i oddaje oba po skanie. Każdy proces nmap dostaje swój udział jako `--min-rate` i `--max-rate`. Test: `TestConcurrentRunsShareThePolicyBudget` (trzy równoległe przebiegi, suma tempa nmap nie przekracza budżetu polityki). |
+| Żądania HTTP na sekundę, wszystkie hosty razem | `rate.http_rps` (20) | `max_http_rps` (50) | Kubełki żetonów w silniku (`probe.Limiter`): jeden na przebieg (limit profilu) i jeden wspólny dla wszystkich przebiegów (limit polityki). Przed wywołaniem kolektora silnik pobiera tyle żetonów, ile żądań planuje (strona + ścieżki + ikona). |
+| Żądania HTTP na sekundę do jednego hosta | – | `max_per_host_rps` (2) | Limiter na host w przebiegu i limiter na host wspólny dla wszystkich przebiegów. |
 | Równoległe usługi HTTP na jednym hoście | `rate.per_host_concurrency` (1) | – | Semafor na host. |
 | Dodatkowe ścieżki sygnatur na usługę | – | `max_paths_per_host` (8) | Silnik obcina listę ścieżek przed przekazaniem kolektorowi. |
 | Przekierowania | `http.max_redirects` (3) | twardy limit 10 | `httpfp` (`root`) |
@@ -52,7 +52,7 @@ Znane ograniczenia limitów:
 
 - Sondy wykrywania wersji (`-sV`) idą zwykłymi gniazdami. `--max-rate` ich nie obejmuje; licznik pakietów jest dla nich szacunkiem.
 - Limiter HTTP pobiera z góry koszt całego wywołania kolektora (strona, ikona, ścieżki). Żądania wewnątrz jednego wywołania idą bez odstępu między sobą, a przekierowania nie są wliczane.
-- Budżet pakietów, limiter HTTP i limiter na host są tworzone dla każdego przebiegu osobno. Kilka przebiegów naraz wysyła razem do N × `max_pps` (przegląd H2, otwarte; należy do silnika).
+- Budżet pakietów, limiter HTTP i limiter na host są wspólne dla wszystkich przebiegów silnika. Kilka przebiegów naraz nie przekracza razem `max_pps` polityki (przegląd H2, naprawione).
 
 ### 1.3 Polityka bezpieczeństwa
 
@@ -134,7 +134,7 @@ Testy: `TestValidatorRejectsUnsafeSignatures`, `TestCheckPath`, `TestRetroHuntRe
 
 Zakres wyznaczają cele wpisane przez użytkownika z uprawnieniem `targets:create`, ograniczone blokadą operatora i dozwolonymi sieciami, minus wyłączenia.
 
-Otwarte (przegląd M2, należy do silnika): sprawdzenie nazwy domenowej i skan rozwiązują ją osobno, więc nazwa o zmiennych odpowiedziach DNS może wskazać adres spoza dozwolonych sieci. Przy wznowieniu zapisane części planu dostają tylko aktualne wyłączenia, a nie zawężoną blokadę.
+Naprawione (przegląd M2): silnik sam trzyma się dozwolonych sieci. Adres z ponownie rozwiązanej nazwy domenowej i części planu wznowione po przerwie przechodzą to samo sprawdzenie co przy starcie; adres spoza dozwolonych sieci nie jest skanowany. Test: `TestEngineKeepsToTheAllowedNetworks`.
 
 ### 1.7 Kontener skanera
 
@@ -306,8 +306,7 @@ Sprawdzone na działającym stosie jako `viewer`: dodanie celu → 403, awaryjne
 
 | Obszar | Ograniczenie |
 | --- | --- |
-| Tempo | Budżet pakietów i limity HTTP działają w obrębie jednego przebiegu. Kilka przebiegów naraz sumuje swoje limity (przegląd H2, otwarte). `--min-rate` = `--max-rate`: stałe tempo, bez samoczynnego zwalniania nmap. Sondy `-sV` poza limitem pakietów. |
-| Zakres | Nazwa domenowa jest rozwiązywana osobno przy sprawdzeniu i przy skanie; wznowione części planu nie dostają zawężonej blokady (przegląd M2, otwarte). |
+| Tempo | `--min-rate` = `--max-rate`: stałe tempo, bez samoczynnego zwalniania nmap. Sondy `-sV` poza limitem pakietów. |
 | Kontener | `NET_ADMIN` zostaje obok `NET_RAW` (decyzja po przeglądzie, L5). |
 | Kopie | Zrzut `pg_dump` jest jawny poza kolumnami warstwy 2. Trzeba go szyfrować. |
 | Klucze | Klucz `pg_tde` w pliku na wolumenie. `rotate-key` opakowuje na nowo tylko klucze danych; stara kopia bazy ze starym kluczem pozostaje czytelna. |
@@ -338,9 +337,9 @@ Przegląd kodu z 2026-11-21 (wewnętrzny, jeden recenzent) znalazł 2 problemy w
 | Nr | Problem | Poprawka | Commit | Test |
 | --- | --- | --- | --- | --- |
 | H1 | `scans:run` mógł zeskanować dowolny adres skanem doraźnym; edycja celu omijała sprawdzenie dozwolonych sieci | adres skanu doraźnego musi leżeć we włączonym celu (także przy wznowieniu i ponownym sondowaniu); edycja celu przechodzi sprawdzenie; import do zakresu wymaga `targets:create` | `b90c5de` | `TestAdHocRunStaysInsideEnabledTargets`, `TestTargetUpdateRunsTheAllowedNetworksCheck`, `TestImportIntoScopeNeedsTargetsCreate` |
-| H2 | limit pakietów na przebieg, nie globalny | **otwarte**, należy do silnika (`internal/scan`) | – | – |
+| H2 | limit pakietów na przebieg, nie globalny | jeden budżet pakietów, limiter HTTP i limiter na host dla wszystkich przebiegów silnika; limity polityki obowiązują sumę równoległych przebiegów | `abae8e3` | `TestConcurrentRunsShareThePolicyBudget` |
 | M1 | retro-hunt jako wyrocznia ukrytych wartości ciasteczek | puste wartości ciasteczek dla użytkownika bez `results:update` | `03dd94b` | `TestRetroHuntIsNoCookieValueOracle` |
-| M2 | DNS rozwiązywany osobno przy sprawdzeniu i przy skanie | **otwarte**, należy do silnika (`internal/scan`) | – | – |
+| M2 | DNS rozwiązywany osobno przy sprawdzeniu i przy skanie | silnik sprawdza dozwolone sieci także dla ponownie rozwiązanych nazw i wznowionych części planu | `abae8e3` | `TestEngineKeepsToTheAllowedNetworks` |
 | M3 | wyścig mógł skasować awaryjne zatrzymanie | atomowy `jsonb_set`; zapis polityki nie zmienia flagi | `7aab986` | `TestSafetyEditKeepsTheEmergencyStop`, `TestSafetyPutNeverClearsTheEmergencyStop` |
 | M4 | blokada kont i zalew dziennika bez logowania; odpowiedź zdradzała istnienie konta | reset licznika po blokadzie, jedna odpowiedź 401, fikcyjna weryfikacja hasła, limit treści, budżet wpisów bez sesji, `czujka user unlock` | `6899d6c` | `TestLoginGivesNoAccountOracle`, `TestLoginAuditIsBounded`, `TestLockExpiryResetsTheFailureCounter` |
 | L1 | test DefectDojo wysyłał zapisany klucz na adres z żądania | klucz idzie tylko do zapisanego hosta | `bcf9f69` | `TestDojoStoredKeyStaysWithItsHost` |

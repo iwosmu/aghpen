@@ -55,6 +55,22 @@ func TestUDPArgsAreSafe(t *testing.T) {
 	}
 }
 
+// Version detection of open UDP ports sends only the probes nmap lists for
+// the port (intensity 0), never to 161, never a script.
+func TestUDPVersionArgsAreSafe(t *testing.T) {
+	n := &Nmap{Path: "nmap", privileged: true}
+	line := strings.Join(n.UDPVersionArgs([]int{53, 123, 161, 9999}, 100, time.Minute, false), " ")
+	if !strings.HasPrefix(line, "-sU -sV --version-intensity 0 -Pn -p U:53,123 ") {
+		t.Errorf("args = %s", line)
+	}
+	if strings.Contains(line, "script") || strings.Contains(line, "-sC") || strings.Contains(line, "-A ") || strings.Contains(line, "161") {
+		t.Errorf("unsafe: %s", line)
+	}
+	if !strings.Contains(line, "--max-rate 100") {
+		t.Errorf("not rate limited: %s", line)
+	}
+}
+
 // The SNMP probe is the SNMPv3 engine discovery: no community string, no user.
 func TestSNMPProbe(t *testing.T) {
 	if len(snmpEngineDiscovery) != 60 || snmpEngineDiscovery[0] != 0x30 || snmpEngineDiscovery[1] != 0x3a || snmpEngineDiscovery[4] != 3 {
