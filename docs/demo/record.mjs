@@ -16,6 +16,10 @@
 //   CZ_PROFILE        profile to start live in shot 2 (default "Laboratorium /16: pełny przegląd"); CZ_START_SCAN=0 shows the
 //                     latest completed run of that profile instead (for a read-only account)
 //   CZ_SCAN_SECONDS   real seconds of the live scan to record (default 96; shown at ×8, so 12 s in the film)
+//   CZ_SCAN_WARM_CHUNKS  the film cuts in once this many address groups are done and a host is up (default 8; the
+//                     discovery phase before it is cut out); CZ_SCAN_WARM_MAX caps that wait in seconds (default 900)
+//   CZ_SCAN_FINISH    1 (default) waits off-camera for the live run to finish and ends the shot on its counts; 0 ends on
+//                     the last finished run of the profile; CZ_SCAN_FINISH_MAX caps the wait in seconds (default 1800)
 //   CZ_HOST           unstable host for shot 4 (default 10.66.70.20)
 //   CZ_RULE           rule for shot 6 (default "Panel administracyjny poza siecią zarządzania")
 //   CZ_SERVICE        service for the signature from an example, "ip:port" (default 10.66.1.10:80)
@@ -35,6 +39,10 @@ const EMAIL = env.CZ_EMAIL || "admin@czujka.local";
 const PASSWORD = env.CZ_PASSWORD;
 if (!PASSWORD) { console.error("set CZ_PASSWORD"); process.exit(2); }
 const PROFILE = env.CZ_PROFILE || "Laboratorium /16: pełny przegląd";
+const SCAN_WARM_CHUNKS = Number(env.CZ_SCAN_WARM_CHUNKS || 8);
+const SCAN_WARM_MAX = Number(env.CZ_SCAN_WARM_MAX || 900);
+const SCAN_FINISH = env.CZ_SCAN_FINISH !== "0";
+const SCAN_FINISH_MAX = Number(env.CZ_SCAN_FINISH_MAX || 1800);
 const START_SCAN = env.CZ_START_SCAN !== "0";
 const SCAN_SECONDS = Number(env.CZ_SCAN_SECONDS || 96);
 const HOST = env.CZ_HOST || "10.66.70.20";
@@ -72,10 +80,24 @@ const SHOTS = [
 ];
 const marks = {}; // id -> {start, end, fast: [[t0, t1]]}
 let cur = null;
-function begin(id) { cur = { start: now(), end: 0, fast: [] }; marks[id] = cur; }
+function begin(id) { cur = { start: now(), end: 0, fast: [], skip: [] }; marks[id] = cur; }
 function end() { cur.end = now(); cur = null; }
 function fastOn() { cur.fast.push([now(), 0]); }
 function fastOff() { cur.fast[cur.fast.length - 1][1] = now(); }
+// A cut inside a shot: the frames between skipOn and skipOff are left out of the film (a hard cut, no ×8 mark).
+function skipOn() { cur.skip.push([now(), 0]); }
+function skipOff() { cur.skip[cur.skip.length - 1][1] = now(); }
+// Waits until check(run) is true or the timeout passes; returns the last run state.
+async function waitRun(id, check, timeoutS) {
+  const t0 = now();
+  let st = null;
+  while (now() - t0 < timeoutS) {
+    st = await api("/runs/" + id);
+    if (st && (check(st) || ["completed", "failed", "cancelled"].includes(st.status))) break;
+    await sleep(3000);
+  }
+  return st;
+}
 
 // ---------- browser ----------
 const browser = await chromium.launch({ headless: env.CZ_HEADED !== "1" });
@@ -228,7 +250,8 @@ if (!prof) throw new Error("no profile named " + PROFILE);
 const done = ((await api("/runs?limit=50&status=completed&profile_id=" + prof.id)).items || []).filter((r) => !r.ad_hoc);
 
 // ---------- 2. live /16 scan ----------
-let liveRun = null;
+let liveRun = null, liveDone = false, stopExtra = null;
+const TIME_STEPS_BACK = Number(env.CZ_TIME_STEPS || 4);
 if (!want("scan")) {} else if (START_SCAN) {
   await present("/runs");
   begin("scan");
@@ -240,9 +263,16 @@ if (!want("scan")) {} else if (START_SCAN) {
   await click(page.getByRole("dialog").getByRole("button", { name: "Uruchom", exact: true }));
   await page.waitForURL(/\/runs\/\d+/);
   liveRun = Number(page.url().match(/\/runs\/(\d+)/)[1]);
-  await settle(2200);
+  await settle(1800);
+  // Discovery (one ARP sweep on-link, then the host sweep) shows 0 % and no hosts for minutes: cut it out and come back
+  // when the first address groups have finished and hosts are on the map.
+  skipOn();
+  await waitRun(liveRun, (st) => (st.stats?.chunks_done || 0) >= SCAN_WARM_CHUNKS && (st.stats?.hosts_up || 0) > 0, SCAN_WARM_MAX);
+  await page.reload(); await settle(1500);
+  skipOff();
   const map = page.getByText("Mapa przestrzeni adresowej").first();
   await point(map, 900);
+  await settle(1200);
   fastOn();
   const t0 = now();
   while (now() - t0 < SCAN_SECONDS) {
@@ -251,7 +281,15 @@ if (!want("scan")) {} else if (START_SCAN) {
     if (st && ["completed", "failed", "cancelled"].includes(st.status)) break;
   }
   fastOff();
-  await settle(1500);
+  // End on a finished run with its counts: wait (cut) for this run to finish, else show the last finished run.
+  skipOn();
+  const fin = SCAN_FINISH ? await waitRun(liveRun, () => false, SCAN_FINISH_MAX) : null;
+  if (fin && fin.status === "completed") { await page.reload(); liveDone = true; }
+  else if (done[0]) await page.goto(URL0 + "/runs/" + done[0].id + "?present=1");
+  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.evaluate(() => window.scrollTo(0, 0)); await settle(1200);
+  skipOff();
+  await settle(3500);
   end();
 } else {
   const last = done[0];
@@ -293,14 +331,26 @@ if (want("unstable")) {
 
 // ---------- 5. time machine ----------
 if (want("time")) {
-  await present("/time");
+  // Pick where to scrub from the data: the step between two analysed runs where the counts change most, then start
+  // a few runs before it so the scrub crosses it (no fixed run id).
+  // Every analysed run, as on the scrubber (the arrow keys step through the same list).
+  const pts = (await api("/timeline")).runs || [];
+  const score = (a, b) => Math.abs(a.hosts_up - b.hosts_up) * 3 + Math.abs(a.services_open - b.services_open) * 2 + Math.abs(a.hosts_missing - b.hosts_missing) + Math.abs(a.hosts_down - b.hosts_down) + Math.abs(a.findings_open - b.findings_open);
+  let best = -1, bi = 0;
+  for (let i = 1; i < pts.length; i++) { const s = score(pts[i - 1], pts[i]); if (s >= best) { best = s; bi = i; } }
+  const startIdx = Math.min(pts.length - 1, bi + TIME_STEPS_BACK - 1);
+  const after = pts.length ? pts[startIdx] : null;
+  console.log("time machine: biggest change between runs", pts[bi - 1]?.run_id, "and", pts[bi]?.run_id, "(score " + best + ")");
+  await present(after ? "/time?run=" + after.run_id : "/time");
   begin("time");
   await settle(2200);
   const strip = page.getByText(/krok o jeden przebieg/).first();
   if (await strip.count()) await point(strip, 900);
   await settle(800);
-  for (let i = 0; i < 6; i++) { await page.keyboard.press("ArrowLeft"); await settle(1300); }
-  for (let i = 0; i < 2; i++) { await page.keyboard.press("ArrowRight"); await settle(1300); }
+  // Step back across the change, then forward over it again, slow enough to read the numbers and the map.
+  for (let i = 0; i < TIME_STEPS_BACK; i++) { await page.keyboard.press("ArrowLeft"); await settle(1500); }
+  await settle(800);
+  for (let i = 0; i < 2; i++) { await page.keyboard.press("ArrowRight"); await settle(1700); }
   await settle(2500);
   end();
 }
@@ -331,14 +381,29 @@ if (want("rules")) {
 
 // ---------- 7. emergency stop ----------
 if (STOP && want("stop")) {
-  if (liveRun) await present("/runs/" + liveRun); else await present("/");
+  // The stop needs a running scan to show its effect: reuse the live run, or start the profile (cancelled afterwards).
+  let stopRun = liveRun && !liveDone ? liveRun : null;
+  if (!stopRun) {
+    const r = await api("/runs", "POST", { profile_id: prof.id });
+    stopRun = (r && r.id) || (r && r.details && r.details.run_id) || null;
+    if (stopRun && !liveRun) liveRun = stopRun;
+    if (stopRun && stopRun !== liveRun) stopExtra = stopRun;
+    if (stopRun) await waitRun(stopRun, (st) => st.status === "running" && (st.stats?.packets_sent || st.stats?.addresses_done || 0) > 0, 120);
+  }
+  if (stopRun) await present("/runs/" + stopRun); else await present("/");
   begin("stop");
   await settle(1500);
   await click(page.getByTestId("emergency-stop"), 900);
   await settle(900);
   const confirm = page.getByRole("dialog").getByRole("button", { name: /Stop awaryjny|Zatrzymaj|Potwierdź/ }).last();
   await click(confirm, 700);
-  await settle(4000);
+  // The state after the stop: the run paused by the emergency stop, the top strip in its stopped state, 0 pps.
+  await settle(2500);
+  const state = page.getByText(/wstrzymany|zatrzyman/i).first();
+  if (await state.count()) await point(state, 900);
+  await settle(1500);
+  await moveTo(1500, 60, 900);
+  await settle(2500);
   end();
 }
 
@@ -361,7 +426,8 @@ if (marks.stop) {
   const paused = ((await api("/runs?status=paused&limit=100")).items || []).filter((r) => r.pause_reason === "emergency_stop");
   for (const r of paused) await api("/runs/" + r.id + (r.id === liveRun ? "/cancel" : "/resume"), "POST");
 }
-if (liveRun) await api("/runs/" + liveRun + "/cancel", "POST");
+if (liveRun && !liveDone) await api("/runs/" + liveRun + "/cancel", "POST");
+if (stopExtra) await api("/runs/" + stopExtra + "/cancel", "POST");
 await cdp.send("Page.stopScreencast");
 await sleep(300);
 
@@ -398,12 +464,12 @@ for (const s of SHOTS) {
   const inside = frames.filter((f) => f.ts > m.start && f.ts < m.end);
   const seq = (before ? [{ ...before, ts: m.start }] : []).concat(inside);
   if (!seq.length) continue;
-  const speed = (t) => (m.fast.some(([a, b]) => t >= a && t < b) ? FAST : 1);
+  const speed = (t) => (m.skip.some(([a, b]) => t >= a && t < b) ? Infinity : m.fast.some(([a, b]) => t >= a && t < b) ? FAST : 1);
   let list = "", out = 0, fastFrom = -1, fastTo = -1;
   for (let i = 0; i < seq.length; i++) {
     const t = seq[i].ts, next = i + 1 < seq.length ? seq[i + 1].ts : m.end;
     // Split a frame's hold at the edges of a fast segment so each part gets its own speed.
-    const cuts = [t, ...m.fast.flat().filter((x) => x > t && x < next), next];
+    const cuts = [t, ...m.fast.flat().concat(m.skip.flat()).filter((x) => x > t && x < next), next];
     for (let k = 0; k + 1 < cuts.length; k++) {
       const sp = speed(cuts[k]);
       const d = (cuts[k + 1] - cuts[k]) / sp;

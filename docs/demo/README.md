@@ -27,6 +27,9 @@ Wynik w `docs/demo/`:
 | `CZ_PROFILE` | `Laboratorium /16: pełny przegląd` | profil uruchamiany na żywo w ujęciu 2; z nim liczą się też dwa ostatnie pełne przebiegi w ujęciu 3 |
 | `CZ_START_SCAN` | `1` | `0`: ujęcie 2 pokazuje ostatni zakończony przebieg zamiast nowego skanu |
 | `CZ_SCAN_SECONDS` | `120` | ile sekund skanu nagrać; w filmie trwa to 1/8 tego czasu, ze znakiem „×8” |
+| `CZ_SCAN_WARM_CHUNKS` | film wchodzi w skan, gdy tyle podgrup jest gotowych i jest choć jeden aktywny host; faza wykrywania przed nim jest wycięta (domyślnie 8; `CZ_SCAN_WARM_MAX` ogranicza czekanie, domyślnie 900 s) |
+| `CZ_SCAN_FINISH` | 1 (domyślnie): poza kadrem czeka na koniec skanu i kończy ujęcie na jego liczbach; 0: kończy na ostatnim zakończonym przebiegu (`CZ_SCAN_FINISH_MAX`, domyślnie 1800 s) |
+| `CZ_TIME_STEPS` | o ile przebiegów wehikuł czasu cofa się przez największą zmianę znalezioną w danych (domyślnie 4) |
 | `CZ_HOST` | `10.66.70.20` | host niestabilny w ujęciu 4 |
 | `CZ_RULE` | `Panel administracyjny poza siecią zarządzania` | reguła w ujęciu 6 |
 | `CZ_SERVICE` | `10.66.1.10:80` | usługa do „Zaproponuj sygnaturę” |
