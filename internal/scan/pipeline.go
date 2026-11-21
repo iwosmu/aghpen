@@ -181,11 +181,16 @@ func (r *run) udpStage(ctx context.Context, g *group, up []probe.Host, rate int,
 		return nil
 	}
 	byIP := map[string][]probe.Port{}
+	gaveUp := map[string]bool{}
 	for _, h := range res.Hosts {
 		byIP[h.IP] = h.Ports
+		gaveUp[h.IP] = h.TimedOut
 	}
 	for i := range up {
 		up[i].Ports = append(up[i].Ports, byIP[up[i].IP]...)
+		if !gaveUp[up[i].IP] {
+			r.udpCovered.Store(up[i].IP, true) // the UDP ports count as scanned on this host
+		}
 	}
 	return nil
 }
@@ -819,19 +824,27 @@ func (r *run) densePass(ctx context.Context, g *group, scanned map[string]*probe
 		scanned[h.IP] = &cp
 		added += len(h.Ports)
 	}
-	timedOut := map[string]bool{}
-	for _, h := range res.Hosts {
-		if h.TimedOut {
-			timedOut[h.IP] = true
-		}
-	}
-	for _, ip := range dense {
-		if !timedOut[ip] {
-			r.cover(ip, rest)
-		}
+	for _, ip := range finished(res) {
+		r.cover(ip, rest)
 	}
 	r.log.Info("wide port pass for dense hosts", "group", g.id, "hosts", len(dense), "ports", rest.Count(), "new_open", added)
 	return nil
+}
+
+// finished lists the hosts that a port scan reported up and did not give
+// up on: only those had every port of the pass scanned. A host missing from
+// nmap's output was not seen by the pass.
+func finished(res *probe.Result) []string {
+	var ips []string
+	if res == nil {
+		return nil
+	}
+	for _, h := range res.Hosts {
+		if !h.TimedOut {
+			ips = append(ips, h.IP)
+		}
+	}
+	return ips
 }
 
 // cover records that a finished pass scanned the ports of extra on host ip.
@@ -860,7 +873,10 @@ func (r *run) coverage(ip string) *model.PortCoverage {
 		}
 	}
 	c := &model.PortCoverage{TCP: portRanges(&set), UDP: []model.PortRange{}}
-	udp := append([]int(nil), r.udpPorts...)
+	var udp []int
+	if _, ok := r.udpCovered.Load(ip); ok { // the UDP stage ran and finished for this host
+		udp = append(udp, r.udpPorts...)
+	}
 	sort.Ints(udp)
 	for _, p := range udp {
 		if n := len(c.UDP); n > 0 && c.UDP[n-1].Hi == p-1 {
@@ -898,12 +914,12 @@ func portRanges(s *probe.PortSet) []model.PortRange {
 // HTTP collector reads it in under a second. Measured on one host with 7
 // ports: 68 s before, mostly -sV (43 s) and then the HTTP stage (24 s).
 const (
-	quickMaxPairs       = 32               // open TCP ports in a group, all hosts together
+	quickMaxPairs = 32 // open TCP ports in a group, all hosts together
 	// bound for one port's version detection: the general path's bound, so
 	// the result does not depend on the path (Gitea needs 42 s, Prometheus
 	// 66 s: nmap matches it only with its late FourOhFourRequest probe)
 	quickServiceTimeout = serviceHostTimeout
-	quickMaxProcs       = 8                // nmap processes at one time on the quick path
+	quickMaxProcs       = 8 // nmap processes at one time on the quick path
 )
 
 // amqpHello reads an AMQP broker's product and version (a variable for tests).
@@ -1310,15 +1326,11 @@ func (r *run) fullRangeFinish(ctx context.Context, g *group, up []probe.Host, re
 		r.stats.warn("Pełny zakres portów nie został przeskanowany (błąd nmap). Usługi spoza listy portów profilu są w tym przebiegu nieznane.")
 		return nil
 	}
-	timedOut := map[string]bool{}
-	for _, h := range ps.Hosts {
-		if h.TimedOut {
-			timedOut[h.IP] = true
-		}
-	}
-	for _, ip := range ips {
-		if !timedOut[ip] && fs.rest != nil {
-			r.cover(ip, fs.rest) // every port of 1-65535 the policy allows was scanned on this host
+	if fs.rest != nil {
+		for _, ip := range finished(ps) {
+			if _, ok := byIP[ip]; ok {
+				r.cover(ip, fs.rest) // every port of 1-65535 the policy allows was scanned on this host
+			}
 		}
 	}
 	var more []probe.Host

@@ -122,6 +122,9 @@ type run struct {
 	// covered holds, per host IP, the extra TCP ports a finished dense or
 	// full-range pass scanned (*probe.PortSet); see coverage.
 	covered sync.Map
+	// udpCovered holds the IPs whose UDP stage finished (the UDP ports count
+	// as covered only there; a failed or skipped stage covers nothing).
+	udpCovered sync.Map
 
 	hostnames map[string][]string
 	hints     map[string]model.HostHint

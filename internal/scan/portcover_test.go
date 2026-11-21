@@ -15,6 +15,10 @@ func TestCoverage(t *testing.T) {
 		base.Add(p)
 	}
 	r := &run{ports: base, udpPorts: []int{161, 53, 123}}
+	if c := r.coverage("10.0.0.1"); c.Has("udp", 53) {
+		t.Error("UDP ports covered although the UDP stage did not run for the host")
+	}
+	r.udpCovered.Store("10.0.0.1", true)
 	c := r.coverage("10.0.0.1")
 	want := []model.PortRange{{Lo: 22, Hi: 22}, {Lo: 80, Hi: 82}, {Lo: 443, Hi: 443}}
 	if len(c.TCP) != len(want) {
@@ -40,6 +44,9 @@ func TestCoverage(t *testing.T) {
 	}
 	if c := r.coverage("10.0.0.2"); c.Has("tcp", 8787) {
 		t.Error("another host got the full range")
+	}
+	if got := finished(&probe.Result{Hosts: []probe.Host{{IP: "10.0.0.1"}, {IP: "10.0.0.2", TimedOut: true}}}); len(got) != 1 || got[0] != "10.0.0.1" {
+		t.Errorf("finished = %v: a timed-out host or one nmap did not list is not covered", got)
 	}
 	if (&run{}).coverage("10.0.0.1") != nil {
 		t.Error("unknown port list: want nil coverage")
