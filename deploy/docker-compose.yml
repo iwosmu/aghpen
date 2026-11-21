@@ -115,6 +115,9 @@ services:
       CZUJKA_HOST_GATEWAY: ${CZUJKA_HOST_GATEWAY:-}
       # The port the docker host publishes the UI on: that service of the docker host is Czujka itself (tag "czujka").
       CZUJKA_PUBLISHED_PORT: ${CZUJKA_PORT:-8080}
+      # Kernel packet cap (nftables in this container's own network namespace):
+      # auto installs it when possible, require refuses to scan without it, off.
+      CZUJKA_KERNEL_CAP: ${CZUJKA_KERNEL_CAP:-auto}
     ports:
       - "${CZUJKA_BIND:-127.0.0.1}:${CZUJKA_PORT:-8080}:8080"
     volumes:
@@ -124,6 +127,7 @@ services:
     # A DefectDojo that runs on the docker host (lab/defectdojo) is reachable as http://host.docker.internal:<port>.
     extra_hosts: ["host.docker.internal:host-gateway"]
     # Non-root user (see the Dockerfile) with exactly the two capabilities nmap needs.
+    # NET_ADMIN also lets nft install the kernel packet cap in this container's namespace.
     cap_drop: [ALL]
     cap_add: [NET_RAW, NET_ADMIN]
     read_only: true
