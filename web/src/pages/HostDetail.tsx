@@ -1,0 +1,176 @@
+import { Link, useParams } from 'react-router';
+import { useAction, useItem, usePage } from '../api/hooks';
+import { patch } from '../api/client';
+import type { AvailabilityProfile, Change, Host, Scope, Service } from '../api/types';
+import { t, plural } from '../i18n';
+import { fmtDateTime, fmtRelative } from '../lib/format';
+import { ErrorState, KV, PageHeader, Panel, Select, SkeletonRows, TagInput, Tags, useTip } from '../ui/kit';
+import { DataTable, type Col } from '../ui/table';
+import { ChangeMark, ClassChips, Crit, HostStatusMark, InterestScore, ServiceStateMark, Sev } from '../ui/marks';
+import { InlineText, OverrideNote } from '../ui/edit';
+import { WeekHeatmap } from '../viz/WeekHeatmap';
+import { useCan } from '../session';
+
+function ModelOutput({ h, a }: { h: Host; a: AvailabilityProfile }) {
+  const left = Math.max(0, a.down_after_misses - h.consecutive_misses);
+  const tip = useTip();
+  const recent = [...(a.recent ?? [])].slice(0, 28).reverse();
+  return (
+    <div className="space-y-3">
+      <dl className="border-t border-rule">
+        <div className="grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-3 border-b border-rule py-1.5">
+          <dt className="num text-lg font-semibold">{a.p_alive.toFixed(2)}</dt>
+          <dd className="text-sm text-ink-2">{t('prawdopodobieństwo, że host nadal istnieje', 'probability that the host still exists')} <span className="mono text-xs text-ink-3">p_alive</span></dd>
+        </div>
+        <div className="grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-3 border-b border-rule py-1.5">
+          <dt className="num text-lg font-semibold">{a.down_after_misses}</dt>
+          <dd className="text-sm text-ink-2">{plural(a.down_after_misses, ['brak odpowiedzi z rzędu', 'braki odpowiedzi z rzędu', 'braków odpowiedzi z rzędu'], ['miss in a row', 'misses in a row'])} {t('i host zostaje uznany za nieaktywny', 'and the host is declared inactive')}</dd>
+        </div>
+        <div className="grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-3 border-b border-rule py-1.5">
+          <dt className="num text-lg font-semibold">{h.consecutive_misses}</dt>
+          <dd className="text-sm text-ink-2">
+            {plural(h.consecutive_misses, ['brak z rzędu teraz', 'braki z rzędu teraz', 'braków z rzędu teraz'], ['miss in a row now', 'misses in a row now'])}
+            {h.status !== 'down' && h.consecutive_misses > 0 ? <span className="text-ink-3"> · {t('jeszcze ' + left + ' do „nieaktywny”', left + ' more to "inactive"')}</span> : null}
+          </dd>
+        </div>
+      </dl>
+      <p className="border-l border-rule-strong pl-3 text-sm text-ink">{a.pattern || t('Za mało obserwacji, aby opisać wzorzec.', 'Too few observations to describe a pattern.')}</p>
+      <p className="text-xs text-ink-2">
+        {h.status === 'expected-offline' ? t('Host nie odpowiada, ale o tej porze zwykle nie odpowiada. Zmiana nie trafia do alertów.', 'The host does not answer, but at this hour it usually does not. The change raises no alert.')
+          : h.status === 'unstable' ? t('Host odpowiada nieregularnie. Skaner ponawia próby, zanim zapisze brak odpowiedzi.', 'The host answers irregularly. The scanner retries before it records a miss.')
+          : h.status === 'down' ? t('Liczba kolejnych braków odpowiedzi przekroczyła próg wynikający z profilu dostępności.', 'The run of misses passed the threshold that follows from the availability profile.')
+          : t('Host odpowiada zgodnie z profilem.', 'The host answers as its profile predicts.')}
+      </p>
+      {recent.length ? (
+        <div>
+          <div className="mb-1 text-xs text-ink-3">{t('Ostatnie próby (najnowsza po prawej)', 'Recent probes (latest on the right)')}</div>
+          <div className="flex flex-wrap gap-[3px]">
+            {recent.map((o, i) => (
+              <span key={i} tabIndex={0}
+                onPointerEnter={(e) => tip.show(e, <div><div className="num text-ink">#{o.run_id} · {fmtDateTime(o.at)}</div><div className="text-ink-2">{o.up ? t('odpowiedź', 'answered') + (o.rtt_ms ? ', ' + o.rtt_ms.toFixed(1) + ' ms' : '') : t('brak odpowiedzi', 'no answer')} · {o.attempts} {plural(o.attempts, ['próba', 'próby', 'prób'], ['attempt', 'attempts'])}{o.reason ? ' · ' + o.reason : ''}</div></div>)}
+                onPointerLeave={tip.hide} onFocus={(e) => tip.showAt(e.currentTarget, <span className="num">#{o.run_id} · {o.up ? t('odpowiedź', 'answered') : t('brak odpowiedzi', 'no answer')}</span>)} onBlur={tip.hide}
+                className="block h-[14px] w-[10px]" style={o.up ? { background: 'var(--seq-4)' } : { boxShadow: 'inset 0 0 0 1px var(--rule-strong)' }}
+                aria-label={'#' + o.run_id + ' ' + (o.up ? t('odpowiedź', 'answered') : t('brak odpowiedzi', 'no answer'))} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {tip.node}
+    </div>
+  );
+}
+
+export default function HostDetail() {
+  const id = Number(useParams().id);
+  const canEdit = useCan('results:update');
+  const q = useItem<Host>('/hosts/' + id);
+  const services = useItem<Service[]>('/hosts/' + id + '/services');
+  const avail = useItem<AvailabilityProfile>('/hosts/' + id + '/availability');
+  const changes = usePage<Change>('/hosts/' + id + '/changes', { limit: 50 });
+  const scopes = usePage<Scope>('/scopes', { limit: 200 });
+  const save = useAction((body: Record<string, unknown>) => patch<Host>('/hosts/' + id, body), { invalidate: ['/hosts'], success: t('Zapisano', 'Saved') });
+  if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
+  if (!q.data) return <SkeletonRows rows={12} />;
+  const h = q.data;
+  const now = new Date();
+  const svcCols: Col<Service>[] = [
+    { id: 'port', header: t('Port', 'Port'), width: 90, cell: (s) => <Link to={'/services/' + s.id} className="mono link">{s.port}/{s.proto}</Link> },
+    { id: 'state', header: t('Stan', 'State'), cell: (s) => <ServiceStateMark state={s.state} /> },
+    { id: 'name', header: t('Usługa', 'Service'), cell: (s) => <span>{s.name}{s.tls ? <span className="ml-1.5 text-2xs text-ink-3">TLS</span> : null}</span> },
+    { id: 'product', header: t('Produkt', 'Product'), hide: 'md', cell: (s) => <span className="text-ink-2">{[s.product, s.version].filter(Boolean).join(' ') || '–'}</span> },
+    { id: 'title', header: t('Tytuł / technologie', 'Title / technologies'), wrap: true, cell: (s) => <span className="block min-w-[160px] max-w-[420px] truncate text-ink-2">{s.title || (s.technologies ?? []).map((x) => x.name).join(', ') || '–'}</span> },
+    { id: 'class', header: t('Klasy', 'Classes'), hide: 'lg', cell: (s) => <ClassChips classes={s.classes} max={2} /> },
+    { id: 'interest', header: t('Ciekawość', 'Interest'), align: 'right', cell: (s) => <InterestScore value={s.interest} reasons={s.interest_why} /> },
+  ];
+  return (
+    <div>
+      <PageHeader
+        back={{ to: '/hosts', label: t('Hosty', 'Hosts') }}
+        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono">{h.ip}</span><span className="text-base font-normal"><HostStatusMark status={h.status} /></span></span>}
+        sub={<>{h.label ? <span className="text-ink">{h.label} · </span> : null}<span className="mono">{(h.hostnames ?? []).join(', ') || t('bez nazwy DNS', 'no DNS name')}</span></>}
+        readOnly={!canEdit}
+        actions={<span className="flex items-center gap-2 text-sm text-ink-2">{t('Ciekawość', 'Interest')} <InterestScore value={h.interest} /></span>}
+      />
+      <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+        <div className="space-y-4">
+          <Panel title={t('Opis analityka', 'Analyst notes')}>
+            <dl>
+              <KV k={t('Etykieta', 'Label')}><InlineText label={t('Etykieta', 'Label')} value={h.label} canEdit={canEdit} busy={save.isPending} placeholder={t('brak etykiety', 'no label')} onSave={(v) => save.mutate({ label: v })} /></KV>
+              <KV k={t('Właściciel', 'Owner')}><InlineText label={t('Właściciel', 'Owner')} value={h.owner} canEdit={canEdit} busy={save.isPending} placeholder={t('nieprzypisany', 'not assigned')} onSave={(v) => save.mutate({ owner: v })} /></KV>
+              <KV k={t('Krytyczność', 'Criticality')}>
+                {canEdit ? (
+                  <span className="flex items-center gap-2"><span className="w-[150px]"><Select label={t('Krytyczność', 'Criticality')} value={String(h.criticality)} onChange={(v) => save.mutate({ criticality: Number(v) })} options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: n + ' · ' + [t('znikoma', 'negligible'), t('niska', 'low'), t('średnia', 'medium'), t('wysoka', 'high'), t('krytyczna', 'critical')][n - 1] }))} /></span><Crit value={h.criticality} /></span>
+                ) : <Crit value={h.criticality} />}
+              </KV>
+              <KV k={t('Tagi', 'Tags')}>{canEdit ? <TagInput value={h.tags ?? []} onChange={(v) => save.mutate({ tags: v })} placeholder={t('dodaj tag', 'add a tag')} /> : <Tags tags={h.tags} max={12} />}</KV>
+              <KV k={t('Notatka', 'Note')}><InlineText label={t('Notatka', 'Note')} multiline value={h.note} canEdit={canEdit} busy={save.isPending} placeholder={t('brak notatki', 'no note')} onSave={(v) => save.mutate({ note: v })} /></KV>
+            </dl>
+          </Panel>
+          <Panel title={t('Dane ze skanów', 'Scan data')}>
+            <dl>
+              <KV k={t('System', 'OS')}>
+                <InlineText label={t('System', 'OS')} value={h.os_guess} canEdit={canEdit} placeholder={t('nie rozpoznano', 'not recognised')} onSave={(v) => save.mutate({ os_guess: v })} />
+                <OverrideNote o={h.overrides?.os_guess} canEdit={canEdit} onRevert={() => save.mutate({ os_guess: null })} />
+              </KV>
+              <KV k={t('Nazwy DNS', 'DNS names')} mono>
+                {(h.hostnames ?? []).join(', ') || '–'}
+                <OverrideNote o={h.overrides?.hostnames} canEdit={canEdit} onRevert={() => save.mutate({ hostnames: null })} />
+              </KV>
+              {h.mac ? <KV k="MAC" mono>{h.mac}{h.vendor ? <span className="ml-2 font-sans text-ink-3">{h.vendor}</span> : null}</KV> : null}
+              <KV k={t('Zakresy', 'Scopes')}>{(h.scope_ids ?? []).map((sid) => scopes.data?.items.find((s) => s.id === sid)?.name ?? '#' + sid).join(', ') || '–'}</KV>
+              <KV k={t('Pierwszy raz', 'First seen')}><span className="num">{fmtDateTime(h.first_seen)}</span></KV>
+              <KV k={t('Ostatnio widziany', 'Last seen')}><span className="num">{fmtDateTime(h.last_seen)}</span> <span className="text-ink-3">{fmtRelative(h.last_seen)}</span></KV>
+              <KV k={t('Ostatnia odpowiedź', 'Last answer')}><span className="num">{h.last_up ? fmtDateTime(h.last_up) : '–'}</span></KV>
+              <KV k={t('Stabilność', 'Stability')}><span className="num">{h.stability.toFixed(2)}</span> <span className="text-xs text-ink-3">{t('udział prób z odpowiedzią', 'share of probes answered')}</span></KV>
+              <KV k={t('Źródło', 'Source')}>{h.source === 'import' ? t('import pliku', 'file import') : t('skan', 'scan')}</KV>
+            </dl>
+          </Panel>
+        </div>
+
+        <div className="min-w-0 space-y-4">
+          <Panel title={t('Usługi', 'Services')} count={services.data?.length} flush>
+            <DataTable inPanel rows={services.data} cols={svcCols} rowKey={(s) => s.id} rowHref={(s) => '/services/' + s.id} loading={services.isPending} error={services.error} retry={() => services.refetch()}
+              rowClass={(s) => (s.state === 'gone' ? 'text-ink-3' : undefined)}
+              empty={<p className="p-3 text-sm text-ink-2">{t('Skan nie wykrył otwartych usług na tym hoście.', 'The scan found no open service on this host.')}</p>}
+              mobile={(s) => (
+                <div>
+                  <div className="flex items-center justify-between gap-2"><span className="mono text-sm">{s.port}/{s.proto} <span className="font-sans text-ink-2">{s.name}</span></span><InterestScore value={s.interest} /></div>
+                  <div className="mt-0.5 truncate text-xs text-ink-3">{s.title || [s.product, s.version].filter(Boolean).join(' ') || '–'}</div>
+                </div>
+              )} />
+          </Panel>
+
+          <Panel title={t('Dostępność w tygodniu', 'Availability over the week')} actions={<span className="text-ink-3">{t('model decyduje, kiedy host jest „nieaktywny”', 'the model decides when the host is "inactive"')}</span>}>
+            {avail.error ? <ErrorState error={avail.error} retry={() => avail.refetch()} /> : !avail.data ? <div className="skeleton h-[220px]" /> : (
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+                <WeekHeatmap buckets={avail.data.buckets} nowIndex={now.getDay() * 24 + now.getHours()} />
+                <ModelOutput h={h} a={avail.data} />
+              </div>
+            )}
+          </Panel>
+
+          <Panel title={t('Historia zmian', 'Change timeline')} count={changes.data?.total} flush>
+            {changes.error ? <ErrorState error={changes.error} retry={() => changes.refetch()} /> : !changes.data ? <SkeletonRows rows={4} /> : changes.data.items.length === 0 ? (
+              <p className="p-3 text-sm text-ink-2">{t('Od pierwszej obserwacji nic się na tym hoście nie zmieniło.', 'Nothing has changed on this host since it was first seen.')}</p>
+            ) : (
+              <ol>
+                {changes.data.items.map((c) => (
+                  <li key={c.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 border-b border-rule px-3 py-2 last:border-b-0 sm:grid-cols-[150px_190px_minmax(0,1fr)_auto]">
+                    <span className="num hidden text-xs text-ink-3 sm:block" title={fmtDateTime(c.at)}>{fmtDateTime(c.at)}</span>
+                    <span><ChangeMark kind={c.kind} expected={c.expected} /></span>
+                    <span className="col-span-2 min-w-0 text-sm sm:col-span-1">
+                      {c.summary}
+                      {c.port ? <Link to={'/services/' + c.service_id} className="mono link ml-2 text-xs">:{c.port}</Link> : null}
+                      <span className="num ml-2 text-xs text-ink-3 sm:hidden">{fmtRelative(c.at)}</span>
+                    </span>
+                    <span className="hidden items-center gap-3 sm:flex">{c.expected ? <span className="text-xs text-ink-3">{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} />}<Link to={'/runs/' + c.run_id} className="num link text-xs">#{c.run_id}</Link></span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Panel>
+        </div>
+      </div>
+    </div>
+  );
+}

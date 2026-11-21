@@ -1,0 +1,9 @@
+{"generated":"2026-11-20","results":[
+ {"host":"10.66.3.40","port":80,"last_seen":"2026-11-20 13:55:10","source":"netflow"},
+ {"address":"10.66.3.40","port":"631","last_seen":"2026-11-20T13:58:00Z","source":"netflow"},
+ {"fqdn":"drukarka-3p.kampus.example","ip":"10.66.3.40"},
+ {"hostname":"bez-adresu.kampus.example"},
+ {"ip":"999.1.1.1"},
+ {"note":"nic tu nie ma"},
+ {"ip":"10.66.9.9","port":70000}
+]}

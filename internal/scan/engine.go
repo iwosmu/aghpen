@@ -1,0 +1,621 @@
+package scan
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"math"
+	"sort"
+	"sync"
+	"time"
+
+	"github.com/iwosmu/aghpen/internal/model"
+	"github.com/iwosmu/aghpen/internal/probe"
+	"github.com/iwosmu/aghpen/internal/targets"
+)
+
+// Deps are the collaborators of the engine. Fingerprinter and Signatures may
+// be nil: the HTTP stage and the signature stage are skipped then.
+type Deps struct {
+	Fingerprinter model.Fingerprinter
+	Signatures    model.SignatureEngine
+	Logger        *slog.Logger
+	NmapPath      string // empty: "nmap" from PATH; when nmap is missing the native prober runs
+
+	// Optional settings.
+	Prober      probe.Prober     // replaces the nmap/native choice (tests)
+	ForceNative bool             // use the native Go prober even when nmap is installed
+	Resolver    targets.Resolver // DNS resolver for domain targets; default net.DefaultResolver
+	Now         func() time.Time // clock; default time.Now
+	OnGroup     func(GroupEvent) // called when a work group ends (dev CLI, diagnostics)
+}
+
+// GroupEvent describes one finished work group: the consecutive chunks that
+// one nmap process per stage scanned together. Its size is the adaptive
+// chunk size.
+type GroupEvent struct {
+	ID         int       `json:"id"`
+	FirstSeq   int       `json:"first_seq"`
+	LastSeq    int       `json:"last_seq"`
+	Chunks     int       `json:"chunks"`
+	Size       int       `json:"size"` // addresses
+	Spec       []string  `json:"spec"`
+	RatePPS    int       `json:"rate_pps"` // --max-rate share of this group
+	Status     string    `json:"status"`
+	DurationMs int64     `json:"duration_ms"`
+	HostsUp    int       `json:"hosts_up"`
+	Packets    int64     `json:"packets"`
+	PPS        float64   `json:"pps"`
+	NextSize   int       `json:"next_size"` // group size the planner wants next
+	StartedAt  time.Time `json:"started_at"`
+	Error      string    `json:"error,omitempty"`
+}
+
+// Engine implements model.Engine.
+type Engine struct {
+	deps   Deps
+	log    *slog.Logger
+	now    func() time.Time
+	once   sync.Once
+	prober probe.Prober
+	// direct is the "second method" of the last retry round: a TCP connect
+	// to the ports a host had open before. Tests replace it.
+	direct func(ctx context.Context, ip string, ports []int, timeout time.Duration, lim *probe.Limiter) (probe.Host, int64)
+}
+
+var _ model.Engine = (*Engine)(nil)
+
+// New builds an engine. The prober (nmap or native) is chosen on first use.
+func New(d Deps) *Engine {
+	e := &Engine{deps: d, log: d.Logger, now: d.Now, direct: probe.ConnectProbe}
+	if e.log == nil {
+		e.log = slog.Default()
+	}
+	if e.now == nil {
+		e.now = time.Now
+	}
+	return e
+}
+
+// Prober returns the prober in use (nmap or native).
+func (e *Engine) Prober() probe.Prober {
+	e.once.Do(func() {
+		if e.deps.Prober != nil {
+			e.prober = e.deps.Prober
+			return
+		}
+		e.prober = probe.New(probe.Options{NmapPath: e.deps.NmapPath, ForceNative: e.deps.ForceNative, Logger: e.log})
+	})
+	return e.prober
+}
+
+// run is the state of one Run call.
+type run struct {
+	e       *Engine
+	log     *slog.Logger
+	plan    model.ScanPlan
+	sink    model.ResultSink
+	sinkCtx context.Context // survives cancellation, so the final state reaches the store
+	prober  probe.Prober
+	ports   *probe.PortSet
+	disc    model.DiscoveryOpts
+	lim     Limits
+	sizer   *sizer
+	budget  *Budget
+	stats   *statsKeeper
+	httpLim *probe.Limiter
+	hostSem chan struct{}
+	paths   []string
+
+	hostnames map[string][]string
+	hints     map[string]model.HostHint
+	hintIPs   []uint32
+
+	mu         sync.Mutex
+	all        []*unit
+	pending    []*unit
+	running    int
+	groupSeq   int
+	windowStop bool
+	firstErr   error
+}
+
+// Run executes one scan plan. See model.Engine.
+func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.ResultSink) model.RunOutcome {
+	prev := model.RunStats{}
+	if plan.PrevStats != nil {
+		prev = *plan.PrevStats
+	}
+	log := e.log.With("run", plan.RunID)
+	fail := func(err error) model.RunOutcome {
+		log.Error("run refused", "error", err.Error())
+		return model.RunOutcome{Status: model.RunFailed, Stats: prev, Err: err}
+	}
+
+	// 1. Safety gate.
+	if plan.Policy.EmergencyStop {
+		if len(plan.Chunks) > 0 {
+			// a paused run stays paused, its remaining chunks are kept
+			log.Warn("emergency stop is active: the paused run is not resumed")
+			return model.RunOutcome{Status: model.RunPaused, PauseReason: model.PauseEmergency, Stats: prev, Err: ErrEmergencyStop}
+		}
+		return fail(ErrEmergencyStop)
+	}
+	if sink == nil {
+		return fail(errors.New("scan: no result sink"))
+	}
+
+	// 2. Effective limits and ports: the stricter of profile and policy.
+	ports, err := probe.EffectivePorts(plan.Profile.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts)
+	if err != nil {
+		return fail(fmt.Errorf("scan: ports: %w", err))
+	}
+	if ports.Count() == 0 {
+		return fail(errors.New("scan: the safety policy leaves no port to scan"))
+	}
+	disc := probe.NormalizeDiscovery(plan.Profile.Discovery)
+	if disc.TCPSynPorts, err = probe.FilterPorts(disc.TCPSynPorts, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err != nil {
+		return fail(err)
+	}
+	disc.TCPAckPorts, _ = probe.FilterPorts(disc.TCPAckPorts, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts)
+	if len(disc.TCPSynPorts) == 0 && !disc.ICMPEcho && !disc.ICMPTimestamp && !disc.SkipDiscovery {
+		// the policy removed every TCP probe port: probe the first ports of the allowed set
+		list := ports.List()
+		disc.TCPSynPorts = list[:min(3, len(list))]
+	}
+	lim := EffectiveLimits(plan.Profile, plan.Policy)
+
+	// 3. Scope: merge targets, resolve domains, subtract exclusions.
+	exp := targets.Expand(ctx, plan.Targets, plan.Policy.Exclusions, e.deps.Resolver, 3*time.Second)
+	for d, why := range exp.Unresolved {
+		log.Warn("domain target does not resolve, skipped", "domain", d, "reason", why)
+	}
+	if ctx.Err() != nil {
+		return model.RunOutcome{Status: model.RunCancelled, Stats: prev, Err: context.Cause(ctx)}
+	}
+
+	r := &run{
+		e: e, log: log, plan: plan, sink: sink, sinkCtx: context.WithoutCancel(ctx),
+		prober: e.Prober(), ports: ports, disc: disc, lim: lim,
+		budget:    NewBudget(lim.PPS),
+		httpLim:   probe.NewLimiter(lim.HTTPRPS, int(math.Ceil(lim.HTTPRPS))),
+		hostSem:   make(chan struct{}, lim.ParallelHosts),
+		hostnames: exp.Hostnames,
+		hints:     map[string]model.HostHint{},
+	}
+	for _, h := range plan.Hints {
+		p, err := targets.ParseValue(h.IP)
+		if err != nil || p.Count != 1 {
+			continue
+		}
+		r.hints[p.Value] = h
+		if !p.V6.IsValid() {
+			r.hintIPs = append(r.hintIPs, p.Range.Lo)
+		}
+	}
+	sort.Slice(r.hintIPs, func(i, j int) bool { return r.hintIPs[i] < r.hintIPs[j] })
+	if e.deps.Signatures != nil && plan.Profile.HTTP.SignaturePaths && lim.MaxPaths > 0 {
+		r.paths = e.deps.Signatures.ExtraPaths()
+		if len(r.paths) > lim.MaxPaths {
+			r.paths = r.paths[:lim.MaxPaths]
+		}
+	}
+
+	// 4. Plan: fresh, or the remaining chunks of a paused run.
+	chunking := normalizeChunking(plan.Profile.Chunking)
+	resumed := len(plan.Chunks) > 0
+	var units []*unit
+	if resumed {
+		units, err = unitsFromChunks(plan.Chunks, exp.Exclusions)
+	} else {
+		units, err = buildUnits(plan.RunID, exp.V4, exp.V6, r.hintIPs, unitSizeFor(chunking, exp.Count()))
+	}
+	if err != nil {
+		return fail(fmt.Errorf("scan: plan: %w", err))
+	}
+	unitSize := blockSize
+	var total int64
+	for _, u := range units {
+		total += int64(u.c.Size)
+		unitSize = max(unitSize, min(u.c.Size, chunking.MaxSize))
+	}
+	if !resumed {
+		unitSize = unitSizeFor(chunking, exp.Count())
+	}
+	r.all, r.pending = units, append([]*unit{}, units...)
+	r.sizer = newSizer(chunking, unitSize)
+	if plan.MeasuredPPS > 0 && chunking.Adaptive && !resumed {
+		// history: start near the size that should take target_seconds
+		perAddr := r.packetsPerAddress()
+		guess := plan.MeasuredPPS / perAddr * float64(chunking.TargetSeconds)
+		r.sizer.cur = clampF(guess, r.sizer.min, r.sizer.max)
+	}
+
+	r.stats = newStatsKeeper(plan.PrevStats, e.now)
+	r.stats.parallel = lim.ParallelChunks
+	r.stats.fallback = r.packetsPerAddress() / float64(lim.PPS) * float64(lim.ParallelChunks)
+	r.stats.update(func(s *model.RunStats) {
+		s.AddressesTotal = s.AddressesDone + total
+		s.ChunksTotal = s.ChunksDone + len(units)
+	})
+
+	chunks := make([]model.Chunk, len(units))
+	for i, u := range units {
+		chunks[i] = u.c
+	}
+	if err := sink.OnPlan(ctx, plan.RunID, chunks); err != nil {
+		return fail(fmt.Errorf("scan: sink rejected the plan: %w", err))
+	}
+	log.Info("scan plan ready",
+		"addresses", total, "excluded", exp.Excluded, "chunks", len(units), "unit_size", unitSize,
+		"resumed", resumed, "prober", r.prober.Name(), "privileged", r.prober.Privileged(),
+		"ports", ports.Count(), "pps", lim.PPS, "parallel_chunks", lim.ParallelChunks,
+		"http_rps", lim.HTTPRPS, "hints", len(r.hints), "first_group", r.sizer.Next())
+	return r.execute(ctx)
+}
+
+// packetsPerAddress estimates the discovery packets for one dead address.
+func (r *run) packetsPerAddress() float64 {
+	return discoveryProbes(r.disc, r.prober.Privileged()) * 2 // one retry
+}
+
+func discoveryProbes(d model.DiscoveryOpts, privileged bool) float64 {
+	if d.SkipDiscovery {
+		return 0
+	}
+	n := len(d.TCPSynPorts)
+	if privileged {
+		n += len(d.TCPAckPorts)
+		if d.ICMPEcho {
+			n++
+		}
+		if d.ICMPTimestamp {
+			n++
+		}
+	}
+	if n == 0 {
+		n = 1
+	}
+	return float64(n)
+}
+
+func (r *run) execute(ctx context.Context) model.RunOutcome {
+	workCtx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	if we := r.plan.WindowEnd; we != nil {
+		if d := we.Sub(r.e.now()); d <= 0 {
+			cancel(ErrPauseWindow)
+		} else {
+			t := time.AfterFunc(d, func() { cancel(ErrPauseWindow) })
+			defer t.Stop()
+		}
+	}
+
+	// progress about once per second
+	progStop := make(chan struct{})
+	var progWG sync.WaitGroup
+	progWG.Add(1)
+	go func() {
+		defer progWG.Done()
+		tick := time.NewTicker(time.Second)
+		defer tick.Stop()
+		for {
+			select {
+			case <-tick.C:
+				if err := r.sink.OnProgress(r.sinkCtx, r.plan.RunID, r.stats.snapshot()); err != nil {
+					r.log.Debug("sink OnProgress failed", "error", err.Error())
+				}
+			case <-progStop:
+				return
+			}
+		}
+	}()
+
+	sem := make(chan struct{}, r.lim.ParallelChunks)
+	var wg sync.WaitGroup
+loop:
+	for {
+		select {
+		case sem <- struct{}{}:
+		case <-workCtx.Done():
+			break loop
+		}
+		g, rate := r.claim()
+		if g == nil {
+			<-sem
+			break
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
+			r.runGroup(workCtx, g, rate)
+		}()
+	}
+	wg.Wait()
+	close(progStop)
+	progWG.Wait()
+	return r.finish(ctx, workCtx)
+}
+
+// claim takes the next work group, or nil when nothing may start: no chunk
+// is left, or the next one would not fit before the window ends.
+func (r *run) claim() (*group, int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.pending) == 0 || r.windowStop {
+		return nil, 0
+	}
+	g, rest := takeGroup(r.pending, r.sizer.Next())
+	// equal share of the packet budget; the last lone group may use all of it
+	rate := r.budget.Share(r.lim.ParallelChunks)
+	if len(rest) == 0 && r.running == 0 {
+		rate = r.lim.PPS
+	}
+	if we := r.plan.WindowEnd; we != nil {
+		left := we.Sub(r.e.now())
+		for r.estimate(g.size, rate) > left {
+			if len(g.units) == 1 {
+				r.windowStop = true
+				r.log.Info("window guard: the next chunk does not fit before the window ends, no new chunk starts",
+					"chunk", g.units[0].c.Seq, "size", g.size, "estimate_ms", r.estimate(g.size, rate).Milliseconds(), "left_ms", left.Milliseconds())
+				return nil, 0
+			}
+			last := g.units[len(g.units)-1]
+			g.units = g.units[:len(g.units)-1]
+			g.size -= last.c.Size
+		}
+		rest = r.pending[len(g.units):]
+	}
+	r.pending = rest
+	r.groupSeq++
+	g.id = r.groupSeq
+	r.running++
+	r.sizer.record(g.size)
+	return g, rate
+}
+
+// estimate predicts the wall time of a group: from the measured speed when
+// there is one, else from the packet count and the rate.
+func (r *run) estimate(size, rate int) time.Duration {
+	if d, ok := r.sizer.Estimate(size); ok {
+		return d
+	}
+	sec := float64(size) * r.packetsPerAddress() / float64(max(1, rate))
+	return time.Duration(sec * float64(time.Second))
+}
+
+func (r *run) emitChunk(u *unit) {
+	if err := r.sink.OnChunk(r.sinkCtx, u.c); err != nil {
+		r.log.Warn("sink OnChunk failed", "chunk", u.c.Seq, "error", err.Error())
+		r.stats.update(func(s *model.RunStats) { s.Errors++ })
+	}
+}
+
+// groupStats are the counters of one group. They are taken back when the
+// group is deferred, because its chunks will be scanned again.
+type groupStats struct {
+	mu       sync.Mutex
+	hostsUp  int
+	services int
+	http     int
+	packets  int64
+}
+
+func (r *run) runGroup(ctx context.Context, g *group, want int) {
+	defer func() {
+		r.mu.Lock()
+		r.running--
+		r.mu.Unlock()
+	}()
+	start := r.e.now()
+	for _, u := range g.units {
+		t := start
+		u.c.Status, u.c.StartedAt, u.c.FinishedAt, u.c.Error, u.hostUp = model.ChunkRunning, &t, nil, "", 0
+		r.emitChunk(u)
+	}
+	gs := &groupStats{}
+	rate, err := r.budget.Acquire(ctx, want)
+	if err == nil {
+		err = r.scanGroup(ctx, g, rate, gs)
+		r.budget.Release(rate)
+	}
+	end := r.e.now()
+	dur := end.Sub(start)
+	pps := 0.0
+	if dur > 0 {
+		pps = round1(float64(gs.packets) / dur.Seconds())
+	}
+
+	status := model.ChunkDone
+	errText := ""
+	switch {
+	case ctx.Err() != nil:
+		status = model.ChunkDeferred
+		r.stats.update(func(s *model.RunStats) {
+			s.HostsUp -= gs.hostsUp
+			s.ServicesOpen -= gs.services
+			s.HTTPServices -= gs.http
+		})
+	case err != nil:
+		status = model.ChunkFailed
+		errText = err.Error()
+		r.log.Error("chunk group failed", "group", g.id, "chunks", g.label(), "error", errText)
+		r.mu.Lock()
+		if r.firstErr == nil {
+			r.firstErr = err
+		}
+		r.mu.Unlock()
+		r.stats.update(func(s *model.RunStats) { s.Errors++ })
+	default:
+		r.sizer.Observe(g.size, dur)
+		r.stats.update(func(s *model.RunStats) {
+			s.AddressesDone += int64(g.size)
+			s.ChunksDone += len(g.units)
+		})
+	}
+	for _, u := range g.units {
+		u.c.Status, u.c.Error, u.c.PPS, u.c.HostsUp = status, errText, pps, u.hostUp
+		// the group ran as one process: each chunk gets its share of the time
+		u.c.DurationMs = dur.Milliseconds() * int64(u.c.Size) / int64(max(1, g.size))
+		if status != model.ChunkDeferred {
+			t := end
+			u.c.FinishedAt = &t
+		} else {
+			u.c.HostsUp = 0
+		}
+		r.emitChunk(u)
+	}
+	ev := GroupEvent{
+		ID: g.id, FirstSeq: g.units[0].c.Seq, LastSeq: g.units[len(g.units)-1].c.Seq, Chunks: len(g.units),
+		Size: g.size, Spec: g.specs(), RatePPS: rate, Status: string(status), DurationMs: dur.Milliseconds(),
+		HostsUp: gs.hostsUp, Packets: gs.packets, PPS: pps, NextSize: r.sizer.Next(), StartedAt: start, Error: errText,
+	}
+	r.log.Info("chunk group finished", "group", g.id, "chunks", g.label(), "size", g.size, "status", ev.Status,
+		"ms", ev.DurationMs, "hosts_up", ev.HostsUp, "packets", ev.Packets, "pps", ev.PPS, "rate_cap", rate, "next_size", ev.NextSize)
+	if r.e.deps.OnGroup != nil {
+		r.e.deps.OnGroup(ev)
+	}
+}
+
+// finish computes the outcome and marks unfinished chunks as deferred.
+func (r *run) finish(parent, work context.Context) model.RunOutcome {
+	open, done, failed := 0, 0, 0
+	for _, u := range r.all {
+		switch u.c.Status {
+		case model.ChunkDone:
+			done++
+		case model.ChunkFailed:
+			failed++
+		default:
+			open++
+		}
+	}
+	out := model.RunOutcome{Status: model.RunCompleted}
+	switch {
+	case parent.Err() != nil:
+		cause := context.Cause(parent)
+		if reason, ok := pauseReason(cause); ok {
+			out.Status, out.PauseReason = model.RunPaused, reason
+		} else {
+			out.Status, out.Err = model.RunCancelled, cause
+		}
+	case open > 0:
+		// the window closed, or the guard refused to start the next chunk
+		out.Status, out.PauseReason = model.RunPaused, model.PauseWindowClosed
+	case failed > 0 && done == 0:
+		out.Status, out.Err = model.RunFailed, r.firstErr
+	}
+	if out.Status != model.RunCompleted && out.Status != model.RunFailed {
+		for _, u := range r.all {
+			if u.c.Status == model.ChunkPending || u.c.Status == model.ChunkRunning {
+				u.c.Status = model.ChunkDeferred
+				r.emitChunk(u)
+			}
+		}
+	}
+	out.Stats = r.stats.snapshot()
+	if out.Status == model.RunCompleted {
+		out.Stats.ETASec = 0
+	}
+	if err := r.sink.OnProgress(r.sinkCtx, r.plan.RunID, out.Stats); err != nil {
+		r.log.Debug("sink OnProgress failed", "error", err.Error())
+	}
+	r.log.Info("run finished", "status", out.Status, "pause_reason", out.PauseReason,
+		"addresses_done", out.Stats.AddressesDone, "addresses_total", out.Stats.AddressesTotal,
+		"chunks_done", out.Stats.ChunksDone, "chunks_total", out.Stats.ChunksTotal, "deferred", open,
+		"hosts_up", out.Stats.HostsUp, "services", out.Stats.ServicesOpen, "packets", out.Stats.PacketsSent,
+		"avg_pps", out.Stats.AvgPPS, "elapsed_sec", out.Stats.ElapsedSec, "group_sizes", fmt.Sprint(r.sizer.History()))
+	return out
+}
+
+// Estimate computes the traffic budget of a plan. It sends nothing: domains
+// are not resolved and count as one address each.
+func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
+	lim := EffectiveLimits(plan.Profile, plan.Policy)
+	chunking := normalizeChunking(plan.Profile.Chunking)
+	est := model.ScanEstimate{EffectivePPS: lim.PPS, FitsWindow: true}
+
+	if len(plan.Chunks) > 0 {
+		for _, c := range plan.Chunks {
+			if c.Status != model.ChunkDone {
+				est.Addresses += int64(c.Size)
+				est.Chunks++
+			}
+		}
+	} else {
+		total, excluded := targets.Count(plan.Targets, plan.Policy.Exclusions)
+		est.Addresses = total - excluded
+		us := int64(unitSizeFor(chunking, est.Addresses))
+		est.Chunks = int((est.Addresses + us - 1) / us)
+		vals := make([]string, len(plan.Targets))
+		for i, t := range plan.Targets {
+			vals[i] = t.Value
+		}
+		st := targets.Build(vals)
+		set := st.V4.Subtract(targets.Build(plan.Policy.Exclusions).V4)
+		if set.BlockCount() <= 1<<16 { // exact count for scopes up to a /8
+			if units, err := buildUnits(0, set, st.V6, nil, int(us)); err == nil {
+				est.Chunks = len(units) + (len(st.Domains)+blockSize-1)/blockSize
+			}
+		}
+	}
+	if est.Addresses <= 0 {
+		return est
+	}
+
+	// Expected share of live addresses: from the inventory when it knows
+	// hosts in this scope, else a cautious default.
+	est.ExpectedLiveRate = 0.05
+	if len(plan.Hints) > 0 {
+		est.ExpectedLiveRate = math.Min(1, float64(len(plan.Hints))/float64(est.Addresses))
+	}
+	live := float64(est.Addresses) * est.ExpectedLiveRate
+	dead := float64(est.Addresses) - live
+
+	nPorts := 100.0
+	if ports, err := probe.EffectivePorts(plan.Profile.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil {
+		nPorts = float64(ports.Count())
+	}
+	disc := probe.NormalizeDiscovery(plan.Profile.Discovery)
+	probes := discoveryProbes(disc, e.Prober().Privileged())
+	var packets float64
+	if disc.SkipDiscovery {
+		packets = float64(est.Addresses) * nPorts * 2 // every address gets a port scan, silent ports are retried
+		live = float64(est.Addresses) * est.ExpectedLiveRate
+	} else {
+		packets = dead*probes*2 + live*probes // a dead address gets one retry
+		packets += live * nPorts * 1.05
+	}
+	if plan.Profile.ServiceDetection {
+		packets += live * 3 * 14 // about 3 open ports per host, about 14 packets per version probe
+	}
+	if plan.Profile.Retry.UnstableRetries > 0 {
+		packets += float64(len(plan.Hints)) * 0.1 * probes * float64(plan.Profile.Retry.UnstableRetries)
+	}
+	est.EstPackets = int64(packets)
+
+	var sec float64
+	if plan.MeasuredPPS > 0 {
+		est.BasedOnHistory = true
+		sec = packets / plan.MeasuredPPS
+	} else {
+		// nmap seldom holds the cap exactly; process start and the service
+		// stage add fixed time per group
+		groups := math.Ceil(float64(est.Addresses) / float64(chunking.MaxSize))
+		sec = packets/(float64(lim.PPS)*0.85) + groups*2/float64(lim.ParallelChunks)
+		if plan.Profile.ServiceDetection {
+			sec += live * 3 * 1.5 / float64(lim.ParallelHosts)
+		}
+	}
+	est.EstDurationSec = int64(math.Ceil(sec))
+	if plan.WindowEnd != nil {
+		est.WindowSec = int64(plan.WindowEnd.Sub(e.now()).Seconds())
+		if est.WindowSec < 0 {
+			est.WindowSec = 0
+		}
+		est.FitsWindow = est.EstDurationSec <= est.WindowSec
+	}
+	return est
+}
