@@ -182,3 +182,26 @@ Backend items (not changed, UI only):
 - The host tag filter lists the internal tag "new-exposure".
 - A dashboard field `last_full_run` / `prev_full_run` would save the extra `GET /runs` call; the UI does not need it.
 - Auto-resolve flapping on the frequent profile (section 11, item 4) is still open.
+
+## 14. One machine: "Ten komputer" in two clicks, run story, returned and slower
+
+Stack: own `czuiy` (port 18621) built from `iwosmu/czujka-core` f69010a (loopback mapping, `service_returned`, `response_slower`, `response_recovered`, `/services/{id}/response-times`) with this branch's UI on vite. Target: `localhost`, which the backend maps to the docker host 192.168.65.254 (this Mac). Own test containers: `czuit-slow` (Python HTTP with a set delay, 127.0.0.1:9090) and `czuit-back` (nginx, 127.0.0.1:9100).
+
+**Fresh install, measured with Playwright (`one-pl-1..5`):**
+
+| Step | Time after login | Clicks |
+| --- | --- | --- |
+| Wizard with "Najszybciej: zeskanuj ten komputer" | 0.8 s | 0 |
+| "Ten komputer (localhost)": line "localhost = host Dockera 192.168.65.254" | 1.5 s | 1 |
+| "Uruchom skan": run page, live | 2.2 s | 2 |
+| First services on screen (15 rows) | 98 s | 2 |
+| Run done | 100 s | 2 |
+
+2 clicks meet the goal (≤ 5). 98 s misses the 60 s goal: this engine still sends services in one batch at the end of the port stage (top-1000 with the seeded default profile, 1 min 35 s). The UI polls `/services?run_id` every 3 s, so rows show as soon as the engine stores the first stage (`RunStats.passes`, shown as one line when there are 2 or more passes). The screenshots show top-1000 results; the staged full-range engine change was not in this build.
+
+**Returned and slower, real API:** run #3 (nginx `czuit-back` stopped, delay 900 ms on `czuit-slow`) gave `service_gone` :9100 and `response_slower` :9090 "3 ms → 902 ms". Run #4 (both back) gave `service_returned` :9100 "nie było jej 5 min 24 s (1 skan)" and `response_recovered` :9090 "3 ms → 2 ms". The dashboard headline, the run page story, compare, the change filters and the service story show these rows with their own glyphs (`one-6..12`). The service page shows the response-time chart from `/response-times` (`one-10`). Mobile: `one-m1..m3`.
+
+Also in this round: a service name is never empty (fallback "nierozpoznana"); Czujka's own port carries "ta instancja Czujki" (tag `czujka`); one-host runs show a services table instead of the /16 map; the time machine hides the map for one block; the targets list shows "skanowany jako 192.168.65.254".
+
+**Safety note.** From 17:16 the coordinator forbade range scans of the Mac (nmap `-sV` probes hit local tools). Before that I ran 7 top-1000 scans of host.docker.internal from `czuiz`/`czuiy`. After the notice both stacks have `allowed_ports` set to the template ports plus my own published ports, and every profile on them scans only that list. Run #4 above used that list. The "Ten komputer" quick start copies the seeded default profile, as agreed; that is correct on a jury machine, but on a developer's Mac it scans the Mac's own ports.
+

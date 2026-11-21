@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAction, useItem, usePage } from '../api/hooks';
 import { del, patch, post, upload } from '../api/client';
-import type { SafetyPolicy, Scope, Target, TargetPreview } from '../api/types';
+import type { Health, SafetyPolicy, Scope, Target, TargetPreview } from '../api/types';
+import { THIS_COMPUTER, isLoopback, loopbackLine } from '../lib/thisComputer';
 import { t, plural } from '../i18n';
 import { cx, fmtInt } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
@@ -31,6 +32,30 @@ export function OperatorLockNote({ networks }: { networks: string[] | null | und
   );
 }
 
+/** "localhost = host Dockera 192.168.65.254": what each loopback entry is scanned as. */
+export function LoopbackNote({ targets }: { targets: { value: string; maps_to?: string }[] }) {
+  const health = useItem<Health>('/healthz', undefined, { staleTime: 60_000 });
+  const lines = [...new Set(targets.map((x) => loopbackLine(x.value, x.maps_to, health.data?.host_gateway)).filter((x): x is string => Boolean(x)))];
+  if (!lines.length) return null;
+  return (
+    <div className="space-y-0.5" data-testid="loopback-note">
+      {lines.map((l) => <p key={l} className="flex items-start gap-1.5 text-sm text-ink"><Icon name="info" size={14} className="mt-[3px] flex-none text-ink-3" /><span className="mono">{l}</span></p>)}
+    </div>
+  );
+}
+
+/** The ready "Ten komputer (localhost)" target, next to the ranges field. */
+export function ThisComputerChip({ text, onChange }: { text: string; onChange: (next: string) => void }) {
+  const has = text.split(/\r?\n/).some((l) => isLoopback(l.replace(/#.*/, '')));
+  return (
+    <button type="button" className={cx('inline-flex h-[26px] items-center gap-1.5 border px-2 text-xs', has ? 'border-accent text-ink' : 'border-rule-strong text-ink-2 hover:border-accent hover:text-ink')}
+      aria-pressed={has} data-testid="this-computer"
+      onClick={() => onChange(has ? text : (text.trim() ? text.replace(/\s+$/, '') + '\n' : '') + THIS_COMPUTER)}>
+      <Icon name={has ? 'check' : 'plus'} size={12} />{t('Ten komputer', 'This computer')} <span className="mono text-ink-3">(localhost)</span>
+    </button>
+  );
+}
+
 export function PreviewReport({ p, pending }: { p: TargetPreview; pending?: boolean }) {
   const cell = (n: number, label: string, glyph: 'check' | 'x' | 'ring' | 'dashring', tone: 'new' | 'gone' | 'expected' | 'changed') => (
     <div className="flex items-center gap-2 border-b border-rule py-1.5 sm:border-b-0 sm:border-r sm:px-3 sm:first:pl-0 sm:last:border-r-0">
@@ -46,6 +71,7 @@ export function PreviewReport({ p, pending }: { p: TargetPreview; pending?: bool
         {cell(p.duplicates, plural(p.duplicates, ['duplikat', 'duplikaty', 'duplikatów'], ['duplicate', 'duplicates']), 'ring', 'changed')}
         {cell(p.excluded, plural(p.excluded, ['adres wykluczony polityką', 'adresy wykluczone polityką', 'adresów wykluczonych polityką'], ['address excluded by the policy', 'addresses excluded by the policy']), 'dashring', 'changed')}
       </div>
+      <div className="mt-2"><LoopbackNote targets={p.valid} /></div>
       <p className="mt-2 border-t border-rule pt-2 text-sm">{t('Do zakresu trafi ', 'The scope gains ')}<span className="num text-base font-semibold">{fmtInt(p.address_count)}</span> {plural(p.address_count, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}.</p>
       {locked ? (
         <p className="mt-2 flex items-start gap-1.5 border-t border-rule pt-2 text-sm text-ink" data-testid="preview-lock">
@@ -100,6 +126,7 @@ function AddTargets({ scope }: { scope: Scope }) {
       {tab === 'manual' ? (
         <div className="mt-3 grid gap-4 lg:grid-cols-2">
           <div>
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-ink-3"><span>{t('Gotowe cele:', 'Ready targets:')}</span><ThisComputerChip text={text} onChange={setText} /></div>
             <Field label={t('Cele, jeden w wierszu', 'Targets, one per line')} hint={t('Adres IP, CIDR, zakres a-b albo domena. Tekst po # jest komentarzem.', 'An IP address, CIDR, range a-b or a domain. Text after # is a comment.')}>
               <textarea className="field mono" rows={8} spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} placeholder={'10.20.48.0/24\n10.30.6.10-10.30.6.40\nlab.uczelnia.example'} data-testid="targets-text" />
             </Field>
@@ -176,7 +203,7 @@ export default function Targets() {
     invalidate: ['/scopes', '/dashboard'], success: t('Usunięto', 'Deleted'), onSuccess: (_r, c) => { setConfirm(null); if (c.kind === 'scope') u.set({ scope: null }); },
   });
   const cols: Col<Target>[] = [
-    { id: 'value', header: t('Cel', 'Target'), cell: (x) => <span className={cx('mono', !x.enabled && 'text-ink-3 line-through')}>{x.value}</span> },
+    { id: 'value', header: t('Cel', 'Target'), cell: (x) => <span className={cx('mono', !x.enabled && 'text-ink-3 line-through')}>{x.value}{x.maps_to ? <span className="ml-2 font-sans text-xs text-ink-3" data-testid="target-maps-to">{t('skanowany jako', 'scanned as')} <span className="mono text-ink-2">{x.maps_to}</span></span> : null}</span> },
     { id: 'kind', header: t('Rodzaj', 'Kind'), cell: (x) => <span className="text-ink-2">{kindLabel(x.kind)}</span> },
     { id: 'addr', header: t('Adresy', 'Addresses'), align: 'right', cell: (x) => <span className="num">{fmtInt(x.addresses)}</span> },
     { id: 'note', header: t('Notatka', 'Note'), hide: 'md', cell: (x) => <span className="block max-w-[260px] truncate text-ink-2">{x.note || '–'}</span> },

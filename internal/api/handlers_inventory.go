@@ -7,8 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/iwosmu/aghpen/internal/analyze"
 	"github.com/iwosmu/aghpen/internal/defectdojo"
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/store"
@@ -602,4 +605,59 @@ func (s *Server) exportDojo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
+}
+
+// serviceResponseTimes is GET /services/{id}/response-times: the HTTP
+// response time of each open observation of the service, oldest first, with
+// the rule of analyze applied (baseline and slow flag), for a chart.
+func (s *Server) serviceResponseTimes(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	limit := 50
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 500 {
+			writeErr(w, http.StatusUnprocessableEntity, "validation", "limit: 1..500")
+			return
+		}
+		limit = n
+	}
+	pts, err := s.st.ResponseSeries(r.Context(), id, limit)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	vals := make([]int, len(pts))
+	for i, p := range pts {
+		vals[i] = p.Ms
+	}
+	rule := analyze.ResponseSeries(vals)
+	type point struct {
+		RunID      int64     `json:"run_id"`
+		At         time.Time `json:"at"`
+		Ms         *int      `json:"ms"`          // null: the port was open, HTTP did not answer
+		BaselineMs *int      `json:"baseline_ms"` // null: no baseline yet
+		Slow       bool      `json:"slow"`
+	}
+	out := struct {
+		ServiceID int64   `json:"service_id"`
+		Rule      any     `json:"rule"`
+		Points    []point `json:"points"`
+	}{ServiceID: id, Points: make([]point, len(pts)),
+		Rule: map[string]any{"baseline_n": analyze.ResponseBaselineN, "slow_factor": analyze.ResponseSlowFactor, "slow_min_ms": analyze.ResponseSlowMinMs}}
+	for i, p := range pts {
+		pt := point{RunID: p.RunID, At: p.At, Slow: rule[i].Slow}
+		if p.Ms >= 0 {
+			ms := p.Ms
+			pt.Ms = &ms
+		}
+		if rule[i].Baseline >= 0 {
+			b := rule[i].Baseline
+			pt.BaselineMs = &b
+		}
+		out.Points[i] = pt
+	}
+	writeJSON(w, http.StatusOK, out)
 }

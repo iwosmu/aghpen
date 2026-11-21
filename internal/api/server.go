@@ -129,6 +129,7 @@ func (s *Server) routes() http.Handler {
 		r.With(can(model.PermResultsUpdate)).Patch("/services/{id}", s.patchService)
 		r.With(can(model.PermResultsDelete)).Delete("/services/{id}", s.deleteService)
 		r.With(can(model.PermResultsRead)).Get("/services/{id}/observations", s.listObservations)
+		r.With(can(model.PermResultsRead)).Get("/services/{id}/response-times", s.serviceResponseTimes)
 		r.With(can(model.PermResultsRead)).Get("/service-groups", s.listServiceGroups)
 		r.With(can(model.PermResultsRead)).Get("/technologies", s.listTechnologies)
 		r.With(can(model.PermResultsRead)).Get("/tags", s.listTags)
