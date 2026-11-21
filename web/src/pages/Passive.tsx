@@ -31,9 +31,9 @@ function ResultView({ res, scope, onDone }: { res: PassiveResult; scope: Scope; 
         {' · '}<span className="num text-ink">{cands.length}</span> {plural(cands.length, ['kandydat', 'kandydaci', 'kandydatów'], ['candidate', 'candidates'])}
         {' · '}<span className="num text-ink">{hints.length}</span> {t('podpowiedzi nazw', 'name hints')}
         {' · '}<span className="num text-ink">{oos.length}</span> {t('poza zakresem', 'out of scope')}
-        {res.hosts_updated !== undefined ? <>{' · '}<span className="num text-ink">{res.hosts_updated}</span> {t('hosty z nową nazwą: (liczba po etykiecie)', 'hosts named: (count after the label)')}</> : null}
+        {res.hosts_updated !== undefined ? <>{' · '}{t('hosty z nową nazwą', 'hosts named')}: <span className="num text-ink">{res.hosts_updated}</span></> : null}
       </p>
-      {res.file ? <p className="text-xs text-ink-3">{t('Plik', 'File')}: {res.file.format}, {fmtInt(res.file.records)} {t('rekordy: (liczba po etykiecie)', 'records: (count after the label)')}, {fmtInt(res.file.skipped)} {t('pominiętych', 'skipped')}, {fmtInt(res.file.invalid_total)} {t('błędnych', 'invalid')}{(res.file.invalid ?? []).slice(0, 3).map((i) => <span key={i.line} className="block">{t('wiersz', 'line')} <span className="num">{i.line}</span>: <span className="mono">{i.value}</span>: {i.reason}</span>)}</p> : null}
+      {res.file ? <p className="text-xs text-ink-3">{t('Plik', 'File')}: {res.file.format}, {t('rekordy', 'records')}: {fmtInt(res.file.records)}, {t('pominięte', 'skipped')}: {fmtInt(res.file.skipped)}, {t('błędne', 'invalid')}: {fmtInt(res.file.invalid_total)}{(res.file.invalid ?? []).slice(0, 3).map((i) => <span key={i.line} className="block">{t('wiersz', 'line')} <span className="num">{i.line}</span>: <span className="mono">{i.value}</span>: {i.reason}</span>)}</p> : null}
       {(res.sources ?? []).filter((s) => s.error || s.skipped).map((s) => <p key={s.name} className="flex items-start gap-1.5 text-xs text-st-changed"><Glyph name="delta" tone="changed" size={12} />{s.name}: {s.skipped ? t('pominięte (źródło zewnętrzne wyłączone)', 'skipped (external source disabled)') : s.error}</p>)}
       {cands.length ? (
         <div className="border border-rule">

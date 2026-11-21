@@ -75,9 +75,9 @@ describe('service names', () => {
 describe('port passes', () => {
   it('shows each pass state', () => {
     setLang('pl');
-    expect(passState({ name: 'top_ports', state: 'done', hosts: 1, ports_total: 1000, ports_done: 1000 })).toBe('gotowe');
+    expect(passState({ name: 'top_ports', state: 'done', hosts: 1, ports_total: 1000, ports_done: 1000 })).toBe('gotowy');
     expect(passState({ name: 'full_range', state: 'running', hosts: 1, ports_total: 65535, ports_done: 21000 })).toMatch(/^32/);
-    expect(passState({ name: 'full_range', state: 'pending', hosts: 1, ports_total: 65535, ports_done: 0 })).toBe('czeka');
+    expect(passState({ name: 'full_range', state: 'pending', hosts: 1, ports_total: 65535, ports_done: 0 })).toBe('oczekuje');
   });
 });
 
@@ -126,7 +126,7 @@ describe('no equal values with an arrow', () => {
     expect(responseDelta(mk('response_recovered', { baseline_ms: 1, ms: 1 }, { ms: 1 }))).toBe('teraz 1 ms');
     expect(responseDelta(mk('response_slower', { baseline_ms: 5, ms: 5 }, { ms: 5 }))).toBe('teraz 5 ms');
     setLang('en');
-    expect(responseDelta(mk('response_recovered', { baseline_ms: 0, ms: null }, { ms: 0 }))).toBe('no answer → 0 ms');
+    expect(responseDelta(mk('response_recovered', { baseline_ms: 0, ms: null }, { ms: 0 }))).toBe('no response → 0 ms');
     setLang('pl');
   });
 });

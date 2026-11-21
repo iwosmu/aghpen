@@ -192,11 +192,11 @@ export function Sev({ level, compact }: { level: Severity | string; compact?: bo
 }
 
 // ---------- Finding status ----------
-export const FINDING_STATUSES: FindingStatus[] = ['new', 'in analysis', 'accepted', 'false_positive', 'resolved'];
+export const FINDING_STATUSES: FindingStatus[] = ['new', 'triaged', 'accepted', 'false_positive', 'resolved'];
 export function findingStatusInfo(s: FindingStatus | string): { tone: Tone; glyph: GlyphName; label: string } {
   switch (s) {
     case 'new': return { tone: 'accent', glyph: 'dot', label: t('nowe', 'new') };
-    case 'in analysis': return { tone: 'neutral', glyph: 'half', label: t('w analizie', 'in analysis') };
+    case 'triaged': return { tone: 'neutral', glyph: 'half', label: t('w analizie', 'in analysis') };
     case 'accepted': return { tone: 'neutral', glyph: 'check', label: t('zaakceptowane', 'accepted') };
     case 'false_positive': return { tone: 'expected', glyph: 'x', label: t('fałszywy alarm', 'false positive') };
     case 'resolved': return { tone: 'expected', glyph: 'ring', label: t('rozwiązane', 'resolved') };

@@ -57,8 +57,8 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
       ) : (
         <div className="space-y-3" data-testid="sig-import-report">
           <p className="flex items-start gap-2 text-sm">
-            <Glyph name={report.stored ? 'check' : 'x'} tone={report.stored ? 'new: (count after the label)' : 'gone'} />
-            <span>{report.stored ? t('Zapisano: ', 'Stored: ') : t('Nic nie zapisano. ', 'Nothing was stored. ')}<span className="num font-medium">{(rep?.created ?? []).length}</span> {t('nowe: (liczba po etykiecie)', 'new: (count after the label)')}, <span className="num font-medium">{(rep?.updated ?? []).length}</span> {t('zastąpionych', 'replaced')}, <span className="num font-medium">{(rep?.skipped ?? []).length}</span> {t('pominiętych', 'skipped')}, <span className="num font-medium">{issues.filter((i) => i.level === 'error').length}</span> {t('błędów', 'errors')}.</span>
+            <Glyph name={report.stored ? 'check' : 'x'} tone={report.stored ? 'new' : 'gone'} />
+            <span>{report.stored ? t('Zapisano. ', 'Stored. ') : t('Nic nie zapisano. ', 'Nothing was stored. ')}{t('Nowe', 'New')}: <span className="num font-medium">{(rep?.created ?? []).length}</span>, {t('zastąpione', 'replaced')}: <span className="num font-medium">{(rep?.updated ?? []).length}</span>, {t('pominięte', 'skipped')}: <span className="num font-medium">{(rep?.skipped ?? []).length}</span>, {t('błędy', 'errors')}: <span className="num font-medium">{issues.filter((i) => i.level === 'error').length}</span>.</span>
           </p>
           <ul className="max-h-[320px] overflow-auto border-t border-rule text-sm">
             {(rep?.created ?? []).map((s) => <li key={'c' + s} className="flex h-[30px] items-center gap-2 border-b border-rule"><Glyph name="plus" tone="new" size={12} /><span className="mono">{s}</span><span className="ml-auto text-xs text-ink-3">{t('nowa', 'new: (count after the label)')}</span></li>)}
