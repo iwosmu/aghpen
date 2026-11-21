@@ -141,7 +141,7 @@ function AddTargets({ scope }: { scope: Scope }) {
           </div>
           <div>
             <p className="label mb-1.5">{t('Podgląd przed zapisem', 'Preview before saving')}</p>
-            {text.trim() && p ? <PreviewReport p={p} pending={stale} /> : <p className="border border-dashed border-rule-strong p-3 text-sm text-ink-2">{t('Zacznij pisać: Czujka na bieżąco policzy poprawne wpisy, błędy z powodem, duplikaty, wykluczenia i liczbę adresów.', 'Start typing: Czujka counts valid entries, errors with a reason, duplicates, exclusions and the number of addresses as you go.')}</p>}
+            {text.trim() && p ? <PreviewReport p={p} pending={stale} /> : null}
           </div>
         </div>
       ) : (
@@ -218,7 +218,6 @@ export default function Targets() {
     <div>
       <PageHeader
         title={t('Cele', 'Targets')}
-        sub={t('Zakres to nazwany zbiór celów z właścicielem. Skaner nigdy nie wychodzi poza cele wpisane tutaj.', 'A scope is a named set of targets with an owner. The scanner never leaves the targets entered here.')}
         readOnly={!canCreate && !canUpdate}
         actions={canCreate ? <Button variant="primary" icon="plus" onClick={() => setDialog('new')}>{t('Nowy zakres', 'New scope')}</Button> : null}
       />
@@ -258,7 +257,7 @@ export default function Targets() {
               {canCreate ? <PassivePanel scope={scope} /> : null}
               <Panel title={t('Cele', 'Targets')} count={targets.data?.total} flush>
                 <DataTable inPanel rows={targets.data?.items} cols={cols} rowKey={(x) => x.id} loading={targets.isPending} error={targets.error} retry={() => targets.refetch()} dim={targets.isPlaceholderData}
-                  empty={<p className="p-3 text-sm text-ink-2">{t('Brak celów.', 'No targets yet.')}{canCreate ? ' ' + t('Dodaj je w formularzu powyżej.', 'Add them in the form above.') : ''}</p>}
+                  empty={<p className="p-3 text-sm text-ink-2">{t('Brak celów.', 'No targets yet.')}</p>}
                   mobile={(x) => (
                     <div className="flex items-center justify-between gap-2"><span><span className="mono text-sm">{x.value}</span><span className="ml-2 text-xs text-ink-3">{kindLabel(x.kind)} · {fmtInt(x.addresses)}</span></span>{canDelete ? <IconButton icon="trash" label={t('Usuń cel ', 'Delete target ') + x.value} onClick={() => setConfirm({ kind: 'target', id: x.id, label: x.value })} /> : null}</div>
                   )} />

@@ -51,7 +51,7 @@ function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: nu
             <thead><tr className="border-b border-rule-strong text-left text-xs text-ink-3">
               {hosts.length > 1 ? <th className="h-[30px] px-3 font-medium">IP</th> : null}
               <th className="h-[30px] px-3 font-medium">{t('Port', 'Port')}</th>
-              <th className="px-3 font-medium" title={live ? t('Port otwarty w tym przebiegu; zniknięcia pokażą się po końcu skanu', 'Port open in this run; gone services show when the scan ends') : t('Stan usługi dziś, po najnowszym skanie', 'The state of the service today, after the latest scan')}>{live ? t('Stan', 'Status') : t('Stan dziś', 'Status today')}</th>
+              <th className="px-3 font-medium">{live ? t('Stan', 'Status') : t('Stan dziś', 'Status today')}</th>
               <th className="px-3 font-medium">{t('Usługa', 'Service')}</th>
               <th className="px-3 font-medium">{t('Produkt', 'Product')}</th>
               <th className="hidden px-3 font-medium md:table-cell">{t('Tytuł strony', 'Page title')}</th>
@@ -77,7 +77,7 @@ function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: nu
               <Link to={'/services?run_id=' + run.id + '&state=all'} className="link">{t('Wszystkie usługi', 'All services')}</Link>
             </p>
           ) : null}
-          {carried > 0 ? <p className="border-t border-rule px-3 py-2 text-xs text-ink-3" data-testid="run-services-carried">{t('Poza tym skanem', 'Outside this scan')}: {carried} {t('(na końcu listy). Ten skan nie sprawdzał tych portów, więc stan pochodzi z ostatniej obserwacji.', '(at the end of the list). This scan did not check these ports, so the state comes from the last observation.')}</p> : null}
+          {carried > 0 ? <p className="border-t border-rule px-3 py-2 text-xs text-ink-3" data-testid="run-services-carried">{t('Poza tym skanem', 'Outside this scan')}: {carried}</p> : null}
         </div>
       )}
     </Panel>
@@ -164,7 +164,6 @@ export default function RunDetail() {
   const sortedChunks = [...(chunks.data ?? [])].sort((a, b) => a.seq - b.seq);
   const groupSizes = new Map<number, number>();
   for (const c of sortedChunks) if (c.group) groupSizes.set(c.group, (groupSizes.get(c.group) ?? 0) + 1);
-  const multiGroups = [...groupSizes.values()].filter((n) => n > 1).length;
   const openReport = (print: boolean) => {
     const w = window.open('/api/v1/runs/' + run.id + '/report.html', '_blank');
     if (print && w) w.addEventListener('load', () => w.print(), { once: true });
@@ -275,7 +274,7 @@ export default function RunDetail() {
               <Fact label={t('Otwarte usługi', 'Open services')}><span className="num">{fmtInt(s.services_open)}</span> <span className="text-xs font-normal text-ink-3">({fmtInt(s.http_services)} WWW)</span></Fact>
               <Fact label={t('Pakiety', 'Packets')}><PacketCount sent={s.packets_sent} estimated={s.packets_estimated} /></Fact>
               <Fact label={t('Żądania HTTP', 'HTTP requests')}><span className="num">{fmtInt(s.http_requests)}</span></Fact>
-              <Fact label={t('Ponowienia', 'Retries')}><span className="num">{fmtInt(s.retried)}</span></Fact>
+              <Fact label={t('Hosty sprawdzone ponownie', 'Hosts probed again')}><span className="num">{fmtInt(s.retried)}</span></Fact>
             </dl>
           </section>
           <section className="card p-4 sm:p-5">
@@ -297,7 +296,7 @@ export default function RunDetail() {
             )}
           </Panel>
 
-          <Panel title={t('Podgrupy adresów', 'Address chunks')} count={sortedChunks.length} flush actions={<span className="text-ink-3">{groupSizes.size ? groupSizes.size + ' ' + plural(groupSizes.size, ['grupa robocza', 'grupy robocze', 'grup roboczych'], ['work group', 'work groups']) + (multiGroups ? ' · ' + t(multiGroups + ' łączonych', multiGroups + ' merged') : '') : null}{groupSizes.size && profile.data?.chunking.adaptive ? ' · ' : ''}{profile.data?.chunking.adaptive ? t('rozmiar adaptacyjny, cel ' + profile.data.chunking.target_seconds + ' s', 'adaptive size, target ' + profile.data.chunking.target_seconds + ' s') : ''}</span>}>
+          <Panel title={t('Podgrupy adresów', 'Address chunks')} count={sortedChunks.length} flush>
             {chunks.error ? <ErrorState error={chunks.error} retry={() => chunks.refetch()} /> : !chunks.data ? <SkeletonRows rows={8} /> : sortedChunks.length === 0 ? (
               <p className="p-3 text-sm text-ink-2">{run.trigger === 'import' ? t('Import nie ma podgrup.', 'An import has no chunks.') : t('Plan podgrup pojawi się po starcie skanu.', 'The chunk plan appears when the scan starts.')}</p>
             ) : (
@@ -424,7 +423,7 @@ export function phaseText(s: ScanRun['stats'], chunks: number, addrs: number): s
   const where = t(chunks + ' ' + plural(chunks, ['podgrupie', 'podgrupach', 'podgrupach'], ['', '']) + ' (' + fmtInt(addrs) + ' adresów)', chunks + ' ' + (chunks === 1 ? 'chunk' : 'chunks') + ' (' + fmtInt(addrs) + ' addresses)');
   if (s.http_requests > 0) return t('Rozpoznawanie usług WWW i wykrywanie hostów w ', 'Identifying web services and discovering hosts in ') + where;
   if (s.services_open > 0) return t('Wykrywanie hostów i usług w ', 'Discovering hosts and services in ') + where;
-  return t('Wykrywanie hostów w ', 'Discovering hosts in ') + where + t('. Postęp rośnie po zakończeniu każdej podgrupy.', '. Progress grows as each chunk finishes.');
+  return t('Wykrywanie hostów w ', 'Discovering hosts in ') + where + '.';
 }
 
 interface DojoRunResult { test_id: number; test_url: string; reimport: boolean; mode?: 'import' | 'reimport'; title?: string; created: number; closed: number; reactivated: number; untouched: number; total: number }
@@ -435,7 +434,7 @@ export function DojoRunButton({ runId }: { runId: number }) {
   const send = useAction(() => post<DojoRunResult>('/runs/' + runId + '/export/defectdojo'), { silent: true, onSuccess: setRes });
   return (
     <>
-      <Button icon="upload" busy={send.isPending} onClick={() => send.mutate(undefined)} data-testid="run-dojo" title={t('Wyślij wynik przebiegu do DefectDojo jako import „Nmap Scan”', 'Send the run result to DefectDojo as an "Nmap Scan" import')}>{t('Wyślij do DefectDojo', 'Send to DefectDojo')}</Button>
+      <Button icon="upload" busy={send.isPending} onClick={() => send.mutate(undefined)} data-testid="run-dojo">{t('Wyślij do DefectDojo', 'Send to DefectDojo')}</Button>
       <Dialog open={res !== null || Boolean(send.error)} onClose={() => { setRes(null); send.reset(); }} width={480} title={t('Skan w DefectDojo (Nmap Scan)', 'The scan in DefectDojo (Nmap Scan)')}
         footer={<Button variant="primary" onClick={() => { setRes(null); send.reset(); }}>{t('Gotowe', 'Done')}</Button>}>
         {res ? (

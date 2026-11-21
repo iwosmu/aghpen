@@ -166,7 +166,7 @@ function TechList({ s, matches }: { s: Service; matches: SigMatch[] }) {
         )))}
         {ms.length === 0 ? <li className="text-xs text-ink-3">{t('źródło:', 'source:')} {(sources ?? []).join(', ') || 'nmap'}{cpe ? ' · ' + cpe : ''}</li> : null}
       </ul>
-      {ms.length ? <div className="mt-1 text-2xs text-ink-3">{plural(ms.length, ['sygnatura', 'sygnatury', 'sygnatury'], ['signature', 'signatures'])}: {ms.map((m) => m.signature).join(', ')}{ms.length > 1 || (ms[0].evidence ?? []).length > 1 ? t(' · pewność łączona ze wszystkich dowodów', ' · confidence combined over all evidence') : ''}</div> : null}
+      {ms.length ? <div className="mt-1 text-2xs text-ink-3">{plural(ms.length, ['sygnatura', 'sygnatury', 'sygnatury'], ['signature', 'signatures'])}: {ms.map((m) => m.signature).join(', ')}</div> : null}
     </li>
   );
   return (

@@ -124,9 +124,7 @@ export default function Hosts() {
 
       <div ref={wrapRef} className="flex min-h-0 flex-1 flex-col">
         {inf.error ? <ErrorState error={inf.error} retry={() => inf.refetch()} /> : inf.isPending ? <SkeletonRows rows={14} /> : rows.length === 0 ? (
-          <Empty icon="hosts" title={active ? t('Żaden host nie pasuje do filtrów', 'No hosts match the filters') : t('Brak hostów', 'No hosts yet')}
-            hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Hosty pojawią się po pierwszym skanie albo po imporcie wyników.', 'Hosts appear after the first scan or after an import of results.')}
-            action={active ? undefined : <NextSteps />} />
+          <Empty icon="hosts" title={active ? t('Żaden host nie pasuje do filtrów', 'No hosts match the filters') : t('Brak hostów', 'No hosts yet')}            action={active ? undefined : <NextSteps />} />
         ) : (
           <>
             {!narrow ? (
@@ -166,8 +164,8 @@ export default function Hosts() {
               </div>
             </div>
             <div className="flex h-[30px] flex-none items-center justify-between gap-3 border-t border-rule px-4 text-xs text-ink-3 sm:px-6">
-              <span>{t('Wczytano', 'Loaded')} <span className="num text-ink-2">{fmtInt(rows.length)}</span> {t('z', 'of')} <span className="num text-ink-2">{fmtInt(total)}</span>{t('. Lista rysuje tylko widoczne wiersze.', '. The list draws only the visible rows.')}</span>
-              {isFetchingNextPage ? <span className="inline-flex items-center gap-1.5"><Spinner />{t('kolejna porcja', 'next batch')}</span> : null}
+              <span>{t('Wczytano', 'Loaded')} <span className="num text-ink-2">{fmtInt(rows.length)}</span> {t('z', 'of')} <span className="num text-ink-2">{fmtInt(total)}</span></span>
+              {isFetchingNextPage ? <span className="inline-flex items-center gap-1.5"><Spinner /></span> : null}
             </div>
           </>
         )}

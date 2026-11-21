@@ -56,7 +56,6 @@ export default function Changes() {
   const ackOne = useAction((id: number) => post('/changes/' + id + '/ack'), { invalidate: ['/changes', '/dashboard'] });
   const active = FILTERS.filter((k) => u.get(k)).length;
   const rows = q.data?.items;
-  const selectable = (rows ?? []).filter((c) => !c.acked_at);
   const cols: Col<Change>[] = [
     { id: 'kind', header: t('Rodzaj', 'Type'), cell: (c) => <ChangeMark kind={c.kind} expected={c.expected} /> },
     { id: 'what', header: t('Co się zmieniło', 'What changed'), wrap: true, cell: (c) => (
@@ -74,7 +73,6 @@ export default function Changes() {
     <div>
       <PageHeader
         title={t('Zmiany', 'Changes')}
-        sub={t('Dziennik różnic między kolejnymi skanami. Zmiana „oczekiwana” zgadza się z profilem dostępności hosta i nie wymaga reakcji.', 'The log of differences between runs. An "expected" change fits the availability profile of the host and needs no reaction.')}
         readOnly={!canAck}
         actions={<><ExportButtons kind="changes" query={filters} /><LinkButton to="/changes/compare" icon="compare">{t('Porównaj dwa skany', 'Compare two scans')}</LinkButton></>}
       />
@@ -120,7 +118,7 @@ export default function Changes() {
         sort={u.get('sort', '-at')} onSort={(s) => u.set({ sort: s })}
         selected={canAck ? selected : undefined} onSelect={canAck ? setSelected : undefined}
         rowClass={(c) => cx(c.acked_at && 'opacity-70')}
-        empty={<Empty icon="changes" title={active ? t('Żadna zmiana nie pasuje do filtrów', 'No changes match the filters') : t('Brak zmian', 'No changes yet')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Zmiany pojawią się po drugim skanie.', 'Changes appear after the second scan.')} action={active ? undefined : <NextSteps />} />}
+        empty={<Empty icon="changes" title={active ? t('Żadna zmiana nie pasuje do filtrów', 'No changes match the filters') : t('Brak zmian', 'No changes yet')} hint={active ? undefined : t('Zmiany pojawią się po drugim skanie.', 'Changes appear after the second scan.')} action={active ? undefined : <NextSteps />} />}
         mobile={(c) => (
           <div>
             <div className="flex items-center justify-between gap-2"><ChangeMark kind={c.kind} expected={c.expected} /><span className="num text-xs text-ink-3">#{c.run_id}</span></div>
@@ -130,7 +128,6 @@ export default function Changes() {
         )}
       />
       {q.data ? <Pager total={q.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}
-      {canAck && selectable.length > 0 && selected.size === 0 ? <p className="px-4 py-2 text-xs text-ink-3 sm:px-6">{t('Zaznacz wiersze, aby potwierdzić kilka zmian naraz.', 'Select rows to acknowledge several changes at once.')}</p> : null}
-    </div>
+          </div>
   );
 }

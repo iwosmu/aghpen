@@ -28,7 +28,7 @@ function SettingsForm({ s, onDone }: { s: ReprobeSettings; onDone: () => void })
     <div className="mt-3 space-y-3 border-t border-rule pt-3" data-testid="reprobe-settings">
       <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label={t('Ponowne sprawdzenia włączone', 'Re-probing enabled')} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('Limit adresów na godzinę', 'Address limit per hour')} hint={t('najwięcej adresów sprawdzanych w ciągu godziny', 'at most this many addresses per hour')}><input type="number" min={1} className="field num" value={f.budget_per_hour} onChange={(e) => setF({ ...f, budget_per_hour: Number(e.target.value) })} /></Field>
+        <Field label={t('Limit adresów na godzinę', 'Address limit per hour')}><input type="number" min={1} className="field num" value={f.budget_per_hour} onChange={(e) => setF({ ...f, budget_per_hour: Number(e.target.value) })} /></Field>
         <Field label={t('Kroki potwierdzania (minuty)', 'Confirmation steps (minutes)')} hint={t('po ilu minutach od pierwszego braku odpowiedzi', 'minutes after the first miss')} error={!ok && steps ? t('wpisz dodatnie liczby, np. 10, 30, 90', 'enter positive numbers, for example 10, 30, 90') : undefined}><input className="field mono" value={steps} onChange={(e) => setSteps(e.target.value)} /></Field>
       </div>
       <Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!ok} onClick={() => save.mutate(undefined)}>{t('Zapisz', 'Save')}</Button>
@@ -43,7 +43,7 @@ export function ReprobePanel({ hostId, limit = 8 }: { hostId?: number; limit?: n
   const canConfigure = useCan('scans:configure');
   const [edit, setEdit] = useState(false);
   const title = t('Plan ponownych sprawdzeń', 'Re-probe plan');
-  if (q.error && routeMissing(q.error)) return <Panel title={title}><Unavailable what={t('Plan pojawi się, gdy serwer udostępni GET /reprobe/plan. Czujka sprawdzi wtedy ponownie hosty, które przestały odpowiadać, w godzinach, w których model spodziewa się odpowiedzi.', 'The plan appears when the server serves GET /reprobe/plan. Czujka then re-probes hosts that went silent, in the hours when the model expects an answer.')} /></Panel>;
+  if (q.error && routeMissing(q.error)) return <Panel title={title}><Unavailable /></Panel>;
   if (q.error) return <Panel title={title}><ErrorState error={q.error} retry={() => q.refetch()} /></Panel>;
   if (!q.data) return <Panel title={title}><SkeletonRows rows={3} /></Panel>;
   const p = q.data;

@@ -81,21 +81,15 @@ const rankedPorts = (spec: string) => /top-\d+/i.test(spec) || /(^|[\s,])1-65535
 function FullRangeNote({ e, ports }: { e: ScanEstimate; ports: string }) {
   const maxHosts = e.full_range_max_hosts ?? 0;
   const maxAddr = e.full_range_max_addresses;
-  const perHost = e.est_full_range_sec_per_host;
   if (maxHosts <= 0) {
     if (maxAddr && e.addresses > maxAddr && rankedPorts(ports)) {
       return <p className="border-t border-rule px-3 py-2 text-xs text-ink-2" data-testid="full-range-note">{t('Pełny zakres portów 1-65535 nie obejmie tego zakresu: ma ' + fmtInt(e.addresses) + ' adresów, a działa do ' + fmtInt(maxAddr) + '. Skan sprawdzi tylko porty z listy.', 'The full port range 1-65535 does not apply here: the scope has ' + fmtInt(e.addresses) + ' addresses and it works up to ' + fmtInt(maxAddr) + '. The scan checks only the listed ports.')}</p>;
     }
     return null;
   }
-  const portsText = e.full_range_ports ? t(' (' + fmtInt(e.full_range_ports) + ' portów na host)', ' (' + fmtInt(e.full_range_ports) + ' ports per host)') : '';
-  const scopeText = maxAddr ? t(' Dotyczy zakresów do ' + fmtInt(maxAddr) + ' adresów.', ' It applies to scopes of up to ' + fmtInt(maxAddr) + ' addresses.') : '';
   return (
     <div className="border-t border-rule px-3 py-2 text-xs text-ink-2" data-testid="full-range-note">
-      <p><span className="font-medium text-ink">{t('Pełny zakres portów, automatycznie.', 'Full port range, automatic.')}</span> {t('Najpierw porty z listy: ich usługi pojawiają się w trakcie skanu. Potem Czujka sprawdza resztę 1-65535' + portsText + ' na aktywnych hostach, najwyżej na ' + fmtInt(maxHosts) + '. Wynik jest ostateczny dopiero po drugim etapie.', 'First the listed ports: their services show while the scan runs. Then Czujka checks the rest of 1-65535' + portsText + ' on the live hosts, at most ' + fmtInt(maxHosts) + '. The result is final only after the second pass.')}{scopeText}</p>
-      {perHost && perHost > 0 ? (
-        <p className="mt-1">{t('Drugi etap trwa około ', 'The second pass takes about ')}<span className="num text-ink">{fmtDuration(perHost)}</span>{t(' dla 1 hosta i około ', ' for 1 host and about ')}<span className="num text-ink">{fmtDuration(perHost * maxHosts)}</span>{t(' dla ' + fmtInt(maxHosts) + ' hostów, przy tempie ' + fmtInt(e.effective_pps) + ' pps. Czas skanu powyżej już go wlicza.', ' for ' + fmtInt(maxHosts) + ' hosts, at ' + fmtInt(e.effective_pps) + ' pps. The scan time above already counts it.')}</p>
-      ) : null}
+      <p>{t('Najpierw porty z listy: ich usługi pojawiają się w trakcie skanu. Potem Czujka sprawdza resztę 1-65535 na aktywnych hostach, najwyżej na ' + fmtInt(maxHosts) + '. Wynik jest ostateczny dopiero po drugim etapie.', 'First the listed ports: their services show while the scan runs. Then Czujka checks the rest of 1-65535 on the live hosts, at most ' + fmtInt(maxHosts) + '. The result is final only after the second pass.')}</p>
     </div>
   );
 }
@@ -194,7 +188,6 @@ export default function ProfileEdit() {
       <PageHeader
         back={{ to: '/profiles', label: t('Profile skanów', 'Scan profiles') }}
         title={isNew ? t('Nowy profil skanu', 'New scan profile') : p.name || t('Profil', 'Profile')}
-        sub={t('Profil mówi, co skanować, jak szybko i kiedy. Może być tylko ostrzejszy niż polityka bezpieczeństwa.', 'A profile says what to scan, how fast and when. It can only be stricter than the safety policy.')}
         readOnly={ro}
         actions={ro ? null : (
           <>
@@ -207,7 +200,7 @@ export default function ProfileEdit() {
         {invalid && dirty ? <p className="mt-3 text-xs text-danger">{invalid}</p> : null}
         <div className="mt-1"><InlineError error={save.error} /></div>
 
-        <Section title={t('Zakres', 'Scope')} hint={t('Skan obejmuje włączone cele wybranych zakresów.', 'A scan covers the enabled targets of the chosen scopes.')}>
+        <Section title={t('Zakres', 'Scope')}>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label={t('Nazwa', 'Name')}><input className="field" value={p.name} onChange={(e) => up((d) => { d.name = e.target.value; })} /></Field>
             <Field label={t('Opis', 'Description')}><input className="field" value={p.description} onChange={(e) => up((d) => { d.description = e.target.value; })} /></Field>
@@ -222,7 +215,7 @@ export default function ProfileEdit() {
           <div className="mt-3"><Check checked={p.enabled} disabled={ro} onChange={(v) => up((d) => { d.enabled = v; })} label={t('Profil włączony', 'Profile enabled')} /></div>
         </Section>
 
-        <Section title={t('Porty i wykrywanie', 'Ports and discovery')} hint={t('Wykrywanie hostów działa przed skanem portów. Port spoza listy dozwolonych w polityce jest pomijany.', 'Host discovery runs before the port scan. A port outside the policy allow-list is skipped.')}>
+        <Section title={t('Porty i wykrywanie', 'Ports and discovery')}>
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
             <Field label={t('Porty (składnia nmap)', 'Ports (nmap syntax)')} hint={t('np. top-1000 albo 22,80,443,8000-8100', 'for example top-1000 or 22,80,443,8000-8100')}>
               <input className="field mono" value={p.ports} onChange={(e) => up((d) => { d.ports = e.target.value; })} />
@@ -277,7 +270,7 @@ export default function ProfileEdit() {
           ) : null}
         </Section>
 
-        <Section title="HTTP / TLS" hint={t('Kolektor wysyła wyłącznie GET i HEAD. Nie loguje się i nie wysyła danych.', 'The collector sends GET and HEAD only. It never logs in and never sends data.')}>
+        <Section title="HTTP / TLS">
           <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
             <Check checked={p.http.enabled} disabled={ro} onChange={(v) => up((d) => { d.http.enabled = v; })} label={t('Zbieraj dane HTTP i TLS', 'Collect HTTP and TLS data')} />
             <Check checked={p.http.signature_paths} disabled={ro || !p.http.enabled} onChange={(v) => up((d) => { d.http.signature_paths = v; })} label={t('Pobieraj ścieżki z sygnatur', 'Fetch signature paths')} hint={safety.data ? t('najwyżej ' + safety.data.max_paths_per_host + ' na usługę (polityka)', 'at most ' + safety.data.max_paths_per_host + ' per service (policy)') : undefined} />
@@ -301,7 +294,7 @@ export default function ProfileEdit() {
           </div>
         </Section>
 
-        <Section title={t('Podgrupy adresów', 'Address chunks')} hint={t('Rozmiar kolejnej podgrupy wynika ze zmierzonego czasu poprzedniej: celem jest stały czas jednej podgrupy.', 'The size of the next chunk follows the measured time of the previous one: the aim is a steady time per chunk.')}>
+        <Section title={t('Podgrupy adresów', 'Address chunks')}>
           <Check checked={p.chunking.adaptive} disabled={ro} onChange={(v) => up((d) => { d.chunking.adaptive = v; })} label={t('Rozmiar adaptacyjny', 'Adaptive size')} />
           <div className="mt-3 grid gap-3 sm:grid-cols-4">
             <Field label={t('Pierwsze podgrupy', 'First chunks')}><Num value={p.chunking.initial_size} min={1} suffix={t('adr.', 'addr.')} onChange={(v) => up((d) => { d.chunking.initial_size = v; })} /></Field>
@@ -311,18 +304,17 @@ export default function ProfileEdit() {
           </div>
         </Section>
 
-        <Section title={t('Hosty niestabilne', 'Unstable hosts')} hint={t('Znany host, który nie odpowiada, dostaje dodatkowe próby, zanim skan zapisze brak odpowiedzi.', 'A known host that does not answer gets extra probes before the scan records a miss.')}>
+        <Section title={t('Hosty niestabilne', 'Unstable hosts')}>
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label={t('Dodatkowe próby', 'Extra probes')}><Num value={p.retry.unstable_retries} max={10} onChange={(v) => up((d) => { d.retry.unstable_retries = v; })} /></Field>
             <Field label={t('Odstęp między próbami', 'Delay between probes')}><Num value={p.retry.backoff_ms} step={250} suffix="ms" onChange={(v) => up((d) => { d.retry.backoff_ms = v; })} /></Field>
-            <Field label={t('Zgłoś nieaktywność po N brakach odpowiedzi', 'Report down after N misses')} hint={p.retry.down_after_misses === 0 ? t('0: decyduje wzorzec dostępności hosta', '0: the host availability pattern decides') : t('host zgłoszony jako nieaktywny po ' + p.retry.down_after_misses + ' brakach z rzędu, niezależnie od modelu', 'the host is reported inactive after ' + p.retry.down_after_misses + ' misses in a row, whatever the model says')}>
+            <Field label={t('Zgłoś nieaktywność po N brakach odpowiedzi', 'Report down after N misses')} hint={p.retry.down_after_misses === 0 ? t('0: decyduje wzorzec dostępności hosta', '0: the host availability pattern decides') : undefined}>
               <Num value={p.retry.down_after_misses} min={0} max={50} onChange={(v) => up((d) => { d.retry.down_after_misses = Math.max(0, v); })} />
             </Field>
           </div>
-          <p className="mt-2 text-xs text-ink-3">{t('Host, który odpowiadał w poprzednim skanie i milczy teraz, trafia najpierw do „brak odpowiedzi”. Jego usługi są wtedy nieosiągalne, nie zamknięte. Zniknięcie hosta zgłaszamy dopiero według tej reguły.', 'A host that answered in the previous run and is silent now first goes to "missing". Its services are then unreachable, not closed. We report the host gone only under this rule.')}</p>
-        </Section>
+                  </Section>
 
-        <Section title={t('Harmonogram i okna czasowe', 'Schedule and time windows')} hint={t('Skan, który nie zmieści się w oknie, zostaje wstrzymany na jego końcu i wznowiony w następnym.', 'A scan that does not fit its window is paused at the end and resumed in the next one.')}>
+        <Section title={t('Harmonogram i okna czasowe', 'Schedule and time windows')}>
           <Check checked={p.schedule.enabled} disabled={ro} onChange={(v) => up((d) => { d.schedule.enabled = v; })} label={t('Uruchamiaj cyklicznie', 'Run on a schedule')} />
           <div className={cx('mt-3 grid gap-3 sm:grid-cols-3', !p.schedule.enabled && 'opacity-60')}>
             <Field label={t('Częstotliwość', 'Frequency')}>
@@ -353,7 +345,7 @@ export default function ProfileEdit() {
           </div>
         </Section>
 
-        <Section title={t('Budżet ruchu', 'Traffic budget')} hint={t('Policzony bez wysłania żadnego pakietu.', 'Computed without sending a single packet.')}>
+        <Section title={t('Budżet ruchu', 'Traffic budget')}>
           {isNew ? <p className="text-sm text-ink-2">{t('Zapisz profil, aby policzyć budżet ruchu.', 'Save the profile to compute the traffic budget.')}</p> : <EstimateBox profileId={id} stale={dirty} />}
         </Section>
       </fieldset>

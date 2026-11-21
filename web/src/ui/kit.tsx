@@ -232,7 +232,7 @@ export function Unavailable({ what, error }: { what?: ReactNode; error?: unknown
       <Icon name="info" className="mt-0.5 flex-none text-ink-3" size={14} />
       <div className="min-w-0">
         <p className="font-medium text-ink">{t('Funkcja niedostępna w tej instalacji', 'Not available in this installation')}</p>
-        <p className="text-xs text-ink-2">{what ?? t('Ten moduł nie jest podłączony do serwera. Pozostałe funkcje działają normalnie.', 'This module is not connected to the server. Everything else works as usual.')}</p>
+        {what ? <p className="text-xs text-ink-2">{what}</p> : null}
         {msg ? <p className="mono mt-0.5 break-words text-2xs text-ink-3">{msg}</p> : null}
       </div>
     </div>

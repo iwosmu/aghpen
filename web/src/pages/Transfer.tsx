@@ -12,7 +12,7 @@ import { NoAccess } from '../shell/Layout';
 
 type Kind = 'hosts' | 'services' | 'findings' | 'changes';
 
-function ExportRow({ kind, title, hint, filter, runs }: { kind: Kind; title: string; hint: string; filter: { key: string; label: string; options: { value: string; label: string }[] }; runs?: boolean }) {
+function ExportRow({ kind, title, filter, runs }: { kind: Kind; title: string; filter: { key: string; label: string; options: { value: string; label: string }[] }; runs?: boolean }) {
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState('');
   void runs;
@@ -29,7 +29,7 @@ function ExportRow({ kind, title, hint, filter, runs }: { kind: Kind; title: str
     <li className="grid gap-x-4 gap-y-2 border-b border-rule py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_200px_auto] md:items-end">
       <div>
         <div className="text-sm font-medium">{title}</div>
-        <div className="text-xs text-ink-3">{hint} <Link to={'/' + kind} className="link">{t('Więcej filtrów na liście', 'More filters on the list')}</Link></div>
+        <div className="text-xs"><Link to={'/' + kind} className="link">{t('Więcej filtrów na liście', 'More filters on the list')}</Link></div>
       </div>
       <label className="block"><span className="label mb-1 block">{filter.label}</span><Select value={value} onChange={setValue} options={[{ value: '', label: t('wszystkie', 'all') }, ...filter.options]} /></label>
       <div className="flex gap-1.5">
@@ -89,8 +89,7 @@ function DojoExportRow() {
     <div className="mt-3 grid gap-x-4 gap-y-2 border-t border-rule pt-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
       <div>
         <div className="text-sm font-medium">{t('Znaleziska w formacie DefectDojo', 'Findings in DefectDojo format')}</div>
-        <div className="text-xs text-ink-3">{t('Generic Findings Import: wgraj plik w DefectDojo bez integracji sieciowej. Plik wraca też do Czujki przez import znalezisk.', 'Generic Findings Import: upload the file in DefectDojo without a network integration. The file also imports back into Czujka.')}</div>
-      </div>
+              </div>
       <div className="flex gap-1.5">
         <Button icon="download" busy={busy === 'json'} onClick={() => run('json')} data-testid="dojo-export-json">JSON</Button>
         <Button icon="download" busy={busy === 'csv'} onClick={() => run('csv')}>CSV</Button>
@@ -123,7 +122,7 @@ export default function Transfer() {
   };
   return (
     <div>
-      <PageHeader title={t('Import i eksport', 'Import and export')} sub={t('Wczytaj wyniki z innego skanera albo wynieś dane Czujki do arkusza, skryptu lub DefectDojo.', 'Load results of another scanner, or take Czujka data to a spreadsheet, a script or DefectDojo.')} readOnly={!canImport} />
+      <PageHeader title={t('Import i eksport', 'Import and export')} readOnly={!canImport} />
       <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-2">
         <Panel title={t('Import wyników', 'Import results')}>
           {canImport ? (
@@ -160,10 +159,10 @@ export default function Transfer() {
           {canExport ? (
             <>
               <ul>
-                <ExportRow kind="hosts" title={t('Hosty', 'Hosts')} hint={t('Inwentarz z etykietami, właścicielami i stanem.', 'The inventory with labels, owners and status.')} filter={{ key: 'status', label: t('Stan', 'Status'), options: HOST_STATUSES.map((s) => ({ value: s, label: hostStatusInfo(s).label })) }} />
-                <ExportRow kind="services" title={t('Usługi', 'Services')} hint={t('Porty, produkty, technologie, klasy, ciekawość.', 'Ports, products, technologies, classes, interest.')} filter={{ key: 'state', label: t('Stan', 'Status'), options: [{ value: 'open', label: t('otwarte', 'open') }, { value: 'gone', label: t('zniknęły', 'gone') }] }} />
-                <ExportRow kind="findings" title={t('Znaleziska', 'Findings')} hint={t('Ze statusem, wagą, notatkami i odnośnikiem do DefectDojo.', 'With status, severity, notes and the DefectDojo link.')} filter={{ key: 'status', label: t('Status', 'Status'), options: FINDING_STATUSES.map((s) => ({ value: s, label: findingStatusInfo(s).label })) }} />
-                <ExportRow kind="changes" title={t('Zmiany', 'Changes')} hint={t('Dziennik różnic między skanami.', 'The log of differences between runs.')} filter={{ key: 'run_id', label: t('Skan', 'Scan'), options: runOpts }} />
+                <ExportRow kind="hosts" title={t('Hosty', 'Hosts')} filter={{ key: 'status', label: t('Stan', 'Status'), options: HOST_STATUSES.map((s) => ({ value: s, label: hostStatusInfo(s).label })) }} />
+                <ExportRow kind="services" title={t('Usługi', 'Services')} filter={{ key: 'state', label: t('Stan', 'Status'), options: [{ value: 'open', label: t('otwarte', 'open') }, { value: 'gone', label: t('zniknęły', 'gone') }] }} />
+                <ExportRow kind="findings" title={t('Znaleziska', 'Findings')} filter={{ key: 'status', label: t('Status', 'Status'), options: FINDING_STATUSES.map((s) => ({ value: s, label: findingStatusInfo(s).label })) }} />
+                <ExportRow kind="changes" title={t('Zmiany', 'Changes')} filter={{ key: 'run_id', label: t('Skan', 'Scan'), options: runOpts }} />
               </ul>
               <div className="mt-3 grid gap-x-4 gap-y-2 border-t border-rule-strong pt-3 md:grid-cols-[minmax(0,1fr)_200px_auto] md:items-end">
                 <div>

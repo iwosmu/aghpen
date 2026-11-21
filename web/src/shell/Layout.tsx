@@ -103,8 +103,7 @@ function Rail({ onNavigate }: { onNavigate?: () => void }) {
         })}
       </nav>
       <div className="border-t border-rail-rule px-4 py-3" data-testid="whoami">
-        <p className="text-2xs text-rail-ink-2">{t('Zalogowano jako', 'Signed in as')}</p>
-        <p className="mt-0.5 truncate text-sm font-medium text-rail-ink" title={u.email}>{u.name || u.email}</p>
+        <p className="truncate text-sm font-medium text-rail-ink" title={u.email}>{u.name || u.email}</p>
         <p className="mono truncate text-2xs text-rail-ink-2">{u.email}</p>
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className="inline-flex min-w-0 items-center gap-1.5 border border-rail-rule px-1.5 py-0.5 text-xs text-rail-ink" title={roleScope(u.role_slug)}>
@@ -115,7 +114,6 @@ function Rail({ onNavigate }: { onNavigate?: () => void }) {
             <Icon name="logout" size={12} />{t('Wyloguj', 'Sign out')}
           </button>
         </div>
-        <p className="mt-1.5 text-2xs text-rail-ink-2">{roleScope(u.role_slug)}</p>
       </div>
     </div>
   );
@@ -165,7 +163,7 @@ function ActiveRunStrip() {
   const cap = Math.min(profile.data?.rate.max_pps ?? policyCap, policyCap || Infinity) || policyCap;
   const over = overCap(run.stats.current_pps, cap);
   const pace = run.stats.current_pps_basis === 'pace';
-  const tip = (over ? t('Tempo powyżej limitu skanu ' + fmtInt(cap) + ' pps. ', 'Rate above the run cap of ' + fmtInt(cap) + ' pps. ') : '') + (pace ? paceTip() : run.stats.current_pps_basis === 'measured' ? t('Tempo zmierzone z dokładnych liczników pakietów.', 'Rate measured from exact packet counts.') : '');
+  const tip = (over ? t('Tempo powyżej limitu skanu ' + fmtInt(cap) + ' pps. ', 'Rate above the run cap of ' + fmtInt(cap) + ' pps. ') : '') + (pace ? paceTip() : '');
   return (
     <Link to={'/runs/' + run.id} className="hidden min-w-0 items-center gap-2 text-xs text-ink-2 hover:text-ink md:inline-flex">
       <Glyph name="run" tone="accent" pulse size={12} />
@@ -203,10 +201,9 @@ function EmergencyStop({ policy }: { policy: SafetyPolicy | undefined }) {
         <ul className="list-disc space-y-1.5 pl-4 text-sm text-ink">
           <li>{t('Wszystkie trwające skany zostaną wstrzymane.', 'All running scans pause.')}</li>
           <li>{t('Nowe skany nie ruszą, także z harmonogramu.', 'No new scan starts, including scheduled ones.')}</li>
-          <li>{t('Blokadę zwalnia osoba z uprawnieniem ', 'A person with the permission ')}<span className="mono text-xs">safety:manage</span>{t('.', ' releases the stop.')}</li>
+          <li>{t('Stop wyłącza administrator.', 'An administrator turns the stop off.')}</li>
         </ul>
-        <p className="mt-3 text-xs text-ink-3">{t('Operacja trafia do dziennika audytu.', 'The action is written to the audit log.')}</p>
-        <div className="mt-2"><InlineError error={stop.error} /></div>
+                <div className="mt-2"><InlineError error={stop.error} /></div>
       </Dialog>
     </>
   );

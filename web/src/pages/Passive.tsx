@@ -116,7 +116,7 @@ export function PassivePanel({ scope }: { scope: Scope }) {
     { id: 'crtsh', label: 'crt.sh' },
   ];
   return (
-    <Panel title={t('Źródła pasywne', 'Passive sources')} actions={<span className="text-ink-3">{t('bez ruchu do skanowanych adresów', 'no traffic to scanned addresses')}</span>}>
+    <Panel title={t('Źródła pasywne', 'Passive sources')}>
       <Tabs value={tab} onChange={(v) => { setTab(v as Source); setRes(null); runIt.reset(); }} tabs={tabs} />
       <div className="mt-3 space-y-3">
         {tab === 'file' ? (
@@ -129,7 +129,6 @@ export function PassivePanel({ scope }: { scope: Scope }) {
           </div>
         ) : tab === 'ptr' ? (
           <div className="space-y-2">
-            <p className="text-sm text-ink-2">{t('Odpyta systemowy resolver o nazwy znanych aktywnych hostów (najwyżej 5 zapytań na sekundę) i dopisze je do hostów. Nie nadpisuje nazw ustawionych przez analityka.', 'Asks the system resolver for the names of the known live hosts (at most 5 lookups per second) and adds them to the hosts. It does not overwrite names an analyst set.')}</p>
             <Button icon="refresh" busy={runIt.isPending} onClick={() => runIt.mutate('ptr')} data-testid="passive-ptr">{t('Uruchom odwrotny DNS', 'Run reverse DNS')}</Button>
           </div>
         ) : <CrtshTab run={() => runIt.mutate('crtsh')} busy={runIt.isPending} />}

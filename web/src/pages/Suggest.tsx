@@ -24,7 +24,7 @@ export function SuggestButton({ serviceId }: { serviceId: number }) {
         footer={<><Button onClick={() => setOpen(false)}>{t('Zamknij', 'Close')}</Button>{s?.ok && s.yaml ? <Button variant="primary" icon="edit" onClick={go}>{t('Otwórz w edytorze', 'Open in editor')}</Button> : null}</>}>
         <div className="space-y-3" data-testid="suggest-result">
           {run.isPending ? <p className="text-sm text-ink-2">{t('Szukanie cech tej usługi…', 'Looking for distinctive features…')}</p> : null}
-          {run.error ? (routeMissing(run.error) ? <Unavailable what={t('Propozycje sygnatur wymagają POST /signatures/suggest. Moduł nie jest jeszcze podłączony.', 'Signature suggestions need POST /signatures/suggest. The module is not wired yet.')} /> : <InlineError error={run.error} />) : null}
+          {run.error ? (routeMissing(run.error) ? <Unavailable /> : <InlineError error={run.error} />) : null}
           {s ? (
             <>
               <p className="flex items-start gap-2 text-sm font-medium"><span className="mt-0.5"><Glyph name={s.ok ? 'check' : 'x'} tone={s.ok ? 'new' : 'neutral'} /></span>{s.message}</p>
@@ -37,7 +37,7 @@ export function SuggestButton({ serviceId }: { serviceId: number }) {
                     </div>
                   ) : null}
                   {s.retro_hunt ? (
-                    <p className="text-sm text-ink-2">{t('Test wsteczny: ', 'Retro-hunt: ')}{s.matches_target ? t('pasuje do przykładu', 'matches the example') : t('nie pasuje do przykładu', 'does not match the example')}{' · '}{t(s.other_matches + ' innych usług pasuje', s.other_matches + ' other services match')}{' · '}{t('sprawdzono ' + s.retro_hunt.scanned + ' usług, wysłano ' + s.retro_hunt.packets_sent + ' pakietów', s.retro_hunt.scanned + ' services checked, ' + s.retro_hunt.packets_sent + ' packets sent')}</p>
+                    <p className="text-sm text-ink-2">{t('Test na zapisanych wynikach: ', 'Test on stored results: ')}{s.matches_target ? t('pasuje do przykładu', 'matches the example') : t('nie pasuje do przykładu', 'does not match the example')}{' · '}{t('inne dopasowania: ', 'other matches: ')}<span className="num">{s.other_matches}</span>{' · '}{t('sprawdzone usługi: ', 'services checked: ')}<span className="num">{s.retro_hunt.scanned}</span></p>
                   ) : null}
                   <pre className="mono max-h-[260px] overflow-auto border border-rule bg-sunk p-2 text-xs leading-5">{s.yaml}</pre>
                   {(s.rejected ?? []).length ? (

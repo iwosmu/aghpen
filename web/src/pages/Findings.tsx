@@ -116,7 +116,7 @@ function FindingGroupList({ q, active, onOpen }: { q: ReturnType<typeof usePage<
   const groups = useMemo(() => groupFindings(q.data?.items ?? []), [q.data]);
   if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
   if (!q.data) return <div className="px-4 py-3 sm:px-6"><SkeletonRows rows={8} /></div>;
-  if (!groups.length) return <Empty icon="findings" title={active ? t('Żadne znalezisko nie pasuje do filtrów', 'No findings match the filters') : t('Brak otwartych znalezisk', 'No open findings')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Rozwiązane i zaakceptowane są pod filtrem „Status: wszystkie”.', 'Resolved and accepted ones are under the filter "Status: all".')} />;
+  if (!groups.length) return <Empty icon="findings" title={active ? t('Żadne znalezisko nie pasuje do filtrów', 'No findings match the filters') : t('Brak otwartych znalezisk', 'No open findings')} />;
   const toggle = (k: string) => setOpenKeys((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const shown = q.data.items.length;
   return (
@@ -230,7 +230,6 @@ export default function Findings() {
     <div>
       <PageHeader
         title={t('Znaleziska', 'Findings')}
-        sub={t('Rzeczy warte decyzji człowieka: panele administracyjne, środowiska testowe, wygasłe certyfikaty, nowe ekspozycje. Każde ma dowód i status.', 'Things that deserve a human decision: admin panels, staging environments, expired certificates, new exposures. Each has evidence and a status.')}
         readOnly={!canEdit}
         actions={<>{canExport && total > 0 ? <Button icon="upload" onClick={() => setConfirmAll(true)} disabled={Boolean(u.get('assignee'))} title={u.get('assignee') ? t('Eksport pomija filtr „przypisane”. Usuń go albo zaznacz znaleziska.', 'The export ignores the assignee filter. Clear it or select findings.') : undefined} data-testid="dojo-export-filtered">{active ? t('Pasujące do DefectDojo', 'Export matching to DefectDojo') : t('Wszystkie do DefectDojo', 'Export all to DefectDojo')}</Button> : null}<ExportButtons kind="findings" query={filters} />{can('results:create') ? <Button variant="primary" icon="plus" onClick={() => setManual(true)}>{t('Dodaj', 'Add')}</Button> : null}</>}
       />
@@ -267,7 +266,7 @@ export default function Findings() {
         sort={u.get('sort', '-interest')} onSort={(s) => u.set({ sort: s })}
         selected={canEdit || canExport ? selected : undefined} onSelect={canEdit || canExport ? setSelected : undefined}
         rowClass={(f) => (f.status === 'resolved' || f.status === 'false_positive' ? 'text-ink-2' : undefined)}
-        empty={<Empty icon="findings" title={active ? t('Żadne znalezisko nie pasuje do filtrów', 'No findings match the filters') : t('Brak znalezisk', 'No findings yet')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Znaleziska powstają po skanie z dopasowań sygnatur i wykrytych zmian. Możesz też dodać własne.', 'Findings come from signature matches and detected changes after a scan. You can also add your own.')} action={active ? undefined : <NextSteps />} />}
+        empty={<Empty icon="findings" title={active ? t('Żadne znalezisko nie pasuje do filtrów', 'No findings match the filters') : t('Brak znalezisk', 'No findings yet')} action={active ? undefined : <NextSteps />} />}
         mobile={(f) => (
           <div>
             <div className="flex items-center justify-between gap-2"><Sev level={f.severity} /><FindingStatusMark status={f.status} /></div>

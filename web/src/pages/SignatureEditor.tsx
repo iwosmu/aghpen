@@ -106,7 +106,7 @@ export default function SignatureEditor() {
       <PageHeader
         back={{ to: '/signatures', label: t('Sygnatury', 'Signatures') }}
         title={isNew ? t('Nowa sygnatura', 'New signature') : sig?.name ?? ''}
-        sub={builtin ? t('Sygnatura wbudowana. Można ją wyłączyć albo skopiować.', 'Built-in signature. You can disable or copy it.') : t('Edytor reguły w YAML. Walidacja działa w trakcie pisania, a test na zapisanych wynikach nie wysyła żadnego pakietu.', 'The YAML rule editor. Validation runs as you type, and the test on stored results sends no packet.')}
+        sub={builtin ? t('Sygnatura wbudowana. Można ją wyłączyć albo skopiować.', 'Built-in signature. You can disable or copy it.') : undefined}
         readOnly={!canWrite && !(builtin && can('signatures:update'))}
         actions={<>
           {builtin && can('signatures:update') ? <span className="flex items-center gap-2 text-sm text-ink-2">{t('Włączona', 'Enabled')}<Switch checked={enabled} disabled={toggle.isPending} onChange={(x) => toggle.mutate(x)} label={t('Sygnatura włączona', 'Signature enabled')} /></span> : null}
@@ -181,10 +181,10 @@ export default function SignatureEditor() {
           </Panel>
 
           <Panel title={t('Test na zapisanych wynikach', 'Test on stored results')} actions={<Button size="sm" icon="history" busy={retro.isPending} disabled={!v?.ok || pending} onClick={() => retro.mutate(yaml)}>{t('Uruchom test', 'Run test')}</Button>}>
-            {!hunt ? <p className="text-sm text-ink-2">{t('Sprawdź regułę na danych z poprzednich skanów, zanim ją zapiszesz. Test czyta bazę i nie dotyka sieci.', 'Check the rule against data of earlier scans before you save it. The test reads the database and does not touch the network.')}</p> : (
+            {!hunt ? null : (
               <div className={cx(!huntFresh && 'opacity-60')} data-testid="retrohunt">
                 <p className="text-sm">
-                  {t('Dopasowano ', 'Matched ')}<span className="num text-base font-semibold">{fmtInt(hunt.result.total_hits ?? (hunt.result.hits ?? []).length)}</span> {plural(hunt.result.total_hits ?? (hunt.result.hits ?? []).length, ['zapisaną usługę', 'zapisane usługi', 'zapisanych usług'], ['stored service', 'stored services'])}{t(', wysłano ', ', ')}<span className="num text-base font-semibold">{hunt.result.packets_sent}</span> {t('.', '.')}
+                  {t('Dopasowano ', 'Matched ')}<span className="num text-base font-semibold">{fmtInt(hunt.result.total_hits ?? (hunt.result.hits ?? []).length)}</span> {plural(hunt.result.total_hits ?? (hunt.result.hits ?? []).length, ['zapisaną usługę', 'zapisane usługi', 'zapisanych usług'], ['stored service', 'stored services'])}.
                 </p>
                 <p className="text-xs text-ink-3">{t('Przejrzano ' + fmtInt(hunt.result.scanned) + ' obserwacji w ' + hunt.result.took_ms + ' ms.', 'Checked ' + fmtInt(hunt.result.scanned) + ' observations in ' + hunt.result.took_ms + ' ms.')}{!huntFresh ? ' ' + t('Treść zmieniła się od tego testu.', 'The text has changed since this test.') : ''}</p>
                 {hunt.result.truncated ? <p className="mt-1 text-xs text-ink-2" data-testid="retro-truncated">{t('Lista pokazuje pierwsze ' + fmtInt((hunt.result.hits ?? []).length) + ' z ' + fmtInt(hunt.result.total_hits ?? 0) + ' trafień.', 'The list shows the first ' + fmtInt((hunt.result.hits ?? []).length) + ' of ' + fmtInt(hunt.result.total_hits ?? 0) + ' hits.')}</p> : null}

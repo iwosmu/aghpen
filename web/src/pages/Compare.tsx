@@ -76,7 +76,7 @@ export default function Compare() {
   const group = (g: string) => all.filter((c) => changeKindInfo(c.kind).group === g || (g === 'changed' && changeKindInfo(c.kind).group === 'unstable'));
   return (
     <div>
-      <PageHeader back={{ to: '/changes', label: t('Zmiany', 'Changes') }} title={t('Porównanie skanów', 'Compare scans')} sub={t('Co pojawiło się, zniknęło i zmieniło między dowolnymi dwoma zakończonymi przebiegami.', 'What appeared, disappeared and changed between any two completed runs.')} />
+      <PageHeader back={{ to: '/changes', label: t('Zmiany', 'Changes') }} title={t('Porównanie skanów', 'Compare scans')} />
       <div className="space-y-4 p-4 sm:p-6">
         <div className="flex flex-wrap items-end gap-3">
           <label className="block min-w-[240px] flex-1"><span className="label mb-1 block">{t('Starszy skan (przed)', 'Older scan (before)')}</span><Select value={from} onChange={(v) => u.set({ from: v })} options={opts} /></label>
@@ -107,7 +107,7 @@ export default function Compare() {
               {d.summary.hosts_missing ? (
                 <span className="mt-1 flex items-start gap-1.5 text-ink-2" data-testid="compare-missing">
                   <Glyph name="half" tone="expected" />
-                  <span><span className="num text-ink">{d.summary.hosts_missing}</span> {plural(d.summary.hosts_missing, ['host nie odpowiada', 'hosty nie odpowiadają', 'hostów nie odpowiada'], ['host is not responding', 'hosts are not responding'])}{t(' (niepotwierdzone: Czujka sprawdzi ponownie)', ' (unconfirmed: Czujka checks again)')}{d.summary.services_unreachable ? <>{t('; ich ', '; their ')}<span className="num text-ink">{d.summary.services_unreachable}</span> {plural(d.summary.services_unreachable, ['usługa nie odpowiada', 'usługi nie odpowiadają', 'usług nie odpowiada'], ['service is not answering', 'services are not answering'])}{t(' (stan nieznany, nie zamknięte)', ' (unknown, not closed)')}</> : null}. {t('Lista w kolumnie „Zniknęły”.', 'They are listed under "Gone".')}</span>
+                  <span><span className="num text-ink">{d.summary.hosts_missing}</span> {plural(d.summary.hosts_missing, ['host nie odpowiada', 'hosty nie odpowiadają', 'hostów nie odpowiada'], ['host is not responding', 'hosts are not responding'])}{t(' (niepotwierdzone: Czujka sprawdzi ponownie)', ' (unconfirmed: Czujka checks again)')}.</span>
                 </span>
               ) : null}
             </div>

@@ -24,7 +24,6 @@ function FewObservations({ a, n }: { a: AvailabilityProfile; n: number }) {
   return (
     <div data-testid="few-observations">
       <p className="text-sm text-ink">{t('Model zna ten host dopiero z ' + n + ' ' + plural(n, ['obserwacji', 'obserwacji', 'obserwacji'], ['', '']) + '.', 'The model knows this host from only ' + n + ' ' + (n === 1 ? 'observation' : 'observations') + '.')}</p>
-      <p className="mt-1 text-sm text-ink-2">{t('Wzorzec tygodniowy (mapa 7 × 24 godzin) pojawi się, gdy będzie co najmniej ' + MIN_OBS + ' obserwacji: jeszcze ' + (MIN_OBS - n) + ' ' + plural(MIN_OBS - n, ['skan', 'skany', 'skanów'], ['', '']) + ' tego hosta. Do tego czasu „nieaktywny” wynika z progu braków odpowiedzi.', 'The weekly pattern (a 7 × 24 hour map) appears from ' + MIN_OBS + ' observations: ' + (MIN_OBS - n) + ' more scans of this host. Until then "inactive" follows the miss threshold.')}</p>
       <ol className="mt-3 grid grid-cols-8 gap-1.5" data-testid="probe-strip">
         {recent.map((o, i) => {
           const label = fmtDateTime(o.at) + ': ' + (o.up ? t('odpowiedź', 'response') : t('brak odpowiedzi', 'no response'));
@@ -72,12 +71,13 @@ function ModelOutput({ h, a, compact }: { h: Host; a: AvailabilityProfile; compa
         </div>
       </dl>
       {compact ? null : <p className="border-l border-rule-strong pl-3 text-sm text-ink">{a.pattern || t('Za mało obserwacji, aby opisać wzorzec.', 'Too few observations to describe a pattern.')}</p>}
-      <p className="text-xs text-ink-2">
-        {h.status === 'expected-offline' ? t('O tej porze host zwykle nie odpowiada.', 'The host usually does not respond at this hour.')
-          : h.status === 'unstable' ? t('Host odpowiada nieregularnie.', 'The host responds irregularly.')
-          : h.status === 'down' ? t('Braków odpowiedzi z rzędu jest więcej niż próg.', 'More misses in a row than the threshold.')
-          : t('Host odpowiada zgodnie z profilem.', 'The host answers as its profile predicts.')}
-      </p>
+      {h.status === 'expected-offline' || h.status === 'unstable' || h.status === 'down' ? (
+        <p className="text-xs text-ink-2">
+          {h.status === 'expected-offline' ? t('O tej porze host zwykle nie odpowiada.', 'The host usually does not respond at this hour.')
+            : h.status === 'unstable' ? t('Host odpowiada nieregularnie.', 'The host responds irregularly.')
+            : t('Braków odpowiedzi z rzędu jest więcej niż próg.', 'More misses in a row than the threshold.')}
+        </p>
+      ) : null}
       {recent.length && !compact ? (
         <div>
           <div className="mb-1 text-xs text-ink-3">{t('Ostatnie próby (najnowsza po prawej)', 'Recent probes (latest on the right)')}</div>
@@ -178,7 +178,7 @@ export default function HostDetail() {
               )} />
           </Panel>
 
-          <Panel title={t('Dostępność w tygodniu', 'Availability over the week')} actions={<span className="text-ink-3">{t('model decyduje, kiedy host jest „nieaktywny”', 'the model decides when the host is "inactive"')}</span>}>
+          <Panel title={t('Dostępność w tygodniu', 'Availability over the week')}>
             {avail.error ? <ErrorState error={avail.error} retry={() => avail.refetch()} /> : !avail.data ? <div className="skeleton h-[220px]" /> : obsCount(avail.data) < MIN_OBS ? (
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
                 <FewObservations a={avail.data} n={obsCount(avail.data)} />

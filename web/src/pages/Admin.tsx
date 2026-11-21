@@ -105,8 +105,7 @@ function RolesTab({ canManage }: { canManage: boolean }) {
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-[70ch] text-sm text-ink-2">{t('Role wbudowane są tylko do odczytu. Rolę własną możesz zmieniać: zaznacz uprawnienia w jej kolumnie i zapisz.', 'Built-in roles are read-only. You can change a custom role: tick permissions in its column and save.')}</p>
-        {canManage ? <Button variant="primary" icon="plus" onClick={() => setAdd(true)}>{t('Nowa rola', 'New role')}</Button> : null}
+                {canManage ? <Button variant="primary" icon="plus" onClick={() => setAdd(true)}>{t('Nowa rola', 'New role')}</Button> : null}
       </div>
       <div className="overflow-x-auto border border-rule bg-panel">
         <table className="w-full text-sm" data-testid="permission-matrix">
@@ -226,8 +225,7 @@ function SafetyTab() {
     <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <Panel title={t('Polityka bezpieczeństwa', 'Safety policy')} actions={canManage ? <Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!dirty} onClick={() => save.mutate(undefined)}>{t('Zapisz politykę', 'Save policy')}</Button> : undefined}>
         {!canManage ? <div className="mb-3"><ReadOnlyNote text={t('Tylko do odczytu.', 'Read only.')} /></div> : null}
-        <p className="mb-3 max-w-[72ch] text-sm text-ink-2">{t('Twarde limity dla wszystkich skanów. Profil może być tylko ostrzejszy. Silnik stosuje je także wtedy, gdy profil prosi o więcej.', 'Hard caps for every scan. A profile can only be stricter. The engine applies them even when a profile asks for more.')}</p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {num('max_pps', t('Pakiety na sekundę', 'Packets per second'), 'pps')}
           {num('max_http_rps', t('Żądania HTTP na sekundę', 'HTTP requests per second'), 'rps')}
           {num('max_per_host_rps', t('Żądania na host', 'Requests per host'), 'rps')}
@@ -276,7 +274,7 @@ function SafetyTab() {
           <Icon name={q.data.emergency_stop ? 'stop' : 'shield'} className={q.data.emergency_stop ? '' : 'text-st-new'} />
           {q.data.emergency_stop ? t('Włączony', 'On') : t('Wyłączony', 'Off')}
         </p>
-        <p className="mt-2 text-sm text-ink-2">{t('Stop natychmiast wstrzymuje wszystkie trwające skany i blokuje nowe, także te z harmonogramu, dopóki ktoś z uprawnieniem safety:manage go nie zwolni.', 'The stop pauses every running scan at once and blocks new ones, scheduled ones too, until someone with the safety:manage permission releases it.')}</p>
+        <p className="mt-2 text-sm text-ink-2">{t('Stop wstrzymuje wszystkie trwające skany i blokuje nowe, także z harmonogramu, dopóki administrator go nie wyłączy.', 'The stop pauses all running scans and blocks new ones, scheduled ones too, until an administrator turns it off.')}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {!q.data.emergency_stop && can('safety:stop') ? <Button variant="dangerSolid" icon="stop" onClick={() => setConfirmStop(true)}>{t('Zatrzymaj wszystkie skany', 'Stop all scans')}</Button> : null}
           {q.data.emergency_stop && canManage ? <Button variant="primary" icon="play" busy={release.isPending} onClick={() => release.mutate(undefined)}>{t('Wyłącz stop', 'Turn off the stop')}</Button> : null}
@@ -315,12 +313,11 @@ function WebhookPanel() {
   return (
     <Panel title={t('Webhook alertów', 'Alert webhook')} className="mt-4" actions={<Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!dirty} onClick={() => save.mutate(undefined)} data-testid="webhook-save">{t('Zapisz ustawienia', 'Save settings')}</Button>}>
       <div data-testid="webhook">
-        <p className="mb-3 max-w-[72ch] text-sm text-ink-2">{t('Po każdym przeanalizowanym skanie Czujka wysyła jedno podsumowanie zmian (Slack, Mattermost albo własny odbiornik).', 'After each analysed scan Czujka sends one summary of the changes (Slack, Mattermost or your own receiver).')}</p>
-        <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label={t('Webhook włączony', 'Webhook enabled')} />
+                <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label={t('Webhook włączony', 'Webhook enabled')} />
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label={t('Adres (URL)', 'Address (URL)')}><input className="field mono" value={f.url} onChange={(e) => { setF({ ...f, url: e.target.value }); setTest(null); }} placeholder="https://hooks.slack.com/services/…" data-testid="webhook-url" /></Field>
           <Field label={t('Minimalna waga', 'Minimum severity')}><Select value={f.min_severity} onChange={(v) => setF({ ...f, min_severity: v as WebhookSettings['min_severity'] })} options={SEV_OPTS()} /></Field>
-          <Field label={t('Sekret HMAC (opcjonalnie)', 'HMAC secret (optional)')} hint={f.secret_set && !clear ? t('Zapisany. Wpisz nowy, aby go zmienić. Podpis w nagłówku X-Czujka-Signature.', 'Stored. Type a new one to replace it. Signature in the X-Czujka-Signature header.') : t('Bez sekretu wiadomości nie są podpisywane.', 'Without a secret the messages are not signed.')}>
+          <Field label={t('Sekret HMAC (opcjonalnie)', 'HMAC secret (optional)')} hint={f.secret_set && !clear ? t('Zapisany. Wpisz nowy, aby go zmienić. Podpis w nagłówku X-Czujka-Signature.', 'Stored. Type a new one to replace it. Signature in the X-Czujka-Signature header.') : undefined}>
             <input className="field mono" type="password" autoComplete="off" value={secret} disabled={clear} onChange={(e) => { setSecret(e.target.value); setTest(null); }} placeholder={f.secret_set ? '••••••••••••••••' : ''} data-testid="webhook-secret" />
           </Field>
           <Field label={t('Adres Czujki w odnośnikach', 'Czujka address in the links')} hint={t('Puste: adres, z którego zapisano ustawienia.', 'Empty: the address the settings were saved from.')}><input className="field mono" value={f.ui_url} onChange={(e) => setF({ ...f, ui_url: e.target.value })} placeholder={typeof window !== 'undefined' ? window.location.origin : ''} /></Field>
@@ -333,7 +330,7 @@ function WebhookPanel() {
               <span className="mt-0.5"><Glyph name={test.ok ? 'check' : 'x'} tone={test.ok ? 'new' : 'gone'} /></span>
               <span>{test.ok ? t('Odbiornik przyjął test: ', 'The receiver took the test: ') : t('Test nieudany: ', 'The test failed: ')}<span className="mono">{test.status ? 'HTTP ' + test.status : t('brak odpowiedzi', 'no response')} · {fmtInt(test.ms)} ms</span>{test.error ? <span className="block text-xs text-ink-2">{test.error}</span> : null}</span>
             </span>
-          ) : <span className="text-xs text-ink-3">{t('Test używa adresu i sekretu z formularza, także niezapisanych.', 'The test uses the address and secret in the form, saved or not.')}</span>}
+          ) : null}
         </div>
         <div className="mt-2"><InlineError error={save.error ?? run.error} /></div>
       </div>
@@ -366,10 +363,9 @@ function DojoTab() {
   return (
     <div className="max-w-[860px] p-4 sm:p-6">
       <Panel title="DefectDojo" actions={<Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!dirty} onClick={() => save.mutate(undefined)}>{t('Zapisz ustawienia', 'Save settings')}</Button>}>
-        <p className="mb-3 max-w-[72ch] text-sm text-ink-2">{t('Czujka wysyła wybrane znaleziska do DefectDojo jako jeden test w zaangażowaniu. Ponowny eksport aktualizuje istniejące wpisy zamiast tworzyć duplikaty.', 'Czujka sends chosen findings to DefectDojo as one test in an engagement. A repeated export updates existing entries instead of making duplicates.')}</p>
-        <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label={t('Integracja włączona', 'Integration enabled')} />
+                <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label={t('Integracja włączona', 'Integration enabled')} />
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Field label={t('Adres DefectDojo', 'DefectDojo URL')} hint={/\/\/(host\.docker\.internal|localhost|127\.)/.test(f.url) && !f.link_url ? t('Bez adresu do odnośników Czujka zapisuje linki z tym adresem. Adres widoczny tylko z kontenera (host.docker.internal, localhost) nie otworzy się w przeglądarce analityka.', 'Czujka writes finding links with this address. An address visible only from the container (host.docker.internal, localhost) does not open in the analyst browser.') : undefined}><input className="field mono" value={f.url} onChange={(e) => { setF({ ...f, url: e.target.value }); setTest(null); }} placeholder="https://defectdojo.example" /></Field>
+          <Field label={t('Adres DefectDojo', 'DefectDojo URL')}><input className="field mono" value={f.url} onChange={(e) => { setF({ ...f, url: e.target.value }); setTest(null); }} placeholder="https://defectdojo.example" /></Field>
           {'link_url' in q.data ? (
             <Field label={t('Adres do odnośników (publiczny)', 'Link address (public)')} hint={t('Adres DefectDojo dla przeglądarki. Puste: adres wyżej.', 'The DefectDojo URL for the browser. Empty: the URL above.')}>
               <input className="field mono" value={f.link_url ?? ''} onChange={(e) => setF({ ...f, link_url: e.target.value })} placeholder="http://127.0.0.1:18080" data-testid="dojo-link-url" />
@@ -394,7 +390,7 @@ function DojoTab() {
               <span className="mt-0.5"><Glyph name={test.ok ? 'check' : 'x'} tone={test.ok ? 'new' : 'gone'} /></span>
               <span>{test.message}{test.version ? <span className="mono ml-2 text-xs text-ink-3">v{test.version}</span> : null}</span>
             </span>
-          ) : <span className="text-xs text-ink-3">{t('Test używa wartości z formularza, także niezapisanych.', 'The test uses the values in the form, saved or not.')}</span>}
+          ) : null}
         </div>
         <div className="mt-2"><InlineError error={save.error ?? run.error} /></div>
 
@@ -480,14 +476,13 @@ export default function Admin() {
   const readOnly = (tab === 'roles' && !can('roles:manage')) || (tab === 'safety' && !can('safety:manage'));
   return (
     <div>
-      <PageHeader title={t('Administracja', 'Administration')} sub={t('Konta, role, dziennik audytu, polityka bezpieczeństwa i integracje.', 'Accounts, roles, the audit log, the safety policy and integrations.')} readOnly={readOnly} />
+      <PageHeader title={t('Administracja', 'Administration')} readOnly={readOnly} />
       <div className="px-4 pt-2 sm:px-6"><Tabs tabs={tabs} value={tab} onChange={(id) => u.set({ tab: id, q: null, action: null, entity: null })} /></div>
       {tab === 'users' ? <UsersTab /> : null}
       {tab === 'roles' ? <RolesTab canManage={can('roles:manage')} /> : null}
       {tab === 'audit' ? <AuditTab /> : null}
       {tab === 'safety' ? <SafetyTab /> : null}
       {tab === 'defectdojo' ? <DojoTab /> : null}
-      <p className="px-4 py-3 text-2xs text-ink-3 sm:px-6">{fmtInt(tabs.length)} {t('sekcji dostępnych dla Twojej roli.', 'sections available to your role.')}</p>
-    </div>
+          </div>
   );
 }

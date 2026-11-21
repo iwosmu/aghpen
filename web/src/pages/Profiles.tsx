@@ -52,13 +52,12 @@ export default function Profiles() {
     <div>
       <PageHeader
         title={t('Profile skanów', 'Scan profiles')}
-        sub={t('Co skanować, jak szybko, kiedy i w jakich oknach czasowych.', 'What to scan, how fast, when and in which time windows.')}
         readOnly={!canEdit}
         actions={canEdit ? <LinkButton to="/profiles/new" variant="primary" icon="plus">{t('Nowy profil', 'New profile')}</LinkButton> : null}
       />
       <DataTable
         rows={q.data?.items} cols={cols} rowKey={(p) => p.id} rowHref={(p) => '/profiles/' + p.id} loading={q.isPending} error={q.error} retry={() => q.refetch()}
-        empty={<Empty icon="profiles" title={t('Brak profili', 'No profiles yet')} hint={t('Profil łączy zakresy z portami, tempem i harmonogramem. Zacznij od jednego profilu dla całej sieci.', 'A profile joins scopes with ports, rate and schedule. Start with one profile for the whole network.')} action={canEdit ? <LinkButton to="/profiles/new" variant="primary" icon="plus">{t('Nowy profil', 'New profile')}</LinkButton> : undefined} />}
+        empty={<Empty icon="profiles" title={t('Brak profili', 'No profiles yet')} action={canEdit ? <LinkButton to="/profiles/new" variant="primary" icon="plus">{t('Nowy profil', 'New profile')}</LinkButton> : undefined} />}
         mobile={(p) => (
           <div>
             <div className="text-sm font-medium">{p.name}</div>

@@ -67,7 +67,6 @@ export default function Services() {
     <div>
       <PageHeader
         title={t('Usługi', 'Services')}
-        sub={t('Każda otwarta para adres:port z tym, co skaner o niej ustalił. Grupy łączą usługi o tej samej treści, żeby 80 identycznych drukarek było jednym wierszem.', 'Every open address:port pair with what the scanner learned about it. Groups join services with the same content, so 80 identical printers are one row.')}
         readOnly={!canEdit}
         actions={view === 'list' ? <ExportButtons kind="services" query={filters} /> : null}
       />
@@ -106,7 +105,7 @@ export default function Services() {
         <DataTable
           rows={list.data?.items} cols={cols} rowKey={(s) => s.id} rowHref={(s) => '/services/' + s.id} loading={list.isPending} error={list.error} retry={() => list.refetch()} dim={list.isPlaceholderData}
           sort={u.get('sort', '-interest')} onSort={(s) => u.set({ sort: s })} rowClass={(s) => (s.state === 'gone' ? 'text-ink-3' : undefined)}
-          empty={<Empty icon="services" title={active ? t('Żadna usługa nie pasuje do filtrów', 'No services match the filters') : t('Brak usług', 'No services yet')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Usługi pojawią się po pierwszym skanie albo po imporcie wyników.', 'Services appear after the first scan or after an import of results.')} action={active ? undefined : <NextSteps />} />}
+          empty={<Empty icon="services" title={active ? t('Żadna usługa nie pasuje do filtrów', 'No services match the filters') : t('Brak usług', 'No services yet')} action={active ? undefined : <NextSteps />} />}
           mobile={(s) => (
             <div>
               <div className="flex items-center justify-between gap-2"><span className="mono text-sm">{s.ip}:{s.port}</span><InterestScore value={s.interest} /></div>
@@ -129,7 +128,7 @@ export default function Services() {
         />
       )}
       {total !== undefined ? <Pager total={total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}
-      {view === 'groups' && groups.data ? <p className="px-4 py-2 text-xs text-ink-3 sm:px-6">{fmtInt(groups.data.total)} {plural(groups.data.total, ['grupa', 'grupy', 'grup'], ['group', 'groups'])}{t(': klucz grupy to skrót treści strony, tytułu i zestawu technologii.', ': the group key is a hash of the page content, the title and the technology set.')}</p> : null}
+      {view === 'groups' && groups.data ? <p className="px-4 py-2 text-xs text-ink-3 sm:px-6">{fmtInt(groups.data.total)} {plural(groups.data.total, ['grupa', 'grupy', 'grup'], ['group', 'groups'])}</p> : null}
     </div>
   );
 }

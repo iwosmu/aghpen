@@ -108,7 +108,7 @@ export default function Setup() {
     setPwDone(true); setStep(2);
   });
   const saveNetwork = () => go(async () => {
-    const s = scope ?? await post<Scope>('/scopes', { name: netName.trim(), description: t('Utworzony w kreatorze pierwszego uruchomienia', 'Created in the first-run wizard'), owner: '', criticality: 3, tags: [] });
+    const s = scope ?? await post<Scope>('/scopes', { name: netName.trim(), description: '', owner: '', criticality: 3, tags: [] });
     setScope(s);
     await post<TargetPreview>('/scopes/' + s.id + '/targets', { text: ranges });
     invalidate(qc, '/scopes', '/dashboard');
@@ -122,7 +122,7 @@ export default function Setup() {
   });
   const saveProfile = () => go(async () => {
     const base = await post<ScanProfile>('/profiles', {
-      name: netName.trim() + t(': skan cykliczny', ': scheduled scan'), description: t('Utworzony w kreatorze pierwszego uruchomienia', 'Created in the first-run wizard'),
+      name: netName.trim() + t(': skan cykliczny', ': scheduled scan'), description: '',
       scope_ids: [scope!.id], ports: portSet,
       discovery: { icmp_echo: true, icmp_timestamp: false, tcp_syn_ports: [22, 80, 443], tcp_ack_ports: [80], arp: true, skip_discovery: false, mode: 'balanced' },
       service_detection: true, version_intensity: 5,
@@ -165,7 +165,7 @@ export default function Setup() {
   });
   const skip = () => { try { localStorage.setItem(SETUP_DONE_KEY, 'skipped'); } catch { /* ignore */ } navigate('/', { replace: true }); };
 
-  const pwError = pw && pw.length < 12 ? t('Hasło musi mieć co najmniej 12 znaków.', 'The password needs at least 12 characters.') : pw2 && pw !== pw2 ? t('Hasła się różnią.', 'The passwords do not match.') : '';
+  const pwError = pw && pw.length < 10 ? t('Hasło musi mieć co najmniej 10 znaków.', 'The password needs at least 10 characters.') : pw2 && pw !== pw2 ? t('Hasła się różnią.', 'The passwords do not match.') : '';
   const p = preview.data;
   const netOk = netName.trim().length > 0 && Boolean(p && p.valid.length > 0 && p.address_count > 0) && debounced === ranges;
 
@@ -176,8 +176,7 @@ export default function Setup() {
         <div>
           <p className="text-xs text-ink-3">{t('Kreator', 'Wizard')}</p>
           <h1 className="mt-1 text-xl font-semibold tracking-[-0.015em]">{t('Pierwszy skan', 'First scan')}</h1>
-          <p className="mt-1 max-w-[62ch] text-sm text-ink-2">{t('Przygotuj dane od właściciela sieci: zakresy adresów, limit tempa i dozwolone porty. Każdy krok zapisuje się od razu; możesz go później zmienić w konfiguracji.', 'Have the data from the network owner ready: address ranges, the rate limit and the allowed ports. Every step is saved at once; you can change it later in the configuration.')}</p>
-        </div>
+                  </div>
         <button type="button" className="link text-sm" onClick={skip}>{t('Pomiń kreator', 'Skip wizard')}</button>
       </div>
       <section className="mx-4 mb-4 border border-rule bg-panel px-4 py-3 sm:mx-6" data-testid="setup-quick">
@@ -194,19 +193,17 @@ export default function Setup() {
         {quick ? (
           <div className="mt-3 border-t border-rule pt-3">
             <LoopbackNote targets={quickPreview.data?.valid ?? [{ value: THIS_COMPUTER }]} />
-            <p className="mt-1 text-xs text-ink-3">{t('Zakres', 'Scope')} „{THIS_COMPUTER_SCOPE()}” · {t('cel', 'target')} <span className="mono">{THIS_COMPUTER}</span> · {t('profil domyślny (kopia), bez harmonogramu', 'the default profile (a copy), no schedule')} · {t('tylko GET i HEAD', 'GET and HEAD only')}</p>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
               <Button variant="primary" icon="play" busy={busy} onClick={startQuick} data-testid="setup-quick-start">{t('Uruchom skan', 'Start scan')}</Button>
-              <span className="text-xs text-ink-3">{t('Hasło, limity i harmonogram ustawisz później w konfiguracji.', 'Set the password, limits and schedule later in the configuration.')}</span>
-            </div>
+                          </div>
           </div>
         ) : null}
       </section>
       <div className="border-t border-rule">
         <Step n={1} title={t('Zmień hasło administratora', 'Change the administrator password')} done={pwDone} active={step === 1} summary={t('hasło zmienione', 'password changed')}>
-          <p className="mb-3 text-sm text-ink-2">{t('Hasło z logu instalacji widział każdy, kto ma dostęp do logów kontenera. Ustaw własne.', 'Anyone with access to the container logs has seen the password from the install log. Set your own.')} <span className="mono text-xs text-ink-3">{session.user.email}</span></p>
+          <p className="mb-3 text-sm text-ink-2"><span className="mono text-xs text-ink-3">{session.user.email}</span></p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={t('Nowe hasło (min. 12 znaków)', 'New password (min. 12 characters)')}><input type="password" autoComplete="new-password" className="field" value={pw} onChange={(e) => setPw(e.target.value)} data-testid="setup-pw" /></Field>
+            <Field label={t('Nowe hasło (co najmniej 10 znaków)', 'New password (at least 10 characters)')}><input type="password" autoComplete="new-password" className="field" value={pw} onChange={(e) => setPw(e.target.value)} data-testid="setup-pw" /></Field>
             <Field label={t('Powtórz hasło', 'Repeat the password')} error={pwError || undefined}><input type="password" autoComplete="new-password" className="field" value={pw2} onChange={(e) => setPw2(e.target.value)} data-testid="setup-pw2" /></Field>
           </div>
           <div className="mt-4 flex items-center gap-3">
@@ -223,14 +220,13 @@ export default function Setup() {
               <textarea className="field mono min-h-[110px] py-2" value={ranges} onChange={(e) => setRanges(e.target.value)} placeholder={(policyQ.data?.operator_networks?.[0] ?? '10.0.0.0/16') + '\n192.168.10.1-192.168.10.50\nportal.example.edu'} data-testid="setup-ranges" />
             </Field>
             <OperatorLockNote networks={policyQ.data?.operator_networks} />
-            {p && ranges.trim() ? <PreviewReport p={p} pending={preview.isFetching || debounced !== ranges} /> : <p className="text-xs text-ink-3">{t('Podgląd pojawi się w trakcie pisania: liczba adresów, błędne wiersze, adresy wykluczone polityką. Nic nie jest jeszcze zapisane.', 'The preview appears as you type: the address count, invalid lines, addresses excluded by the policy. Nothing is saved yet.')}</p>}
+            {p && ranges.trim() ? <PreviewReport p={p} pending={preview.isFetching || debounced !== ranges} /> : null}
           </div>
           <div className="mt-4"><Button variant="primary" icon="check" busy={busy} disabled={!netOk} onClick={saveNetwork}>{t('Zapisz zakres i dalej', 'Save scope and continue')}</Button></div>
         </Step>
 
         <Step n={3} title={t('Ustaw limity od właściciela sieci', 'Set limits from the network owner')} done={limitsDone} active={step === 3} summary={fmtInt(pps) + ' pps · ' + httpRps + ' HTTP/s · ' + (ports.trim() || t('wszystkie porty', 'all ports'))}>
-          <p className="mb-3 text-sm text-ink-2">{t('Te limity są twarde: żaden profil ani skan ich nie przekroczy. Skaner zawsze używa tylko GET i HEAD.', 'These limits are hard: no profile or scan goes above them. The scanner always uses GET and HEAD only.')}</p>
-          <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-2">
             <Field label={t('Pakiety na sekundę (łącznie)', 'Packets per second (total)')}><input type="number" min={10} className="field num" value={pps} onChange={(e) => setPps(Number(e.target.value))} data-testid="setup-pps" /></Field>
             <Field label={t('Żądania HTTP na sekundę (łącznie)', 'HTTP requests per second (total)')}><input type="number" min={1} step={1} className="field num" value={httpRps} onChange={(e) => setHttpRps(Number(e.target.value))} /></Field>
             <Field label={t('Dozwolone porty (składnia nmap)', 'Allowed ports (nmap syntax)')} hint={t('puste: wszystkie porty; np. 1-1024,3306,5432,8000-8999', 'empty: all ports; for example 1-1024,3306,5432,8000-8999')}><input className="field mono" value={ports} onChange={(e) => setPorts(e.target.value)} data-testid="setup-ports" /></Field>
@@ -264,12 +260,10 @@ export default function Setup() {
           ) : null}
           <div className="mt-3">
             <Check checked={reprobe} onChange={setReprobe} label={t('Sprawdzaj ponownie hosty, które przestały odpowiadać', 'Re-probe hosts that stopped responding')} />
-            <p className="ml-6 text-xs text-ink-3">{t('Domyślnie włączone. Host, który przestał odpowiadać, Czujka sprawdza ponownie pojedynczą sondą (nowy host w ciągu kilku minut), tylko w oknach profilu, zamiast czekać z potwierdzeniem do następnego pełnego skanu. Odznacz, aby wyłączyć.', 'On by default. A host that went silent is checked again with a single probe (a new host within minutes), only inside the profile windows, instead of waiting for the next full scan to confirm. Uncheck to turn it off.')}</p>
-          </div>
+                      </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Button variant="primary" icon="play" busy={busy} onClick={start} data-testid="setup-start">{t('Uruchom pierwszy skan', 'Start the first scan')}</Button>
-            <span className="text-xs text-ink-3">{t('Stop awaryjny w górnym pasku zatrzymuje skan w każdej chwili.', 'The emergency stop in the top bar halts the scan at any time.')}</span>
-          </div>
+                      </div>
         </Step>
       </div>
       {error ? <div className="px-4 py-3 sm:px-6"><InlineError error={error} /></div> : null}

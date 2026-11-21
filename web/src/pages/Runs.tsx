@@ -84,8 +84,7 @@ export function AdHocRunDialog({ open, onClose }: { open: boolean; onClose: () =
         <Button variant="primary" icon="play" busy={start.isPending} disabled={list.length === 0} onClick={() => start.mutate(undefined)} data-testid="adhoc-start">{t('Uruchom', 'Tryb')}</Button>
       </>}
     >
-      <p className="mb-3 text-sm text-ink-2">{t('Jednorazowy przebieg tylko dla podanych adresów. Nie oznacza innych hostów jako nieaktywnych i nie zmienia historii tempa profilu.', 'A one-off run for the given addresses only. It marks no other host as inactive and does not change the speed history of the profile.')}</p>
-      <div className="grid gap-3">
+            <div className="grid gap-3">
         <label className="block"><span className="label mb-1 block">{t('Ustawienia z profilu', 'Settings from the profile')}</span>
           <Select value={chosen} onChange={setPid} options={items.map((p) => ({ value: String(p.id), label: p.name }))} />
         </label>
@@ -142,7 +141,6 @@ export default function Runs() {
     <div>
       <PageHeader
         title={t('Skany', 'Scans')}
-        sub={t('Każdy przebieg to jeden obchód sieci: zaplanowany, uruchomiony ręcznie albo zaimportowany z pliku.', 'A run is one round of the network: scheduled, started by hand or imported from a file.')}
         readOnly={!canRun}
         actions={<>
           <Link to="/changes/compare" className="link inline-flex h-[30px] items-center gap-1.5 text-sm">{t('Porównaj dwa skany', 'Compare two scans')}</Link>

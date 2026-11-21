@@ -109,7 +109,6 @@ export default function Signatures() {
     <div>
       <PageHeader
         title={t('Sygnatury', 'Signatures')}
-        sub={t('Reguły, które rozpoznają technologie i rodzaje usług po odpowiedzi serwera. Sygnatura tylko czyta: metody GET i HEAD, bez danych wysyłanych do usługi.', 'Rules that recognise technologies and kinds of services from the server response. A signature only reads: GET and HEAD, no data sent to the service.')}
         readOnly={!canToggle && !can('signatures:create')}
         actions={can('signatures:create') ? <><Button icon="upload" onClick={() => setImportOpen(true)} data-testid="sig-import">{t('Importuj', 'Import')}</Button><LinkButton to="/signatures/new" variant="primary" icon="plus">{t('Nowa sygnatura', 'New signature')}</LinkButton></> : null}
       />
@@ -123,7 +122,7 @@ export default function Signatures() {
       <DataTable
         rows={q.data?.items} cols={cols} rowKey={(s) => s.id} rowHref={(s) => '/signatures/' + s.id} loading={q.isPending} error={q.error} retry={() => q.refetch()} dim={q.isPlaceholderData}
         sort={u.get('sort', 'name')} onSort={(s) => u.set({ sort: s })} rowClass={(s) => (s.enabled ? undefined : 'text-ink-3')}
-        empty={<Empty icon="signatures" title={active ? t('Żadna sygnatura nie pasuje do filtrów', 'No signatures match the filters') : t('Brak sygnatur', 'No signatures yet')} hint={active ? undefined : t('Napisz pierwszą regułę w edytorze i sprawdź ją na zapisanych wynikach, zanim ją włączysz.', 'Write the first rule in the editor and test it on stored results before you enable it.')} />}
+        empty={<Empty icon="signatures" title={active ? t('Żadna sygnatura nie pasuje do filtrów', 'No signatures match the filters') : t('Brak sygnatur', 'No signatures yet')} />}
         mobile={(s) => (
           <div>
             <div className="flex items-center justify-between gap-2"><span className="text-sm font-medium">{s.name}</span><span className="num text-xs text-ink-2">{s.match_count}</span></div>

@@ -226,16 +226,14 @@ export default function TimeMachine() {
     return () => window.removeEventListener('keydown', onKey);
   }, [cur, runs]);
 
-  const header = <PageHeader title={t('Oś czasu', 'Timeline')} sub={t('Sieć taka, jaka była po wybranym przebiegu: hosty, usługi i znaleziska z tamtej chwili, a obok to, co od tamtej pory zniknęło albo się zmieniło.', 'The network as it was after the chosen run: hosts, services and findings of that moment, next to what has gone or changed since.')} />;
-  if (tl.error) return <div>{header}<div className="p-4 sm:p-6">{routeMissing(tl.error) ? <Unavailable what={t('Serwer nie udostępnia jeszcze osi czasu (GET /timeline). Gdy integrator podłączy moduł, ta strona pokaże każdy przeanalizowany przebieg.', 'The server does not serve the time line yet (GET /timeline). When the integrator wires the module, this page shows every analysed run.')} /> : <ErrorState error={tl.error} retry={() => tl.refetch()} />}</div></div>;
+  const header = <PageHeader title={t('Oś czasu', 'Timeline')} />;
+  if (tl.error) return <div>{header}<div className="p-4 sm:p-6">{routeMissing(tl.error) ? <Unavailable /> : <ErrorState error={tl.error} retry={() => tl.refetch()} />}</div></div>;
   if (!tl.data) return <div>{header}<SkeletonRows rows={10} /></div>;
-  if (runs.length === 0) return <div>{header}<div className="p-4 sm:p-6"><Empty icon="history" title={t('Brak skanów', 'No scans yet')} hint={t('Oś czasu zapełni się po pierwszym zakończonym skanie.', 'The time line fills after the first finished scan.')} /></div></div>;
+  if (runs.length === 0) return <div>{header}<div className="p-4 sm:p-6"><Empty icon="history" title={t('Brak skanów', 'No scans yet')} /></div></div>;
   if (runs.length === 1) {
     return (
       <div>{header}<div className="p-4 sm:p-6" data-testid="tm-one-run">
-        <Empty icon="history" title={t('Potrzeba co najmniej dwóch skanów', 'At least two scans are needed')}
-          hint={t('Jest jeden przeanalizowany przebieg (#' + runs[0].run_id + ', ' + fmtDateTime(runs[0].at) + '). Po następnym skanie zobaczysz tu, jak sieć wyglądała wtedy i co od tamtej pory zniknęło albo się zmieniło.', 'There is one analysed run (#' + runs[0].run_id + ', ' + fmtDateTime(runs[0].at) + '). After the next scan this page shows how the network looked then and what has gone or changed since.')}
-          action={<Link to={'/runs/' + runs[0].run_id} className="link text-sm">{t('Otwórz skan', 'Open scan')} #{runs[0].run_id}</Link>} />
+        <Empty icon="history" title={t('Potrzeba co najmniej dwóch skanów', 'At least two scans are needed')}          action={<Link to={'/runs/' + runs[0].run_id} className="link text-sm">{t('Otwórz skan', 'Open scan')} #{runs[0].run_id}</Link>} />
       </div></div>
     );
   }
@@ -332,7 +330,7 @@ function Lane({ intervals, t0, t1, height = 10 }: { intervals: LifeInterval[]; t
 
 export function HostLifePanel({ hostId }: { hostId: number }) {
   const q = useItem<HostLife>('/timeline/hosts/' + hostId);
-  if (q.error && routeMissing(q.error)) return <Panel title={t('Dostępność hosta', 'Host availability')}><Unavailable what={t('Pasma dostępności hosta i jego usług pojawią się, gdy serwer udostępni GET /timeline/hosts/{id}.', 'The availability lanes of the host and its services appear when the server serves GET /timeline/hosts/{id}.')} /></Panel>;
+  if (q.error && routeMissing(q.error)) return <Panel title={t('Dostępność hosta', 'Host availability')}><Unavailable /></Panel>;
   if (q.error) return <Panel title={t('Dostępność hosta', 'Host availability')}><ErrorState error={q.error} retry={() => q.refetch()} /></Panel>;
   if (!q.data) return <Panel title={t('Dostępność hosta', 'Host availability')}><SkeletonRows rows={3} /></Panel>;
   const L = q.data;
@@ -372,7 +370,7 @@ const fieldLabel = (f: string) => sharedFieldLabel(f, 'service');
 export function ServiceHistoryPanel({ serviceId }: { serviceId: number }) {
   const q = useItem<ServiceHistory>('/timeline/services/' + serviceId);
   const title = t('Zmiany pól', 'Field changes');
-  if (q.error && routeMissing(q.error)) return <Panel title={title}><Unavailable what={t('Historia zmian pól usługi pojawi się, gdy serwer udostępni GET /timeline/services/{id}.', 'The field history of the service appears when the server serves GET /timeline/services/{id}.')} /></Panel>;
+  if (q.error && routeMissing(q.error)) return <Panel title={title}><Unavailable /></Panel>;
   if (q.error) return <Panel title={title}><ErrorState error={q.error} retry={() => q.refetch()} /></Panel>;
   if (!q.data) return <Panel title={title}><SkeletonRows rows={3} /></Panel>;
   const h = q.data;

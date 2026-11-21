@@ -105,7 +105,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
         </span>
       </p>
       {partial ? (
-        <p className="mt-1.5 text-sm text-ink-2" data-testid="handover-partial" title={t('Przebieg częściowy widzi tylko część sieci, więc nie porównujemy go z pełnym skanem.', 'A partial run sees only part of the network, so it is not compared with a full scan.')}>
+        <p className="mt-1.5 text-sm text-ink-2" data-testid="handover-partial">
           {t('Ostatnio', 'Last')}: {partialRunPhrase(partial)} (<Link to={'/runs/' + partial.id} className="num link">#{partial.id}</Link>, {fmtRelative(partial.finished_at)}); {t('skan częściowy.', 'a partial scan.')}
         </p>
       ) : null}
@@ -266,7 +266,7 @@ function SafetyPanel({ st }: { st: Dash['safety'] }) {
     <Panel title={t('Bezpieczeństwo skanowania', 'Scan safety')} actions={<Link to="/admin?tab=safety" className="link">{can('safety:manage') ? t('Polityka', 'Policy') : t('Polityka', 'Policy')}</Link>}>
       <p className={cx('mb-2 flex items-center gap-2 text-sm font-medium', st.emergency_stop ? 'text-danger' : 'text-ink')}>
         <Icon name={st.emergency_stop ? 'stop' : 'shield'} className={st.emergency_stop ? '' : 'text-st-new'} />
-        {st.emergency_stop ? t('Stop awaryjny włączony', 'Emergency stop is on') : t('Skaner działa w trybie bezpiecznej detekcji', 'The scanner runs in safe-detection mode')}
+        {st.emergency_stop ? t('Stop awaryjny włączony', 'Emergency stop is on') : t('Tylko GET i HEAD', 'GET and HEAD only')}
       </p>
       <dl>
         <Stat label={t('Limit pakietów', 'Packet limit')} value={<>{fmtInt(st.max_pps)} <span className="font-sans text-xs font-normal text-ink-3">pps</span></>} />
@@ -279,7 +279,7 @@ function SafetyPanel({ st }: { st: Dash['safety'] }) {
   );
 }
 
-interface Step { done: boolean; title: string; text: string; state?: string; to?: string; cta?: string; blocked?: string }
+interface Step { done: boolean; title: string; text?: string; state?: string; to?: string; cta?: string; blocked?: string }
 
 /** A fresh installation: no scan and no imported result yet. Says what to do next, in order. */
 function FirstRun({ d }: { d: Dash }) {
@@ -297,16 +297,12 @@ function FirstRun({ d }: { d: Dash }) {
     {
       done: hasTargets,
       title: t('Dodaj cele', 'Add targets'),
-      text: t('Utwórz zakres i wpisz sieci, które wolno skanować. Skaner nigdy nie wychodzi poza tę listę.', 'Create a scope and enter the networks that may be scanned. The scanner never leaves this list.'),
       state: hasTargets ? fmtInt(addresses) + ' ' + plural(addresses, ['adres w zakresie', 'adresy w zakresie', 'adresów w zakresie'], ['address in scope', 'addresses in scope']) : (scopes.data?.total ? t('zakres istnieje, brakuje w nim celów', 'a scope exists, it has no target yet') : undefined),
       to: '/targets', cta: can('targets:create') ? t('Otwórz cele', 'Open targets') : t('Zobacz cele', 'View targets'),
     },
     {
       done: Boolean(ready),
       title: t('Przygotuj profil skanu', 'Prepare a scan profile'),
-      text: first && !ready
-        ? t('Profil „' + first.name + '” jest gotowy. Przypisz mu zakres, ustaw tempo i okna czasowe.', 'The profile "' + first.name + '" is ready. Give it a scope, then set the rate and the time windows.')
-        : t('Profil łączy zakresy z portami, tempem i oknami czasowymi.', 'A profile joins scopes with ports, rate and time windows.'),
       state: ready ? t('profil „' + ready.name + '” ma przypisany zakres', 'the profile "' + ready.name + '" has a scope') : undefined,
       to: can('scans:configure') ? (first ? '/profiles/' + first.id : '/profiles/new') : '/profiles',
       cta: can('scans:configure') ? t('Otwórz profil', 'Open profile') : t('Zobacz profile', 'View profiles'),
@@ -314,7 +310,6 @@ function FirstRun({ d }: { d: Dash }) {
     {
       done: false,
       title: t('Uruchom pierwszy skan', 'Start the first scan'),
-      text: t('Przebieg pokaże postęp na mapie przestrzeni adresowej. Po nim pulpit powie, co działa w sieci i co się zmieniło.', 'The run shows its progress on the address-space map. After it the dashboard says what is on the network and what changed.'),
       blocked: engineOff ? t('Brak skanera w tej instalacji. Zaimportuj wyniki z pliku.', 'No scanner in this installation. Import results from a file.') : undefined,
       to: '/profiles', cta: can('scans:run') ? t('Uruchom skan', 'Start a scan') : undefined,
     },
@@ -323,7 +318,6 @@ function FirstRun({ d }: { d: Dash }) {
   return (
     <section aria-labelledby="first-run-title" data-testid="first-run">
       <h2 id="first-run-title" className="text-xl font-semibold tracking-[-0.015em]">{t('Czujka nie ma jeszcze danych o sieci.', 'Czujka has no data about the network yet.')}</h2>
-      <p className="mt-2 max-w-[70ch] text-base text-ink-2">{t('Trzy kroki dzielą tę instalację od pierwszego obchodu. Każdy krok można wykonać teraz albo wrócić do niego później.', 'Three steps stand between this installation and its first watch. Do each step now or come back to it later.')}</p>
       {can('targets:create') && can('scans:configure') ? <p className="mt-2 text-sm"><Link to="/setup" className="link">{t('Albo użyj kreatora', 'Or use the wizard')}</Link></p> : null}
       <ol className="mt-4 border-y border-rule">
         {steps.map((s, i) => (
@@ -333,7 +327,7 @@ function FirstRun({ d }: { d: Dash }) {
             </span>
             <div className="min-w-0">
               <p className={cx('text-sm font-medium', s.done ? 'text-ink-2' : 'text-ink')}>{s.title}<span className="sr-only">{s.done ? ' (' + t('zrobione', 'done') + ')' : ''}</span></p>
-              <p className="mt-0.5 max-w-[72ch] text-sm text-ink-2">{s.text}</p>
+              {s.text ? <p className="mt-0.5 max-w-[72ch] text-sm text-ink-2">{s.text}</p> : null}
               {s.state ? <p className="mt-1 text-xs text-ink-3">{s.state}</p> : null}
               {s.blocked ? <p className="mt-1 flex items-start gap-1.5 text-xs text-ink-2"><Icon name="info" size={12} className="mt-0.5 flex-none text-ink-3" />{s.blocked}</p> : null}
             </div>
