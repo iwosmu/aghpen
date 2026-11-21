@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -258,9 +259,11 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 	if r.ports != nil {
 		nports = int(r.ports.Count())
 	}
+	endPass := r.stats.passBegin(model.PassTopPorts, len(ips), int64(len(ips)*nports), rate)
 	ps, err := r.prober.PortScan(ctx, probe.PortScanRequest{
 		Hosts: ips, Ports: r.ports, MaxRate: rate, MaxRetries: 2, HostTimeout: portScanTimeout(len(ips), nports, rate), IPv6: g.v6,
 	})
+	endPass()
 	end()
 	r.account(gs, ps, t0)
 	if err != nil {
@@ -317,7 +320,10 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 			return context.Cause(ctx)
 		}
 	}
-	if err := r.densePass(ctx, g, scanned, rate, gs); err != nil {
+	full := r.claimFullRange(hosts, scanned)
+	if full {
+		r.stats.passState(model.PassTopPorts, model.PassDone)
+	} else if err := r.densePass(ctx, g, scanned, rate, gs); err != nil {
 		return err
 	}
 	unknown := map[string]bool{}
@@ -360,10 +366,45 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 		up = append(up, h)
 	}
 
-	if r.quickEligible(up) {
-		return r.quickHosts(ctx, g, up, attempts, rate, gs, found, unknown)
+	for _, h := range up {
+		found[h.IP] = true
 	}
+	results, err := r.describeHosts(ctx, g, up, attempts, rate, gs, true, true)
+	if err != nil {
+		return err
+	}
+	if full && ctx.Err() == nil {
+		// the top ports are known: store them now, then scan the rest
+		for _, res := range results {
+			r.interimHost(gs, res)
+		}
+		if err := r.fullRangePass(ctx, g, up, results, attempts, rate, gs); err != nil {
+			return err
+		}
+	} else if full {
+		return context.Cause(ctx)
+	}
+	for _, res := range results {
+		if unknown[res.IP] {
+			res.PortsUnknown, res.Reason = true, model.ReasonPortsUnknown
+		}
+		r.emitHost(g, gs, res)
+	}
+	return nil
+}
 
+// describeHosts runs version detection, the UDP stage (withUDP) and the
+// HTTP stage on hosts whose open ports are known, and returns their
+// results in the order of up. interim lets the quick path store a partial
+// result while a slow version detection runs.
+func (r *run) describeHosts(ctx context.Context, g *group, up []probe.Host, attempts, rate int, gs *groupStats, withUDP, interim bool) ([]model.HostResult, error) {
+	if r.quickEligible(up) {
+		return r.quickResults(ctx, g, up, attempts, rate, gs, withUDP, interim)
+	}
+	up = append([]probe.Host(nil), up...)
+	for i := range up {
+		up[i].Ports = append([]probe.Port(nil), up[i].Ports...)
+	}
 	if r.plan.Profile.ServiceDetection {
 		var hp []probe.HostPorts
 		for _, h := range up {
@@ -384,7 +425,7 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 			r.account(gs, sv, t0)
 			if err != nil {
 				if ctx.Err() != nil {
-					return context.Cause(ctx)
+					return nil, context.Cause(ctx)
 				}
 				// keep the port-scan result; the services stay named by port number
 				r.log.Warn("service detection failed, keeping port-scan data", "error", err.Error())
@@ -413,42 +454,33 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 		}
 	}
 
-	if len(r.udpPorts) > 0 && len(up) > 0 {
+	if withUDP && len(r.udpPorts) > 0 && len(up) > 0 {
 		if err := r.udpStage(ctx, g, up, rate, gs); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	for _, h := range up {
-		found[h.IP] = true
-	}
+	results := make([]model.HostResult, len(up))
 	var wg sync.WaitGroup
-	for _, h := range up {
+	for i, h := range up {
 		select {
 		case r.hostSem <- struct{}{}:
 		case <-ctx.Done():
 			wg.Wait()
-			return context.Cause(ctx)
+			return nil, context.Cause(ctx)
 		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			defer func() { <-r.hostSem }()
-			res := r.buildHost(ctx, h, attempts)
-			if unknown[h.IP] {
-				res.PortsUnknown, res.Reason = true, model.ReasonPortsUnknown
-			}
-			if ctx.Err() != nil {
-				return // half-collected: the chunk is deferred and scanned again
-			}
-			r.emitHost(g, gs, res)
+			results[i] = r.buildHost(ctx, h, attempts)
 		}()
 	}
 	wg.Wait()
 	if ctx.Err() != nil {
-		return context.Cause(ctx)
+		return nil, context.Cause(ctx) // half-collected: the chunk is deferred and scanned again
 	}
-	return nil
+	return results, nil
 }
 
 func (r *run) names(ip string) []string {
@@ -714,9 +746,11 @@ func (r *run) densePass(ctx context.Context, g *group, scanned map[string]*probe
 	dense = dense[:min(len(dense), maxDensePerGroup)]
 	t0 := r.e.now()
 	end := r.stats.begin(rate)
+	endPass := r.stats.passBegin(model.PassDense, len(dense), int64(len(dense)*rest.Count()), rate)
 	res, err := r.prober.PortScan(ctx, probe.PortScanRequest{
 		Hosts: dense, Ports: rest, MaxRate: rate, MaxRetries: 1, HostTimeout: portScanTimeout(len(dense), rest.Count(), rate), IPv6: g.v6,
 	})
+	endPass()
 	end()
 	r.account(gs, res, t0)
 	if err != nil {
@@ -771,15 +805,14 @@ func (r *run) quickEligible(up []probe.Host) bool {
 	return n > 0 && n <= quickMaxPairs
 }
 
-func (r *run) quickHosts(ctx context.Context, g *group, up []probe.Host, attempts, rate int, gs *groupStats, found, unknown map[string]bool) error {
+func (r *run) quickResults(ctx context.Context, g *group, up []probe.Host, attempts, rate int, gs *groupStats, withUDP, interim bool) ([]model.HostResult, error) {
 	// UDP runs beside the TCP work on its own copy of the hosts.
 	udpUp := make([]probe.Host, len(up))
 	for i, h := range up {
 		udpUp[i] = probe.Host{IP: h.IP}
-		found[h.IP] = true
 	}
 	udpDone := make(chan error, 1)
-	if len(r.udpPorts) > 0 {
+	if withUDP && len(r.udpPorts) > 0 {
 		go func() { udpDone <- r.udpStage(ctx, g, udpUp, rate, gs) }()
 	} else {
 		udpDone <- nil
@@ -792,37 +825,36 @@ func (r *run) quickHosts(ctx context.Context, g *group, up []probe.Host, attempt
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			results[i] = r.quickHost(ctx, h, attempts, share, procs, gs, g.v6)
-			if unknown[h.IP] {
-				results[i].PortsUnknown, results[i].Reason = true, model.ReasonPortsUnknown
+			var store func(model.HostResult)
+			if interim {
+				store = func(part model.HostResult) { r.interimHost(gs, part) }
 			}
+			results[i] = r.quickHost(ctx, h, attempts, share, procs, gs, g.v6, store)
 		}()
 	}
 	wg.Wait()
 	if err := <-udpDone; err != nil {
-		return err
+		return nil, err
 	}
 	if ctx.Err() != nil {
-		return context.Cause(ctx)
+		return nil, context.Cause(ctx)
 	}
 	for i := range results {
-		res := results[i]
 		for _, p := range udpUp[i].Ports {
 			s := toService(p)
 			nameService(&s)
-			r.match(&s, res.Hostnames)
-			res.Services = append(res.Services, s)
+			r.match(&s, results[i].Hostnames)
+			results[i].Services = append(results[i].Services, s)
 		}
-		r.emitHost(g, gs, res)
 	}
-	return nil
+	return results, nil
 }
 
 // quickHost runs version detection per open TCP port and the HTTP stage at
 // the same time. A port whose HTTP stage got a page cancels its version
 // detection (the page names it); the others keep nmap's answer, bounded by
 // quickServiceTimeout.
-func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, procs chan struct{}, gs *groupStats, v6 bool) model.HostResult {
+func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, procs chan struct{}, gs *groupStats, v6 bool, store func(model.HostResult)) model.HostResult {
 	res := r.newHostResult(h, attempts)
 	cancels := map[int]context.CancelFunc{}
 	var mu sync.Mutex
@@ -882,8 +914,8 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 		part := quickMerge(res, detected)
 		mu.Unlock()
 		r.finishHost(&part)
-		if ctx.Err() == nil {
-			r.interimHost(gs, part)
+		if ctx.Err() == nil && store != nil {
+			store(part)
 		}
 		<-svDone
 	}
@@ -919,4 +951,141 @@ func quickMerge(res model.HostResult, detected map[int]probe.Port) model.HostRes
 		}
 	}
 	return res
+}
+
+// A small scope gets every TCP port: after the profile's top ports (stored
+// at once, so their services show within seconds), a second pass scans the
+// rest of 1-65535 on the live hosts. It applies to profiles with a ranked
+// port list (top-N), to scopes of at most fullRangeMaxAddresses addresses,
+// and to at most fullRangeMaxHosts live hosts in the whole run. An explicit
+// port list ("80,443,8080") is scanned as written. One host at cap 1000
+// (840 for nmap after the HTTP reserve): about 64 500 ports in ~80 s.
+const (
+	fullRangeMaxAddresses = 256
+	fullRangeMaxHosts     = 16
+)
+
+// fullRangePlanned tells whether the run may get the full-range pass.
+func (r *run) fullRangePlanned(addresses int64) bool {
+	return fullRangeFor(r.plan.Profile.Ports, r.ports, addresses)
+}
+
+func fullRangeFor(spec string, ports *probe.PortSet, addresses int64) bool {
+	if ports == nil || ports.Count() >= 65535 || addresses > fullRangeMaxAddresses {
+		return false
+	}
+	return strings.Contains(strings.ToLower(spec), "top-")
+}
+
+// claimFullRange decides the full-range pass for one group: every live host
+// of the group must fit into what is left of the run's host budget.
+func (r *run) claimFullRange(hosts []probe.Host, scanned map[string]*probe.Host) bool {
+	if !r.fullPlanned {
+		return false
+	}
+	n := int64(0)
+	for _, h := range hosts {
+		if p := scanned[h.IP]; p != nil && !p.TimedOut && (h.Up || p.Responded) {
+			n++
+		}
+	}
+	if n == 0 {
+		return false
+	}
+	for {
+		left := r.fullLeft.Load()
+		if left < n {
+			r.log.Info("full port range skipped: too many live hosts", "hosts", n, "budget_left", left)
+			return false
+		}
+		if r.fullLeft.CompareAndSwap(left, left-n) {
+			return true
+		}
+	}
+}
+
+// fullRangePass scans the ports outside the profile's list on the live
+// hosts, describes the new open ports and adds them to results.
+func (r *run) fullRangePass(ctx context.Context, g *group, up []probe.Host, results []model.HostResult, attempts, rate int, gs *groupStats) error {
+	rest, err := probe.ParsePorts("1-65535")
+	if err != nil {
+		return nil
+	}
+	rest.Remove(r.ports)
+	var ips []string
+	byIP := map[string]int{}
+	for i, res := range results {
+		if res.Up {
+			ips = append(ips, res.IP)
+			byIP[res.IP] = i
+		}
+	}
+	if len(ips) == 0 || rest.Count() == 0 {
+		r.stats.passState(model.PassFullRange, model.PassSkipped)
+		return nil
+	}
+	t0 := r.e.now()
+	end := r.stats.begin(rate)
+	endPass := r.stats.passBegin(model.PassFullRange, len(ips), int64(len(ips)*rest.Count()), rate)
+	ps, err := r.prober.PortScan(ctx, probe.PortScanRequest{
+		Hosts: ips, Ports: rest, MaxRate: rate, MaxRetries: 1, HostTimeout: portScanTimeout(len(ips), rest.Count(), rate), IPv6: g.v6,
+	})
+	endPass()
+	end()
+	r.account(gs, ps, t0)
+	if err != nil {
+		if ctx.Err() != nil {
+			return context.Cause(ctx)
+		}
+		r.log.Warn("full port range failed, keeping the top ports", "group", g.id, "error", err.Error())
+		for _, ip := range ips {
+			results[byIP[ip]].PortsUnknown = true // the other ports were not seen: nothing there is gone
+		}
+		r.stats.warn("Pełny zakres portów nie został przeskanowany (błąd nmap). Usługi spoza listy portów profilu są w tym przebiegu nieznane.")
+		return nil
+	}
+	var more []probe.Host
+	for _, h := range ps.Hosts {
+		i, ok := byIP[h.IP]
+		if !ok {
+			continue
+		}
+		if h.TimedOut {
+			results[i].PortsUnknown = true
+			r.stats.warn("Pełny zakres portów nie skończył się dla części hostów (limit czasu nmap). Usługi spoza listy portów profilu są w tym przebiegu nieznane.")
+			continue
+		}
+		if len(h.Ports) == 0 {
+			continue
+		}
+		for _, u := range up {
+			if u.IP == h.IP {
+				u.Ports = h.Ports
+				more = append(more, u)
+				break
+			}
+		}
+	}
+	newOpen := 0
+	if len(more) > 0 {
+		add, err := r.describeHosts(ctx, g, more, attempts, rate, gs, false, false)
+		if err != nil {
+			return err
+		}
+		for _, a := range add {
+			i := byIP[a.IP]
+			results[i].Services = append(results[i].Services, a.Services...)
+			sort.SliceStable(results[i].Services, func(x, y int) bool {
+				sx, sy := results[i].Services[x], results[i].Services[y]
+				if sx.Proto != sy.Proto {
+					return sx.Proto < sy.Proto
+				}
+				return sx.Port < sy.Port
+			})
+			newOpen += len(a.Services)
+		}
+	}
+	r.stats.passState(model.PassFullRange, model.PassDone)
+	r.log.Info("full port range pass", "group", g.id, "hosts", len(ips), "ports", rest.Count(), "new_open", newOpen, "ms", r.e.now().Sub(t0).Milliseconds())
+	return nil
 }

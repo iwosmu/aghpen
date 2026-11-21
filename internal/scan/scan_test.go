@@ -996,3 +996,86 @@ func TestQuickPathStoresAPartialResultFirst(t *testing.T) {
 		t.Errorf("stats counted the partial result twice: %+v", out.Stats)
 	}
 }
+
+func TestSmallScopeGetsTheFullPortRange(t *testing.T) {
+	netw := &fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 80, 40000}}}
+	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.Ports = "top-100"
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	plan.Policy.MaxPerHostRPS = 100
+	sink := newSink()
+	out := e.Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	h := sink.host("10.7.0.5")
+	if h == nil || len(h.Services) != 3 || h.Services[2].Port != 40000 || h.PortsUnknown {
+		t.Fatalf("final host = %+v", h)
+	}
+	sink.mu.Lock()
+	first := sink.hosts[0]
+	sink.mu.Unlock()
+	if !first.PortsUnknown || len(first.Services) != 2 {
+		t.Errorf("the top ports must be stored first as a partial result: %+v", first)
+	}
+	p := out.Stats.Passes
+	if len(p) != 2 || p[0].Name != model.PassTopPorts || p[1].Name != model.PassFullRange {
+		t.Fatalf("passes = %+v", p)
+	}
+	if p[0].State != model.PassDone || p[0].PortsTotal != 100 || p[0].PortsDone != 100 || p[0].Hosts != 1 {
+		t.Errorf("top ports pass = %+v", p[0])
+	}
+	if p[1].State != model.PassDone || p[1].PortsTotal != 65535-100 || p[1].PortsDone != p[1].PortsTotal {
+		t.Errorf("full range pass = %+v", p[1])
+	}
+	if out.Stats.ServicesOpen != 3 || out.Stats.HostsUp != 1 {
+		t.Errorf("stats = %+v", out.Stats)
+	}
+
+	// an explicit port list is scanned as written: one pass, no array
+	plan = basePlan("10.7.0.5")
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	sink = newSink()
+	out = e.Run(context.Background(), plan, sink)
+	if h := sink.host("10.7.0.5"); h == nil || len(h.Services) != 2 || out.Stats.Passes != nil {
+		t.Errorf("explicit list: host %+v, passes %+v", h, out.Stats.Passes)
+	}
+}
+
+func TestFullRangeHostBudget(t *testing.T) {
+	hosts := map[string][]int{}
+	for i := 1; i <= 20; i++ {
+		hosts[fmt.Sprintf("10.7.0.%d", i)] = []int{80, 40000}
+	}
+	netw := &fakeNet{hosts: hosts}
+	e := New(Deps{Prober: netw, Logger: quiet})
+	plan := basePlan("10.7.0.0/27")
+	plan.Profile.Ports = "top-100"
+	sink := newSink()
+	out := e.Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	if h := sink.host("10.7.0.3"); h == nil || len(h.Services) != 1 {
+		t.Errorf("20 live hosts are over the budget of %d: host %+v", fullRangeMaxHosts, h)
+	}
+	p := out.Stats.Passes
+	if len(p) != 2 || p[1].State != model.PassSkipped {
+		t.Errorf("passes = %+v", p)
+	}
+}
+
+func TestEstimateCountsTheFullRange(t *testing.T) {
+	e := New(Deps{Prober: &fakeNet{}, Logger: quiet})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.Ports = "top-1000"
+	est := e.Estimate(plan)
+	if est.FullRangeMaxHosts != fullRangeMaxHosts || est.EstPackets < 64000 || est.EstDurationSec < 60 {
+		t.Errorf("one host with top-1000: %+v", est)
+	}
+	plan.Profile.Ports = "22,80,443"
+	if est := e.Estimate(plan); est.FullRangeMaxHosts != 0 || est.EstPackets > 1000 {
+		t.Errorf("explicit list: %+v", est)
+	}
+}

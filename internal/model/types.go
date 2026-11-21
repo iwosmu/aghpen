@@ -322,6 +322,10 @@ type ScanEstimate struct {
 	PrevDurationSec int64      `json:"prev_duration_sec"`
 	PrevHostsUp     int        `json:"prev_hosts_up"`
 	PrevAddresses   int64      `json:"prev_addresses"`
+	// FullRangeMaxHosts > 0: a small scope with a top-N port list; after the
+	// list, up to this many live hosts also get the rest of 1-65535 (counted
+	// in the packets and the duration).
+	FullRangeMaxHosts int `json:"full_range_max_hosts,omitempty"`
 }
 
 // ---------- Scan runs ----------
@@ -375,6 +379,10 @@ type RunStats struct {
 	// Warnings are the engine's sanity checks that failed: the run ended,
 	// but its result is not complete. The API and the UI show them.
 	Warnings []string `json:"warnings,omitempty"`
+	// Passes lists the port passes of a run in execution order, only when
+	// the run has more than one (a small scope gets top ports, then the
+	// full range; the /16 gets a dense pass for hosts with many open ports).
+	Passes []PassStat `json:"passes,omitempty"`
 }
 
 type ScanRun struct {
@@ -479,6 +487,30 @@ func VendorForMAC(mac, vendor string) string {
 	}
 	return vendor
 }
+
+// PassStat is one port pass of a run. PortsTotal and PortsDone count
+// host-port pairs (for one host: ports). While a pass runs, PortsDone is
+// computed from the pinned nmap send rate (--min-rate = --max-rate); it is
+// exact when the pass is done.
+type PassStat struct {
+	Name       string `json:"name"`  // top_ports, full_range or dense
+	State      string `json:"state"` // pending, running, done or skipped
+	Hosts      int    `json:"hosts"`
+	PortsTotal int64  `json:"ports_total"`
+	PortsDone  int64  `json:"ports_done"`
+}
+
+// Port pass names and states (RunStats.Passes).
+const (
+	PassTopPorts  = "top_ports"
+	PassFullRange = "full_range"
+	PassDense     = "dense"
+
+	PassPending = "pending"
+	PassRunning = "running"
+	PassDone    = "done"
+	PassSkipped = "skipped"
+)
 
 // ReasonPortsUnknown is the HostResult.Reason of a host that answered but
 // whose port scan did not finish. The reason is stored with the host
