@@ -23,6 +23,13 @@ const (
 	// bucket alone knows too little for many weeks.
 	ShrinkStrength = 2.0
 
+	// CellShrinkStrength is the same weight for the finest level, the
+	// hour-of-week cell. A cell has few observations (four after a month of
+	// daily scans), so chance alone often fills it with answers only. The
+	// stronger pull stops a host that answers at random from looking as if
+	// it had a schedule.
+	CellShrinkStrength = 4.0
+
 	// NeighbourWeight is the weight of the two neighbouring hours in the
 	// hour-of-day rate. Scans do not start at the same minute every day.
 	NeighbourWeight = 0.5
@@ -137,7 +144,7 @@ type rates struct {
 //	global    = (U + a) / (N + a + b)              Beta(1,1) prior
 //	hod[h]    = (U_h + m*global) / (N_h + m)       U_h, N_h include the two neighbour hours at half weight
 //	hdt[k][h] = (U_kh + m*hod[h]) / (N_kh + m)     k = working day or weekend
-//	how[i]    = (U_i + m*hdt[k(i)][i%24]) / (N_i + m)
+//	how[i]    = (U_i + c*hdt[k(i)][i%24]) / (N_i + c)      c = CellShrinkStrength
 func buildRates(b *[168]model.AvailBucket) rates {
 	var r rates
 	var hodUp, hodAll [24]float64
@@ -169,7 +176,7 @@ func buildRates(b *[168]model.AvailBucket) rates {
 		n := float64(max(b[i].Up, 0) + max(b[i].Down, 0))
 		k, h := dayType(i/24), i%24
 		hdt := (dtUp[k][h] + ShrinkStrength*r.hod[h]) / (dtAll[k][h] + ShrinkStrength)
-		r.how[i] = (u + ShrinkStrength*hdt) / (n + ShrinkStrength)
+		r.how[i] = (u + CellShrinkStrength*hdt) / (n + CellShrinkStrength)
 	}
 	return r
 }

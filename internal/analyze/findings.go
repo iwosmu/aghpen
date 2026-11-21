@@ -172,7 +172,11 @@ func (b *findingBuilder) baseEvidence() []model.Evidence {
 		if s.HTTP.Title != "" {
 			ev = append(ev, model.Evidence{Matcher: "title", Where: "title", Snippet: clip(s.HTTP.Title, 120)})
 		}
-		ev = append(ev, model.Evidence{Matcher: "status", Where: "url:" + s.HTTP.URL, Snippet: fmt.Sprintf("HTTP %d", s.HTTP.Status)})
+		if s.HTTP.Status != 0 {
+			ev = append(ev, model.Evidence{Matcher: "status", Where: "url:" + s.HTTP.URL, Snippet: fmt.Sprintf("HTTP %d", s.HTTP.Status)})
+		} else if s.HTTP.Title == "" {
+			ev = append(ev, model.Evidence{Matcher: "path", Where: "url:" + s.HTTP.URL, Snippet: clip(firstNonEmpty(s.HTTP.Server, productVersion(s), s.HTTP.URL), 120)})
+		}
 	} else if v := productVersion(s); v != "" {
 		ev = append(ev, model.Evidence{Matcher: "banner", Where: fmt.Sprintf("port:%d/%s", s.Port, firstNonEmpty(s.Proto, "tcp")), Snippet: clip(firstNonEmpty(s.Banner, v), 120)})
 	}

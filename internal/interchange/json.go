@@ -153,7 +153,8 @@ func jsonElement(raw json.RawMessage, index int, opts Options, rep *report, col 
 	_, hasIP := obj["ip"]
 	_, hasServices := obj["services"]
 	_, hasUp := obj["up"]
-	if hasIP && (hasServices || hasUp) && isNativeServices(obj["services"]) {
+	_, hasPort := obj["port"]
+	if hasIP && (hasServices || (hasUp && !hasPort)) && isNativeServices(obj["services"]) {
 		var h model.HostResult
 		if err := json.Unmarshal(raw, &h); err != nil {
 			rep.invalid(index, snippet(raw), "niepoprawny rekord hosta: "+err.Error())

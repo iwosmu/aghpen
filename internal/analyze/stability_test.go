@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"math/rand"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -103,9 +104,12 @@ func TestStabilityScenarios(t *testing.T) {
 			if as[i].Status != model.HostExpectedOffline || !as[i].Expected {
 				t.Errorf("night miss %d: want expected-offline, got %s", i+1, as[i].Status)
 			}
-			if as[i].PAlive < 0.7 {
-				t.Errorf("night miss %d lowered p_alive to %.3f", i+1, as[i].PAlive)
+			if as[i].PAlive < 0.6 {
+				t.Errorf("night miss %d: p_alive = %.3f, want it to stay high", i+1, as[i].PAlive)
 			}
+		}
+		if drop := as[0].PAlive - as[1].PAlive; drop > 0.01 {
+			t.Errorf("one night miss lowered p_alive by %.3f", drop)
 		}
 		// Index 2 = Mon 10:00: it misses its usual hour.
 		if as[2].Status != model.HostUnstable {
@@ -311,5 +315,39 @@ func TestApplyToHostAndAvailabilityProfile(t *testing.T) {
 	ap := AvailabilityProfile(7, p, a)
 	if ap.HostID != 7 || ap.DownAfterMisses != 1 || len(ap.Recent) != 21 {
 		t.Errorf("profile: id=%d down_after=%d recent=%d", ap.HostID, ap.DownAfterMisses, len(ap.Recent))
+	}
+}
+
+// The tolerance of an irregular host depends on the hours of its misses.
+// This test shows the spread over many random histories.
+func TestRandomHostToleranceDistribution(t *testing.T) {
+	start := time.Date(2026, 10, 26, 0, 0, 0, 0, warsaw)
+	hist := map[int]int{}
+	const seeds = 300
+	var all []int
+	for seed := int64(1); seed <= seeds; seed++ {
+		rng := rand.New(rand.NewSource(seed))
+		p, next := history(start, 120, 6*time.Hour, func(time.Time) bool { return rng.Intn(2) == 0 })
+		p.Add(model.HostObservation{At: next, Up: true}, warsaw)
+		n := 0
+		for i := 1; i <= 20; i++ {
+			next = next.Add(6 * time.Hour)
+			p.Add(model.HostObservation{At: next, Up: false}, warsaw)
+			if Assess(p, warsaw).Status == model.HostDown {
+				n = i
+				break
+			}
+		}
+		hist[n]++
+		all = append(all, n)
+	}
+	sort.Ints(all)
+	median := all[len(all)/2]
+	t.Logf("random 50%% host, %d histories: misses until reported inactive -> count: %v; median %d, min %d, max %d", seeds, hist, median, all[0], all[len(all)-1])
+	if median < 4 || median > 6 {
+		t.Errorf("median tolerance = %d misses, want about 5", median)
+	}
+	if all[0] < 3 {
+		t.Errorf("an irregular host was reported after only %d misses", all[0])
 	}
 }

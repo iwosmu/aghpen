@@ -341,6 +341,8 @@ func TestImportJSONVariants(t *testing.T) {
 		{"host with nested ports", `[{"ip":"10.0.0.3","hostname":"db.example","ports":[{"port":5432,"service":"postgresql","version":"16.2"},{"port":22}]},{"ip":"10.0.0.4","ports":[80,443]}]`,
 			[]string{`10.0.0.3 up=true 22/tcp open name= product="" version=""`, `10.0.0.3 up=true 5432/tcp open name=postgresql product="" version="16.2"`,
 				`10.0.0.4 up=true 443/tcp open name= product="" version=""`, `10.0.0.4 up=true 80/tcp open name= product="" version=""`}, 0},
+		{"flat record with an up flag keeps its port", `[{"ip":"10.0.0.9","up":true,"port":8080,"service":"http"}]`,
+			[]string{`10.0.0.9 up=true 8080/tcp open name=http product="" version=""`}, 0},
 		{"json lines", "{\"ip\":\"10.0.0.5\",\"port\":80}\n{\"ip\":\"10.0.0.6\",\"port\":81}\n",
 			[]string{`10.0.0.5 up=true 80/tcp open name= product="" version=""`, `10.0.0.6 up=true 81/tcp open name= product="" version=""`}, 0},
 		{"invalid records are reported, valid ones are kept", `[{"ip":"999.1.1.1","up":true,"services":[]},{"ip":"10.0.0.7","up":true,"services":[{"port":70000}]},{"ip":"10.0.0.8","up":true,"services":[]},42,{"port":80}]`,

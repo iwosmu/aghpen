@@ -72,6 +72,8 @@ func TestDiffHostTransitions(t *testing.T) {
 			[]string{"host_back"}, "Host 10.0.0.2 znów odpowiada po zgłoszeniu jako nieaktywny", model.SevLow},
 		{"unstable", ptr(host("10.0.0.2", model.HostUp)), host("10.0.0.2", model.HostUnstable),
 			[]string{"host_unstable"}, "Host 10.0.0.2 nie odpowiedział w porze", model.SevLow},
+		{"irregular host misses again", ptr(host("10.0.0.2", model.HostUp)), HostSnapshot{IP: "10.0.0.2", Status: model.HostUnstable, Stability: 0.5, Observations: 40},
+			[]string{"host_unstable(expected)"}, "Host 10.0.0.2 nie odpowiedział; odpowiada nieregularnie (w ok. 50% skanów)", model.SevInfo},
 		{"expected offline", ptr(host("10.0.0.2", model.HostUp)), HostSnapshot{IP: "10.0.0.2", Status: model.HostExpectedOffline, Pattern: "zwykle aktywny pn–pt 08–16"},
 			[]string{"host_gone(expected)"}, "Host 10.0.0.2 nie odpowiada, zgodnie z profilem dostępności (zwykle aktywny pn–pt 08–16)", model.SevInfo},
 		{"expected back", ptr(host("10.0.0.2", model.HostExpectedOffline)), host("10.0.0.2", model.HostUp),

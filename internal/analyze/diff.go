@@ -22,6 +22,11 @@ const ContentChangeDistance = 16
 // A weak guess that comes and goes is noise. Confidence 0 means "not set".
 const MinTechConfidence = 0.5
 
+// FlakyStability: a host that answered in less than this share of its runs
+// (with at least MinObsForExpected observations) is known to be irregular.
+// A new miss of such a host is expected and stays out of the headline.
+const FlakyStability = 0.8
+
 // HostSnapshot is the state of one host in one run.
 type HostSnapshot struct {
 	HostID int64
@@ -32,6 +37,10 @@ type HostSnapshot struct {
 	Status model.HostStatus
 	// Pattern is the availability text of the host, used in summaries.
 	Pattern string
+	// Stability and Observations come from the stability model (share of
+	// runs with an answer, number of observations). Zero means unknown.
+	Stability    float64
+	Observations int
 	// Services are the services observed in this run. For a host that did
 	// not answer, leave it empty or carry the last known services forward;
 	// Diff never reports a service of a silent host as gone.
@@ -61,7 +70,8 @@ type DiffOptions struct {
 //	host_new         | low      | a new address answers
 //	host_gone        | medium   | the model reported the host inactive; info when Expected
 //	host_back        | low      | a host reported inactive answers again; info when Expected
-//	host_unstable    | low      | a host that was up starts to miss runs
+//	host_unstable    | low      | a host that was up starts to miss runs; Expected (info) when
+//	                 |          | the host is known to answer irregularly (FlakyStability)
 //	service_new      | medium   | sensitive class or port (admin panel, database, remote access,
 //	                 |          | dev tool, IoT); low otherwise
 //	service_gone     | low      |
@@ -232,8 +242,13 @@ func (d *differ) host(prev, cur *HostSnapshot) {
 		d.add(cur, nil, model.ChangeHostGone, model.SevInfo, "status", string(prev.Status), string(model.HostExpectedOffline), true,
 			fmt.Sprintf("Host %s nie odpowiada, zgodnie z profilem dostępności%s", cur.IP, patternNote))
 	case !cur.Up && known && cur.Status == model.HostUnstable && prev.Status != model.HostUnstable && !wasDown:
-		d.add(cur, nil, model.ChangeHostUnstable, model.SevLow, "status", string(prev.Status), string(model.HostUnstable), false,
-			fmt.Sprintf("Host %s nie odpowiedział w porze, w której zwykle odpowiada; jeszcze nie jest zgłoszony jako nieaktywny", cur.IP))
+		if cur.Observations >= MinObsForExpected && cur.Stability > 0 && cur.Stability < FlakyStability {
+			d.add(cur, nil, model.ChangeHostUnstable, model.SevInfo, "status", string(prev.Status), string(model.HostUnstable), true,
+				fmt.Sprintf("Host %s nie odpowiedział; odpowiada nieregularnie (w ok. %d%% skanów)%s", cur.IP, int(cur.Stability*100+0.5), patternNote))
+		} else {
+			d.add(cur, nil, model.ChangeHostUnstable, model.SevLow, "status", string(prev.Status), string(model.HostUnstable), false,
+				fmt.Sprintf("Host %s nie odpowiedział w porze, w której zwykle odpowiada; jeszcze nie jest zgłoszony jako nieaktywny", cur.IP))
+		}
 	}
 
 	if !cur.Up {
