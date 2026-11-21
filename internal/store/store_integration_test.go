@@ -579,3 +579,43 @@ func TestIngestBenchmark(t *testing.T) {
 		timeIt("Dashboard", func() error { _, err := st.Dashboard(ctx); return err })
 	}
 }
+
+// A host whose port scan did not finish (ports_unknown) keeps its services:
+// they are not marked gone. A finished scan of the same host does mark them.
+func TestPortsUnknownKeepsServices(t *testing.T) {
+	st := storetest.New(t)
+	sink := st.NewSink(store.SinkOptions{MarkMissing: true})
+	svc := func(port int) model.ServiceResult {
+		return model.ServiceResult{Port: port, Proto: "tcp", State: "open", Name: "http"}
+	}
+	ingest := func(h model.HostResult) {
+		t.Helper()
+		if err := sink.OnHost(ctx, h); err != nil {
+			t.Fatal(err)
+		}
+		if err := sink.Flush(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	states := func() map[int]string {
+		hosts, _ := st.ListHosts(ctx, store.HostFilter{})
+		svcs, _ := st.HostServices(ctx, hosts.Items[0].ID)
+		out := map[int]string{}
+		for _, s := range svcs {
+			out[s.Port] = string(s.State)
+		}
+		return out
+	}
+	run1 := mkRun(t, st)
+	ingest(model.HostResult{RunID: run1.ID, IP: "10.20.0.9", Up: true, Services: []model.ServiceResult{svc(22), svc(80)}})
+	run2 := mkRun(t, st)
+	ingest(model.HostResult{RunID: run2.ID, IP: "10.20.0.9", Up: true, Reason: model.ReasonPortsUnknown, PortsUnknown: true})
+	if s := states(); s[22] != "open" || s[80] != "open" {
+		t.Fatalf("after a run with unknown ports: %v", s)
+	}
+	run3 := mkRun(t, st)
+	ingest(model.HostResult{RunID: run3.ID, IP: "10.20.0.9", Up: true, Reason: "arp-response", Services: []model.ServiceResult{svc(80)}})
+	if s := states(); s[22] != "gone" || s[80] != "open" {
+		t.Fatalf("after a finished scan: %v", s)
+	}
+}

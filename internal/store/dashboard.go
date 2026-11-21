@@ -8,6 +8,13 @@ import (
 	"github.com/iwosmu/aghpen/internal/model"
 )
 
+// fullRun is the SQL condition of a full run: a run of a profile over its
+// whole scope (trigger manual or schedule), not an ad-hoc run, a re-probe, an
+// import or a manual entry. The "since last scan" numbers, the trend and its
+// deltas come only from full runs, so a partial run never looks like a scope
+// that shrank.
+const fullRun = `r.profile_id IS NOT NULL AND r.ad_hoc IS NULL AND r.trigger NOT IN ('reprobe', 'import', 'manual-entry')`
+
 // Dashboard builds the 3-30-300 dashboard. Every part is one indexed query;
 // the parts run in parallel.
 func (s *Store) Dashboard(ctx context.Context) (model.Dashboard, error) {
@@ -48,9 +55,25 @@ func (s *Store) Dashboard(ctx context.Context) (model.Dashboard, error) {
 		if err != nil {
 			return err
 		}
-		runs, err := jsonRows[model.ScanRun](ctx, s.db, wrapJSON("SELECT "+runCols+" FROM runs r WHERE r.status = 'completed' ORDER BY r.id DESC LIMIT 1"))
+		runs, err := jsonRows[model.ScanRun](ctx, s.db, wrapJSON("SELECT "+runCols+" FROM runs r WHERE r.status = 'completed' AND "+fullRun+" ORDER BY r.id DESC LIMIT 1"))
 		if err != nil {
 			return err
+		}
+		var after int64
+		if len(runs) > 0 {
+			after = runs[0].ID
+		}
+		partial, err := jsonRows[model.ScanRun](ctx, s.db, wrapJSON("SELECT "+runCols+" FROM runs r WHERE r.status = 'completed' AND NOT ("+fullRun+") AND r.id > "+itoa(int(after))+" ORDER BY r.id DESC LIMIT 1"))
+		if err != nil {
+			return err
+		}
+		if len(partial) > 0 {
+			p := partial[0]
+			at := p.CreatedAt
+			if p.FinishedAt != nil {
+				at = *p.FinishedAt
+			}
+			h.LastPartial = &model.PartialRun{RunID: p.ID, Trigger: p.Trigger, Addresses: p.Stats.AddressesTotal, At: at}
 		}
 		mu.Lock()
 		defer mu.Unlock()
@@ -111,7 +134,9 @@ func (s *Store) Dashboard(ctx context.Context) (model.Dashboard, error) {
 			COALESCE((r.stats->>'hosts_up')::int, 0) AS hosts, COALESCE((r.stats->>'services_open')::int, 0) AS services,
 			(SELECT count(*) FROM changes c WHERE c.run_id = r.id AND NOT c.expected)::int AS changes,
 			(SELECT count(*) FROM findings f WHERE f.first_run_id = r.id)::int AS findings
-			FROM runs r WHERE r.status = 'completed' ORDER BY r.id DESC LIMIT 30`))
+			FROM runs r WHERE r.status = 'completed' AND `+fullRun+`
+				AND r.profile_id = (SELECT r.profile_id FROM runs r WHERE r.status = 'completed' AND `+fullRun+` ORDER BY r.id DESC LIMIT 1)
+			ORDER BY r.id DESC LIMIT 30`))
 		for i, j := 0, len(pts)-1; i < j; i, j = i+1, j-1 {
 			pts[i], pts[j] = pts[j], pts[i]
 		}

@@ -224,6 +224,10 @@ func simService(c *Container, p SimPort) truth.Service {
 		Technologies: p.Techs, TechOptional: p.TechOptional, Classes: p.Classes, ClassOptional: p.ClassOpt,
 		Interesting: p.Interesting, Signatures: p.Signatures,
 	}
+	// labsim is a Go net/http server; nmap -sV fingerprints it as "Golang
+	// net/http server". A scanner that reports Go is right about the
+	// imitation, so Go is optional (never a false positive, never required).
+	s.TechOptional = append(append([]string{}, s.TechOptional...), "Go")
 	if p.Kind == "tarpit" {
 		s.Name = "unknown"
 		return s

@@ -53,6 +53,10 @@ type HostSnapshot struct {
 	// not answer, leave it empty or carry the last known services forward;
 	// Diff never reports a service of a silent host as gone.
 	Services []model.ServiceResult
+	// PortsUnknown: the host answered, but its port scan did not finish.
+	// A previous service that Services does not list is unreachable in this
+	// run, not gone.
+	PortsUnknown bool
 	// ServiceIDs maps "port/proto" to the store id, when known.
 	ServiceIDs map[string]int64
 }
@@ -340,6 +344,10 @@ func (d *differ) host(prev, cur *HostSnapshot) {
 		if c, ok := curSvc[k]; ok && isOpen(c) {
 			continue
 		}
+		if _, listed := curSvc[k]; cur.PortsUnknown && !listed && isOpen(p) {
+			d.unreachable++ // the port scan did not finish: not measured, not gone
+			continue
+		}
 		proto := p.Proto
 		if proto == "" {
 			proto = "tcp"
@@ -380,7 +388,7 @@ func (d *differ) service(h *HostSnapshot, p, c *model.ServiceResult) {
 	case p.Version != "" && c.Version != "" && p.Version != c.Version && strings.EqualFold(p.Product, c.Product):
 		d.add(h, c, model.ChangeServiceChanged, model.SevLow, "version", p.Version, c.Version, false,
 			fmt.Sprintf("Zmiana wersji %s: %s → %s", at, productVersion(p), productVersion(c)))
-	case p.Product == "" && c.Product == "" && p.Name != "" && c.Name != "" && p.Name != c.Name:
+	case p.Product == "" && c.Product == "" && p.Name != "" && c.Name != "" && p.Name != c.Name && versionMeasured(p) == versionMeasured(c):
 		d.add(h, c, model.ChangeServiceChanged, model.SevLow, "name", p.Name, c.Name, false,
 			fmt.Sprintf("Zmiana usługi %s: %s → %s", at, p.Name, c.Name))
 	}
@@ -409,8 +417,35 @@ func (d *differ) service(h *HostSnapshot, p, c *model.ServiceResult) {
 	}
 }
 
+// versionMeasured reports whether nmap version detection looked at the
+// service in its run: a product, a version or a CPE, or a probed name
+// (confidence of a probe match). A run without -sV names the service from
+// the port table only.
+func versionMeasured(s *model.ServiceResult) bool {
+	return s.Product != "" || s.Version != "" || len(s.CPE) > 0 || s.Confidence >= 0.8
+}
+
+// withoutNmapOnly drops the technologies that only nmap version detection
+// supports.
+func withoutNmapOnly(ts []model.Technology) []model.Technology {
+	out := make([]model.Technology, 0, len(ts))
+	for _, t := range ts {
+		if len(t.Sources) == 1 && t.Sources[0] == "nmap" {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
 func (d *differ) techs(h *HostSnapshot, p, c *model.ServiceResult, at string) {
-	pt, ct := techMap(p.Technologies), techMap(c.Technologies)
+	pts, cts := p.Technologies, c.Technologies
+	// One side was not measured by version detection: what only nmap -sV
+	// reports is unknown there, not gone (a full run, then a discovery run).
+	if versionMeasured(p) != versionMeasured(c) {
+		pts, cts = withoutNmapOnly(pts), withoutNmapOnly(cts)
+	}
+	pt, ct := techMap(pts), techMap(cts)
 	names := make([]string, 0, len(pt)+len(ct))
 	for n := range pt {
 		names = append(names, n)

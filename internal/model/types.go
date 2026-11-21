@@ -300,6 +300,11 @@ type ScanEstimate struct {
 	BasedOnHistory   bool    `json:"based_on_history"` // true when earlier runs gave a measured speed
 	ExpectedLiveRate float64 `json:"expected_live_rate"`
 	DiscoveryMode    string  `json:"discovery_mode"` // fast | balanced | thorough: the mode the numbers assume
+	// The low end of the range for a scope the inventory does not know yet
+	// (1 % of the addresses live instead of 5 %). Equal to EstPackets and
+	// EstDurationSec when the inventory knows hosts in the scope.
+	EstPacketsLow     int64 `json:"est_packets_low"`
+	EstDurationLowSec int64 `json:"est_duration_low_sec"`
 
 	// Windows: in_window is true when a window of the profile is open now (or
 	// it has none). Outside the windows window_sec is the length of the next
@@ -343,14 +348,29 @@ type RunStats struct {
 	HostsUp        int     `json:"hosts_up"`
 	ServicesOpen   int     `json:"services_open"`
 	HTTPServices   int     `json:"http_services"`
-	PacketsSent    int64   `json:"packets_sent"` // estimate from nmap stats plus native probes
+	PacketsSent    int64   `json:"packets_sent"` // probe packets: nmap's own count of raw packets (ARP included) plus native probes; the kernel TCP of HTTP and version detection is not in it (limited by http_rps and the HTTP reserve of the cap)
 	HTTPRequests   int64   `json:"http_requests"`
-	CurrentPPS     float64 `json:"current_pps"`
-	AvgPPS         float64 `json:"avg_pps"`
-	ElapsedSec     int64   `json:"elapsed_sec"` // active time only, pauses excluded
-	ETASec         int64   `json:"eta_sec"`
-	Retried        int     `json:"retried"` // unstable hosts probed again
-	Errors         int     `json:"errors"`
+	CurrentPPS     float64 `json:"current_pps"` // see CurrentPPSBasis
+	// PacketsEstimated is the part of PacketsSent that is an estimate (a
+	// stage whose nmap output had no packet count), not a count.
+	PacketsEstimated int64 `json:"packets_estimated"`
+	// CurrentPPSBasis says what CurrentPPS is: "measured" (only finished
+	// stages with nmap's exact counts in the window) or "pace" (it includes
+	// the pinned --min-rate/--max-rate pace of nmap processes still running,
+	// or estimated counts). The UI must not present "pace" as a measurement.
+	CurrentPPSBasis string  `json:"current_pps_basis,omitempty"`
+	AvgPPS          float64 `json:"avg_pps"`
+	ElapsedSec      int64   `json:"elapsed_sec"` // active time only, pauses excluded
+	ETASec          int64   `json:"eta_sec"`
+	Retried         int     `json:"retried"` // unstable hosts probed again
+	Errors          int     `json:"errors"`
+	// PortsUnknown counts live hosts whose port scan did not finish (nmap
+	// --host-timeout, even after one more try): their services are not
+	// measured in this run, not gone.
+	PortsUnknown int `json:"ports_unknown"`
+	// Warnings are the engine's sanity checks that failed: the run ended,
+	// but its result is not complete. The API and the UI show them.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 type ScanRun struct {
@@ -435,6 +455,21 @@ type HostResult struct {
 	ObservedAt time.Time       `json:"observed_at"`
 	Services   []ServiceResult `json:"services"`
 	Scripts    []ScriptResult  `json:"scripts,omitempty"` // nmap host scripts, kept for import/export round trips
+	// PortsUnknown: the host answered, but its port scan did not finish. The
+	// listed services are what was measured; services it does not list are
+	// unknown, not gone.
+	PortsUnknown bool `json:"ports_unknown,omitempty"`
+}
+
+// ReasonPortsUnknown is the HostResult.Reason of a host that answered but
+// whose port scan did not finish. The reason is stored with the host
+// observation, so the analysis after the run still knows it.
+const ReasonPortsUnknown = "ports-unknown"
+
+// HasUnknownPorts reports whether the host's services that the result does
+// not list are unknown in this run rather than gone.
+func (h HostResult) HasUnknownPorts() bool {
+	return h.PortsUnknown || h.Reason == ReasonPortsUnknown
 }
 
 // ScriptResult is the output of one nmap script (NSE), as found in imported
@@ -945,6 +980,10 @@ type DefectDojoSettings struct {
 	// applies the status changes made in DefectDojo (status pull).
 	StatusSync    bool               `json:"status_sync"`
 	ScopeMappings []DojoScopeMapping `json:"scope_mappings"` // per-scope product and engagement
+	// LinkURL is the public base of the DefectDojo links that Czujka stores
+	// and shows (dojo_url, test_url). Empty: url. Set it when Czujka reaches
+	// DefectDojo at an address a browser cannot open.
+	LinkURL string `json:"link_url"`
 }
 
 // DojoScopeMapping sends the findings of one scope to its own DefectDojo
@@ -1028,6 +1067,18 @@ type Headline struct {
 	AdminPanels      int   `json:"admin_panels"`
 	StagingEnvs      int   `json:"staging_envs"`
 	HostsMissing     int   `json:"hosts_missing"` // hosts with a host_missing change in the last completed run
+	// LastPartial is the newest completed partial run (ad hoc, re-probe,
+	// import, manual entry) when it is newer than the last full run; the
+	// headline numbers above never come from it. nil: none.
+	LastPartial *PartialRun `json:"last_partial"`
+}
+
+// PartialRun names a run that covered only part of the scope.
+type PartialRun struct {
+	RunID     int64     `json:"run_id"`
+	Trigger   string    `json:"trigger"`
+	Addresses int64     `json:"addresses"`
+	At        time.Time `json:"at"`
 }
 
 // Page is the envelope of every list endpoint.

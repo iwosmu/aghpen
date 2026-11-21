@@ -208,6 +208,7 @@ func manyPorts() []SimPort {
 	for _, p := range ports {
 		sp := simplePage(p, "nginx", fmt.Sprintf("Instancja testowa %d", p), fmt.Sprintf("<p>Usługa na porcie %d.</p>", p))
 		sp.NameAlt = []string{"*"}
+		sp.TechOptional = []string{"nginx"} // the Server header says nginx
 		out = append(out, sp)
 	}
 	return out
@@ -329,8 +330,10 @@ func simContainers() []Container {
 	}
 	oldStatus := simplePage(8000, apacheOld, "Status serwera (stary)", "<pre>uptime: 412 days</pre>")
 	oldStatus.Product, oldStatus.Version, oldStatus.NameAlt = "Apache httpd", "2.2.15", []string{"http-alt"}
+	oldStatus.TechOptional = []string{"Apache HTTP Server"} // the Server header names it
 	newStatus := simplePage(8081, "nginx/1.26.2", "Konsola diagnostyczna", "<h1>Konsola diagnostyczna</h1><pre>queue: 0\nworkers: 4</pre>")
 	newStatus.Product, newStatus.Version, newStatus.NameAlt = "nginx", "1.26.2", []string{"blackice-icecap"}
+	newStatus.TechOptional = []string{"nginx"} // the Server header names it
 
 	jwtSite := func(fixed bool) labcfg.Site {
 		return labcfg.Site{

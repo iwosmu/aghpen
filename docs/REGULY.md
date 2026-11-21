@@ -124,7 +124,8 @@ Pomiar na 2000 hostach i 6000 usługach (PostgreSQL 17 z pg_tde, Apple M-series)
 - Waga ustalenia = `severity` reguły. Ocena „ciekawe”: high 80, medium 60, low 40, info 20, plus jedna piąta oceny usługi (najwyżej 100).
 - Dowody wymieniają pola, które spełniły warunek, np. `class: admin-panel`, `port: 8080/tcp`, `not: nie zachodzi: etykieta approved`.
 - Naruszenie, które zniknęło, dostaje status `resolved`. Dotyczy to tylko ustaleń w statusie `new`: status nadany przez analityka (`triaged`, `accepted`, `false_positive`), notatka, etykiety i przypisanie nigdy nie są nadpisane. Waga albo tytuł zmienione ręcznie też zostają.
-- Naruszenie, które wróciło, przechodzi z `resolved` znowu na `new`.
+- Naruszenie, które wróciło, przechodzi z `resolved` znowu na `new`, ale tylko wtedy, gdy skan zaobserwował jego przyczynę po rozwiązaniu (czas obserwacji usługi albo hosta jest późniejszy niż chwila rozwiązania). Dzieje się to raz na jedno rozwiązanie i zostawia wpis `finding.reopen` w dzienniku audytu. Samo ponowne sprawdzenie reguł na tych samych danych nie otwiera ustalenia. Ta sama zasada obowiązuje ustalenia silnika.
+- Statusów `accepted` i `false_positive` (od analityka albo z pobrania statusów DefectDojo) nie zmienia żaden skan ani żadna reguła.
 - Wyłączenie albo usunięcie reguły rozwiązuje jej otwarte ustalenia przy następnym sprawdzeniu. Zmiana reguły uruchamia sprawdzenie w tle od razu.
 
 Pomiar pełnego sprawdzenia (11 włączonych reguł, 2000 hostów, 6000 usług): 99 ms przy pierwszym zapisie 1160 ustaleń, 88 ms przy kolejnym przebiegu bez zmian.
@@ -184,3 +185,7 @@ version:
 ```
 
 Wyjaśnienie reguły: „nagłówek X-Infokiosk-Node występuje tylko w tej usłudze i w 1 podobnych instancjach (0 z 28 pozostałych usług)”. Retro-hunt: przykład i drugi kiosk, obie z wersją 4.2.1, 0 wysłanych pakietów.
+
+## Ocena ciekawości obserwacji z reguły
+
+Obserwacja z reguły ma ocenę z ważności reguły: wysoka 60, średnia 45, niska 30, informacyjna 15. Ocena usługi dodaje najwyżej 9 punktów (jedna dziesiąta). Reguła często powtarza fakt, który silnik już zgłasza dla tej samej usługi (panel administracyjny poza siecią zarządzania to też obserwacja silnika „panel administracyjny”, 75). Dlatego obserwacja z reguły stoi tuż pod obserwacją silnika, a pierwszy ekran pokazuje różne problemy, nie jeden fakt dwa razy. Przed tą zmianą w laboratorium obie obserwacje z reguł dla jednej usługi i obserwacja silnika miały po 100.

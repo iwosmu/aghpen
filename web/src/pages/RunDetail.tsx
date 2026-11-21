@@ -11,7 +11,7 @@ import { triggerLabel } from './Runs';
 import { Icon } from '../ui/Icon';
 import { ChunkStatusMark, Glyph, RunStatusMark } from '../ui/marks';
 import { AddressMap } from '../viz/AddressMap';
-import { ProgressBar, RateGauge } from '../viz/charts';
+import { PacketCount, ProgressBar, RateGauge } from '../viz/charts';
 import { useCan } from '../session';
 
 function Fact({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
@@ -41,6 +41,7 @@ export default function RunDetail() {
   const id = Number(useParams().id);
   const navigate = useNavigate();
   const canRun = useCan('scans:run');
+  const canExport = useCan('export:run');
   const { run: runQ, recent, connected } = useLiveRun(id, { withChunks: true });
   const run = runQ.data;
   const chunks = useItem<Chunk[]>('/runs/' + id + '/chunks', undefined, { enabled: Boolean(run) });
@@ -107,6 +108,7 @@ export default function RunDetail() {
             {['running', 'paused', 'queued'].includes(run.status) ? <Button variant="danger" icon="x" onClick={() => setConfirmCancel(true)}>{t('Anuluj skan', 'Cancel the scan')}</Button> : null}
             {run.status === 'completed' && run.summary?.prev_run_id ? <Button icon="compare" onClick={() => navigate('/changes/compare?from=' + run.summary!.prev_run_id + '&to=' + run.id)}>{t('Porównaj z poprzednim', 'Compare with the previous')}</Button> : null}
             {reportReady ? <ReportButtons onOpen={openReport} /> : null}
+            {run.status === 'completed' && canExport ? <DojoRunButton runId={run.id} /> : null}
           </>
         ) : (
           <>
@@ -145,6 +147,16 @@ export default function RunDetail() {
           </div>
         ) : null}
 
+        {s.warnings && s.warnings.length > 0 ? (
+          <div role="alert" data-testid="run-warnings" className="flex items-start gap-2 border border-danger/60 bg-st-gone-wash px-3 py-2 text-sm">
+            <Icon name="alert" className="mt-0.5 text-danger" />
+            <span>
+              <span className="font-medium">{t('Wynik skanu jest niepełny.', 'The scan result is incomplete.')}</span>
+              {s.warnings.map((w) => <span key={w} className="block">{w}</span>)}
+            </span>
+          </div>
+        ) : null}
+
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <section className="border border-rule bg-panel p-3">
             <div className="flex items-baseline justify-between gap-3">
@@ -164,14 +176,14 @@ export default function RunDetail() {
               <Fact label={t('Podgrupy', 'Chunks')}><span className="num">{s.chunks_done} / {s.chunks_total}</span></Fact>
               <Fact label={t('Aktywne hosty', 'Hosts up')}><span className="num">{fmtInt(s.hosts_up)}</span></Fact>
               <Fact label={t('Otwarte usługi', 'Open services')}><span className="num">{fmtInt(s.services_open)}</span> <span className="text-xs font-normal text-ink-3">({fmtInt(s.http_services)} WWW)</span></Fact>
-              <Fact label={t('Wysłane pakiety', 'Packets sent')}><span className="num">{fmtInt(s.packets_sent)}</span></Fact>
+              <Fact label={t('Pakiety prób', 'Probe packets')}><PacketCount sent={s.packets_sent} estimated={s.packets_estimated} /></Fact>
               <Fact label={t('Żądania HTTP', 'HTTP requests')}><span className="num">{fmtInt(s.http_requests)}</span></Fact>
               <Fact label={t('Ponowione próby', 'Retried hosts')}><span className="num">{fmtInt(s.retried)}</span></Fact>
             </dl>
           </section>
           <section className="border border-rule bg-panel p-3">
             <h2 className="mb-2 text-sm font-semibold">{t('Tempo skanowania', 'Scan rate')}</h2>
-            {policyCap ? <RateGauge current={isLive ? s.current_pps : 0} cap={cap} policyCap={policyCap} /> : <div className="skeleton h-12" />}
+            {policyCap ? <RateGauge current={isLive ? s.current_pps : 0} cap={cap} policyCap={policyCap} basis={isLive ? s.current_pps_basis : undefined} /> : <div className="skeleton h-12" />}
             <p className="mt-2 text-xs text-ink-2">{t('Średnio', 'Average')} <span className="num text-ink">{fmtInt(s.avg_pps)}</span> pps. {profile.data && profile.data.rate.max_pps > policyCap ? t('Profil prosi o ' + fmtInt(profile.data.rate.max_pps) + ' pps, polityka bezpieczeństwa obcina do ' + fmtInt(policyCap) + '.', 'The profile asks for ' + fmtInt(profile.data.rate.max_pps) + ' pps, the safety policy cuts it to ' + fmtInt(policyCap) + '.') : null}</p>
           </section>
         </div>
@@ -307,4 +319,33 @@ export function phaseText(s: ScanRun['stats'], chunks: number, addrs: number): s
   if (s.http_requests > 0) return t('Rozpoznawanie usług WWW i wykrywanie hostów w ', 'Identifying web services and discovering hosts in ') + where;
   if (s.services_open > 0) return t('Wykrywanie hostów i usług w ', 'Discovering hosts and services in ') + where;
   return t('Wykrywanie hostów w ', 'Discovering hosts in ') + where + t('. Postęp rośnie po zakończeniu każdej podgrupy.', '. Progress grows as each chunk finishes.');
+}
+
+interface DojoRunResult { test_id: number; test_url: string; reimport: boolean; created: number; closed: number; reactivated: number; untouched: number; total: number }
+
+/** Uploads the nmap XML of a completed run to DefectDojo as an "Nmap Scan" import (a second upload re-imports into the same test). */
+export function DojoRunButton({ runId }: { runId: number }) {
+  const [res, setRes] = useState<DojoRunResult | null>(null);
+  const send = useAction(() => post<DojoRunResult>('/runs/' + runId + '/export/defectdojo'), { silent: true, onSuccess: setRes });
+  return (
+    <>
+      <Button icon="upload" busy={send.isPending} onClick={() => send.mutate(undefined)} data-testid="run-dojo" title={t('Wyślij wynik przebiegu do DefectDojo jako import „Nmap Scan”', 'Send the run result to DefectDojo as an "Nmap Scan" import')}>{t('Do DefectDojo', 'To DefectDojo')}</Button>
+      <Dialog open={res !== null || Boolean(send.error)} onClose={() => { setRes(null); send.reset(); }} width={480} title={t('Przebieg w DefectDojo (Nmap Scan)', 'The run in DefectDojo (Nmap Scan)')}
+        footer={<Button variant="primary" onClick={() => { setRes(null); send.reset(); }}>{t('Gotowe', 'Done')}</Button>}>
+        {res ? (
+          <div className="space-y-3 text-sm" data-testid="run-dojo-result">
+            <p className="flex items-center gap-2"><Glyph name="check" tone="new" />{res.reimport ? t('Ponowny import do tego samego testu.', 'Re-imported into the same test.') : t('Nowy test w DefectDojo.', 'A new test in DefectDojo.')}</p>
+            <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1">
+              <dt className="text-ink-2">{t('Nowe obserwacje', 'New findings')}</dt><dd className="num">{res.created}</dd>
+              <dt className="text-ink-2">{t('Zamknięte (zniknęły)', 'Closed (gone)')}</dt><dd className="num">{res.closed}</dd>
+              <dt className="text-ink-2">{t('Otwarte ponownie', 'Reopened')}</dt><dd className="num">{res.reactivated}</dd>
+              <dt className="text-ink-2">{t('Bez zmian', 'Unchanged')}</dt><dd className="num">{res.untouched}</dd>
+              <dt className="text-ink-2">{t('Razem w teście', 'Total in the test')}</dt><dd className="num">{res.total}</dd>
+            </dl>
+            <a className="link inline-flex items-center gap-1" href={res.test_url} target="_blank" rel="noreferrer noopener">{t('Otwórz test', 'Open the test')} #{res.test_id}<Icon name="external" size={11} /></a>
+          </div>
+        ) : <InlineError error={send.error} />}
+      </Dialog>
+    </>
+  );
 }

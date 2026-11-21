@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+
 /** Names of exposed admin panels, from the finding titles ("Panel administracyjny: pgAdmin (10.66.10.50:80)"). */
 export function adminPanelNames(findings: { title: string; status: string }[]): string[] {
   const names: string[] = [];
@@ -44,4 +46,9 @@ export const ATTENTION_INTEREST = 70;
 /** A reported rate counts as over the cap above this margin (the limiter allows short bursts). */
 export function overCap(current: number, cap: number): boolean {
   return cap > 0 && current > cap * 1.05;
+}
+
+/** What the live rate is: the set nmap pace, or a measurement from exact packet counts. */
+export function paceTip(): string {
+  return t('To tempo zadane nmap (--min-rate/--max-rate) dla etapów, które jeszcze trwają, nie pomiar. Dokładna liczba pakietów przychodzi po zakończeniu etapu.', 'This is the pace set for nmap (--min-rate/--max-rate) in stages still running, not a measurement. The exact packet count arrives when a stage ends.');
 }

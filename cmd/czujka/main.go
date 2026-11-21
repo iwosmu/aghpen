@@ -13,6 +13,8 @@
 package main
 
 import (
+	// The zone database inside the binary: a bare host or a minimal image
+	// without tzdata still knows Europe/Warsaw (CZUJKA_TZ, schedule windows).
 	"context"
 	"errors"
 	"flag"
@@ -27,6 +29,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/iwosmu/aghpen/internal/api"
 	"github.com/iwosmu/aghpen/internal/auth"
@@ -194,6 +197,13 @@ func serve() error {
 		return err
 	}
 	logTDE(ctx, st, log)
+	// A policy saved before the operator lock (or under a wider one) is
+	// brought inside it; what changed is logged and audited.
+	if c, err := st.ClampAllowedToLock(ctx); err != nil {
+		return err
+	} else if c.Changed() {
+		log.Warn("allowed_networks clamped to the operator lock (CZUJKA_ALLOWED_NETWORKS)", "lock", c.Lock, "before", c.Before, "after", c.After, "dropped", c.Dropped, "narrowed", c.Narrowed)
+	}
 
 	authSvc := auth.New(st, auth.Config{SessionTTL: cfg.SessionTTL, MaxFails: cfg.LoginMaxFails, Lockout: cfg.LoginLockout, PerMinute: cfg.LoginPerMin})
 	generated, err := authSvc.Seed(ctx, cfg.AdminEmail, cfg.AdminPassword)

@@ -1,17 +1,18 @@
 
 === 0. Preconditions ===
 docker 29.6.2; scope: czfull-net 10.91.0.0/22 (created by this script)
+neighbour table of the docker host: 8796 entries, gc_thresh3 131072, table_fulls so far 90386
 
 === 1. Target network with real services ===
-czfull-lab-grafana	grafana/grafana:12.4.15	Up 2 seconds
-czfull-lab-http-a	czfull-lab:latest	Up 3 seconds
-czfull-lab-https	czfull-lab:latest	Up 2 seconds
-czfull-lab-mariadb	mariadb:11	Up 3 seconds
-czfull-lab-nginx	nginx:1.24.0-alpine	Up 4 seconds
-czfull-lab-noicmp	czfull-lab:latest	Up 2 seconds
-czfull-lab-redis	redis:7-alpine	Up 3 seconds
-czfull-lab-ssh	czfull-lab:latest	Up 4 seconds
-czfull-lab-wordpress	wordpress:6.9.4-php8.3-apache	Up 3 seconds
+czfull-lab-grafana	grafana/grafana:12.4.15	Up 4 seconds
+czfull-lab-http-a	czfull-lab:latest	Up 5 seconds
+czfull-lab-https	czfull-lab:latest	Up 4 seconds
+czfull-lab-mariadb	mariadb:11	Up 5 seconds
+czfull-lab-nginx	nginx:1.24.0-alpine	Up 6 seconds
+czfull-lab-noicmp	czfull-lab:latest	Up 4 seconds
+czfull-lab-redis	redis:7-alpine	Up 6 seconds
+czfull-lab-ssh	czfull-lab:latest	Up 6 seconds
+czfull-lab-wordpress	wordpress:6.9.4-php8.3-apache	Up 5 seconds
 
 === 2. Start the product with compose (Czujka joins czfull-net through deploy/docker-compose.scan-network.yml) ===
  Container czfull-e2e-db-1 Healthy 
@@ -21,7 +22,7 @@ czfull-lab-wordpress	wordpress:6.9.4-php8.3-apache	Up 3 seconds
   PASS  healthz: engine and prober: engine=true mode=nmap-raw
   PASS  process user in the container: 10001
   PASS  web UI served by the binary on the same port: 1
-Czujka address on the target network: 10.91.0.2 (eth0)
+Czujka address on the target network: 10.91.0.2 (eth1)
 
 === 3. Log in ===
   PASS  login: admin
@@ -32,35 +33,41 @@ Czujka address on the target network: 10.91.0.2 (eth0)
 === 5. Scope and profile ===
 {"saved":1,"address_count":1024,"excluded":2,"invalid":0}
 profile 2
-{"addresses":1022,"chunks":4,"est_packets":62477,"est_duration_sec":122,"effective_pps":800,"fits_window":true,"window_sec":0,"based_on_history":false,"expected_live_rate":0.05,"discovery_mode":"balanced"}
+{"addresses":1022,"chunks":4,"est_packets":59654,"est_duration_sec":118,"effective_pps":800,"fits_window":true,"window_sec":0,"based_on_history":false,"expected_live_rate":0.05,"discovery_mode":"balanced","est_packets_low":14996,"est_duration_low_sec":29,"in_window":true,"prev_duration_sec":0,"prev_hosts_up":0,"prev_addresses":0}
   PASS  estimate: addresses (1024 minus Czujka and the gateway): 1022 (>= 1022)
 
 === 6. Run 1: start, follow the SSE stream to the end ===
-  SSE: 92 events (chunk=6 done=1 host=9 progress=76 )
-{"id":1,"status":"completed","pause_reason":"","hosts_up":9,"services":9,"packets":17301,"http_requests":77,"avg_pps":234.7,"elapsed_sec":73}
+  SSE: 73 events (chunk=6 done=1 host=9 progress=57 )
+{"id":1,"status":"completed","pause_reason":"","hosts_up":9,"services":9,"packets":13246,"http_requests":77,"avg_pps":243,"elapsed_sec":54}
+  run 1 on the wire (tcpdump, kernel drops 0): nmap raw packets per second max 641, p99 640, avg 234.7 over 56 s, top5 [641,640,640,640,640], seconds over the cap 0; all sent packets max 641/s; totals arp=4111 kernel_rst=19 kernel_tcp=449 raw_syn=9036
+  PASS  run 1: the capture holds nmap's raw SYN probes (a blind capture must fail): 9036 (>= 1000)
+  PASS  run 1: tcpdump lost no packet: 0
+  PASS  run 1: per-second maximum of nmap raw packets on the wire strictly under the cap: 641 (<= 799)
+  run 1: seconds where all sent packets passed the cap: 0 of 56
+  PASS  run 1: per-second maximum of all sent packets within the cap + 10%: 641 (<= 880)
   PASS  run 1 status: completed
   PASS  run 1 hosts up (the 9 lab hosts): 9
 
 === 7. Results of run 1 ===
 -- hosts:
-  10.91.0.10 status=up ports=80 tech=nginx interest=38
+  10.91.0.10 status=up ports=80 tech=nginx interest=34
   10.91.0.20 status=up ports=22 tech=OpenSSH interest=19
   10.91.1.30 status=up ports=6379 tech=Redis interest=65
-  10.91.1.80 status=up ports=80 tech=Apache HTTP Server,PHP,WordPress,jQuery interest=73
+  10.91.1.80 status=up ports=80 tech=Apache HTTP Server,PHP,WordPress,jQuery interest=56
   10.91.1.81 status=up ports=3306 tech=MariaDB interest=65
   10.91.2.40 status=up ports=8765 tech=Python,Python http.server interest=59
-  10.91.2.90 status=up ports=3000 tech=Grafana,Grafana http interest=80
-  10.91.3.50 status=up ports=9443 tech=Python,Python http.server interest=98
+  10.91.2.90 status=up ports=3000 tech=Grafana interest=75
+  10.91.3.50 status=up ports=9443 tech=Python,Python http.server interest=70
   10.91.3.60 status=up ports=80 tech=Python,Python http.server interest=59
 -- services with technologies, versions, classes and interest reasons:
-  10.91.3.50:9443 http | SimpleHTTPServer 0.6 | title=Czujka lab | tech=Python 3.12.13, Python http.server 0.6 | classes=staging | interest=98 why=signature+40 staging+20 signature+14 self-signed-cert+10 cert-expiring+5 sensitive-header+5 signature+4
-  10.91.2.90:3000 http | Grafana http  | title=Grafana | tech=Grafana 12.4.15, Grafana http | classes=dev-tool,login | interest=80 why=signature+35 login-plain-http+25 dev-tool+20
-  10.91.1.80:80 http | Apache httpd 2.4.67 | title=WordPress › Installation | tech=Apache HTTP Server 2.4.67, PHP 8.3.31, jQuery, WordPress | classes=admin-panel | interest=73 why=admin-panel+30 signature+18 signature+14 signature+6 sensitive-header+5
+  10.91.2.90:3000 http | Grafana http  | title=Grafana | tech=Grafana 12.4.15 | classes=dev-tool,login | interest=75 why=signature+35 login-plain-http+25 dev-tool+20
+  10.91.3.50:9443 http | SimpleHTTPServer 0.6 | title=Czujka lab | tech=Python 3.12.13, Python http.server 0.6 | classes= | interest=70 why=signature+40 signature+14 self-signed-cert+10 cert-expiring+5 sensitive-header+1
   10.91.1.30:6379 redis | Redis key-value store 7.4.12 | title= | tech=Redis 7.4.12 | classes=database | interest=65 why=signature+40 database+25
   10.91.1.81:3306 mysql | MariaDB 11.8.9 | title= | tech=MariaDB 11.8.9 | classes=database | interest=65 why=signature+40 database+25
   10.91.2.40:8765 http | SimpleHTTPServer 0.6 | title=Czujka lab | tech=Python 3.12.13, Python http.server 0.6 | classes= | interest=59 why=signature+40 signature+14 sensitive-header+5
   10.91.3.60:80 http | SimpleHTTPServer 0.6 | title=Czujka lab | tech=Python 3.12.13, Python http.server 0.6 | classes= | interest=59 why=signature+40 signature+14 sensitive-header+5
-  10.91.0.10:80 http | nginx 1.24.0 | title=Welcome to nginx! | tech=nginx 1.24.0 | classes=default-page | interest=38 why=signature+14 signature+14 default-page+5 sensitive-header+5
+  10.91.1.80:80 http | Apache httpd 2.4.67 | title=WordPress › Installation | tech=Apache HTTP Server 2.4.67, PHP 8.3.31, jQuery, WordPress | classes=admin-panel | interest=56 why=admin-panel+30 signature+18 signature+2 signature+6
+  10.91.0.10:80 http | nginx 1.24.0 | title=Welcome to nginx! | tech=nginx 1.24.0 | classes=default-page | interest=34 why=signature+14 signature+14 default-page+5 sensitive-header+1
   10.91.0.20:22 ssh | OpenSSH 9.7 | title= | tech=OpenSSH 9.7 | classes=remote-access | interest=19 why=signature+14 remote-access+5
   PASS  nginx found with its version: nginx 1.24.0
   PASS  WordPress recognised: true
@@ -71,45 +78,44 @@ profile 2
   PASS  Czujka and the gateway were not scanned (exclusions): 0
   PASS  Redis found on 6379: Redis key-value store
 -- findings:
-  #23 [new] interesting-header 10.91.3.50:9443 interest=98  Interesujący nagłówek: HTTPS bez HSTS (10.91.3.50:9443)
-  #22 [new] interesting-header 10.91.3.50:9443 interest=98  Interesujący nagłówek: Wersja oprogramowania w Server (10.91.3.50:9443)
-  #21 [new] signature 10.91.3.50:9443 interest=98  Dopasowanie sygnatury: Python http.server 3.12.13 (10.91.3.50:9443)
-  #20 [new] interesting-header 10.91.3.50:9443 interest=98  Nagłówki ujawniają szczegóły oprogramowania: Server (10.91.3.50:9443)
-  #19 [new] self-signed-cert 10.91.3.50:9443 interest=98  Samopodpisany certyfikat TLS: czeng-lab.test (10.91.3.50:9443)
-  #18 [new] cert-expiring 10.91.3.50:9443 interest=98  Certyfikat TLS wkrótce wygaśnie: czeng-lab.test (10.91.3.50:9443)
-  #17 [new] staging 10.91.3.50:9443 interest=98  Środowisko testowe lub staging: Czujka lab (10.91.3.50:9443)
-  #16 [new] dev-tool 10.91.2.90:3000 interest=80  Narzędzie deweloperskie: Grafana (10.91.2.90:3000)
-  #15 [new] login-plain-http 10.91.2.90:3000 interest=80  Logowanie przez nieszyfrowane HTTP: Grafana (10.91.2.90:3000)
-  #6 [new] signature 10.91.1.80:80 interest=73  Dopasowanie sygnatury: WordPress (10.91.1.80:80)
-  #5 [new] interesting-header 10.91.1.80:80 interest=73  Interesujący nagłówek: Wersja oprogramowania w Server (10.91.1.80:80)
-  #4 [new] interesting-header 10.91.1.80:80 interest=73  Interesujący nagłówek: Wersja oprogramowania w X-Powered-By (10.91.1.80:80)
-  #3 [new] interesting-header 10.91.1.80:80 interest=73  Nagłówki ujawniają szczegóły oprogramowania: X-Powered-By, Server (10.91.1.80:80)
-  #2 [new] admin-panel 10.91.1.80:80 interest=73  Panel administracyjny: WordPress › Installation (10.91.1.80:80)
-  #7 [new] database-exposed 10.91.1.81:3306 interest=65  Baza danych dostępna z sieci: MariaDB 11.8.9 (10.91.1.81:3306)
-  #1 [new] database-exposed 10.91.1.30:6379 interest=65  Baza danych dostępna z sieci: Redis key-value store 7.4.12 (10.91.1.30:6379)
-  #26 [new] interesting-header 10.91.3.60:80 interest=59  Interesujący nagłówek: Wersja oprogramowania w Server (10.91.3.60:80)
-  #25 [new] signature 10.91.3.60:80 interest=59  Dopasowanie sygnatury: Python http.server 3.12.13 (10.91.3.60:80)
-  #24 [new] interesting-header 10.91.3.60:80 interest=59  Nagłówki ujawniają szczegóły oprogramowania: Server (10.91.3.60:80)
-  #14 [new] interesting-header 10.91.2.40:8765 interest=59  Interesujący nagłówek: Wersja oprogramowania w Server (10.91.2.40:8765)
-  #13 [new] signature 10.91.2.40:8765 interest=59  Dopasowanie sygnatury: Python http.server 3.12.13 (10.91.2.40:8765)
-  #12 [new] interesting-header 10.91.2.40:8765 interest=59  Nagłówki ujawniają szczegóły oprogramowania: Server (10.91.2.40:8765)
-  #10 [new] interesting-header 10.91.0.10:80 interest=38  Interesujący nagłówek: Wersja oprogramowania w Server (10.91.0.10:80)
-  #9 [new] interesting-header 10.91.0.10:80 interest=38  Nagłówki ujawniają szczegóły oprogramowania: Server (10.91.0.10:80)
-  #8 [new] default-page 10.91.0.10:80 interest=38  Strona domyślna serwera: Welcome to nginx! (10.91.0.10:80)
-  #11 [new] remote-access-exposed 10.91.0.20:22 interest=19  Usługa zdalnego dostępu: OpenSSH 9.7 (10.91.0.20:22)
-  PASS  findings of run 1: 26 (>= 3)
+  #23 [new] policy-violation 10.91.2.90:3000 interest=95  Formularz logowania przez zwykły HTTP — 10.91.2.90:3000
+  #22 [new] policy-violation 10.91.1.81:3306 interest=93  Port bazy danych otwarty na sieć skanowaną — 10.91.1.81:3306
+  #20 [new] policy-violation 10.91.1.30:6379 interest=93  Port bazy danych otwarty na sieć skanowaną — 10.91.1.30:6379
+  #21 [new] policy-violation 10.91.1.80:80 interest=91  Panel administracyjny poza siecią zarządzania — 10.91.1.80:80
+  #24 [new] policy-violation 10.91.2.90:3000 interest=75  Środowisko testowe albo narzędzie deweloperskie dostępne w sieci — 10.91.2.90:3000
+  #5 [new] admin-panel 10.91.1.80:80 interest=75  Panel administracyjny: WordPress › Installation (10.91.1.80:80)
+  #8 [new] database-exposed 10.91.1.81:3306 interest=70  Baza danych dostępna z sieci: MariaDB 11.8.9 (10.91.1.81:3306)
+  #4 [new] database-exposed 10.91.1.30:6379 interest=70  Baza danych dostępna z sieci: Redis key-value store 7.4.12 (10.91.1.30:6379)
+  #12 [new] dev-tool 10.91.2.90:3000 interest=60  Narzędzie deweloperskie: Grafana (10.91.2.90:3000)
+  #11 [new] login-plain-http 10.91.2.90:3000 interest=50  Logowanie przez nieszyfrowane HTTP: Grafana (10.91.2.90:3000)
+  #19 [new] policy-violation 10.91.0.10:80 interest=46  Domyślna strona serwera — 10.91.0.10:80
+  #18 [new] signature 10.91.3.60:80 interest=43  Dopasowanie sygnatury: Python http.server 3.12.13 (10.91.3.60:80)
+  #16 [new] signature 10.91.3.50:9443 interest=43  Dopasowanie sygnatury: Python http.server 3.12.13 (10.91.3.50:9443)
+  #10 [new] signature 10.91.2.40:8765 interest=43  Dopasowanie sygnatury: Python http.server 3.12.13 (10.91.2.40:8765)
+  #14 [new] self-signed-cert 10.91.3.50:9443 interest=25  Samopodpisany certyfikat TLS: czeng-lab.test (10.91.3.50:9443)
+  #13 [new] cert-expiring 10.91.3.50:9443 interest=20  Certyfikat TLS wkrótce wygaśnie: czeng-lab.test (10.91.3.50:9443)
+  #3 [new] remote-access-exposed 10.91.0.20:22 interest=20  Usługa zdalnego dostępu: OpenSSH 9.7 (10.91.0.20:22)
+  #6 [new] interesting-header 10.91.1.80:80 interest=18  Nagłówki HTTP: X-Powered-By, Server; Wersja oprogramowania w X-Powered-By; Wersja oprogramowania w Server (10.91.1.80:80)
+  #17 [new] interesting-header 10.91.3.60:80 interest=15  Nagłówki HTTP: Server; Wersja oprogramowania w Server (10.91.3.60:80)
+  #15 [new] interesting-header 10.91.3.50:9443 interest=15  Nagłówki HTTP: Server; Wersja oprogramowania w Server; HTTPS bez HSTS (10.91.3.50:9443)
+  #9 [new] interesting-header 10.91.2.40:8765 interest=15  Nagłówki HTTP: Server; Wersja oprogramowania w Server (10.91.2.40:8765)
+  #2 [new] interesting-header 10.91.0.10:80 interest=15  Nagłówki HTTP: Server; Wersja oprogramowania w Server (10.91.0.10:80)
+  #1 [new] default-page 10.91.0.10:80 interest=15  Strona domyślna serwera: Welcome to nginx! (10.91.0.10:80)
+  #7 [new] signature 10.91.1.80:80 interest=10  Dopasowanie sygnatury: WordPress (10.91.1.80:80)
+  PASS  findings of run 1: 24 (>= 3)
 -- dashboard:
-{"generated_at":"2026-11-21T13:58:58.594733387Z","headline":{"addresses_in_scope":1024,"hosts_up":9,"hosts_unstable":0,"hosts_down":0,"services_open":9,"web_services":6,"findings_open":26,"findings_high":0,"changes_unacked":0,"new_since_last_run":0,"gone_since_last_run":0,"admin_panels":1,"staging_envs":1},"last_run":{"id":1,"profile_id":2,"profile_name":"e2e: pełny skan","status":"completed","pause_reason":"","trigger":"manual","created_by":1,"created_at":"2026-11-21T13:57:44.633915Z","started_at":"2026-11-21T13:57:44.635982Z","finished_at":"2026-11-21T13:58:58.418057Z","window_end":null,"res
+{"generated_at":"2026-11-21T16:06:58.904798512Z","headline":{"addresses_in_scope":1024,"hosts_up":9,"hosts_unstable":0,"hosts_down":0,"services_open":9,"web_services":6,"findings_open":24,"findings_high":4,"changes_unacked":0,"new_since_last_run":0,"gone_since_last_run":0,"admin_panels":1,"staging_envs":0,"hosts_missing":0},"last_run":{"id":1,"profile_id":2,"profile_name":"e2e: pełny skan","status":"completed","pause_reason":"","trigger":"manual","created_by":1,"created_at":"2026-11-21T16:06:03.591136Z","started_at":"2026-11-21T16:06:03.594919Z","finished_at":"2026-11-21T16:06:58.143541Z","win
 
 === 8. Analyst edits before the second run ===
-{"id":4,"product":"nginx","version":"1.24.0","note":"reverse proxy laboratorium","tags":["e2e"]}
-{"id":7,"type":"database-exposed","status":"accepted","note":"baza testowa, ryzyko zaakceptowane"}
+{"id":1,"product":"nginx","version":"1.24.0","note":"reverse proxy laboratorium","tags":["e2e"]}
+{"id":8,"type":"database-exposed","status":"accepted","note":"baza testowa, ryzyko zaakceptowane"}
 
 === 9. Custom signature through the API; retro-hunt with 0 packets ===
-{"id":387,"slug":"e2e-lab-page","name":"Strona laboratorium e2e","enabled":true}
+{"id":391,"slug":"e2e-lab-page","name":"Strona laboratorium e2e","enabled":true}
 {"scanned":9,"total_hits":3,"hits":["10.91.2.40:8765","10.91.3.50:9443","10.91.3.60:80"]}
   PASS  retro-hunt hits in stored observations: 3 (>= 3)
-  PASS  packets sent to lab hosts during the retro-hunt (tcpdump): 0
+  capture during the retro-hunt: 0 lines, 0 sent by Czujka, kernel drops 0
+  PASS  packets sent to lab hosts during the retro-hunt (tcpdump, source filter): 0
 
 === 10. Change the target network: redis stops, a new nginx host, nginx upgraded, one page title changed ===
 czfull-lab-grafana	grafana/grafana:12.4.15	Up About a minute
@@ -123,13 +129,19 @@ czfull-lab-ssh	czfull-lab:latest	Up About a minute
 czfull-lab-wordpress	wordpress:6.9.4-php8.3-apache	Up About a minute
 
 === 11. Run 2 and the diff ===
-  SSE: 154 events (chunk=5 done=1 host=10 progress=138 )
-{"id":2,"status":"completed","pause_reason":"","hosts_up":9,"services":9,"packets":17287,"http_requests":86,"avg_pps":127.2,"elapsed_sec":135}
+  SSE: 61 events (chunk=5 done=1 host=10 progress=45 )
+{"id":2,"status":"completed","pause_reason":"","hosts_up":9,"services":9,"packets":13232,"http_requests":86,"avg_pps":309.6,"elapsed_sec":42}
+  run 2 on the wire (tcpdump, kernel drops 0): nmap raw packets per second max 641, p99 641, avg 305.2 over 43 s, top5 [641,641,641,641,640], seconds over the cap 0; all sent packets max 643/s; totals arp=4089 kernel_rst=18 kernel_tcp=472 raw_syn=9036
+  PASS  run 2: the capture holds nmap's raw SYN probes (a blind capture must fail): 9036 (>= 1000)
+  PASS  run 2: tcpdump lost no packet: 0
+  PASS  run 2: per-second maximum of nmap raw packets on the wire strictly under the cap: 641 (<= 799)
+  run 2: seconds where all sent packets passed the cap: 0 of 43
+  PASS  run 2: per-second maximum of all sent packets within the cap + 10%: 643 (<= 880)
   PASS  run 2 status: completed
-{"prev_run_id":1,"hosts_new":1,"hosts_gone":0,"hosts_back":0,"hosts_unstable":1,"services_new":1,"services_gone":0,"services_changed":1,"by_kind":{"content_changed":1,"headers_changed":1,"host_new":1,"host_unstable":1,"service_changed":1,"service_new":1,"tech_version":1,"title_changed":1},"findings_new":7}
+{"prev_run_id":1,"hosts_new":1,"hosts_gone":0,"hosts_back":0,"hosts_unstable":0,"services_new":1,"services_gone":0,"services_changed":1,"hosts_missing":1,"services_unreachable":1,"by_kind":{"content_changed":1,"headers_changed":1,"host_missing":1,"host_new":1,"service_changed":1,"service_new":1,"tech_version":1,"title_changed":1},"findings_new":6}
 -- changes of run 2:
   title_changed [info] Zmiana tytułu strony 10.91.2.40:8765: „Czujka lab” → „Czujka lab v2”
-  host_unstable [low] Host 10.91.1.30 nie odpowiedział w porze, w której zwykle odpowiada; jeszcze nie jest zgłoszony jako nieaktywny
+  host_missing [medium] Host 10.91.1.30 nie odpowiedział w tym przebiegu (w poprzednim aktywny, 1 otwarta usługa); model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku
   service_new [low] Nowa usługa 10.91.0.11:80 (nginx 1.31.9)
   host_new [low] Nowy host 10.91.0.11 (otwarte porty: 80)
   content_changed [info] Treść strony 10.91.0.10:80 zmieniła się wyraźnie (odległość simhash 17/64)
@@ -140,35 +152,60 @@ czfull-lab-wordpress	wordpress:6.9.4-php8.3-apache	Up About a minute
   PASS  nginx version change reported: true
   PASS  page title change reported: true
   PASS  silent redis host reported: true
-{"from":{"id":1,"profile_id":2,"profile_name":"e2e: pełny skan","status":"completed","pause_reason":"","trigger":"manual","created_by":1,"created_at":"2026-11-21T13:57:44.633915Z","started_at":"2026-11-21T13:57:44.635982Z","finished_at":"2026-11-21T13:58:58.418057Z","window_end":null,"resume_at":null,"stats":{"addresses_total":1022,"addresses_done":1022,"chunks_total":4,"chunks_done":4,"hosts_up":9,"services_open":9,"http_services":6,"packets_sent":17301,"http_requests":77,"current_pps":0,"avg_pps":234.7,"elapsed_sec":73,"eta_sec":0,"retried":0,"errors":0},"summary":{"prev_run_id":null,"hosts_new":0,"hosts_gone":0,"hosts_back":0,"hosts_unstable":0,"services_new":0,"services_gone":0,"services_changed":0,"by_kind":{},"findings_new":26},"error":"","import_file":""},"to":{"id":2,"profile_id":2,"profile_name":"e2e: pełny skan","status":"completed","pause_reason":"","trigger":"manual","created_by":1,"created_at":"2026-11-21T13:59:05.822903Z","started_at":"2026-11-21T13:59:05.825937Z","finished_at":"2026-11-21T14:01:21.799411Z","window_end":null,"resume_at":null,"stats":{"addresses_total":1022,"addresses_done":1022,"chunks_total":5,"chunks_done":5,"hosts_up":9,"services_open":9,"http_services":7,"packets_sent":17287,"http_requests":86,"current_pps":0.2,"avg_pps":127.2,"elapsed_sec":135,"eta_sec":0,"retried":1,"errors":0},"summary":{"prev_run_id":1,"hosts_new":1,"hosts_gone":0,"hosts_back":0,"hosts_unstable":1,"services_new":1,"services_gone":0,"services_changed":1,"by_kind":{"content_changed":1,"headers_changed":1,"host_new":1,"host_unstable":1,"service_changed":1,"service_new":1,"tech_version":1,"title_changed":1},"findings_new":7},"error":"","import_file":""},"by_kind":{"content_changed":1,"headers_changed":1,"host_new":1,"host_unstable":1,"service_changed":1,"service_new":1,"tech_version":1,"title_changed":1}}
+{"from":{"id":1,"profile_id":2,"profile_name":"e2e: pełny skan","status":"completed","pause_reason":"","trigger":"manual","created_by":1,"created_at":"2026-11-21T16:06:03.591136Z","started_at":"2026-11-21T16:06:03.594919Z","finished_at":"2026-11-21T16:06:58.143541Z","window_end":null,"resume_at":null,"stats":{"addresses_total":1022,"addresses_done":1022,"chunks_total":4,"chunks_done":4,"hosts_up":9,"services_open":9,"http_services":6,"packets_sent":13246,"http_requests":77,"current_pps":0,"packets_estimated":126,"current_pps_basis":"measured","avg_pps":243,"elapsed_sec":54,"eta_sec":0,"retried":0,"errors":0},"summary":{"prev_run_id":null,"hosts_new":0,"hosts_gone":0,"hosts_back":0,"hosts_unstable":0,"services_new":0,"services_gone":0,"services_changed":0,"hosts_missing":0,"services_unreachable":0,"by_kind":{},"findings_new":18},"error":"","import_file":"","note":"","label":""},"to":{"id":2,"profile_id":2,"profile_name":"e2e: pełny skan","status":"completed","pause_reason":"","trigger":"manual","created_by":1,"created_at":"2026-11-21T16:07:09.612046Z","started_at":"2026-11-21T16:07:09.616822Z","finished_at":"2026-11-21T16:07:52.413111Z","window_end":null,"resume_at":null,"stats":{"addresses_total":1022,"addresses_done":1022,"chunks_total":5,"chunks_done":5,"hosts_up":9,"services_open":9,"http_services":7,"packets_sent":13232,"http_requests":86,"current_pps":0.2,"packets_estimated":127,"current_pps_basis":"pace","avg_pps":309.6,"elapsed_sec":42,"eta_sec":0,"retried":1,"errors":0},"summary":{"prev_run_id":1,"hosts_new":1,"hosts_gone":0,"hosts_back":0,"hosts_unstable":0,"services_new":1,"services_gone":0,"services_changed":1,"hosts_missing":1,"services_unreachable":1,"by_kind":{"content_changed":1,"headers_changed":1,"host_missing":1,"host_new":1,"service_changed":1,"service_new":1,"tech_version":1,"title_changed":1},"findings_new":6},"error":"","import_file":"","note":"","label":""},"by_kind":{"content_changed":1,"headers_changed":1,"host_missing":1,"host_new":1,"service_changed":1,"service_new":1,"tech_version":1,"title_changed":1}}
   PASS  diff of run 1 and run 2 lists changes: 8 (>= 4)
   PASS  custom signature matched in run 2: true
   PASS  custom signature match count: 3 (>= 3)
   PASS  service edit survives the second scan: reverse proxy laboratorium | e2e | 1.30.7
   PASS  finding triage survives the second scan: accepted | baza testowa, ryzyko zaakceptowane | last_run=2
 
+=== 11b. Exposure rules, time machine and re-probing on the changed lab ===
+  [new] policy-violation|login-over-plain-http|10.91.2.90|3000/tcp
+  [new] policy-violation|database-port-exposed|10.91.1.81|3306/tcp
+  [resolved] policy-violation|database-port-exposed|10.91.1.30|6379/tcp
+  [new] policy-violation|admin-panel-outside-mgmt|10.91.1.80|80/tcp
+  [new] policy-violation|staging-or-debug-exposed|10.91.2.90|3000/tcp
+  [new] policy-violation|default-server-page|10.91.0.11|80/tcp
+  [new] policy-violation|default-server-page|10.91.0.10|80/tcp
+  PASS  rule violation of the running MariaDB stays open: new
+  PASS  rule violation of the stopped redis is resolved: resolved
+  PASS  rules list shows the starter pack: true
+  PASS  time machine: redis host up as of run 1: up
+  PASS  time machine: redis service open as of run 1: open
+  PASS  time machine: redis host silent as of run 2: false
+  PASS  time machine: scrubber lists the runs: 2 (>= 2)
+  PASS  re-probing is off by default: false
+{"enabled":true,"backoff_minutes":[1,2,3]}
+  plan: 10.91.1.30 confirm 1/3 at 2026-11-21T16:08:52.336662Z: Host nie odpowiedział w skanie o 21.11 17:07. Potwierdzenie 1 z 3, 1 min po pierwszym braku: szybki werdykt, czy host wrócił, czy jest nieaktywny.
+  PASS  re-probe plan has a confirmation probe for the silent redis host: true
+  runs after run 2: triggers reprobe; host_gone in run 3
+  PASS  the stopped host became host_gone through re-probe runs: reprobe
+  PASS  no full scan ran between run 2 and host_gone: reprobe
+  PASS  re-probe runs probed only the silent host: 10.91.1.30
+  PASS  redis host status after the confirmation: down
+
 === 12. Run report (HTML and Markdown) ===
   PASS  report.html: 200 text/html; charset=utf-8
   PASS  report.md: 200
   | # Raport z przebiegu #2
   | 
-  | Czujka · CBI AGH · wygenerowano 21.11.2026 15:01
+  | Czujka · CBI AGH · wygenerowano 21.11.2026 17:09
   | 
   | | Przebieg |  |
   | | --- | --- |
   | | Profil | e2e: pełny skan (ręcznie) |
   | | Zakres | Laboratorium e2e · 1 022 adresy |
-  | | Czas | 21.11.2026 14:59–15:01 |
-  | | Porównanie z | przebieg #1 z 21.11.2026 14:57 |
+  | | Czas | 21.11.2026 17:07–17:07 |
+  | | Porównanie z | przebieg #1 z 21.11.2026 17:06 |
   | 
-  | **Przybyło: 1 host i 1 usługa. Zmiany w znanych hostach i usługach: 6.**
+  | **Przybyło: 1 host i 1 usługa. Bez odpowiedzi w tym przebiegu: 1 host (1 usługa bez potwierdzenia); to jeszcze nie jest zgłoszenie nieaktywności. Zmiany w znanych hostach i usługach: 5. Najpierw sprawdź 1 zmianę o wadze średniej lub wysokiej.**
 
 === 13. Exports re-import ===
-  json: 148564 bytes -> {"format":"czujka-json","run_id":3,"hosts":10,"services":9,"invalid":0}
+  json: 148389 bytes -> {"format":"czujka-json","run_id":4,"hosts":9,"hosts_down":1,"services":9,"invalid":0}
   PASS  json export imports again: hosts (live and silent) and open services: hosts=10 services=9
-  csv: 3056 bytes -> {"format":"csv","run_id":4,"hosts":10,"services":9,"invalid":0}
+  csv: 2993 bytes -> {"format":"csv","run_id":5,"hosts":9,"hosts_down":1,"services":9,"invalid":0}
   PASS  csv export imports again: hosts (live and silent) and open services: hosts=10 services=9
-  xml: 7875 bytes -> {"format":"nmap-xml","run_id":5,"hosts":10,"services":9,"invalid":0}
+  xml: 7705 bytes -> {"format":"nmap-xml","run_id":6,"hosts":9,"hosts_down":1,"services":9,"invalid":0}
   PASS  xml export imports again: hosts (live and silent) and open services: hosts=10 services=9
 
 === 14. Signature file import (one valid, one unsafe) ===
@@ -185,40 +222,78 @@ czfull-lab-wordpress	wordpress:6.9.4-php8.3-apache	Up About a minute
   PASS  crt.sh stays off until an admin enables it: 409
 
 === 16. Scan window closes mid-run; the scheduler resumes the run in the next window ===
-windows (Europe/Warsaw): [{"days":[0,1,2,3,4,5,6],"start":"15:01","end":"15:03"},{"days":[0,1,2,3,4,5,6],"start":"15:04","end":"15:29"}]
-window run 6 started at 15:01:24; window 1 closes at 15:03:00
-  PASS  run paused at 15:02:16 with window_closed, resume_at=2026-11-21T14:04:00Z, chunks 1/5
-  PASS  chunks finished before the window closed (the window closed mid-run): 1 (>= 1)
+windows (Europe/Warsaw): [{"days":[0,1,2,3,4,5,6],"start":"17:09","end":"17:11"},{"days":[0,1,2,3,4,5,6],"start":"17:12","end":"17:37"}]
+window run 7 started at 17:09:05; window 1 closes at 17:11:00
+  PASS  run paused at 17:10:51 with window_closed, resume_at=2026-11-21T16:12:00Z, chunks 3/5
+  PASS  chunks finished before the window closed (the window closed mid-run): 3 (>= 1)
 -- chunks of the paused run:
   chunk 1 10.91.0.3-255 done hosts_up=3 group=1
-  chunk 2 10.91.1.0/24 deferred hosts_up=0 group=0
-  chunk 3 10.91.2.0/24 deferred hosts_up=0 group=0
+  chunk 2 10.91.1.0/24 done hosts_up=2 group=2
+  chunk 3 10.91.2.0/24 done hosts_up=2 group=3
   chunk 4 10.91.3.0/24 deferred hosts_up=0 group=0
   chunk 5 10.91.0.0 deferred hosts_up=0 group=0
   PASS  no service reported gone outside the scanned ports 22,80: 0
-  PASS  the scheduler resumed the run at 15:04:01 (window 2 opens at 15:04:00)
+  PASS  the scheduler resumed the run at 17:12:05 (window 2 opens at 17:12:00)
   PASS  window run completed after the resume: completed
 
 === 17. Emergency stop during a run ===
-  nmap processes before the stop: 4; one second after: 0; the stop call took .060013000 s
-  packets leaving the scan interface: 901 in the 3 s before the stop; after the stop: 0 IP packets (SYN/ICMP/HTTP), 0 of them later than 1 s
-  after the stop the kernel still sent 319 ARP requests (neighbour retries for addresses nmap had probed; the last at +2.0 s)
+  nmap processes before the stop: 1; one second after: 0; the stop call took .092635000 s
+  packets Czujka sent on the scan interface: 186 in the ~3 s before the stop (120 SYN); after the stop: 5 IP packets (SYN/ICMP/HTTP), 0 of them later than 1 s, the last at +0.01 s; kernel drops 0
+  after the stop the kernel still sent 3 ARP requests (neighbour retries for addresses nmap had probed; the last at +1.9 s)
   PASS  emergency flag set: true
   PASS  no nmap process one second after the stop: 0
-  PASS  scan packets were flowing before the stop: 901 (>= 1)
+  PASS  SYN probes were on the wire before the stop (the capture sees scan packets): 120 (>= 1)
   PASS  no IP packet (SYN, ICMP, HTTP) to the target network later than 1 s after the stop: 0
   PASS  run paused by the emergency stop: paused emergency_stop
   PASS  a new run is refused while the stop is active: 409
+  PASS  the SSE stream of the stopped run ends with paused (resumable), not done: paused
 {"emergency_stop":false}
-{"id":7,"status":"cancelled"}
+{"id":8,"status":"cancelled"}
+
+=== 19. Part 3: manual entry, findings files, DefectDojo settings, allowed networks, ad-hoc run, run notes, import scope, rotate-key ===
+  PASS  manual entry: host stored through a manual-entry run: manual-entry completed up
+  PASS  manual entry: both services open: 22,8080
+  PASS  manual entry: a bad address is refused: 422
+  PASS  findings export (DefectDojo Generic JSON) has every finding: 36
+  PASS  own DefectDojo export imports again without duplicates: created=0 format=dojo-generic-json
+  PASS  own DefectDojo CSV export imports again without duplicates: 0
+  PASS  foreign DefectDojo Generic finding imported onto the known host: created=1 hosts_created=0
+  PASS  DefectDojo scope mapping stored: true Laboratorium
+  PASS  DefectDojo mapping of a missing scope is refused: 422
+  PASS  DefectDojo status pull without a configured server: 409
+  PASS  dashboard headline has hosts_missing: number
+  PASS  down_after_misses of the silent redis host: 2 (>= 1)
+  PASS  a target outside the allowed networks is refused with a Polish reason: 1
+  PASS  an ad-hoc run outside the allowed networks is refused: 400
+  PASS  ad-hoc run: trigger, status, one host up: reprobe completed 1
+  PASS  ad-hoc run reports no other host missing: 0
+  PASS  ad-hoc run keeps the live host count: 10
+  PASS  run note and label searchable: 2
+  PASS  import into a scope: targets added, down host counted: targets=1 hosts=1 hosts_down=1 skipped=0
+  PASS  import into a scope: the host is in the scope: 10.91.3.201
+  PASS  UDP port outside the allow-list refused: 422
+  PASS  UDP ports of the allow-list accepted: 200
+  |   re-wrapped service_observations.secret      28
+  |   re-wrapped services.note_enc                1
+  |   re-wrapped settings.secret                  1
+  | ciphertexts per key id before: map[7da54ec3b54b:68]
+  | ciphertexts per key id after:  map[2a084d39cc26:68]
+  | done: restart czujka so it encrypts with the new key (run rotate-key again after the restart to re-wrap what the old process wrote meanwhile)
+  PASS  rotate-key rewrote the key file: changed
+  PASS  rotate-key kept the retired key next to it: 1
+  PASS  after rotate-key and a restart: encrypted HTTP body still reads: 0
 
 === 18. Measurements ===
-  run 1: wall 74 s, active 73 s, hosts 9, services 9, packets 17301 (avg 234 pps, cap 800 pps), HTTP requests 77 (1 req/s on average, cap 20 req/s)
-  PASS  run 1 average packet rate under the cap: 234 (<= 800)
-  run 2: wall 136 s, active 135 s, hosts 9, services 9, packets 17287 (avg 127 pps, cap 800 pps), HTTP requests 86 (0.6 req/s on average, cap 20 req/s)
-  PASS  run 2 average packet rate under the cap: 127 (<= 800)
-  memory of the Czujka container during the scans: max 99.9 MiB over 174 samples
+  run 1: wall 55 s, active 54 s, hosts 9, services 9, packets 13246 (avg 243 pps, cap 800 pps), HTTP requests 77 (1.4 req/s on average, cap 20 req/s)
+  PASS  run 1 average packet rate under the cap (engine counter): 243 (<= 800)
+  run 1 on the wire: nmap raw packets 13147 (engine counter 13246); max 641/s, p99 640/s, avg 234.7/s
+  run 2: wall 43 s, active 42 s, hosts 9, services 9, packets 13232 (avg 309 pps, cap 800 pps), HTTP requests 86 (2 req/s on average, cap 20 req/s)
+  PASS  run 2 average packet rate under the cap (engine counter): 309 (<= 800)
+  run 2 on the wire: nmap raw packets 13125 (engine counter 13232); max 641/s, p99 641/s, avg 305.2/s
+  memory of the Czujka container during the scans: max 90.7 MiB over 152 samples
+  neighbour table of the docker host after the run: 8954 entries, gc_thresh3 131072
+  PASS  the docker host's neighbour table never overflowed during the run (else the run is invalid): 0
 
 === Result ===
-PASS: 52  FAIL: 0
+PASS: 100  FAIL: 0
 E2E FULL OK: every check passed

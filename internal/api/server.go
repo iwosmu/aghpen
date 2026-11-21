@@ -238,6 +238,10 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, auth.ErrForbidden), errors.Is(err, auth.ErrBuiltinRole):
 		writeErr(w, http.StatusForbidden, "forbidden", msg)
 	case errors.Is(err, store.ErrInvalid), errors.Is(err, auth.ErrValidation), errors.Is(err, runner.ErrInvalid), errors.Is(err, errValidation):
+		// The sentinel ("validation: ", "invalid: ") is not for people.
+		for _, p := range []string{errValidation.Error() + ": ", runner.ErrInvalid.Error() + ": ", store.ErrInvalid.Error() + ": "} {
+			msg = strings.TrimPrefix(msg, p)
+		}
 		writeErr(w, http.StatusUnprocessableEntity, "validation", msg)
 	case errors.Is(err, context.Canceled):
 		// the client went away

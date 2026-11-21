@@ -2,6 +2,7 @@ package scan
 
 import (
 	"context"
+	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -223,16 +224,18 @@ func TestEffectiveLimits(t *testing.T) {
 	p := model.ScanProfile{Rate: model.RateLimits{MaxPPS: 1000, MaxParallelChunks: 4, MaxParallelHosts: 16, HTTPRPS: 50, PerHostConcurrency: 3, PerHostDelayMs: 200}}
 	pol := model.SafetyPolicy{MaxPPS: 300, MaxHTTPRPS: 20, MaxPerHostRPS: 2, MaxPathsPerHost: 5}
 	l := EffectiveLimits(p, pol)
-	if l.PPS != 300 || l.HTTPRPS != 20 || l.PerHostRPS != 2 || l.ParallelChunks != 4 || l.ParallelHosts != 16 || l.PerHostConc != 3 || l.PerHostDelay != 200*time.Millisecond || l.MaxPaths != 5 {
+	// HTTP fits a quarter of the 300 pps cap: 300/4/8 = 9.375 requests/s
+	if l.PPS != 300 || l.HTTPRPS != 9.375 || l.PerHostRPS != 2 || l.ParallelChunks != 4 || l.ParallelHosts != 16 || l.PerHostConc != 3 || l.PerHostDelay != 200*time.Millisecond || l.MaxPaths != 5 {
 		t.Errorf("limits = %+v", l)
 	}
-	p.Rate.MaxPPS, p.Rate.HTTPRPS = 100, 5
+	p.Rate.MaxPPS, p.Rate.HTTPRPS = 1000, 5
+	pol.MaxPPS = 1000
 	l = EffectiveLimits(p, pol)
-	if l.PPS != 100 || l.HTTPRPS != 5 {
+	if l.PPS != 1000 || l.HTTPRPS != 5 {
 		t.Errorf("the profile may be stricter: %+v", l)
 	}
 	l = EffectiveLimits(model.ScanProfile{}, model.SafetyPolicy{})
-	if l.PPS != defaultPPS || l.ParallelChunks != defaultParallelChunks || l.HTTPRPS != defaultHTTPRPS || l.MaxPaths != 0 {
+	if l.PPS != defaultPPS || l.ParallelChunks != defaultParallelChunks || l.HTTPRPS != math.Min(defaultHTTPRPS, float64(defaultPPS)/32) || l.MaxPaths != 0 {
 		t.Errorf("defaults = %+v", l)
 	}
 	l = EffectiveLimits(model.ScanProfile{Rate: model.RateLimits{MaxPPS: 2, MaxParallelChunks: 8}}, model.SafetyPolicy{})
@@ -313,7 +316,7 @@ func TestStatsKeeper(t *testing.T) {
 	k.update(func(s *model.RunStats) { s.AddressesTotal = 1000 })
 	t0 := now
 	now = now.Add(4 * time.Second)
-	k.addStage(1200, t0, now) // 300 pps for 4 s
+	k.addStage(1200, true, t0, now) // 300 pps for 4 s
 	k.update(func(s *model.RunStats) { s.AddressesDone += 200 })
 	s := k.snapshot()
 	if s.PacketsSent != 3200 || s.ElapsedSec != 24 || s.HostsUp != 3 {
@@ -337,4 +340,32 @@ func TestStatsKeeper(t *testing.T) {
 	if s = k.snapshot(); s.ETASec != 0 {
 		t.Errorf("eta when done = %d", s.ETASec)
 	}
+}
+
+func TestEstimateRangeAndARP(t *testing.T) {
+	e := New(Deps{Prober: &fakeNet{}, Logger: quiet})
+	plan := basePlan("10.66.0.0/16")
+	plan.Profile.Ports = "top-1000"
+	plan.Profile.Discovery = model.DiscoveryOpts{ICMPEcho: true, TCPSynPorts: []int{80, 443}, ARP: true}
+	est := e.Estimate(plan)
+	if est.EstPacketsLow <= 0 || est.EstPacketsLow >= est.EstPackets || est.EstDurationLowSec >= est.EstDurationSec {
+		t.Errorf("a new scope needs a range: %+v", est)
+	}
+	saved := localNetsFn
+	localNetsFn = func() []targets.Range { return targets.Build([]string{"10.66.0.0/16"}).V4.Ranges() }
+	defer func() { localNetsFn = saved }()
+	arp := e.Estimate(plan)
+	if arp.EstPackets >= est.EstPackets {
+		t.Errorf("ARP-only discovery must cost less: %d vs %d", arp.EstPackets, est.EstPackets)
+	}
+	// the inventory knows the scope: one number, no range
+	for i := 0; i < 67; i++ {
+		plan.Hints = append(plan.Hints, model.HostHint{IP: targets.IPString(0x0A420100 + uint32(i))})
+	}
+	k := e.Estimate(plan)
+	if k.EstPacketsLow != k.EstPackets || k.EstDurationLowSec != k.EstDurationSec || k.EstPackets >= arp.EstPacketsLow {
+		t.Errorf("known scope = %+v", k)
+	}
+	t.Logf("lab /16, top-1000: new scope %d-%d packets, %d-%d s; known scope (67 hosts) %d packets, %d s",
+		arp.EstPacketsLow, arp.EstPackets, arp.EstDurationLowSec, arp.EstDurationSec, k.EstPackets, k.EstDurationSec)
 }

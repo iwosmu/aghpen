@@ -20,7 +20,15 @@ const hostCols = `h.id, host(h.ip) AS ip, h.hostnames, h.scope_ids, h.status, h.
   h.first_seen, h.last_seen, h.last_up, h.os_guess, h.mac, h.vendor, h.label, h.owner, h.criticality, h.note_enc AS note, h.tags,
   h.interest, h.service_count, h.open_ports, h.technologies, h.overrides, h.source`
 
-var hostSort = map[string]string{"id": "h.id", "ip": "h.ip", "status": "h.status", "interest": "h.interest", "last_seen": "h.last_seen",
+// Ordering by interest puts live hosts and open services first: a down host
+// and a service that is not open count as interest 0 there (the stored value
+// is unchanged and shown as it is).
+const (
+	hostLiveInterest    = "(CASE WHEN h.status = 'down' THEN 0 ELSE h.interest END)"
+	serviceLiveInterest = "(CASE WHEN s.state = 'open' THEN s.interest ELSE 0 END)"
+)
+
+var hostSort = map[string]string{"id": "h.id", "ip": "h.ip", "status": "h.status", "interest": hostLiveInterest, "last_seen": "h.last_seen",
 	"first_seen": "h.first_seen", "last_up": "h.last_up", "stability": "h.stability", "p_alive": "h.p_alive", "service_count": "h.service_count",
 	"label": "h.label", "owner": "h.owner", "criticality": "h.criticality", "consecutive_misses": "h.consecutive_misses"}
 
@@ -86,7 +94,7 @@ func (s *Store) postHost(h *model.Host) error {
 
 // ListHosts returns a page of hosts.
 func (s *Store) ListHosts(ctx context.Context, f HostFilter) (model.Page[model.Host], error) {
-	return listPage[model.Host](ctx, s.db, hostCols, "hosts h", f.where(), orderBy(f.Sort, hostSort, "h.interest DESC", "h.ip"), f.ListOpts, s.postHost)
+	return listPage[model.Host](ctx, s.db, hostCols, "hosts h", f.where(), orderBy(f.Sort, hostSort, hostLiveInterest+" DESC, h.interest DESC", "h.ip"), f.ListOpts, s.postHost)
 }
 
 // EachHost streams every host that matches the filter (for exports and analysis).
@@ -220,7 +228,7 @@ const serviceCols = `s.id, s.host_id, host(s.ip) AS ip, s.hostname, s.port, s.pr
   s.note_enc AS note, s.tags, s.first_seen, s.last_seen, s.last_changed, s.overrides`
 
 var serviceSort = map[string]string{"id": "s.id", "ip": "s.ip", "port": "s.port", "state": "s.state", "name": "s.name", "product": "s.product",
-	"version": "s.version", "interest": "s.interest", "title": "s.title", "http_status": "s.http_status", "first_seen": "s.first_seen",
+	"version": "s.version", "interest": serviceLiveInterest, "title": "s.title", "http_status": "s.http_status", "first_seen": "s.first_seen",
 	"last_seen": "s.last_seen", "last_changed": "s.last_changed", "confidence": "s.confidence", "group_key": "s.group_key", "cert_not_after": "s.cert_not_after"}
 
 // ServiceFilter are the filters of GET /services.
@@ -297,7 +305,7 @@ func (s *Store) postService(v *model.Service) error {
 
 // ListServices returns a page of services.
 func (s *Store) ListServices(ctx context.Context, f ServiceFilter) (model.Page[model.Service], error) {
-	return listPage[model.Service](ctx, s.db, serviceCols, "services s", f.where(), orderBy(f.Sort, serviceSort, "s.interest DESC", "s.ip, s.port"), f.ListOpts, s.postService)
+	return listPage[model.Service](ctx, s.db, serviceCols, "services s", f.where(), orderBy(f.Sort, serviceSort, serviceLiveInterest+" DESC, s.interest DESC", "s.ip, s.port"), f.ListOpts, s.postService)
 }
 
 // EachService streams every service that matches the filter.

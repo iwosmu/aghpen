@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -251,6 +252,74 @@ func (s *Server) getSafety(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, p)
 }
 
+// checkSafety validates the fields that a PUT /settings/safety changes and
+// normalises them. A field the request leaves as it is stays unchecked, so a
+// policy stored before a rule (or before the operator lock) does not block
+// every later edit; the lock still clamps stored networks at start
+// (store.ClampAllowedToLock) and FilterAllowed applies it to every plan.
+// The messages are Polish: the UI shows them as they are.
+func checkSafety(in *model.SafetyPolicy, cur model.SafetyPolicy) error {
+	sameList := func(a, b []string) bool { return slices.Equal(a, b) || (len(a) == 0 && len(b) == 0) }
+	switch {
+	case in.MaxPPS != cur.MaxPPS && (in.MaxPPS < 1 || in.MaxPPS > 100000):
+		return invalid("max_pps: limit pakietów na sekundę musi mieścić się w przedziale 1–100000")
+	case in.MaxHTTPRPS != cur.MaxHTTPRPS && (in.MaxHTTPRPS <= 0 || in.MaxHTTPRPS > 10000):
+		return invalid("max_http_rps: limit żądań HTTP na sekundę musi być większy od 0 i nie większy niż 10000")
+	case (in.MaxPerHostRPS != cur.MaxPerHostRPS || in.MaxHTTPRPS != cur.MaxHTTPRPS) && (in.MaxPerHostRPS <= 0 || in.MaxPerHostRPS > in.MaxHTTPRPS):
+		return invalid("max_per_host_rps: limit żądań na jeden host musi być większy od 0 i nie większy niż max_http_rps (%g)", in.MaxHTTPRPS)
+	case in.MaxPathsPerHost != cur.MaxPathsPerHost && (in.MaxPathsPerHost < 0 || in.MaxPathsPerHost > 100):
+		return invalid("max_paths_per_host: liczba dodatkowych ścieżek na usługę musi mieścić się w przedziale 0–100")
+	case in.UserAgent != cur.UserAgent && (strings.TrimSpace(in.UserAgent) == "" || len(in.UserAgent) > 300 || strings.ContainsAny(in.UserAgent, "\r\n")):
+		return invalid("user_agent: wymagana jedna niepusta linia, najwyżej 300 znaków")
+	case (in.AllowedPorts != cur.AllowedPorts || in.DeniedPorts != cur.DeniedPorts) && strings.ContainsAny(in.AllowedPorts+in.DeniedPorts, " ;|&$`'\"\\\n"):
+		return invalid("allowed_ports i denied_ports: wymagana lista portów w składni nmap, np. 22,80,443,8000-8100")
+	}
+	// Safe detection only: the scanner never uses a method other than GET or
+	// HEAD. A stored value is cleaned; a sent one is refused.
+	changedMethods := !sameList(in.AllowedMethods, cur.AllowedMethods)
+	methods := []string{}
+	for _, m := range in.AllowedMethods {
+		m = strings.ToUpper(strings.TrimSpace(m))
+		if m != http.MethodGet && m != http.MethodHead {
+			if changedMethods {
+				return invalid("allowed_methods: dozwolone są tylko GET i HEAD (bezpieczna detekcja), podano %q", m)
+			}
+			continue
+		}
+		methods = append(methods, m)
+	}
+	if len(methods) == 0 {
+		methods = []string{http.MethodGet, http.MethodHead}
+	}
+	in.AllowedMethods = methods
+	if !sameList(in.Exclusions, cur.Exclusions) {
+		ex := []string{}
+		for _, e := range in.Exclusions {
+			t, perr := ParseTarget(e)
+			if perr != nil {
+				return invalid("exclusions: %q nie jest adresem IP, blokiem CIDR, zakresem ani domeną", e)
+			}
+			ex = append(ex, t.Value)
+		}
+		in.Exclusions = ex
+	}
+	if !sameList(in.AllowedNetworks, cur.AllowedNetworks) {
+		nets, perr := runner.ParseAllowed(in.AllowedNetworks)
+		if perr != nil {
+			return invalid("allowed_networks: %v", perr)
+		}
+		in.AllowedNetworks = make([]string, 0, len(nets))
+		op, _ := runner.ParseAllowed(cur.OperatorNetworks)
+		for _, n := range nets {
+			if len(op) > 0 && !runner.PrefixInside(n, op) {
+				return invalid("allowed_networks: sieć %s leży poza blokadą operatora (CZUJKA_ALLOWED_NETWORKS: %s); poszerzyć ją może tylko operator wdrożenia", n, strings.Join(cur.OperatorNetworks, ", "))
+			}
+			in.AllowedNetworks = append(in.AllowedNetworks, n.String())
+		}
+	}
+	return nil
+}
+
 func (s *Server) putSafety(w http.ResponseWriter, r *http.Request) {
 	cur, err := s.st.GetSafetyPolicy(r.Context())
 	if err != nil {
@@ -258,69 +327,15 @@ func (s *Server) putSafety(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in := cur
+	// Own arrays: json decoding into a slice reuses its array, which would
+	// change cur too and hide what the request changed.
+	in.AllowedMethods, in.Exclusions, in.AllowedNetworks = slices.Clone(cur.AllowedMethods), slices.Clone(cur.Exclusions), slices.Clone(cur.AllowedNetworks)
 	if !decode(w, r, &in) {
 		return
 	}
 	in.EmergencyStop = cur.EmergencyStop       // only the emergency-stop routes change the flag
 	in.OperatorNetworks = cur.OperatorNetworks // read only: the operator sets it in the environment
-	switch {
-	case in.MaxPPS < 1 || in.MaxPPS > 100000:
-		err = invalid("max_pps must be between 1 and 100000")
-	case in.MaxHTTPRPS <= 0 || in.MaxHTTPRPS > 10000:
-		err = invalid("max_http_rps must be above 0 and at most 10000")
-	case in.MaxPerHostRPS <= 0 || in.MaxPerHostRPS > in.MaxHTTPRPS:
-		err = invalid("max_per_host_rps must be above 0 and not above max_http_rps")
-	case in.MaxPathsPerHost < 0 || in.MaxPathsPerHost > 100:
-		err = invalid("max_paths_per_host must be between 0 and 100")
-	case strings.TrimSpace(in.UserAgent) == "" || len(in.UserAgent) > 300 || strings.ContainsAny(in.UserAgent, "\r\n"):
-		err = invalid("user_agent must be one line of at most 300 characters")
-	case strings.ContainsAny(in.AllowedPorts+in.DeniedPorts, " ;|&$`'\"\\\n"):
-		err = invalid("allowed_ports and denied_ports must be nmap port lists")
-	}
-	if err == nil {
-		// Safe detection only: the scanner never uses a method other than GET or HEAD.
-		methods := []string{}
-		for _, m := range in.AllowedMethods {
-			m = strings.ToUpper(strings.TrimSpace(m))
-			if m != http.MethodGet && m != http.MethodHead {
-				err = invalid("allowed_methods can only hold GET and HEAD (safe detection), got %q", m)
-				break
-			}
-			methods = append(methods, m)
-		}
-		if len(methods) == 0 {
-			methods = []string{http.MethodGet, http.MethodHead}
-		}
-		in.AllowedMethods = methods
-	}
-	if err == nil {
-		ex := []string{}
-		for _, e := range in.Exclusions {
-			t, perr := ParseTarget(e)
-			if perr != nil {
-				err = invalid("exclusion %q: %v", e, perr)
-				break
-			}
-			ex = append(ex, t.Value)
-		}
-		in.Exclusions = ex
-	}
-	if err == nil {
-		nets, perr := runner.ParseAllowed(in.AllowedNetworks)
-		if perr != nil {
-			err = invalid("allowed_networks: %v", perr)
-		} else {
-			in.AllowedNetworks = make([]string, 0, len(nets))
-			op, _ := runner.ParseAllowed(cur.OperatorNetworks)
-			for _, n := range nets {
-				if len(op) > 0 && !runner.PrefixInside(n, op) {
-					err = invalid("allowed_networks: %s lies outside the operator lock (CZUJKA_ALLOWED_NETWORKS: %s); only the operator can widen it", n, strings.Join(cur.OperatorNetworks, ", "))
-					break
-				}
-				in.AllowedNetworks = append(in.AllowedNetworks, n.String())
-			}
-		}
-	}
+	err = checkSafety(&in, cur)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -387,6 +402,12 @@ func checkDojo(d *model.DefectDojoSettings) error {
 	}
 	if d.Enabled && d.URL == "" {
 		return invalid("url is required when the integration is enabled")
+	}
+	d.LinkURL = strings.TrimRight(strings.TrimSpace(d.LinkURL), "/")
+	if d.LinkURL != "" {
+		if u, err := url.Parse(d.LinkURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return invalid("link_url must be an http or https address that a browser opens")
+		}
 	}
 	if d.MinInterest < 0 || d.MinInterest > 100 {
 		return invalid("min_interest must be between 0 and 100")
@@ -829,7 +850,10 @@ func (s *Server) exportRun(w http.ResponseWriter, r *http.Request) {
 }
 
 // exportRunDojo uploads the nmap XML of one run to DefectDojo as an "Nmap
-// Scan" import. A second upload of the same run re-imports into the same test.
+// Scan" import. The test is keyed by the profile and the engagement
+// (NmapTestTitle): the first upload of a profile imports a new test, every
+// later run of that profile re-imports into the same test with
+// close_old_findings. A run without a profile has a test of its own.
 func (s *Server) exportRunDojo(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
 	if !ok {
@@ -882,13 +906,29 @@ func (s *Server) exportRunDojo(w http.ResponseWriter, r *http.Request) {
 	if run.FinishedAt != nil {
 		at = *run.FinishedAt
 	}
-	up, err := s.d.Dojo.UploadNmap(r.Context(), settings, fmt.Sprintf("Czujka run %d", id), &buf, at)
-	auditSet(r, "", "", nil, map[string]any{"hosts": hosts, "test_id": up.TestID, "reimport": up.Reimport, "created": up.Created})
+	title := NmapTestTitle(run)
+	up, err := s.d.Dojo.UploadNmap(r.Context(), settings, title, &buf, at)
+	up.Title, up.Mode = title, "import"
+	if up.Reimport {
+		up.Mode = "reimport"
+	}
+	auditSet(r, "", "", nil, map[string]any{"hosts": hosts, "test_id": up.TestID, "title": title, "mode": up.Mode, "created": up.Created, "closed": up.Closed})
 	if err != nil {
 		writeErrDetails(w, http.StatusBadGateway, "internal", "DefectDojo upload failed: "+err.Error(), up)
 		return
 	}
 	writeJSON(w, http.StatusOK, up)
+}
+
+// NmapTestTitle is the title, and so the key, of the DefectDojo test that
+// receives the nmap XML of a run: one test per profile in the engagement.
+// The profile id (not its name) keeps the key stable when the profile is
+// renamed. A run without a profile (ad hoc) gets its own test.
+func NmapTestTitle(run model.ScanRun) string {
+	if run.ProfileID != nil && *run.ProfileID != 0 {
+		return fmt.Sprintf("Czujka nmap: profil %d", *run.ProfileID)
+	}
+	return fmt.Sprintf("Czujka nmap: przebieg %d", run.ID)
 }
 
 // ---------- web UI ----------

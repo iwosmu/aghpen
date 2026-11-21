@@ -30,6 +30,11 @@ type Violation struct {
 	// Storable is false for a scope-level violation of a scope with no host:
 	// a finding needs a host, so it is reported but not stored.
 	Storable bool `json:"storable"`
+	// SeenAt is when the subject was last observed (service or host
+	// last_seen); zero for a scope-level violation. The finding's last_seen
+	// is this time, so a resolved finding is reopened only by a newer
+	// observation, never by re-evaluating unchanged data.
+	SeenAt time.Time `json:"seen_at"`
 }
 
 // KeyPrefix is the start of the finding key of every violation of one rule.
@@ -63,16 +68,23 @@ func NewEvaluator(rules []*Rule, now time.Time) *Evaluator {
 	return e
 }
 
+// sevInterest is the base interest of a policy finding. A rule often
+// restates what the engine already reports about the same service (an
+// admin panel outside the management network is also the engine's
+// admin-panel finding, 75): the policy finding ranks just below it, so the
+// first screen shows different problems, not one fact twice. Measured on
+// the lab dashboard before: the two policy findings of one service and
+// the engine's finding all read 100.
 func sevInterest(s model.Severity) int {
 	switch s {
 	case model.SevHigh:
-		return 80
-	case model.SevMedium:
 		return 60
+	case model.SevMedium:
+		return 45
 	case model.SevLow:
-		return 40
+		return 30
 	}
-	return 20
+	return 15
 }
 
 func addrOf(h *HostRec) (netip.Addr, bool) {
@@ -263,10 +275,8 @@ func (e *Evaluator) serviceViolation(r *Rule, h *HostRec, s *SvcRec, ev []model.
 	if title == "" && s.Result != nil && s.Result.HTTP != nil {
 		title = s.Result.HTTP.Title
 	}
-	interest := sevInterest(r.Severity) + s.Service.Interest/5
-	if interest > 100 {
-		interest = 100
-	}
+	// the service's own interest adds at most 9: high severity stays under 70
+	interest := sevInterest(r.Severity) + min(s.Service.Interest, 99)/10
 	var what []string
 	for _, x := range ev {
 		what = append(what, x.Where+": "+x.Snippet)
@@ -274,7 +284,7 @@ func (e *Evaluator) serviceViolation(r *Rule, h *HostRec, s *SvcRec, ev []model.
 	v := Violation{Rule: r.ID, RuleName: r.Name, Severity: r.Severity, Subject: SubjectService,
 		Key:    KeyPrefix(r.ID) + h.Host.IP + "|" + strconv.Itoa(s.Service.Port) + "/" + proto,
 		HostID: h.Host.ID, IP: h.Host.IP, Port: s.Service.Port, Proto: proto, URL: s.Service.URL, Title: title,
-		Interest: interest, Storable: h.Host.ID != 0,
+		Interest: interest, Storable: h.Host.ID != 0, SeenAt: s.Service.LastSeen,
 		Summary:  fmt.Sprintf("Reguła „%s”: %s:%d/%s (%s)", r.Name, h.Host.IP, s.Service.Port, proto, strings.Join(what, "; ")),
 		Evidence: append([]model.Evidence{{Matcher: "policy", Where: "rule", Snippet: r.ID}}, ev...)}
 	if id != 0 {
@@ -290,7 +300,7 @@ func (e *Evaluator) hostViolation(r *Rule, h *HostRec, ev []model.Evidence) Viol
 	}
 	return Violation{Rule: r.ID, RuleName: r.Name, Severity: r.Severity, Subject: SubjectHost,
 		Key: KeyPrefix(r.ID) + h.Host.IP, HostID: h.Host.ID, IP: h.Host.IP,
-		Interest: sevInterest(r.Severity), Storable: h.Host.ID != 0,
+		Interest: sevInterest(r.Severity), Storable: h.Host.ID != 0, SeenAt: hostSeen(h.Host),
 		Summary:  fmt.Sprintf("Reguła „%s”: host %s (%s)", r.Name, h.Host.IP, strings.Join(what, "; ")),
 		Evidence: append([]model.Evidence{{Matcher: "policy", Where: "rule", Snippet: r.ID}}, ev...)}
 }
@@ -308,14 +318,26 @@ func (v Violation) Finding(r *Rule, runID int64, now time.Time) model.Finding {
 	if desc != "" {
 		desc += "\n\n"
 	}
+	seen := v.SeenAt
+	if seen.IsZero() || seen.After(now) {
+		seen = now
+	}
 	desc += "Naruszona reguła ekspozycji „" + r.ID + "”. Warunek: " + r.Match.describe() + "."
 	if r.Remediation != "" {
 		desc += "\nZalecenie: " + r.Remediation
 	}
 	return model.Finding{Key: v.Key, Type: FindingType, Title: title, Description: desc, Severity: r.Severity, Status: model.FindingNew,
 		Interest: v.Interest, HostID: v.HostID, IP: v.IP, ServiceID: v.ServiceID, Port: v.Port, URL: v.URL,
-		Signature: "policy:" + r.ID, Evidence: v.Evidence, FirstSeen: now, LastSeen: now, FirstRunID: runID, LastRunID: runID}
+		Signature: "policy:" + r.ID, Evidence: v.Evidence, FirstSeen: seen, LastSeen: seen, FirstRunID: runID, LastRunID: runID}
 }
 
 // Describe returns the condition of the rule in words.
 func (r *Rule) Describe() string { return r.Match.describe() }
+
+// hostSeen is when the host last answered (last_up), else when it was last probed.
+func hostSeen(h model.Host) time.Time {
+	if h.LastUp != nil {
+		return *h.LastUp
+	}
+	return h.LastSeen
+}

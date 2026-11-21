@@ -9,7 +9,8 @@ import (
 )
 
 type xHost struct {
-	Status struct {
+	TimedOut string `xml:"timedout,attr"` // "true": nmap gave up on the host (--host-timeout)
+	Status   struct {
 		State  string `xml:"state,attr"`
 		Reason string `xml:"reason,attr"`
 	} `xml:"status"`
@@ -141,6 +142,14 @@ func convertHost(xh xHost) Host {
 	}
 	if h.Reason != "" && h.Reason != "user-set" {
 		h.Responded = true
+	}
+	if xh.TimedOut == "true" {
+		// With -Pn on Ethernet nmap still resolves the MAC, so the reason is
+		// "arp-response" even when the port scan never finished: the host
+		// answered ARP, its ports are unknown.
+		h.TimedOut = true
+		h.Responded = false
+		return h
 	}
 	for _, ep := range xh.ExtraPorts {
 		if ep.State == "closed" && ep.Count > 0 {

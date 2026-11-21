@@ -397,7 +397,7 @@ func TestProfilesSafetyAndValidation(t *testing.T) {
 	admin.want(422, "PATCH", fmt.Sprintf("/api/v1/profiles/%d", p.ID), map[string]any{"discovery": map[string]any{"mode": "turbo"}}, nil)
 	admin.want(409, "POST", "/api/v1/profiles", map[string]any{"name": "Domyślny"}, nil)
 	// Safe detection: the policy accepts GET and HEAD only.
-	if resp, raw := admin.raw("PUT", "/api/v1/settings/safety", map[string]any{"allowed_methods": []string{"GET", "POST"}}, map[string]string{auth.CSRFHeader: admin.csrf}); resp.StatusCode != 422 || !strings.Contains(string(raw), "GET and HEAD") {
+	if resp, raw := admin.raw("PUT", "/api/v1/settings/safety", map[string]any{"allowed_methods": []string{"GET", "POST"}}, map[string]string{auth.CSRFHeader: admin.csrf}); resp.StatusCode != 422 || !strings.Contains(string(raw), "GET i HEAD") {
 		t.Errorf("POST in allowed_methods: %d %s", resp.StatusCode, raw)
 	}
 	var pol model.SafetyPolicy

@@ -14,12 +14,15 @@ var (
 	passwordInputRe = regexp.MustCompile(`(?i)<input\b[^>]{0,400}\btype\s*=\s*["']?password`)
 	adminTitleRe    = regexp.MustCompile(`(?i)\b(admin|administrator|administration|administracja|administracyjny|administratora|control panel|management console|management interface|web console|panel sterowania|panel zarz[aą]dzania|webadmin|sysadmin)\b`)
 	adminPathRe     = regexp.MustCompile(`(?i)/(admin|administrator|administration|wp-admin|manage|manager|management|console|cpanel|webadmin|controlpanel|adminpanel|admin-console|sysadmin|backend|backoffice)(/|\.php|\.aspx?|\.jsp|\.do|$|\?)`)
-	stagingLabelRe  = regexp.MustCompile(`(?i)(^|[.\-_])(dev|devel|develop|development|test|tst|testing|tests|stage|staging|stg|uat|qa|preprod|pre-prod|preproduction|sandbox|sbx|demo|beta|alpha|acc|acceptance|integration|canary|nightly|lab)[0-9]{0,2}([.\-_]|$)`)
-	stagingTitleRe  = regexp.MustCompile(`(?i)(\b(staging|pre-?prod(uction)?|sandbox|uat)\b|\b(test|dev|development|demo|qa)\s+(environment|server|instance|system|site)\b|\[(test|dev|staging|uat|demo)\]|[śs]rodowisko\s+(testowe|deweloperskie|rozwojowe|demonstracyjne)\b|\bwersja\s+(testowa|demonstracyjna)\b|\bserwer\s+testowy\b)`)
-	stagingValueRe  = regexp.MustCompile(`(?i)^(dev|devel|development|test|testing|stage|staging|stg|uat|qa|preprod|pre-prod|sandbox|demo|local|debug)[0-9]{0,2}$`)
-	dirListingRe    = regexp.MustCompile(`(?i)(<title>\s*index of /|<h1>\s*index of /|<title>\s*directory listing for /|\[to parent directory\]|<h1>\s*directory listing for /|<title>[^<]{0,80} - /</title>\s*</head>\s*<body>\s*<h1>[^<]{0,80} - /</h1>)`)
-	errorTitleRe    = regexp.MustCompile(`(?i)^\s*((error\s*)?(400|401|403|404|405|500|501|502|503|504)\b|not found|forbidden|bad gateway|bad request|service (temporarily )?unavailable|internal server error|gateway time-?out|access denied|unauthorized|http status \d{3}|server error|page not found|b[łl][aą]d\b|nie znaleziono)`)
-	swaggerRe       = regexp.MustCompile(`(?i)(swagger-ui|"swagger"\s*:\s*"2\.|"openapi"\s*:\s*"3\.|redoc-container|<redoc\b|graphiql|graphql playground)`)
+	stagingLabelRe  = regexp.MustCompile(`(?i)(^|[.\-_])(dev|devel|develop|development|test|tst|testing|tests|stage|staging|stg|uat|qa|preprod|pre-prod|preproduction|sandbox|sbx|demo|beta|alpha|acc|acceptance|integration|canary|nightly)[0-9]{0,2}([.\-_]|$)`)
+	// "lab" is not a staging marker: at a university it names a laboratory
+	// (lab.agh.edu.pl, lab-212). Measured on the lab: with it, every service
+	// under *.lab.czujka.test was classed staging (119 false positives).
+	stagingTitleRe = regexp.MustCompile(`(?i)(\b(staging|pre-?prod(uction)?|sandbox|uat)\b|\b(test|dev|development|demo|qa)\s+(environment|server|instance|system|site)\b|\[(test|dev|staging|uat|demo)\]|[śs]rodowisko\s+(testowe|deweloperskie|rozwojowe|demonstracyjne)\b|\bwersja\s+(testowa|demonstracyjna)\b|\bserwer\s+testowy\b)`)
+	stagingValueRe = regexp.MustCompile(`(?i)^(dev|devel|development|test|testing|stage|staging|stg|uat|qa|preprod|pre-prod|sandbox|demo|local|debug)[0-9]{0,2}$`)
+	dirListingRe   = regexp.MustCompile(`(?i)(<title>\s*index of /|<h1>\s*index of /|<title>\s*directory listing for /|\[to parent directory\]|<h1>\s*directory listing for /|<title>[^<]{0,80} - /</title>\s*</head>\s*<body>\s*<h1>[^<]{0,80} - /</h1>)`)
+	errorTitleRe   = regexp.MustCompile(`(?i)^\s*((error\s*)?(400|401|403|404|405|500|501|502|503|504)\b|not found|forbidden|bad gateway|bad request|service (temporarily )?unavailable|internal server error|gateway time-?out|access denied|unauthorized|http status \d{3}|server error|page not found|b[łl][aą]d\b|nie znaleziono)`)
+	swaggerRe      = regexp.MustCompile(`(?i)(swagger-ui|"swagger"\s*:\s*"2\.|"openapi"\s*:\s*"3\.|redoc-container|<redoc\b|graphiql|graphql playground)`)
 )
 
 var stagingHeaders = []string{"x-environment", "x-env", "x-app-env", "x-app-environment", "x-stage", "x-deploy-env", "x-deployment-environment", "x-environment-name"}

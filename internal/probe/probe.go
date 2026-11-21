@@ -89,6 +89,7 @@ type Host struct {
 	Vendor    string
 	Hostnames []string
 	Responded bool // the port scan got any answer (open or closed port)
+	TimedOut  bool // nmap gave up on the host (--host-timeout): its ports are unknown
 	Ports     []Port
 }
 

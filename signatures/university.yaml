@@ -104,7 +104,9 @@
   match:
     min_confidence: 0.5
     rules:
-      - {type: title, regex: 'Wirtualna Uczelnia|Wirtualny Dziekanat', weight: 0.8}
+      - {type: title, regex: 'Wirtualna Uczelnia', weight: 0.8}
+      # "Wirtualny Dziekanat" is a generic Polish name used by several vendors: alone it is not enough.
+      - {type: title, regex: 'Wirtualny Dziekanat', weight: 0.35}
       - {type: body, regex: 'Verbis Dean''s Office|wu/start\.html|Wirtualna Uczelnia', weight: 0.6}
 
 - id: dspace

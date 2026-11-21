@@ -139,6 +139,8 @@
       - {type: title, regex: 'Synology (?:DiskStation|RackStation|NAS)|- Synology', weight: 0.8}
       - {type: meta, name: description, contains: 'DiskStation provides a full-featured', weight: 0.9}
       - {type: meta, name: application-name, regex: 'Synology|DiskStation', weight: 0.8}
+  version:
+    - {type: body, regex: 'Synology DSM ([0-9]+\.[0-9]+(?:\.[0-9]+)?)'}
 
 - id: qnap
   name: QNAP
@@ -181,6 +183,7 @@
 
 - id: hp-printer
   name: Drukarka HP
+  technology: HP Printer
   category: iot
   description: Drukarka albo urządzenie wielofunkcyjne HP z wbudowanym serwerem WWW.
   tags: [drukarka]

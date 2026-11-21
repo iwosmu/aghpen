@@ -306,7 +306,13 @@ func (s *Store) toFindingIn(f model.Finding, now time.Time) (findingIn, error) {
 // data and last_seen. Overridden title, description and severity keep the
 // analyst value (the new observed value goes to overrides). Status, note, tags
 // and assignee are analyst-owned and are not written, with one exception: a
-// finding that was "resolved" and is observed again becomes "new".
+// finding that was "resolved" becomes "new" when its cause is observed after
+// the resolution (Finding.LastSeen later than resolved_at). It is reopened
+// once per resolution, gets an audit entry "finding.reopen" (its history),
+// and the DefectDojo status sync then reopens it there. Accepted and false
+// positive findings are never reopened. An observation older than the
+// resolution (a rule evaluation over unchanged data, a run that saw the
+// cause before an analyst resolved it) does not reopen.
 // It returns the number of findings that did not exist before.
 func (s *Store) UpsertFindings(ctx context.Context, findings []model.Finding) (created int, err error) {
 	if len(findings) == 0 {
@@ -326,13 +332,24 @@ func (s *Store) UpsertFindings(ctx context.Context, findings []model.Finding) (c
 		}
 		rows = append(rows, in)
 	}
-	err = s.db.QueryRow(ctx, `WITH up AS (
+	err = s.db.QueryRow(ctx, `WITH d AS (
+		SELECT * FROM jsonb_to_recordset($1::jsonb) AS d(key text, type text, title text, description text, severity text, interest int, host_id bigint,
+			ip inet, service_id bigint, port int, url text, signature text, evidence_enc text, at timestamptz, run_id bigint)
+	), reopen AS (
+		SELECT f.id, f.resolved_at, d.at, d.run_id FROM findings f JOIN d ON d.key = f.key
+		WHERE f.status = 'resolved' AND d.at > COALESCE(f.resolved_at, '-infinity'::timestamptz)
+	), audit AS (
+		INSERT INTO audit_log (user_email, action, entity, entity_id, detail)
+		SELECT 'system', 'finding.reopen', 'finding', r.id::text,
+			jsonb_build_object('from', 'resolved', 'to', 'new', 'resolved_at', r.resolved_at, 'seen_at', r.at, 'run_id', r.run_id,
+				'reason', 'przyczyna zaobserwowana ponownie po rozwiązaniu')
+		FROM reopen r
+	), up AS (
 		INSERT INTO findings AS f (key, type, title, description, severity, status, interest, host_id, ip, service_id, port, url, signature,
 			evidence_enc, first_seen, last_seen, first_run_id, last_run_id, manual)
 		SELECT d.key, d.type, d.title, d.description, d.severity, 'new', d.interest, d.host_id, d.ip, d.service_id, d.port, d.url, d.signature,
 			d.evidence_enc, d.at, d.at, d.run_id, d.run_id, false
-		FROM jsonb_to_recordset($1::jsonb) AS d(key text, type text, title text, description text, severity text, interest int, host_id bigint,
-			ip inet, service_id bigint, port int, url text, signature text, evidence_enc text, at timestamptz, run_id bigint)
+		FROM d
 		ON CONFLICT (key) DO UPDATE SET
 			type = EXCLUDED.type,
 			title = CASE WHEN f.overrides ? 'title' THEN f.title ELSE EXCLUDED.title END,
@@ -343,7 +360,7 @@ func (s *Store) UpsertFindings(ctx context.Context, findings []model.Finding) (c
 			interest = EXCLUDED.interest, ip = EXCLUDED.ip, service_id = EXCLUDED.service_id, port = EXCLUDED.port, url = EXCLUDED.url,
 			signature = EXCLUDED.signature, evidence_enc = EXCLUDED.evidence_enc,
 			last_seen = GREATEST(f.last_seen, EXCLUDED.last_seen), last_run_id = GREATEST(f.last_run_id, EXCLUDED.last_run_id),
-			status = CASE WHEN f.status = 'resolved' THEN 'new' ELSE f.status END
+			status = CASE WHEN f.status = 'resolved' AND EXCLUDED.last_seen > COALESCE(f.resolved_at, '-infinity'::timestamptz) THEN 'new' ELSE f.status END
 			-- note, tags, assignee and every other status are analyst-owned: never written here
 		RETURNING (xmax = 0) AS inserted)
 		SELECT count(*) FILTER (WHERE inserted) FROM up`, js(rows)).Scan(&created)

@@ -72,21 +72,46 @@ status_of() { # method path [json] -> HTTP status only
 upload() { curl -sS -b "$JAR" -H "X-CSRF-Token: $CSRF" -F "file=@$2" "$API$1"; }
 labif() { docker exec "$CZ" sh -c "ip -o -4 addr | awk '/ $P\\./ {print \$2}'"; }
 txpackets() { docker exec "$CZ" cat "/sys/class/net/$LABIF/statistics/tx_packets"; }
-# A tcpdump sidecar shares the network namespace of the Czujka container and records every packet
-# that leaves the scan interface. The image (alpine + tcpdump) is built locally on first use.
+# A tcpdump sidecar shares the network namespace of the Czujka container and records the packets
+# Czujka sends on the scan interface. It filters on the source address, not on the direction:
+# "tcpdump -Q out" does not see the IP packets nmap writes to its raw socket (measured: only
+# ARP and kernel TCP appeared, none of the SYN probes). Run 1 checks that the capture holds the
+# SYN probes, so a capture that cannot see scan packets fails instead of passing.
+# The image (alpine + tcpdump) is built locally on first use.
 cap_start() {
   docker image inspect czfull-tcpdump:latest >/dev/null 2>&1 ||
     printf 'FROM alpine:3.22\nRUN apk add --no-cache tcpdump\n' | docker build -q -t czfull-tcpdump:latest - >/dev/null
   docker rm -f "$PROJECT-tcpdump" >/dev/null 2>&1 || true
   docker run -d --name "$PROJECT-tcpdump" --net "container:$CZ" --cap-add NET_RAW --cap-add NET_ADMIN \
-    czfull-tcpdump:latest tcpdump -i "$LABIF" -n -tt -l -Q out >/dev/null
+    czfull-tcpdump:latest tcpdump -i "$LABIF" -n -tt -l -B 16384 "src host $CZIP or arp" >/dev/null
   sleep 3
 }
 # cap_stop FILE: stops the capture and writes it without the API's own replies (source port 8080),
 # which leave through the same interface when the default route uses it. They are not scan traffic.
+# SIGTERM makes tcpdump print its counters; CAP_DROPPED is the number of packets the kernel dropped.
 cap_stop() {
+  docker stop -t 5 "$PROJECT-tcpdump" >/dev/null 2>&1 || true
   docker logs "$PROJECT-tcpdump" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+ ' | grep -v '\.8080 >' > "$1" || true
+  CAP_DROPPED=$(docker logs "$PROJECT-tcpdump" 2>&1 | awk '/packets dropped by kernel/ {print $1}' | tail -1)
+  CAP_DROPPED=${CAP_DROPPED:-unknown}
   docker rm -f "$PROJECT-tcpdump" >/dev/null 2>&1 || true
+}
+# sent FILE: the lines of a capture that Czujka sent (IP from its address, ARP requests it asked).
+sent() { awk -v ip="$CZIP" '($2 == "IP" && index($3, ip ".") == 1) || ($2 == "IP" && $3 == ip) || ($2 == "ARP," && index($0, " tell " ip ",") > 0)' "$1"; }
+# rate RUN FILE: per-second bins of the nmap raw packets of a run (e2e/ppsbins) against the cap.
+rate() {
+  local id=$1 f=$2 js
+  js=$("$PPSBINS" -json -cap $MAXPPS -src "$CZIP" "$f")
+  echo "$js" > "$TMP/rate.$id.json"
+  echo "$js" | jq -r --arg id "$id" --arg drop "$CAP_DROPPED" '"  run \($id) on the wire (tcpdump, kernel drops \($drop)): nmap raw packets per second max \(.raw_max_per_s), p99 \(.raw_p99_per_s), avg \(.raw_avg_per_s) over \(.seconds) s, top5 \(.raw_top5), seconds over the cap \(.raw_seconds_over_cap); all sent packets max \(.all_max_per_s)/s; totals \(.total | to_entries | map("\(.key)=\(.value)") | join(" "))"'
+  checkge "run $id: the capture holds nmap's raw SYN probes (a blind capture must fail)" "$(echo "$js" | jq '.total.raw_syn // 0')" 1000
+  check "run $id: tcpdump lost no packet" "$CAP_DROPPED" "0"
+  # nmap's own packets (paced by the engine at the cap minus an HTTP reserve) stay strictly under the cap.
+  checkle "run $id: per-second maximum of nmap raw packets on the wire strictly under the cap" "$(echo "$js" | jq .raw_max_per_s)" $((MAXPPS - 1))
+  # All sent packets include kernel TCP (ACKs of page bodies during version detection, HTTP):
+  # they may pass the cap by at most ALLTOL percent in a second (the tolerance docs/WYNIKI.md states).
+  echo "  run $id: seconds where all sent packets passed the cap: $(echo "$js" | jq .all_seconds_over_cap) of $(echo "$js" | jq .seconds)"
+  checkle "run $id: per-second maximum of all sent packets within the cap + $ALLTOL%" "$(echo "$js" | jq .all_max_per_s)" $((MAXPPS * (100 + ALLTOL) / 100))
 }
 mem_sampler() { # samples the memory of the Czujka container every 2 s while $TMP/mem.on exists
   touch "$TMP/mem.on"
@@ -121,8 +146,27 @@ wait_done() { wait_status "$1" '.status == "completed" or .status == "failed" or
 hm() { printf "%02d:%02d" $(( ($1 / 60) % 24 )) $(( $1 % 60 )); }
 
 step "0. Preconditions"
-for tool in docker curl jq awk; do command -v $tool >/dev/null || { echo "missing tool: $tool"; exit 2; }; done
+for tool in docker curl jq awk go; do command -v $tool >/dev/null || { echo "missing tool: $tool"; exit 2; }; done
+MAXPPS=800; HTTPRPS=20; ALLTOL=10
+PPSBINS="$TMP/ppsbins"; go build -o "$PPSBINS" ./e2e/ppsbins || { echo "cannot build e2e/ppsbins"; exit 2; }
 echo "docker $(docker version --format '{{.Server.Version}}'); scope: $NET $P.0.0/22 (created by this script)"
+# The neighbour table of the docker host (the Docker VM on macOS) is one table
+# for all network namespaces; gc_thresh3 bounds all of them together. When
+# other containers fill it, ARP answers are lost and a run finds hosts without
+# ports or no host at all: such a run says nothing about the product, so stop
+# here. NEIGH_NEED is the free room this scan needs (2 x the /22).
+neigh() { # prints "entries gc_thresh3 table_fulls" of the docker host
+  docker run --rm --net=host alpine sh -c 'awk "NR==2 {print \$1, \$13}" /proc/net/stat/arp_cache | { read e f; echo $((0x$e)) $(cat /proc/sys/net/ipv4/neigh/default/gc_thresh3) $((0x$f)); }' 2>/dev/null
+}
+NEIGH_NEED=2048
+read -r NE NT NF0 <<< "$(neigh)"
+echo "neighbour table of the docker host: $NE entries, gc_thresh3 $NT, table_fulls so far $NF0"
+if [ -z "$NT" ] || [ $((NT - NE)) -lt $NEIGH_NEED ]; then
+  echo "INVALID ENVIRONMENT: the neighbour table of the docker host has $((NT - NE)) free entries, this scan needs $NEIGH_NEED."
+  echo "Other containers fill it (ARP answers would be lost). Raise the limits of the docker host and rerun:"
+  echo "  docker run --rm --privileged --net=host alpine sysctl -w net.ipv4.neigh.default.gc_thresh1=16384 net.ipv4.neigh.default.gc_thresh2=65536 net.ipv4.neigh.default.gc_thresh3=131072"
+  exit 3
+fi
 
 step "1. Target network with real services"
 e2e/full/lab.sh up
@@ -167,11 +211,14 @@ checkge "estimate: addresses (1024 minus Czujka and the gateway)" "$(echo "$EST"
 
 step "6. Run 1: start, follow the SSE stream to the end"
 mem_sampler
+cap_start
 T0=$(date +%s)
 RUN1=$(api POST /runs "{\"profile_id\":$PROFILE}" | jq -r .id)
 follow "$RUN1"
 wait_done "$RUN1" 120
 D1=$(( $(date +%s) - T0 ))
+cap_stop "$TMP/run1.cap.txt"
+rate "$RUN1" "$TMP/run1.cap.txt"
 R1=$(api GET /runs/$RUN1)
 check "run 1 status" "$(echo "$R1" | jq -r .status)" "completed"
 check "run 1 hosts up (the 9 lab hosts)" "$(echo "$R1" | jq .stats.hosts_up)" "9"
@@ -212,17 +259,22 @@ cap_stop "$TMP/retrohunt.cap.txt"
 echo "$RH" | jq -c '{scanned, total_hits, hits: [.hits[]? | "\(.ip):\(.port)"]}'
 checkge "retro-hunt hits in stored observations" "$(echo "$RH" | jq .total_hits)" 3
 # Traffic to the gateway is the docker host side (API replies, ARP refresh for them), not a lab host.
-check "packets sent to lab hosts during the retro-hunt (tcpdump)" "$(grep -v -e "who-has $P.0.1 " -e "> $P.0.1\." "$TMP/retrohunt.cap.txt" | wc -l | tr -d ' ')" "0"
+# The same capture saw the SYN probes of run 1 (step 6), so 0 here is a measurement, not a blind spot.
+echo "  capture during the retro-hunt: $(wc -l < "$TMP/retrohunt.cap.txt" | tr -d ' ') lines, $(sent "$TMP/retrohunt.cap.txt" | wc -l | tr -d ' ') sent by Czujka, kernel drops $CAP_DROPPED"
+check "packets sent to lab hosts during the retro-hunt (tcpdump, source filter)" "$(sent "$TMP/retrohunt.cap.txt" | grep -v -e "who-has $P.0.1 " -e "> $P.0.1\." | wc -l | tr -d ' ')" "0"
 
 step "10. Change the target network: redis stops, a new nginx host, nginx upgraded, one page title changed"
 e2e/full/lab.sh change
 
 step "11. Run 2 and the diff"
+cap_start
 T0=$(date +%s)
 RUN2=$(api POST /runs "{\"profile_id\":$PROFILE}" | jq -r .id)
 follow "$RUN2"
 wait_done "$RUN2" 120
 D2=$(( $(date +%s) - T0 ))
+cap_stop "$TMP/run2.cap.txt"
+rate "$RUN2" "$TMP/run2.cap.txt"
 R2=$(api GET /runs/$RUN2)
 check "run 2 status" "$(echo "$R2" | jq -r .status)" "completed"
 echo "$R2" | jq -c .summary
@@ -357,8 +409,9 @@ api PATCH /profiles/$WP '{"schedule":{"enabled":false}}' >/dev/null
 step "17. Emergency stop during a run"
 SP=$(api POST /profiles "$(jq -nc --argjson s "$SCOPE" '{name:"e2e: stop", scope_ids:[$s], ports:"top-1000", service_detection:true, http:{enabled:true}, rate:{max_pps:200}, enabled:true}')" | jq -r .id)
 RS=$(api POST /runs "{\"profile_id\":$SP}" | jq -r .id)
-wait_status "$RS" '.status == "running" and .stats.packets_sent > 0' 60 || sleep 5
-sleep 2
+# Stop during the port scan, not during ARP discovery: then SYN probes are on the wire and
+# "no IP packet after the stop" measures something. The first open service marks that phase.
+wait_status "$RS" '.status == "running" and .stats.services_open > 0' 180 || echo "  (no open service reported yet: the stop may fall into discovery)"
 cap_start
 NM0=$(docker exec $CZ sh -c 'pgrep nmap | wc -l')
 TS=$(date +%s.%N)
@@ -368,18 +421,21 @@ sleep 1
 NM1=$(docker exec $CZ sh -c 'pgrep nmap | wc -l')
 sleep 3
 cap_stop "$TMP/stop.pcap.txt"
-awk -v t="$TS" '$1+0 > t' "$TMP/stop.pcap.txt" > "$TMP/stop.after.txt" || true
+sent "$TMP/stop.pcap.txt" > "$TMP/stop.sent.txt"
+awk -v t="$TS" '$1+0 > t' "$TMP/stop.sent.txt" > "$TMP/stop.after.txt" || true
 IP_LATE=$(awk -v t="$TS" '$1+0 > t+1 && $2 == "IP"' "$TMP/stop.after.txt" | wc -l | tr -d ' ')
 IP_ANY=$(awk '$2 == "IP"' "$TMP/stop.after.txt" | wc -l | tr -d ' ')
 ARP_ALL=$(grep -c ' ARP, ' "$TMP/stop.after.txt" || true)
 ARP_LAST=$(grep ' ARP, ' "$TMP/stop.after.txt" | tail -1 | awk -v t="$TS" '{printf "%.1f", $1 - t}')
-BEFORE=$(awk -v t="$TS" '$1+0 <= t' "$TMP/stop.pcap.txt" | wc -l | tr -d ' ')
+BEFORE=$(awk -v t="$TS" '$1+0 <= t' "$TMP/stop.sent.txt" | wc -l | tr -d ' ')
+SYN_BEFORE=$(awk -v t="$TS" '$1+0 <= t' "$TMP/stop.sent.txt" | grep -c 'Flags \[S\]' || true)
+LAST_IP=$(awk '$2 == "IP"' "$TMP/stop.after.txt" | tail -1 | awk -v t="$TS" '{printf "%.2f", $1 - t}')
 echo "  nmap processes before the stop: $NM0; one second after: $NM1; the stop call took $(echo "$TE - $TS" | bc) s"
-echo "  packets leaving the scan interface: $BEFORE in the 3 s before the stop; after the stop: $IP_ANY IP packets (SYN/ICMP/HTTP), $IP_LATE of them later than 1 s"
+echo "  packets Czujka sent on the scan interface: $BEFORE in the ~3 s before the stop ($SYN_BEFORE SYN); after the stop: $IP_ANY IP packets (SYN/ICMP/HTTP), $IP_LATE of them later than 1 s, the last at +${LAST_IP:-none} s; kernel drops $CAP_DROPPED"
 echo "  after the stop the kernel still sent $ARP_ALL ARP requests (neighbour retries for addresses nmap had probed; the last at +${ARP_LAST:-0} s)"
 check "emergency flag set" "$(echo "$ES" | jq -r .emergency_stop)" "true"
 check "no nmap process one second after the stop" "$(echo $NM1)" "0"
-checkge "scan packets were flowing before the stop" "$BEFORE" 1
+checkge "SYN probes were on the wire before the stop (the capture sees scan packets)" "$SYN_BEFORE" 1
 check "no IP packet (SYN, ICMP, HTTP) to the target network later than 1 s after the stop" "$IP_LATE" "0"
 check "run paused by the emergency stop" "$(api GET /runs/$RS | jq -r '"\(.status) \(.pause_reason)"')" "paused emergency_stop"
 check "a new run is refused while the stop is active" "$(status_of POST /runs "{\"profile_id\":$SP}")" "409"
@@ -458,14 +514,18 @@ check "after rotate-key and a restart: encrypted HTTP body still reads" "$(api G
 
 step "18. Measurements"
 rm -f "$TMP/mem.on"; sleep 2
-MAXPPS=800; HTTPRPS=20
 for r in "$RUN1:$D1" "$RUN2:$D2"; do
   id=${r%%:*}; wall=${r##*:}
   api GET /runs/$id | jq -r --arg wall "$wall" --argjson cap $MAXPPS --argjson hcap $HTTPRPS \
     '"  run \(.id): wall \($wall) s, active \(.stats.elapsed_sec) s, hosts \(.stats.hosts_up), services \(.stats.services_open), packets \(.stats.packets_sent) (avg \(.stats.avg_pps | floor) pps, cap \($cap) pps), HTTP requests \(.stats.http_requests) (\(if .stats.elapsed_sec > 0 then ((.stats.http_requests / .stats.elapsed_sec * 10 | floor) / 10) else 0 end) req/s on average, cap \($hcap) req/s)"'
-  checkle "run $id average packet rate under the cap" "$(api GET /runs/$id | jq '.stats.avg_pps | floor')" $MAXPPS
+  checkle "run $id average packet rate under the cap (engine counter)" "$(api GET /runs/$id | jq '.stats.avg_pps | floor')" $MAXPPS
+  [ -f "$TMP/rate.$id.json" ] && jq -r --arg id "$id" --arg eng "$(api GET /runs/$id | jq .stats.packets_sent)" '"  run \($id) on the wire: nmap raw packets \([.total.arp, .total.raw_syn, .total.icmp, .total.udp_probe] | map(. // 0) | add) (engine counter \($eng)); max \(.raw_max_per_s)/s, p99 \(.raw_p99_per_s)/s, avg \(.raw_avg_per_s)/s"' "$TMP/rate.$id.json"
 done
 echo "  memory of the Czujka container during the scans: max $(mem_max) MiB over $(wc -l < $TMP/mem.txt | tr -d ' ') samples"
+
+read -r NE2 NT2 NF1 <<< "$(neigh)"
+echo "  neighbour table of the docker host after the run: $NE2 entries, gc_thresh3 $NT2"
+check "the docker host's neighbour table never overflowed during the run (else the run is invalid)" "$((NF1 - NF0))" "0"
 
 step "Result"
 echo "PASS: $PASSES  FAIL: $FAILS"

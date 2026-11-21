@@ -266,3 +266,59 @@ func TestSimhashDistance(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// A full run (version detection on) followed by a discovery-only run and a
+// full run again: the field that a run did not measure keeps its value, so
+// no change event either way.
+func TestDiffDiscoveryRunAfterFullRunIsQuiet(t *testing.T) {
+	full := model.ServiceResult{Port: 22, Proto: "tcp", State: "open", Name: "ssh", Product: "OpenSSH", Version: "9.6p1", CPE: []string{"cpe:/a:openbsd:openssh:9.6p1"}, Confidence: 1,
+		Technologies: []model.Technology{{Name: "OpenSSH", Version: "9.6p1", Sources: []string{"nmap"}}}}
+	bare := model.ServiceResult{Port: 22, Proto: "tcp", State: "open", Name: "ssh", Confidence: 0.3}
+	web := model.ServiceResult{Port: 80, Proto: "tcp", State: "open", Name: "http", Product: "nginx", Version: "1.26.2", Confidence: 1,
+		Technologies: []model.Technology{{Name: "nginx", Version: "1.26.2", Sources: []string{"nmap", "header:server"}}}}
+	webBare := model.ServiceResult{Port: 80, Proto: "tcp", State: "open", Name: "http-alt", Confidence: 0.3,
+		Technologies: []model.Technology{{Name: "nginx", Sources: []string{"header:server"}}}}
+	runs := []Snapshot{
+		snap(1, host("10.0.0.5", model.HostUp, full, web)),
+		snap(2, host("10.0.0.5", model.HostUp, bare, webBare)),
+		snap(3, host("10.0.0.5", model.HostUp, full, web)),
+	}
+	for i := 1; i < len(runs); i++ {
+		changes, _ := Diff(&runs[i-1], runs[i], DiffOptions{})
+		if len(changes) != 0 {
+			t.Errorf("run %d -> %d: %v", i, i+1, kinds(changes))
+		}
+	}
+	// a real upgrade between two full runs is still a change
+	newer := full
+	newer.Version = "9.9p1"
+	newer.Technologies = []model.Technology{{Name: "OpenSSH", Version: "9.9p1", Sources: []string{"nmap"}}}
+	changes, _ := Diff(&runs[2], snap(4, host("10.0.0.5", model.HostUp, newer, web)), DiffOptions{})
+	if got := kinds(changes); len(got) == 0 {
+		t.Errorf("upgrade 9.6p1 -> 9.9p1 not reported")
+	}
+}
+
+// A host whose port scan did not finish (nmap host timeout) keeps its
+// services: they are unreachable in this run, not gone. Measured on the
+// public instance: one such run reported 100 services gone.
+func TestDiffPortsUnknownIsNotGone(t *testing.T) {
+	svc := func(port int) model.ServiceResult {
+		return model.ServiceResult{Port: port, Proto: "tcp", State: "open", Name: "http"}
+	}
+	prev := &Snapshot{RunID: 1, Hosts: []HostSnapshot{{HostID: 1, IP: "10.0.0.1", Up: true, Status: model.HostUp, Services: []model.ServiceResult{svc(22), svc(80)}}}}
+	cur := Snapshot{RunID: 2, Hosts: []HostSnapshot{{HostID: 1, IP: "10.0.0.1", Up: true, Status: model.HostUp, PortsUnknown: true, Services: []model.ServiceResult{svc(80)}}}}
+	ch, sum := Diff(prev, cur, DiffOptions{})
+	for _, c := range ch {
+		if c.Kind == model.ChangeServiceGone {
+			t.Errorf("unexpected %+v", c)
+		}
+	}
+	if sum.ServicesGone != 0 || sum.ServicesUnreachable != 1 {
+		t.Errorf("summary %+v", sum)
+	}
+	cur.Hosts[0].PortsUnknown = false
+	if _, sum = Diff(prev, cur, DiffOptions{}); sum.ServicesGone != 1 {
+		t.Errorf("a finished scan reports the service gone: %+v", sum)
+	}
+}

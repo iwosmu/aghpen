@@ -650,6 +650,8 @@
     rules:
       - {type: header, name: Docker-Distribution-Api-Version, exists: true, weight: 0.95}
       - {type: path, path: /v2/, status: [200, 401], field: header, name: Docker-Distribution-Api-Version, contains: 'registry/', weight: 0.95}
+      # Gitea and Forgejo serve the registry API on /v2/ as one of their package registries: the product is the forge, not a Docker Registry.
+      - {type: body, regex: '(?i)gitea|forgejo', not: true}
 
 - id: docker-registry-open
   name: Docker Registry bez uwierzytelniania
@@ -661,6 +663,7 @@
   match:
     rules:
       - {type: path, path: /v2/, status: [200], field: header, name: Docker-Distribution-Api-Version, contains: 'registry/', weight: 0.95}
+      - {type: body, regex: '(?i)gitea|forgejo', not: true}
 
 - id: docker-api
   name: Docker Engine API

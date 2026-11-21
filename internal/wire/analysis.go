@@ -262,7 +262,7 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 		h := &hosts[i]
 		as := assess[h.HostID]
 		obsStatus = append(obsStatus, store.ObsStatus{HostID: h.HostID, Status: string(as.Status)})
-		hs := analyze.HostSnapshot{HostID: h.HostID, IP: h.IP, Up: h.Up, Services: h.Services, ServiceIDs: h.ServiceIDs}
+		hs := analyze.HostSnapshot{HostID: h.HostID, IP: h.IP, Up: h.Up, Services: h.Services, ServiceIDs: h.ServiceIDs, PortsUnknown: h.HasUnknownPorts()}
 		hs.SetAssessment(as, nObs[h.HostID])
 		cur.Hosts = append(cur.Hosts, hs)
 		if p, ok := prevHosts[h.HostID]; ok && prev != nil {
