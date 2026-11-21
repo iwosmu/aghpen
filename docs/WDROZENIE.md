@@ -85,6 +85,48 @@ Sprawdzone (`deploy/e2e/bundle-proof.sh`, 9 z 9 kontroli): paczka (350 MiB) traf
 
 Kilka instalacji na jednej maszynie: dodaj `-p <nazwa>` i inny port, na przykład `CZUJKA_PORT=18480 docker compose -p czujka-test -f deploy/docker-compose.yml up -d --build --wait`. Nazwy kontenerów i wolumenów dostają wtedy przedrostek `czujka-test`.
 
+### 2.5 Test na szablonie organizatorów (`lab/jury`)
+
+Szablon organizatorów to jedna maszyna: usługi w Dockerze na portach hosta (`lab/jury/README.md`). Są dwa tryby.
+
+| Tryb | Kiedy | Co znaczy `localhost` |
+| --- | --- | --- |
+| domyślny (`deploy/docker-compose.yml`) | Docker Desktop (macOS, Windows) i Linux | host dockera: adres, na który wskazuje `host.docker.internal` (Docker Desktop: 192.168.65.254, Linux: brama mostu, np. 172.17.0.1). Czujka skanuje porty opublikowane przez hosta. |
+| sieć hosta (`deploy/docker-compose.host-network.yml`) | tylko Linux | sam `127.0.0.1` maszyny; Czujka widzi też bezpośrednio każdą sieć mostkową Dockera na tej maszynie |
+
+Tryb domyślny, od zera do pierwszego wyniku:
+
+```sh
+CZUJKA_PORT=9180 docker compose -f deploy/docker-compose.yml up -d --build --wait
+CZUJKA_PORT=9180 docker compose -f deploy/docker-compose.yml logs czujka | grep -A3 "first administrator"
+(cd lab/jury && ./quickstart.sh up)
+```
+
+Szablon zajmuje port 8080, dlatego Czujka dostaje 9180. W interfejsie (`http://127.0.0.1:9180`) wpisz cel `localhost` i w profilu ustaw porty `2223,3001,5673,8787,15673` albo `1-65535`. Podgląd celu pokazuje „skanowany jako 192.168.65.254” (pole `maps_to` w API), a `/api/v1/healthz` podaje `host_gateway`. Host trafia do inwentarza raz, pod adresem bramy, z nazwą `localhost` i etykietą „Host dockera (ten komputer)”. Usługa Czujki na porcie `CZUJKA_PORT` tego hosta dostaje tag `czujka` i nie daje znalezisk. Wykluczenia i blokada operatora dotyczą adresu bramy, nie `127.0.0.1`.
+
+Sieć hosta (Linux):
+
+```sh
+CZUJKA_PORT=9180 docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.host-network.yml up -d --build --wait
+```
+
+Interfejs słucha wtedy na `CZUJKA_BIND:CZUJKA_PORT` samego hosta (domyślnie `127.0.0.1`). Baza zostaje w swojej sieci i jest dostępna z hosta tylko na `127.0.0.1:CZUJKA_DB_HOST_PORT` (domyślnie 55432). Plik wymaga Docker Compose 2.24 lub nowszego.
+
+Zmierzone 2026-11-21:
+
+- Docker Desktop, tryb domyślny, cel `localhost`, własne kontenery na `127.0.0.1` (nginx i Toxiproxy), porty `18950,28787,28085`: `host_gateway` 192.168.65.254. Przebieg 1: 3 usługi, Czujka z tagiem `czujka`. Przebieg 2 (nginx zatrzymany, Toxiproxy +500 ms): `service_gone` na 28787 i `response_slower` na 28085 (509 ms, baza 5 ms). Przebieg 3: `service_returned` na 28787 (83 s nieobecności, 1 skan) i `response_recovered` (4 ms). Każdy przebieg 39–45 s dla jednego hosta i 3 portów.
+- Linux (serwer z Ubuntu 24.04), sieć hosta, cel `127.0.0.1`, porty `18090,28787`: `network_mode=host`, interfejs i baza tylko na `127.0.0.1`, `host_gateway` puste. Przebiegi 1–3: `service_gone`, potem `service_returned` na 28787; usługa Czujki z tagiem `czujka`, bez znalezisk. Każdy przebieg 32–39 s.
+
+Zmiany między skanami (`docs/API.md`, rodzaje zmian):
+
+| Rodzaj | Kiedy |
+| --- | --- |
+| `service_returned` „Usługa wróciła” | usługa (ten sam host, port i protokół) była otwarta we wcześniejszym przebiegu, w poprzednim nie, teraz znów jest otwarta. Zmiana podaje, kiedy była otwarta ostatnio, ile sekund jej nie było i w ilu skanach. Usługa widziana wcześniej nigdy nie jest „nowa”. |
+| `response_slower` „Wolniejsza odpowiedź” | czas odpowiedzi HTTP jest co najmniej 2 razy większy od bazy usługi i większy o co najmniej 300 ms; albo port jest otwarty, a HTTP nie odpowiedział (`"error": "no_answer"`), choć wcześniej odpowiadał. Baza: mediana ostatnich 5 pomiarów, które same nie były wolne; wystarczy jeden pomiar. Zgłaszane raz, przy przejściu. |
+| `response_recovered` „Odpowiedź w normie” | wolna usługa znów odpowiada w zwykłym czasie |
+
+Czas odpowiedzi to czas pierwszego żądania `GET` do usługi (`http.response_ms` w zapisie obserwacji). Seria do wykresu: `GET /api/v1/services/{id}/response-times`.
+
 ## 3. Zmienne `CZUJKA_*`
 
 ### 3.1 Zmienne pliku `deploy/.env` (czyta je `docker-compose.yml`)
@@ -104,6 +146,8 @@ Kilka instalacji na jednej maszynie: dodaj `-p <nazwa>` i inny port, na przykła
 | `CZUJKA_ALLOWED_NETWORKS` | puste | blokada operatora: sieci CIDR po przecinku. Czujka nie skanuje nic poza nimi. Żaden użytkownik, także administrator, nie poszerzy jej w interfejsie ani w API |
 | `CZUJKA_TZ` | `Europe/Warsaw` | strefa czasowa histogramu dostępności hostów (godzina tygodnia) |
 | `CZUJKA_VERSION` | `dev` | etykieta obrazu i wersja w `/healthz` |
+| `CZUJKA_HOST_GATEWAY` | puste | adres, pod którym Czujka w kontenerze skanuje cele `localhost`, `127.x` i `::1`. Puste: adres IPv4 `host.docker.internal` (tylko w kontenerze); `off`: pętla zwrotna zostaje pętlą zwrotną; adres IPv4: ten adres. Odpowiedź tylko IPv6 wyłącza mapowanie (ostrzeżenie w logu) |
+| `CZUJKA_DB_HOST_PORT` | `55432` | tylko w trybie sieci hosta: port bazy na `127.0.0.1` hosta |
 
 ### 3.2 Zmienne binarki ustawiane przez obraz albo compose
 
@@ -111,6 +155,7 @@ Kilka instalacji na jednej maszynie: dodaj `-p <nazwa>` i inny port, na przykła
 | --- | --- | --- |
 | `CZUJKA_DB_URL` | `postgres://czujka:…@db:5432/czujka?sslmode=disable` | adres bazy; wymagana |
 | `CZUJKA_LISTEN` | `:8080` | adres nasłuchu w kontenerze |
+| `CZUJKA_PUBLISHED_PORT` | `CZUJKA_PORT` | port, na którym host publikuje interfejs; usługa Czujki na tym porcie hosta dockera dostaje tag `czujka`. Puste: port z `CZUJKA_LISTEN` |
 | `CZUJKA_WEB_DIR` | `/app/web` | katalog ze zbudowanym interfejsem |
 | `CZUJKA_MASTER_KEY_FILE` | `/var/lib/czujka/master.key` | plik klucza głównego; powstaje z prawami 0600, gdy go nie ma i `CZUJKA_MASTER_KEY` jest puste |
 
@@ -293,7 +338,8 @@ Kontener `czujka` jest w sieci `scan` (zwykły most Dockera). Przez nią i przez
 | Kontenery laboratorium w innej sieci Dockera | `docker network connect <sieć_laboratorium> czujka-czujka-1` | Polecenie sprawdzone: kontener dostaje adres w dołączonej sieci. Skan z produktu: do weryfikacji po integracji silnika. |
 | To samo na stałe | plik override z siecią zewnętrzną (niżej) | niesprawdzone |
 | Sieć fizyczna za hostem | Ruch wychodzi przez NAT hosta. Wykrywanie ARP nie działa przez NAT; działają ICMP i TCP. | do weryfikacji po integracji silnika |
-| Ten sam segment L2 z ARP | `network_mode: host` (tylko Linux) | niesprawdzone |
+| Usługi opublikowane na portach hosta dockera | cel `localhost` (mapowany na `host.docker.internal`, §2.5) | sprawdzone na Docker Desktop 2026-11-21 |
+| `127.0.0.1` maszyny i wszystkie sieci mostkowe Dockera; ten sam segment L2 z ARP | `deploy/docker-compose.host-network.yml` (`network_mode: host`, tylko Linux, §2.5) | cel `127.0.0.1` sprawdzony na Linuksie 2026-11-21; sieci mostkowe i ARP niesprawdzone |
 
 ```yaml
 # deploy/docker-compose.override.yml
