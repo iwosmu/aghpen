@@ -71,6 +71,7 @@ type Deps struct {
 	Route      func(dst netip.Addr) (src netip.Addr, err error)
 	Interfaces func() ([]netip.Prefix, error)
 	FreeBytes  func(dir string) (uint64, error)
+	ReadFile   func(path string) ([]byte, error)
 }
 
 // MinNmap is the oldest nmap version that the engine is tested with.
@@ -97,6 +98,7 @@ func Run(ctx context.Context, d Deps) Report {
 	add("disk", "Wolne miejsce na dysku", d.disk)
 	add("backup_tools", "Narzędzia kopii zapasowej (pg_dump, pg_restore)", d.backupTools)
 	add("scan_networks", "Trasa do sieci skanowanych", func() (string, string, string) { return d.scanNetworks(ctx) })
+	add("neighbour_table", "Tablica sąsiadów jądra (ARP)", func() (string, string, string) { return d.neighbourTable(ctx) })
 	r.OK = true
 	for _, c := range r.Checks {
 		if c.Status == Fail {
@@ -141,6 +143,9 @@ func (d *Deps) defaults() {
 	}
 	if d.FreeBytes == nil {
 		d.FreeBytes = freeBytes
+	}
+	if d.ReadFile == nil {
+		d.ReadFile = os.ReadFile
 	}
 	if d.NmapPath == "" {
 		d.NmapPath = "nmap"
@@ -395,6 +400,131 @@ func (d *Deps) scanNetworks(ctx context.Context) (string, string, string) {
 			st = Fail
 		}
 		return st, detail, "Host Czujki nie ma trasy do tych sieci. W dockerze dołącz kontener do sieci skanowanej (deploy/docker-compose.scan-network.yml, CZUJKA_SCAN_NETWORK) albo użyj network_mode: host; bez dockera dodaj trasę (ip route add <sieć> via <brama>) albo interfejs w tej sieci."
+	}
+	return OK, detail, ""
+}
+
+// GCThresh3 is where the kernel's IPv4 neighbour table limit is readable,
+// also inside a container: the limit is global, not per network namespace.
+const GCThresh3 = "/proc/sys/net/ipv4/neigh/default/gc_thresh3"
+
+// OnLinkAddresses counts the IPv4 addresses of the targets that share a subnet
+// with one of the scanner's interfaces: each of them gets a neighbour entry
+// (ARP) when it is probed. largest is the largest sum over one scope.
+func OnLinkAddresses(ctx context.Context, targets []model.Target, local []netip.Prefix, resolve func(context.Context, string) ([]string, error)) (total, largest int64) {
+	perScope := map[int64]int64{}
+	for _, t := range targets {
+		n := onLink(ctx, t, local, resolve)
+		total += n
+		perScope[t.ScopeID] += n
+	}
+	for _, n := range perScope {
+		largest = max(largest, n)
+	}
+	return total, largest
+}
+
+func onLink(ctx context.Context, t model.Target, local []netip.Prefix, resolve func(context.Context, string) ([]string, error)) int64 {
+	var best int64
+	v := strings.TrimSpace(t.Value)
+	for _, lp := range local {
+		if !lp.Addr().Is4() {
+			continue
+		}
+		var n int64
+		switch t.Kind {
+		case model.TargetIP, model.TargetDomain:
+			if a, err := firstAddr(ctx, t, resolve); err == nil && lp.Contains(a.Unmap()) {
+				n = 1
+			}
+		case model.TargetCIDR:
+			tp, err := netip.ParsePrefix(v)
+			if err != nil || !tp.Addr().Is4() {
+				continue
+			}
+			tp = tp.Masked()
+			switch {
+			case lp.Bits() <= tp.Bits() && lp.Contains(tp.Addr()):
+				n = int64(1) << (32 - tp.Bits())
+			case tp.Bits() < lp.Bits() && tp.Contains(lp.Addr()):
+				n = int64(1) << (32 - lp.Bits())
+			}
+		case model.TargetRange:
+			a, b, _ := strings.Cut(v, "-")
+			from, err1 := netip.ParseAddr(strings.TrimSpace(a))
+			to, err2 := netip.ParseAddr(strings.TrimSpace(b))
+			if err1 != nil || err2 != nil || !from.Is4() || !to.Is4() {
+				continue
+			}
+			lo, hi := u32(from), u32(to)
+			plo := u32(lp.Masked().Addr())
+			phi := plo + uint32(uint64(1)<<(32-lp.Bits())-1)
+			if lo < plo {
+				lo = plo
+			}
+			if hi > phi {
+				hi = phi
+			}
+			if hi >= lo {
+				n = int64(hi-lo) + 1
+			}
+		}
+		best = max(best, n)
+	}
+	return best
+}
+
+func u32(a netip.Addr) uint32 {
+	b := a.As4()
+	return uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
+}
+
+// NeighbourSysctl returns the sysctl lines for n on-link addresses.
+func NeighbourSysctl(n int64) string {
+	t3 := int64(4096)
+	for t3 < 2*n+1024 {
+		t3 *= 2
+	}
+	return fmt.Sprintf("net.ipv4.neigh.default.gc_thresh1 = %d\nnet.ipv4.neigh.default.gc_thresh2 = %d\nnet.ipv4.neigh.default.gc_thresh3 = %d", t3/8, t3/2, t3)
+}
+
+// neighbourTable compares the kernel's neighbour table limit with the number
+// of on-link addresses of the largest enabled scope. When the table overflows
+// during a scan, the kernel evicts the host's own entries too: name
+// resolution and other traffic of the whole host break.
+func (d *Deps) neighbourTable(ctx context.Context) (string, string, string) {
+	var total, largest int64
+	if d.Store != nil {
+		local, _ := d.Interfaces()
+		total, largest = OnLinkAddresses(ctx, d.targets(ctx), local, d.Resolve)
+	}
+	fix := "Skan sieci lokalnej tworzy wpis ARP dla każdego sondowanego adresu. Limit jest wspólny dla całego hosta (także dla kontenerów): po przepełnieniu jądro usuwa wpisy hosta i przestaje działać m.in. DNS. Na hoście (nie w kontenerze) wykonaj:\n" +
+		"cat <<'EOF' | sudo tee /etc/sysctl.d/90-czujka-neigh.conf\n" + NeighbourSysctl(largest) + "\nEOF\nsudo sysctl --system"
+	raw, err := d.ReadFile(GCThresh3)
+	if err != nil {
+		// The kernel shows gc_thresh* only in the host's network namespace: a
+		// container (other than network_mode: host) cannot read the limit.
+		if largest == 0 {
+			return Skip, "nie można odczytać limitu (" + GCThresh3 + "; w kontenerze jądro go ukrywa); żaden włączony zakres nie leży w sieci lokalnej skanera", ""
+		}
+		return Warn, fmt.Sprintf("nie można odczytać limitu z wnętrza kontenera (jądro pokazuje gc_thresh3 tylko w przestrzeni sieciowej hosta); największy zakres ma %d adresów w sieci lokalnej skanera, potrzebne gc_thresh3 >= %d. Sprawdź na hoście: sysctl net.ipv4.neigh.default.gc_thresh3", largest, 2*largest+1024), fix
+	}
+	limit, err := strconv.ParseInt(strings.TrimSpace(string(raw)), 10, 64)
+	if err != nil {
+		return Skip, "nieczytelna wartość gc_thresh3: " + strings.TrimSpace(string(raw)), ""
+	}
+	if d.Store == nil {
+		return OK, fmt.Sprintf("gc_thresh3 = %d; bez bazy danych nie da się policzyć celów w sieci lokalnej", limit), ""
+	}
+	detail := fmt.Sprintf("gc_thresh3 = %d; adresów w sieci lokalnej skanera: %d w największym zakresie, %d we wszystkich włączonych", limit, largest, total)
+	if largest == 0 {
+		return OK, detail + " (skan przez bramę nie zapełnia tablicy sąsiadów)", ""
+	}
+	switch {
+	case limit < largest:
+		return Fail, detail + ": skan przepełni tablicę sąsiadów", fix
+	case limit < 2*largest+1024:
+		return Warn, detail + ": mały zapas na wpisy samego hosta", fix
 	}
 	return OK, detail, ""
 }

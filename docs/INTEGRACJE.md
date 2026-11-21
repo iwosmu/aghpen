@@ -316,7 +316,15 @@ Wyniki z żywej instancji:
 
 ### 4.4 Plik nmap XML
 
-Eksport XML jednego przebiegu może trafić do osobnego testu typu „Nmap Scan". Ponowne wysłanie tego samego przebiegu robi reimport do tego samego testu (0 nowych pozycji). Parser DefectDojo tworzy jedną pozycję na numer otwartego portu, z endpointem dla każdego hosta.
+Eksport XML przebiegu (`POST /runs/{id}/export/defectdojo`) trafia do testu typu „Nmap Scan". Kluczem testu jest profil i engagement: tytuł `Czujka nmap: profil <id>` (przebieg bez profilu: `Czujka nmap: przebieg <id>`). Pierwsze wysłanie dla profilu robi import i tworzy test (`mode: "import"`). Każdy kolejny przebieg tego profilu robi reimport do tego samego testu z `close_old_findings=true` (`mode: "reimport"`): pozycje, których nowy plik już nie ma, DefectDojo zamyka (`closed` w odpowiedzi). Id profilu, nie nazwa, trzyma klucz stały po zmianie nazwy. Przebiegi wysyłaj w kolejności czasu: starszy przebieg wysłany po nowszym zamknie to, co widział tylko nowszy. Parser DefectDojo tworzy jedną pozycję na numer otwartego portu, z endpointem dla każdego hosta.
+
+### 4.4a Adres linków (`link_url`)
+
+Czujka może łączyć się z DefectDojo pod adresem, którego przeglądarka analityka nie otworzy (np. `http://host.docker.internal:18080` z kontenera). Pole `link_url` w ustawieniach DefectDojo to publiczny adres DefectDojo. Z niego Czujka buduje każdy link: `dojo_url` obserwacji, `test_url` oraz linki produktu i engagementu. Puste pole oznacza adres `url`.
+
+### 4.4b Awaria w środku eksportu
+
+Gdy DefectDojo przyjmie `/import-scan`, a potem przestanie odpowiadać przed odczytem kontrolnym, Czujka nie zna id nowych pozycji. Odpowiedź to 502 z kodem `dojo_unconfirmed` i tekstem „Wysłano, nie potwierdzono: powtórz eksport.". Nie ma w niej surowego błędu Go. Ponowny eksport znajduje te pozycje po kluczu (`unique_id_from_tool`) i łączy je bez duplikatów. To samo robi pobranie statusów (`POST /defectdojo/pull`, pole `linked`); ono niczego w DefectDojo nie tworzy. Test `TestUnconfirmedExportIsLinkedByKeyLater` zrywa połączenie po imporcie i sprawdza oba sposoby.
 
 ### 4.5 Ograniczenia
 
@@ -410,6 +418,8 @@ Sprawdzone na lokalnym DefectDojo 3.5.202: po `PATCH` w DefectDojo (`false_p`, `
 - obserwacja Czujki ze statusem `resolved` (już niewidoczna), której pozycja w DefectDojo jest otwarta: `PATCH is_mitigated = true, active = false` i notatka „Czujka: obserwacja … nie jest już widoczna (ostatnio widziana …, przebieg #…). Oznaczona jako usunięta.";
 - obserwacja znów widoczna (`new` albo `triaged`), której pozycja jest zamknięta: `PATCH is_mitigated = false, active = true` i notatka „… jest znów widoczna … Ponownie otwarta.";
 - pozycje oznaczone w DefectDojo jako fałszywy alarm, zaakceptowane albo poza zakresem nie są otwierane ponownie.
+
+Po stronie Czujki obowiązuje jedna zasada dla ustaleń silnika i ustaleń z reguł polityki. `accepted` i `false_positive` (od analityka albo z pobrania statusów) nie zmienia żaden skan. Ustalenie `resolved` wraca do `new` tylko wtedy, gdy przyczynę zaobserwowano po rozwiązaniu, raz na jedno rozwiązanie, z wpisem `finding.reopen` w dzienniku audytu. Synchronizacja przenosi to otwarcie do DefectDojo. Samo ponowne sprawdzenie reguł na tych samych danych niczego nie otwiera.
 
 Sprawdzone na lokalnej instancji: zamknięcie dało `active: False, is_mitigated: True, mitigated: 2026-11-21T13:15:56Z` i notatkę; ponowne otwarcie `active: True, is_mitigated: False` i drugą notatkę. Pierwsza próba z polem `mitigated` dostała 400 („Editing mitigated timestamp is disabled"), dlatego klient go nie wysyła.
 

@@ -287,7 +287,7 @@ export default function ProfileEdit() {
               <Num value={p.retry.down_after_misses} min={0} max={50} onChange={(v) => up((d) => { d.retry.down_after_misses = Math.max(0, v); })} />
             </Field>
           </div>
-          <p className="mt-2 text-xs text-ink-3">{t('Host, który odpowiadał w poprzednim skanie i milczy teraz, trafia najpierw do „brak odpowiedzi” (host_missing). Jego usługi są wtedy nieosiągalne, nie zamknięte. Zniknięcie (host_gone) zgłaszamy dopiero według tej reguły.', 'A host that answered in the previous run and is silent now first goes to "missing" (host_missing). Its services are then unreachable, not closed. We report it gone (host_gone) only under this rule.')}</p>
+          <p className="mt-2 text-xs text-ink-3">{t('Host, który odpowiadał w poprzednim skanie i milczy teraz, trafia najpierw do „brak odpowiedzi”. Jego usługi są wtedy nieosiągalne, nie zamknięte. Zniknięcie hosta zgłaszamy dopiero według tej reguły.', 'A host that answered in the previous run and is silent now first goes to "missing". Its services are then unreachable, not closed. We report the host gone only under this rule.')}</p>
         </Section>
 
         <Section title={t('Harmonogram i okna czasowe', 'Schedule and time windows')} hint={t('Skan, który nie zmieści się w oknie, zostaje wstrzymany na jego końcu i wznowiony w następnym.', 'A scan that does not fit its window is paused at the end and resumed in the next one.')}>

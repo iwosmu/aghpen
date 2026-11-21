@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "oversized-h1",
+        "value": "*",
+        "files": [
+          "docs/slides/czujka.src.html"
+        ],
+        "createdAt": "2026-11-21T15:16:48.801Z",
+        "reason": "agent decided: 1920x1080 slide deck; each h1 is a slide's assertion headline at 64px, at most two lines, and all 10 rendered pages leave room for content (build.mjs checks overflow)"
+      }
+    ]
+  }
+}

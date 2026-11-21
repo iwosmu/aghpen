@@ -18,6 +18,11 @@ import { ExportButtons, useDraft } from '../ui/edit';
 import { useCan } from '../session';
 
 const PAGE = 500;
+/** What a host without open ports is: it answers, but the profile found no open port on it. */
+function noPortsText(status: string): string {
+  return status === 'down' ? t('nie odpowiada', 'not answering') : t('odpowiada, brak otwartych portów w profilu', 'answers, no open port in the profile');
+}
+const LIVE_STATUSES = 'up,unstable,expected-offline,unknown';
 const FILTERS = ['q', 'status', 'scope_id', 'tag', 'tech', 'port', 'min_interest', 'cidr'];
 
 interface VCol { id: string; header: string; width: string; min: number; sort?: string; align?: 'right'; cell: (h: Host) => ReactNode }
@@ -31,6 +36,9 @@ export default function Hosts() {
   const query = useMemo(() => {
     const q: Record<string, string> = {};
     for (const k of FILTERS) { const v = u.get(k); if (v) q[k] = v; }
+    // Default: every host except the inactive ones ("all" shows them too).
+    const st = u.get('status', 'live');
+    if (st === 'all') delete q.status; else q.status = st === 'live' ? LIVE_STATUSES : st;
     q.sort = u.get('sort', '-interest');
     return q;
   }, [u]);
@@ -74,10 +82,10 @@ export default function Hosts() {
         <span className={cx('mono', h.label ? 'text-ink-3' : 'text-ink-2')}>{h.hostnames?.[0] ?? (h.label ? '' : '–')}</span>
       </span>
     ) },
-    { id: 'ports', header: t('Otwarte porty', 'Open ports'), width: 'minmax(120px, 1fr)', min: 900, sort: 'service_count', cell: (h) => <span className="mono block truncate text-ink-2">{(h.open_ports ?? []).join(' ') || '–'}</span> },
-    { id: 'tech', header: t('Technologie', 'Technologies'), width: 'minmax(140px, 1.2fr)', min: 1080, cell: (h) => <span className="block truncate text-ink-2">{(h.technologies ?? []).join(', ') || '–'}</span> },
+    { id: 'ports', header: t('Otwarte porty', 'Open ports'), width: 'minmax(120px, 1fr)', min: 900, sort: 'service_count', cell: (h) => (h.open_ports ?? []).length ? <span className="mono block truncate text-ink-2">{(h.open_ports ?? []).join(' ')}</span> : <span className="block truncate text-xs text-ink-3" title={noPortsText(h.status)}>{h.status === 'down' ? noPortsText(h.status) : t('brak otwartych portów', 'no open port')}</span> },
+    { id: 'tech', header: t('Technologie', 'Technologies'), width: 'minmax(140px, 1.2fr)', min: 1080, cell: (h) => <span className="block truncate text-ink-2">{(h.technologies ?? []).join(', ') || ((h.open_ports ?? []).length ? '–' : '')}</span> },
     { id: 'tags', header: t('Tagi', 'Tags'), width: '150px', min: 1320, cell: (h) => <Tags tags={h.tags} max={2} /> },
-    { id: 'palive', header: 'p_alive', width: '62px', min: 760, sort: 'p_alive', align: 'right', cell: (h) => <span className="num text-ink-2">{h.p_alive.toFixed(2)}</span> },
+    { id: 'palive', header: t('Obecność', 'Presence'), width: '62px', min: 760, sort: 'p_alive', align: 'right', cell: (h) => <span className="num text-ink-2">{h.p_alive.toFixed(2)}</span> },
     { id: 'seen', header: t('Ostatnio widziany', 'Last seen'), width: '128px', min: 700, sort: 'last_seen', cell: (h) => <span className="num text-ink-2" title={fmtDateTime(h.last_seen)}>{fmtRelative(h.last_seen)}</span> },
     { id: 'interest', header: t('Ciekawość', 'Interest'), width: '86px', min: 0, sort: 'interest', align: 'right', cell: (h) => <InterestScore value={h.interest} /> },
   ];
@@ -90,7 +98,7 @@ export default function Hosts() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title={t('Hosty', 'Hosts')}
-        sub={inf.data ? <><span className="num text-ink">{fmtInt(total)}</span> {plural(total, ['host', 'hosty', 'hostów'], ['host', 'hosts'])}{active ? t(' po filtrach', ' after filters') : t(' w inwentarzu', ' in the inventory')}</> : t('Wczytywanie…', 'Loading…')}
+        sub={inf.data ? <><span className="num text-ink">{fmtInt(total)}</span> {plural(total, ['host', 'hosty', 'hostów'], ['host', 'hosts'])}{active ? t(' po filtrach', ' after filters') : u.get('status') ? '' : t(' w inwentarzu bez nieaktywnych (filtr „Stan”)', ' in the inventory, inactive ones hidden (filter "Status")')}</> : t('Wczytywanie…', 'Loading…')}
         readOnly={!canEdit}
         actions={<>{canCreate ? <Button icon="plus" onClick={() => setManual(true)} data-testid="host-manual">{t('Dodaj host ręcznie', 'Add a host by hand')}</Button> : null}<ExportButtons kind="hosts" query={query} /></>}
       />
@@ -98,7 +106,7 @@ export default function Hosts() {
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
         <SearchField value={q} onChange={setQ} placeholder={t('IP, nazwa, etykieta', 'IP, name, label')} width={200} />
         <FilterField label={t('Stan', 'Status')} width={150}>
-          <Select value={u.get('status')} onChange={(v) => u.set({ status: v })} options={[{ value: '', label: t('wszystkie', 'all') }, ...HOST_STATUSES.map((s) => ({ value: s, label: hostStatusInfo(s).label }))]} />
+          <Select value={u.get('status', 'live')} onChange={(v) => u.set({ status: v === 'live' ? null : v })} options={[{ value: 'live', label: t('bez nieaktywnych', 'not inactive') }, { value: 'all', label: t('wszystkie', 'all') }, ...HOST_STATUSES.map((s) => ({ value: s, label: hostStatusInfo(s).label }))]} />
         </FilterField>
         <FilterField label={t('Zakres', 'Scope')} width={160}>
           <Select value={u.get('scope_id')} onChange={(v) => u.set({ scope_id: v })} options={[{ value: '', label: t('wszystkie', 'all') }, ...(scopes.data?.items ?? []).map((s) => ({ value: String(s.id), label: s.name }))]} />
@@ -149,7 +157,7 @@ export default function Hosts() {
                       {narrow ? (
                         <>
                           <span className="flex items-center justify-between gap-2"><span className="mono text-sm text-ink">{h.ip}</span><InterestScore value={h.interest} /></span>
-                          <span className="flex items-center justify-between gap-2 text-xs"><span className="truncate text-ink-2">{h.label || h.hostnames?.[0] || (h.open_ports ?? []).join(' ') || '–'}</span><span className="flex-none"><HostStatusMark status={h.status} /></span></span>
+                          <span className="flex items-center justify-between gap-2 text-xs"><span className="truncate text-ink-2">{h.label || h.hostnames?.[0] || (h.open_ports ?? []).join(' ') || noPortsText(h.status)}</span><span className="flex-none"><HostStatusMark status={h.status} /></span></span>
                         </>
                       ) : cols.map((c) => <span key={c.id} role="cell" className={cx('min-w-0 whitespace-nowrap', c.align === 'right' && 'flex justify-end')}>{c.cell(h)}</span>)}
                     </Link>

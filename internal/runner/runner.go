@@ -165,14 +165,14 @@ func (m *Manager) BuildPlan(ctx context.Context, profile model.ScanProfile, run 
 			plan.Profile.Ports = p
 		}
 	case len(profile.ScopeIDs) == 0:
-		return plan, fmt.Errorf("%w: the profile has no scope", ErrInvalid)
+		return plan, fmt.Errorf("%w: profil nie ma zakresu", ErrInvalid)
 	default:
 		if plan.Targets, err = m.st.EnabledTargets(ctx, profile.ScopeIDs); err != nil {
 			return plan, err
 		}
 	}
 	if len(plan.Targets) == 0 {
-		return plan, fmt.Errorf("%w: the scopes of the profile have no enabled target", ErrInvalid)
+		return plan, fmt.Errorf("%w: zakresy profilu nie mają żadnego włączonego celu", ErrInvalid)
 	}
 	// Defence in depth: the API rejects targets outside the allowed networks at
 	// entry; the plan drops them again, also targets stored before the policy changed.
@@ -184,11 +184,11 @@ func (m *Manager) BuildPlan(ctx context.Context, profile model.ScanProfile, run 
 		m.log.Warn("target outside the allowed networks dropped from the plan", "target", d.Value, "reason", d.Reason)
 	}
 	if len(kept) == 0 {
-		where := "the allowed networks of the safety policy"
+		where := "dozwolonymi sieciami polityki bezpieczeństwa"
 		if len(plan.Policy.OperatorNetworks) > 0 {
-			where += " or the operator lock (CZUJKA_ALLOWED_NETWORKS: " + strings.Join(plan.Policy.OperatorNetworks, ", ") + ")"
+			where += " albo blokadą operatora (CZUJKA_ALLOWED_NETWORKS: " + strings.Join(plan.Policy.OperatorNetworks, ", ") + ")"
 		}
-		msg := "every target lies outside " + where
+		msg := "każdy cel leży poza " + where
 		if len(dropped) > 0 {
 			msg += "; " + dropped[0].Value + ": " + dropped[0].Reason
 		}
@@ -293,7 +293,7 @@ func (m *Manager) Start(ctx context.Context, profileID int64, userID *int64, tri
 		return model.ScanRun{}, err
 	}
 	if !p.Enabled {
-		return model.ScanRun{}, fmt.Errorf("%w: the profile is disabled", ErrInvalid)
+		return model.ScanRun{}, fmt.Errorf("%w: profil jest wyłączony", ErrInvalid)
 	}
 	if id, err := m.activeRunOf(ctx, p.ID); err != nil {
 		return model.ScanRun{}, err
@@ -811,18 +811,18 @@ func AdHocTargets(addrs []string) ([]model.Target, error) {
 		if strings.Contains(v, "/") {
 			p, err := netip.ParsePrefix(v)
 			if err != nil {
-				return nil, fmt.Errorf("%w: %q is not an IP address or CIDR", ErrInvalid, v)
+				return nil, fmt.Errorf("%w: %q nie jest adresem IP ani blokiem CIDR", ErrInvalid, v)
 			}
 			p = p.Masked()
 			host := p.Addr().BitLen() - p.Bits()
 			if host > 16 {
-				return nil, fmt.Errorf("%w: %q is larger than a /16", ErrInvalid, v)
+				return nil, fmt.Errorf("%w: %q jest większy niż /16", ErrInvalid, v)
 			}
 			t.Kind, t.Value, t.Addresses = model.TargetCIDR, p.String(), int64(1)<<host
 		} else {
 			a, err := netip.ParseAddr(v)
 			if err != nil {
-				return nil, fmt.Errorf("%w: %q is not an IP address or CIDR", ErrInvalid, v)
+				return nil, fmt.Errorf("%w: %q nie jest adresem IP ani blokiem CIDR", ErrInvalid, v)
 			}
 			t.Kind, t.Value, t.Addresses = model.TargetIP, a.Unmap().String(), 1
 		}
@@ -830,10 +830,10 @@ func AdHocTargets(addrs []string) ([]model.Target, error) {
 		out = append(out, t)
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("%w: no address to probe", ErrInvalid)
+		return nil, fmt.Errorf("%w: brak adresu do sprawdzenia", ErrInvalid)
 	}
 	if total > MaxAdHocAddresses {
-		return nil, fmt.Errorf("%w: %d addresses is more than %d", ErrInvalid, total, MaxAdHocAddresses)
+		return nil, fmt.Errorf("%w: %d adresów to więcej niż limit %d", ErrInvalid, total, MaxAdHocAddresses)
 	}
 	return out, nil
 }
@@ -860,7 +860,7 @@ func (m *Manager) StartAdHoc(ctx context.Context, scope model.AdHocScope, userID
 			return model.ScanRun{}, err
 		}
 		if len(page.Items) == 0 {
-			return model.ScanRun{}, fmt.Errorf("%w: no scan profile exists", ErrInvalid)
+			return model.ScanRun{}, fmt.Errorf("%w: nie ma żadnego profilu skanowania", ErrInvalid)
 		}
 		scope.ProfileID = page.Items[0].ID
 	}
@@ -869,7 +869,7 @@ func (m *Manager) StartAdHoc(ctx context.Context, scope model.AdHocScope, userID
 		return model.ScanRun{}, err
 	}
 	if strings.ContainsAny(scope.Ports, " ;|&$`'\"\\\n") {
-		return model.ScanRun{}, fmt.Errorf("%w: ports must be an nmap port list", ErrInvalid)
+		return model.ScanRun{}, fmt.Errorf("%w: ports: wymagana lista portów w składni nmap, np. 22,80,443,8000-8100", ErrInvalid)
 	}
 	if trigger == "" {
 		trigger = TriggerReprobe

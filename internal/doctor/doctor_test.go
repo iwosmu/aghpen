@@ -3,6 +3,7 @@ package doctor
 import (
 	"context"
 	"errors"
+	"github.com/iwosmu/aghpen/internal/model"
 	"net/netip"
 	"strings"
 	"testing"
@@ -98,5 +99,36 @@ func TestRouteSourceSendsNothingAndWorksForLoopback(t *testing.T) {
 	src, err := routeSource(netip.MustParseAddr("127.0.0.1"))
 	if err != nil || !src.IsLoopback() {
 		t.Fatalf("route to loopback: %v %v", src, err)
+	}
+}
+
+func TestNeighbourTableAgainstOnLinkScopes(t *testing.T) {
+	ctx := context.Background()
+	local := []netip.Prefix{netip.MustParsePrefix("10.66.0.0/16"), netip.MustParsePrefix("172.18.0.0/24")}
+	targets := []model.Target{
+		{ScopeID: 1, Kind: model.TargetCIDR, Value: "10.66.0.0/16"},             // all on-link: 65536
+		{ScopeID: 2, Kind: model.TargetCIDR, Value: "172.18.0.0/22"},            // overlaps the /24: 256
+		{ScopeID: 2, Kind: model.TargetRange, Value: "172.18.0.250-172.18.1.5"}, // 6 inside the /24
+		{ScopeID: 2, Kind: model.TargetIP, Value: "8.8.8.8"},                    // via the gateway
+		{ScopeID: 3, Kind: model.TargetCIDR, Value: "192.0.2.0/24"},             // not local
+	}
+	total, largest := OnLinkAddresses(ctx, targets, local, nil)
+	if largest != 65536 || total != 65536+256+6 {
+		t.Fatalf("on-link: total %d largest %d", total, largest)
+	}
+	if !strings.Contains(NeighbourSysctl(65536), "gc_thresh3 = 262144") {
+		t.Errorf("sysctl for a /16: %s", NeighbourSysctl(65536))
+	}
+	if !strings.Contains(NeighbourSysctl(10), "gc_thresh3 = 4096") {
+		t.Errorf("sysctl floor: %s", NeighbourSysctl(10))
+	}
+	d := Deps{ReadFile: func(string) ([]byte, error) { return nil, errors.New("no proc") }}
+	d.defaults()
+	if st, _, _ := d.neighbourTable(ctx); st != Skip {
+		t.Errorf("without /proc: %s", st)
+	}
+	d.ReadFile = func(string) ([]byte, error) { return []byte("1024\n"), nil }
+	if st, detail, _ := d.neighbourTable(ctx); st != OK || !strings.Contains(detail, "1024") {
+		t.Errorf("without a database: %s %s", st, detail)
 	}
 }

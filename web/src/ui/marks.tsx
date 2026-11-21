@@ -126,7 +126,7 @@ export function runStatusInfo(s: RunStatus | string, pauseReason?: string): { to
     case 'running': return { tone: 'accent', glyph: 'run', label: t('w toku', 'running'), live: true };
     case 'analyzing': return { tone: 'accent', glyph: 'half', label: t('analiza', 'analysing'), live: true };
     case 'paused': {
-      const why = pauseReason === 'window_closed' ? t('okno zamknięte', 'window closed') : pauseReason === 'emergency_stop' ? t('stop awaryjny', 'emergency stop') : t('ręcznie', 'manual');
+      const why = pauseReason === 'window_closed' ? t('okno zamknięte', 'window closed') : pauseReason === 'emergency_stop' ? t('stop awaryjny', 'emergency stop') : pauseReason === 'restart' ? t('restart serwera', 'server restart') : t('ręcznie', 'manual');
       return { tone: pauseReason === 'emergency_stop' ? 'danger' : 'changed', glyph: 'pause', label: t('wstrzymany', 'paused') + ' · ' + why, live: false };
     }
     case 'completed': return { tone: 'neutral', glyph: 'check', label: t('zakończony', 'completed'), live: false };

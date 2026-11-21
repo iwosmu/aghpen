@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode 
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import { cx } from '../lib/format';
-import { t } from '../i18n';
+import { t, getLang } from '../i18n';
+import { lockMessage } from '../lib/lock';
 import { Icon } from './Icon';
 import { ApiError, isUnavailable } from '../api/client';
 
@@ -201,6 +202,9 @@ export function explainError(error: unknown): Explained {
   if (e.status === 404) return { ...base, title: t('Nie znaleziono', 'Not found'), detail: t('Ten obiekt nie istnieje albo został usunięty.', 'This object does not exist or was deleted.') };
   if (e.code === 'emergency_stop') return { ...base, icon: 'stop', title: t('Stop awaryjny jest aktywny', 'The emergency stop is active'), detail: t('Żaden skan nie wystartuje, dopóki blokada nie zostanie zwolniona.', 'No scan starts until the stop is released.') };
   if (e.status === 409) return { ...base, title: t('Operacja jest sprzeczna z bieżącym stanem', 'The operation conflicts with the current state'), detail: msg };
+  if (e.code === 'dojo_unconfirmed') return { ...base, icon: 'alert', retryable: true, title: t('Wysłano, nie potwierdzono', 'Sent, not confirmed'), detail: getLang() === 'pl' ? msg.replace(/^Wysłano, nie potwierdzono:\s*(\S)/, (_m, c: string) => c.toUpperCase()) : 'Repeat the export. DefectDojo accepted the data but stopped answering before it confirmed it. Repeating the export, or pulling the statuses, links these findings by key, without duplicates.' };
+  const locked = e.status === 422 ? lockMessage(msg, getLang()) : null;
+  if (locked) return { ...base, icon: 'lock', title: t('Zablokowane przez operatora wdrożenia', 'Blocked by the deployment operator'), detail: locked };
   if (e.status === 422 || e.code === 'validation') return { ...base, title: t('Dane nie przeszły walidacji', 'The data did not pass validation'), detail: msg };
   if (e.status === 429) return { ...base, icon: 'clock', title: t('Zbyt wiele prób', 'Too many attempts'), detail: t('Spróbuj ponownie za kilka minut.', 'Try again in a few minutes.') + ' (' + msg + ')' };
   if (e.status === 400) return { ...base, title: t('Nieprawidłowe żądanie', 'Bad request'), detail: msg };

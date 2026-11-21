@@ -1,0 +1,4 @@
+out/
+*.webm
+raw/
+node_modules/

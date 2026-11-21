@@ -4,7 +4,7 @@ import type { CountPoint, NameCount } from '../api/types';
 import { useWidth } from '../lib/hooks';
 import { cx, fmtDate, fmtInt, fmtSigned } from '../lib/format';
 import { t } from '../i18n';
-import { overCap } from '../lib/headline';
+import { overCap, paceTip } from '../lib/headline';
 import { Icon } from '../ui/Icon';
 
 /** Ranked horizontal bars: one series, one colour, the value at the tip. */
@@ -111,13 +111,24 @@ export function ProgressBar({ value, max, label, active = 0 }: { value: number; 
 }
 
 /** Rate against its caps: the fill is the current rate, the tick marks the profile cap, the track ends at the policy cap. */
-export function RateGauge({ current, cap, policyCap, unit = 'pps' }: { current: number; cap: number; policyCap: number; unit?: string }) {
+/** A probe packet count; "≈" when part of it is an estimate. */
+export function PacketCount({ sent, estimated }: { sent: number; estimated?: number }) {
+  if (!estimated) return <span className="num">{fmtInt(sent)}</span>;
+  return (
+    <span className="num" title={t('W tym około ' + fmtInt(estimated) + ' pakietów szacowanych: etap nmap nie podał dokładnej liczby.', 'About ' + fmtInt(estimated) + ' of these packets are estimated: an nmap stage gave no exact count.')} data-testid="packets-estimated">
+      <span className="text-ink-3">≈ </span>{fmtInt(sent)}
+    </span>
+  );
+}
+
+export function RateGauge({ current, cap, policyCap, unit = 'pps', basis }: { current: number; cap: number; policyCap: number; unit?: string; basis?: string }) {
   const max = Math.max(policyCap, cap, current, 1);
   const over = overCap(current, cap);
+  const pace = basis === 'pace';
   return (
     <div data-over={over || undefined}>
       <div className="flex items-baseline justify-between gap-3">
-        <span className={cx('inline-flex items-baseline gap-1', over && 'text-danger')}>{over ? <Icon name="alert" size={14} className="self-center" /> : null}<span className={cx('num text-lg font-semibold', over ? 'text-danger' : 'text-ink')}>{fmtInt(current)}</span> <span className="text-xs text-ink-3">{unit}</span></span>
+        <span className={cx('inline-flex items-baseline gap-1', over && 'text-danger')}>{over ? <Icon name="alert" size={14} className="self-center" /> : null}{pace ? <span className="num text-lg font-semibold text-ink-3">≈</span> : null}<span className={cx('num text-lg font-semibold', over ? 'text-danger' : 'text-ink')}>{fmtInt(current)}</span> <span className="text-xs text-ink-3">{unit}</span>{pace ? <span className="ml-1 border border-rule-strong px-1 text-2xs text-ink-2" title={paceTip()} data-testid="rate-pace">{t('tempo zadane', 'set pace')}</span> : basis === 'measured' ? <span className="ml-1 text-2xs text-ink-3" data-testid="rate-measured">{t('zmierzone', 'measured')}</span> : null}</span>
         <span className="text-xs text-ink-2">{t('limit skanu', 'run cap')} <span className="num text-ink">{fmtInt(cap)}</span></span>
       </div>
       <div className="relative mt-1.5 h-[8px] bg-[color-mix(in_oklch,var(--accent)_14%,var(--raised))]" role="meter" aria-valuemin={0} aria-valuemax={max} aria-valuenow={current} aria-label={t('Tempo pakietów względem limitu', 'Packet rate against the cap')}>
@@ -130,7 +141,9 @@ export function RateGauge({ current, cap, policyCap, unit = 'pps' }: { current: 
       </div>
       {over ? (
         <p role="alert" className="mt-2 border-l-2 border-danger pl-2 text-xs text-ink" data-testid="rate-over-cap">
-          {t('Zgłoszone tempo przekracza limit skanu o ' + Math.round((current / cap - 1) * 100) + '%. To nie jest normalny stan: sprawdź przebieg albo użyj stopu awaryjnego.', 'The reported rate is ' + Math.round((current / cap - 1) * 100) + '% above the run cap. This is not a normal state: check the run or use the emergency stop.')}
+          {pace
+            ? t('Tempo zadane przekracza limit skanu o ' + Math.round((current / cap - 1) * 100) + '%. To nie jest normalny stan: sprawdź profil i przebieg albo użyj stopu awaryjnego.', 'The set pace is ' + Math.round((current / cap - 1) * 100) + '% above the run cap. This is not a normal state: check the profile and the run or use the emergency stop.')
+            : t('Zmierzone tempo przekracza limit skanu o ' + Math.round((current / cap - 1) * 100) + '%. To nie jest normalny stan: sprawdź przebieg albo użyj stopu awaryjnego.', 'The measured rate is ' + Math.round((current / cap - 1) * 100) + '% above the run cap. This is not a normal state: check the run or use the emergency stop.')}
         </p>
       ) : null}
     </div>

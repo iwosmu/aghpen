@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { usePage, useAction } from '../api/hooks';
+import { usePage, useAction, useItem } from '../api/hooks';
 import { post } from '../api/client';
-import type { ScanProfile, ScanRun } from '../api/types';
+import type { SafetyPolicy, ScanProfile, ScanRun } from '../api/types';
 import { t } from '../i18n';
 import { fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelative } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
@@ -12,6 +12,10 @@ import { RUN_STATUSES, RunStatusMark, runStatusInfo, Glyph } from '../ui/marks';
 import { ProgressBar } from '../viz/charts';
 import { useCan } from '../session';
 import { EstimateBox } from './ProfileEdit';
+import { OperatorLockNote } from './Targets';
+import { outsideLock } from '../lib/lock';
+import { Icon } from '../ui/Icon';
+import { isFullRun, partialRunPhrase } from '../lib/headline';
 
 export function triggerLabel(x: string): string {
   switch (x) {
@@ -55,10 +59,56 @@ export function StartRunDialog({ open, onClose, profileId }: { open: boolean; on
   );
 }
 
+/** A run over chosen addresses (POST /runs/adhoc): the profile gives rate, discovery and HTTP settings; the policy and the operator lock apply. */
+export function AdHocRunDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const profiles = usePage<ScanProfile>('/profiles', { limit: 100 }, open);
+  const safety = useItem<SafetyPolicy>('/settings/safety', undefined, { enabled: open });
+  const [pid, setPid] = useState('');
+  const [addrs, setAddrs] = useState('');
+  const [ports, setPorts] = useState('');
+  const [reason, setReason] = useState('');
+  const navigate = useNavigate();
+  const items = profiles.data?.items ?? [];
+  const chosen = pid || (items[0] ? String(items[0].id) : '');
+  const list = addrs.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
+  const outside = outsideLock(list, safety.data?.operator_networks ?? []);
+  const start = useAction(() => post<ScanRun>('/runs/adhoc', { profile_id: Number(chosen) || 0, addresses: list, ports: ports.trim(), reason: reason.trim() }), {
+    invalidate: ['/runs', '/dashboard'], silent: true,
+    onSuccess: (run) => { onClose(); navigate('/runs/' + run.id); },
+  });
+  return (
+    <Dialog
+      open={open} onClose={onClose} title={t('Skan wybranych adresów', 'Scan chosen addresses')} width={560}
+      footer={<>
+        <Button onClick={onClose}>{t('Anuluj', 'Cancel')}</Button>
+        <Button variant="primary" icon="play" busy={start.isPending} disabled={list.length === 0} onClick={() => start.mutate(undefined)} data-testid="adhoc-start">{t('Uruchom', 'Start')}</Button>
+      </>}
+    >
+      <p className="mb-3 text-sm text-ink-2">{t('Jednorazowy przebieg tylko dla podanych adresów. Nie oznacza innych hostów jako nieaktywnych i nie zmienia historii tempa profilu.', 'A one-off run for the given addresses only. It marks no other host as inactive and does not change the speed history of the profile.')}</p>
+      <div className="grid gap-3">
+        <label className="block"><span className="label mb-1 block">{t('Ustawienia z profilu', 'Settings from the profile')}</span>
+          <Select value={chosen} onChange={setPid} options={items.map((p) => ({ value: String(p.id), label: p.name }))} />
+        </label>
+        <label className="block"><span className="label mb-1 block">{t('Adresy: IP albo CIDR do /16', 'Addresses: IP or CIDR up to /16')}</span>
+          <textarea className="field mono" rows={4} value={addrs} onChange={(e) => setAddrs(e.target.value)} placeholder={(safety.data?.operator_networks?.[0]?.replace(/\.0\/\d+$/, '.10') ?? '10.66.70.20') + '\n10.66.3.0/24'} data-testid="adhoc-addresses" aria-invalid={outside.length > 0} />
+        </label>
+        <OperatorLockNote networks={safety.data?.operator_networks} />
+        {outside.length ? <p className="flex items-start gap-1.5 text-xs text-st-changed" data-testid="adhoc-outside-lock"><Icon name="lock" size={13} className="mt-px flex-none" /><span>{t('Poza blokadą operatora: ', 'Outside the operator lock: ')}<span className="mono">{outside.join(', ')}</span>{t('. Serwer nie zeskanuje tych adresów.', '. The server will not scan these addresses.')}</span></p> : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block"><span className="label mb-1 block">{t('Porty (puste = porty profilu)', 'Ports (empty = the profile ports)')}</span><input className="field mono" value={ports} onChange={(e) => setPorts(e.target.value)} placeholder="80,443,8080" /></label>
+          <label className="block"><span className="label mb-1 block">{t('Powód (trafia do dziennika)', 'Reason (goes to the audit log)')}</span><input className="field" value={reason} onChange={(e) => setReason(e.target.value)} /></label>
+        </div>
+      </div>
+      <div className="mt-3" data-testid="adhoc-error"><InlineError error={start.error} /></div>
+    </Dialog>
+  );
+}
+
 export default function Runs() {
   const u = useUrlState();
   const canRun = useCan('scans:run');
   const [startOpen, setStartOpen] = useState(false);
+  const [adhocOpen, setAdhocOpen] = useState(false);
   const limit = 25;
   const offset = Number(u.get('offset', '0'));
   const q = usePage<ScanRun>('/runs', { status: u.get('status'), profile_id: u.get('profile_id'), sort: u.get('sort', '-id'), limit, offset });
@@ -66,7 +116,7 @@ export default function Runs() {
   const cols: Col<ScanRun>[] = [
     { id: 'id', header: '#', sort: 'id', width: 64, cell: (r) => <Link to={'/runs/' + r.id} className="num link">#{r.id}</Link> },
     { id: 'status', header: t('Stan', 'Status'), cell: (r) => <RunStatusMark status={r.status} pauseReason={r.pause_reason} /> },
-    { id: 'profile', header: t('Profil / źródło', 'Profile / source'), cell: (r) => <span className="block max-w-[280px] truncate" title={r.profile_name + (r.note ? ' · ' + r.note : '')}>{r.label ? <span className="mr-1.5 border border-rule-strong px-1 text-2xs text-ink-2">{r.label}</span> : null}{r.profile_name}</span> },
+    { id: 'profile', header: t('Profil / źródło', 'Profile / source'), cell: (r) => <span className="block max-w-[280px] truncate" title={r.profile_name + (r.note ? ' · ' + r.note : '')}>{r.label ? <span className="mr-1.5 border border-rule-strong px-1 text-2xs text-ink-2">{r.label}</span> : null}{isFullRun(r) || r.status !== 'completed' && r.profile_id != null ? r.profile_name : <>{partialRunPhrase(r)}{r.profile_name ? <span className="text-ink-3"> · {t('opcje profilu', 'profile options')} {r.profile_name}</span> : null}</>}</span> },
     { id: 'trigger', header: t('Start', 'Trigger'), hide: 'lg', cell: (r) => <span className={r.trigger === 'reprobe' ? 'text-accent' : 'text-ink-2'}>{triggerLabel(r.trigger)}</span> },
     { id: 'started', header: t('Rozpoczęty', 'Started'), sort: 'started_at', cell: (r) => <span className="num text-ink-2" title={fmtDateTime(r.started_at)}>{fmtRelative(r.started_at)}</span> },
     { id: 'dur', header: t('Czas', 'Duration'), align: 'right', hide: 'md', cell: (r) => <span className="num">{fmtDuration(r.stats.elapsed_sec)}</span> },
@@ -96,6 +146,7 @@ export default function Runs() {
         readOnly={!canRun}
         actions={<>
           <Link to="/changes/compare" className="link inline-flex h-[30px] items-center gap-1.5 text-sm">{t('Porównaj dwa przebiegi', 'Compare two runs')}</Link>
+          {canRun ? <Button icon="targets" onClick={() => setAdhocOpen(true)} data-testid="adhoc-open">{t('Skan wybranych adresów', 'Scan chosen addresses')}</Button> : null}
           {canRun ? <Button variant="primary" icon="play" onClick={() => setStartOpen(true)}>{t('Uruchom skan', 'Start a scan')}</Button> : null}
         </>}
       />
@@ -121,6 +172,7 @@ export default function Runs() {
       />
       {q.data ? <Pager total={q.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}
       <StartRunDialog open={startOpen} onClose={() => setStartOpen(false)} />
+      <AdHocRunDialog open={adhocOpen} onClose={() => setAdhocOpen(false)} />
     </div>
   );
 }

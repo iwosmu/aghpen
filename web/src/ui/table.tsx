@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { cx, fmtInt } from '../lib/format';
-import { t } from '../i18n';
+import { plural, t } from '../i18n';
 import { Icon } from './Icon';
 import { Button, Empty, ErrorState, SkeletonRows } from './kit';
 
@@ -155,7 +155,7 @@ export function DataTable<T>(p: TableProps<T>) {
 export function Pager({ total, limit, offset, onOffset }: { total: number; limit: number; offset: number; onOffset: (o: number) => void }) {
   if (total === 0) return null;
   if (total <= limit && offset === 0) {
-    return <div className="border-t border-rule px-4 py-2 text-xs text-ink-3 sm:px-6">{fmtInt(total)} {t('wierszy', 'rows')}</div>;
+    return <div className="border-t border-rule px-4 py-2 text-xs text-ink-3 sm:px-6">{fmtInt(total)} {plural(total, ['wiersz', 'wiersze', 'wierszy'], ['row', 'rows'])}</div>;
   }
   const from = total === 0 ? 0 : offset + 1;
   const to = Math.min(total, offset + limit);

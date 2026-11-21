@@ -11,7 +11,7 @@ import { post } from '../api/client';
 import { openStream } from '../api/events';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
 import type { Health, Permission, SafetyPolicy, ScanProfile, ScanRun } from '../api/types';
-import { overCap } from '../lib/headline';
+import { overCap, paceTip } from '../lib/headline';
 import { Glyph } from '../ui/marks';
 
 interface NavItem { to: string; label: string; icon: string; perms: Permission[]; end?: boolean }
@@ -164,12 +164,14 @@ function ActiveRunStrip() {
   const policyCap = safety.data?.max_pps ?? 0;
   const cap = Math.min(profile.data?.rate.max_pps ?? policyCap, policyCap || Infinity) || policyCap;
   const over = overCap(run.stats.current_pps, cap);
+  const pace = run.stats.current_pps_basis === 'pace';
+  const tip = (over ? t('Tempo powyżej limitu skanu ' + fmtInt(cap) + ' pps. ', 'Rate above the run cap of ' + fmtInt(cap) + ' pps. ') : '') + (pace ? paceTip() : run.stats.current_pps_basis === 'measured' ? t('Tempo zmierzone z dokładnych liczników pakietów.', 'Rate measured from exact packet counts.') : '');
   return (
     <Link to={'/runs/' + run.id} className="hidden min-w-0 items-center gap-2 text-xs text-ink-2 hover:text-ink md:inline-flex">
       <Glyph name="run" tone="accent" pulse size={12} />
       <span className="truncate">{t('Skan', 'Run')} <span className="num">#{run.id}</span> · {run.profile_name}</span>
       <span className="num text-ink">{fmtPct(pct)}</span>
-      <span className={cx('num inline-flex items-center gap-1', over ? 'font-medium text-danger' : 'text-ink-3')} title={over ? t('Tempo powyżej limitu skanu ' + fmtInt(cap) + ' pps', 'Rate above the run cap of ' + fmtInt(cap) + ' pps') : undefined} data-testid={over ? 'strip-over-cap' : undefined}>{over ? <Icon name="alert" size={11} /> : null}{fmtInt(run.stats.current_pps)}{cap ? <span className="text-ink-3"> / {fmtInt(cap)}</span> : null} pps</span>
+      <span className={cx('num inline-flex items-center gap-1', over ? 'font-medium text-danger' : 'text-ink-3')} title={tip || undefined} data-testid={over ? 'strip-over-cap' : pace ? 'strip-pace' : undefined}>{over ? <Icon name="alert" size={11} /> : null}{pace ? <span className="font-sans text-ink-3">{t('tempo zadane', 'set pace')}</span> : null}{pace ? '≈' : ''}{fmtInt(run.stats.current_pps)}{cap ? <span className="text-ink-3"> / {fmtInt(cap)}</span> : null} pps</span>
     </Link>
   );
 }
@@ -249,12 +251,16 @@ function SafetyChip({ policy }: { policy: SafetyPolicy | undefined }) {
   if (!policy) return null;
   const probe = health.data?.probe;
   const pm = probeModeLabel(probe?.mode);
+  const op = policy.operator_networks ?? [];
+  const title = t('Polityka bezpieczeństwa skanowania', 'Scan safety policy')
+    + (op.length ? '. ' + t('Blokada operatora wdrożenia: skanowanie tylko w ' + op.join(', ') + '. Żaden użytkownik, także administrator, nie może jej poszerzyć.', 'Deployment operator lock: scanning only inside ' + op.join(', ') + '. No user, an administrator included, can widen it.') : '');
   return (
     <Link
       to="/admin?tab=safety" className="hidden items-center gap-1.5 text-xs text-ink-2 hover:text-ink lg:inline-flex"
-      title={t('Polityka bezpieczeństwa skanowania', 'Scan safety policy')}
+      title={title} data-testid="safety-chip"
     >
       <Icon name="shield" size={14} className="text-st-new" />
+      {op.length ? <><span className="inline-flex items-center gap-1" data-testid="safety-chip-lock"><Icon name="lock" size={12} className="text-ink-3" /><span className="mono text-ink">{op.length === 1 ? op[0] : op.length + ' ' + t('sieci', 'networks')}</span></span><span className="text-ink-3">·</span></> : null}
       <span>{t('limit', 'cap')} <span className="num text-ink">{fmtInt(policy.max_pps)}</span> pps</span>
       <span className="text-ink-3">·</span>
       <span className="mono text-ink">{(policy.allowed_methods ?? []).join('/') || 'GET/HEAD'}</span>

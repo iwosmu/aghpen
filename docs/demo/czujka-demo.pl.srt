@@ -1,0 +1,27 @@
+1
+00:00:00,000 --> 00:00:21,589
+Jedno polecenie, potem kreator
+
+2
+00:00:21,589 --> 00:00:45,898
+Skan całej sieci /16
+
+3
+00:00:45,898 --> 00:00:58,054
+Co się zmieniło między skanami
+
+4
+00:00:58,054 --> 00:01:16,506
+Rytm hosta i ponowne sprawdzenia
+
+5
+00:01:16,506 --> 00:01:34,118
+Wehikuł czasu
+
+6
+00:01:34,118 --> 00:01:54,005
+Reguła i sygnatura z przykładu
+
+7
+00:01:54,005 --> 00:02:04,225
+Stop awaryjny

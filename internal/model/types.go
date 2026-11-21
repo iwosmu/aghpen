@@ -995,6 +995,10 @@ type DefectDojoSettings struct {
 	// applies the status changes made in DefectDojo (status pull).
 	StatusSync    bool               `json:"status_sync"`
 	ScopeMappings []DojoScopeMapping `json:"scope_mappings"` // per-scope product and engagement
+	// LinkURL is the public base of the DefectDojo links that Czujka stores
+	// and shows (dojo_url, test_url). Empty: url. Set it when Czujka reaches
+	// DefectDojo at an address a browser cannot open.
+	LinkURL string `json:"link_url"`
 }
 
 // DojoScopeMapping sends the findings of one scope to its own DefectDojo
@@ -1078,6 +1082,18 @@ type Headline struct {
 	AdminPanels      int   `json:"admin_panels"`
 	StagingEnvs      int   `json:"staging_envs"`
 	HostsMissing     int   `json:"hosts_missing"` // hosts with a host_missing change in the last completed run
+	// LastPartial is the newest completed partial run (ad hoc, re-probe,
+	// import, manual entry) when it is newer than the last full run; the
+	// headline numbers above never come from it. nil: none.
+	LastPartial *PartialRun `json:"last_partial"`
+}
+
+// PartialRun names a run that covered only part of the scope.
+type PartialRun struct {
+	RunID     int64     `json:"run_id"`
+	Trigger   string    `json:"trigger"`
+	Addresses int64     `json:"addresses"`
+	At        time.Time `json:"at"`
 }
 
 // Page is the envelope of every list endpoint.

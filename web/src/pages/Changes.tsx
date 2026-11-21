@@ -6,6 +6,7 @@ import { post } from '../api/client';
 import type { Change, ScanRun } from '../api/types';
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtRelative, show } from '../lib/format';
+import { fieldLabel, fieldValue } from '../lib/fields';
 import { useUrlState } from '../lib/hooks';
 import { Button, Empty, LinkButton, PageHeader, Select } from '../ui/kit';
 import { Icon } from '../ui/Icon';
@@ -17,14 +18,14 @@ import { useCan } from '../session';
 const FILTERS = ['q', 'run_id', 'kind', 'severity', 'acked', 'expected', 'host_id'];
 
 export function BeforeAfter({ c }: { c: Change }) {
-  const b = show(c.before), a = show(c.after);
+  const b = c.field ? fieldValue(c.field, c.before) : show(c.before), a = c.field ? fieldValue(c.field, c.after) : show(c.after);
   if (!b && !a) return null;
   return (
     <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs">
-      {c.field ? <span className="text-ink-3">{c.field}:</span> : null}
-      {b ? <span className="mono max-w-[180px] truncate text-ink-3 line-through decoration-[var(--ink-3)]" title={b}>{b}</span> : <span className="text-ink-3">{t('(brak)', '(none)')}</span>}
+      {c.field ? <span className="text-ink-3" title={c.field}>{fieldLabel(c.field)}:</span> : null}
+      {b ? <span className="mono max-w-[180px] truncate text-ink-3 line-through decoration-[var(--ink-3)]" title={b}>{b}</span> : <span className="text-ink-3">{t('brak', 'none')}</span>}
       <Icon name="arrowRight" size={11} className="text-ink-3" />
-      {a ? <span className="mono max-w-[180px] truncate text-ink" title={a}>{a}</span> : <span className="text-ink-3">{t('(brak)', '(none)')}</span>}
+      {a ? <span className="mono max-w-[180px] truncate text-ink" title={a}>{a}</span> : <span className="text-ink-3">{t('brak', 'none')}</span>}
     </span>
   );
 }

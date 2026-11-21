@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="pl">
+<!-- impeccable-disable oversized-h1 -- 1920x1080 slides: each h1 is the slide's one-line headline (at most 8 words); the config ignore in .impeccable/config.json is not found when the hook runs from docs/slides -->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Czujka: skaner, który rozumie czas (HackNation 2026, CBI AGH)</title>
+<!--
+  Deck source. Build: cd docs/slides && npm install && npm run build
+  The build inlines fonts and screenshots into czujka.html and prints czujka.pdf.
+  Every figure carries its source file in a comment next to it; nothing on a slide names a source.
+  Budget per slide (enforced by build.mjs): a title of at most 8 words and at most 12 more words.
+  Speaker notes for every slide are in docs/DEMO.md, section 2.
+  Slots marked "DO UZUPEŁNIENIA" wait for measurements that do not exist yet.
+-->
+<style>
+/*FONTS*/
+@page { size: 1920px 1080px; margin: 0; }
+:root {
+  --bg: #0e131b; --panel: #131a24; --raised: #1a2330; --sunk: #0a0e15;
+  --rule: #232e3f; --rule-strong: #364459;
+  --ink: #e9e5da; --ink-2: #b9b7ad; --ink-3: #8d93a0;
+  --accent: #6ea3f2; --accent-wash: #16263f;
+  --st-new: #22a89a; --st-gone: #e5556a; --st-changed: #c98500; --st-unstable: #9085e9; --st-expected: #7b8494;
+  --seq-0: #1b2533; --seq-1: #184f95; --seq-2: #256abf; --seq-3: #3987e5; --seq-4: #6da7ec; --seq-5: #b7d3f6;
+  --sans: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --s: 1;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #05080d; }
+::selection { background: var(--accent); color: var(--sunk); }
+.deck { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 0; }
+.frame { width: calc(1920px * var(--s)); height: calc(1080px * var(--s)); overflow: hidden; }
+.slide {
+  width: 1920px; height: 1080px; transform: scale(var(--s)); transform-origin: 0 0;
+  position: relative; overflow: hidden; background: var(--bg); color: var(--ink);
+  font-family: var(--sans); font-size: 28px; line-height: 1.4; font-variant-numeric: tabular-nums;
+  padding: 80px 112px 0;
+}
+@media print {
+  html, body { background: var(--bg); }
+  .deck { display: block; padding: 0; }
+  .frame { width: 1920px; height: 1080px; break-after: page; }
+  .slide { transform: none; }
+}
+h1 { font-size: 72px; line-height: 1.1; font-weight: 600; letter-spacing: -0.02em; margin: 0; max-width: 1696px; text-wrap: balance; }
+h2 { font-size: 32px; line-height: 1.25; font-weight: 600; margin: 0 0 16px; }
+p { margin: 0; }
+.lead { font-size: 32px; color: var(--ink-2); max-width: 1400px; }
+.muted { color: var(--ink-3); }
+.mono { font-family: var(--mono); }
+.src { font-size: 24px; color: var(--ink-3); }
+.foot { position: absolute; right: 112px; bottom: 40px; font-size: 24px; color: var(--ink-3); font-family: var(--mono); }
+.body { position: absolute; left: 112px; right: 112px; top: 250px; bottom: 116px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px; }
+.row { display: flex; gap: 64px; height: 100%; }
+.col { display: flex; flex-direction: column; min-width: 0; }
+.shot { position: relative; overflow: hidden; border: 1px solid var(--rule-strong); border-radius: 2px; background: var(--panel); flex: none; }
+.shot img { position: absolute; left: calc(-1px * var(--x) * var(--z)); top: calc(-1px * var(--y) * var(--z)); width: calc(var(--w, 1440) * 1px * var(--z)); height: auto; display: block; }
+.slot {
+  border: 3px dashed var(--st-changed); border-radius: 2px; color: var(--st-changed);
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 24px 32px; font-family: var(--mono); font-size: 26px; line-height: 1.35; background: rgba(201,133,0,0.05);
+}
+.cap { font-size: 40px; line-height: 1.3; color: var(--ink-2); text-align: center; max-width: 1500px; }
+.cap b { color: var(--ink); font-weight: 600; }
+.big { white-space: nowrap; font-family: var(--mono); font-size: 200px; font-weight: 500; line-height: 1; letter-spacing: -0.04em; color: var(--ink); }
+.biglabel { font-size: 40px; color: var(--ink-2); margin-top: 16px; }
+.nums { display: flex; gap: 120px; align-items: flex-start; justify-content: center; }
+.num { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.slotnum { border: 4px dashed var(--st-changed); border-radius: 2px; padding: 24px 56px 32px; background: rgba(201,133,0,0.05); }
+.slotnum .big { color: var(--st-changed); }
+.slotin { color: var(--st-changed); border: 3px dashed var(--st-changed); border-radius: 2px; padding: 0 16px; font-family: var(--mono); }
+.slotin small { font-size: 24px; letter-spacing: 0.08em; margin-left: 10px; }
+.slotnum .tag { font-family: var(--mono); font-size: 28px; letter-spacing: 0.08em; color: var(--st-changed); margin-bottom: 8px; }
+code.one { font-family: var(--mono); font-size: 72px; color: var(--ink); background: var(--sunk); border: 1px solid var(--rule); border-radius: 2px; padding: 40px 64px; white-space: nowrap; }
+.mark { display: inline-block; vertical-align: -6px; margin-right: 12px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="g-new" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" stroke="#22a89a" stroke-width="3" fill="none"/></symbol>
+    <symbol id="g-gone" viewBox="0 0 24 24"><path d="M4 12h16" stroke="#e5556a" stroke-width="3" fill="none"/></symbol>
+    <symbol id="g-changed" viewBox="0 0 24 24"><path d="M12 4 L21 20 H3 Z" stroke="#c98500" stroke-width="2.6" fill="none" stroke-linejoin="miter"/></symbol>
+    <symbol id="g-unstable" viewBox="0 0 24 24"><path d="M2 12c2.5-6 5-6 7.5 0s5 6 7.5 0 3.5-4 5-2" stroke="#9085e9" stroke-width="2.6" fill="none"/></symbol>
+    <symbol id="g-expected" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#7b8494" stroke-width="2.6" stroke-dasharray="4 3" fill="none"/></symbol>
+    <symbol id="g-ok" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" stroke="#6ea3f2" stroke-width="3" fill="none"/></symbol>
+    <symbol id="g-dot" viewBox="0 0 24 24"><rect x="8" y="8" width="8" height="8" fill="#8d93a0"/></symbol>
+  </defs>
+</svg>
+<main class="deck">
+
+<!-- 1. The question. Product name and the question only. -->
+<div class="frame"><section class="slide" id="s1" style="display:flex; flex-direction:column; justify-content:center; padding-bottom:80px;">
+  <div style="display:flex; align-items:center; gap:28px; margin-bottom:72px;">
+    <img src="../../web/public/favicon.svg" width="96" height="96" alt="">
+    <h1 style="font-size:72px;">Czujka</h1>
+  </div>
+  <p style="font-size:112px; line-height:1.08; font-weight:600; letter-spacing:-0.03em; max-width:1600px; text-wrap:balance;">Adres milczy o&nbsp;3&nbsp;w&nbsp;nocy. Wyłączony na noc czy zniknął?</p>
+  <div class="foot">1 / 10</div>
+</section></div>
+
+<!-- 2. Thesis. Heatmap: schematic of the workstation in TestStabilityScenarios (docs/ALGORYTMY.md §2.6): active Mon-Fri 10-15,
+     scan every 4 h. Test A: 16 misses over the weekend, p_alive 0.779 -> 0.699, expected-offline. Test B: misses on Monday 10:00 and 14:00,
+     p_alive 0.205 -> 0.028, down. Not data from a live host. -->
+<div class="frame"><section class="slide" id="s2">
+  <h1>Skaner, który rozumie czas.</h1>
+  <div class="body">
+    <svg id="heat" width="1560" height="560" role="img" aria-label="Rytm stacji roboczej: aktywna od poniedziałku do piątku w godzinach 10–15"></svg>
+    <p class="cap"><svg class="mark" width="36" height="36"><use href="#g-expected"/></svg>weekend: cisza zgodna z rytmem; <svg class="mark" width="36" height="36" style="margin-left:24px;"><use href="#g-gone"/></svg>poniedziałek: alarm</p>
+  </div>
+  <div class="foot">2 / 10</div>
+</section></div>
+
+<!-- 3. Scale. Screenshot: web/screenshots/lab/47-run-completed-pl-dark-1440.png (run #2, lab 10.66.0.0/16, before the ARP-first engine).
+     Crop: the address map only. The run time is an open slot: the old 7 min 24 s came from the engine before the change; fill it with the
+     current lab gate run of the /16 (e2e/lab-gate.sh) when the coordinator confirms it. -->
+<div class="frame"><section class="slide" id="s3">
+  <h1>Cała sieć /16 w&nbsp;jednym przebiegu.</h1>
+  <div class="body">
+    <div class="shot" style="--x:237; --y:333; --z:1.12; width:656px; height:600px;">
+      <img src="../../web/screenshots/lab/47-run-completed-pl-dark-1440.png" alt="Mapa 256 bloków /24 po pełnym przebiegu">
+    </div>
+    <p class="cap">65&nbsp;535 adresów w&nbsp;<span class="slotin">?<small>DO UZUPEŁNIENIA</small></span></p>
+  </div>
+  <div class="foot">3 / 10</div>
+</section></div>
+
+<!-- 4. Recognition. Signature count: signatures/*.yaml, 386. Screenshot: web/screenshots/lab/44-service-detail-pl-dark-1440.png
+     (10.66.1.10:80 in the lab, interest 100 with seven reasons). Crop: the "Dlaczego ciekawa" panel. -->
+<div class="frame"><section class="slide" id="s4">
+  <h1>Wie, co działa pod adresem.</h1>
+  <div class="body">
+    <div class="shot" style="--x:1021; --y:152; --z:2.05; width:820px; height:640px;">
+      <img src="../../web/screenshots/lab/44-service-detail-pl-dark-1440.png" alt="Ocena ciekawości 100 i siedem powodów">
+    </div>
+    <p class="cap">386 sygnatur. Każda ocena ze swoimi powodami.</p>
+  </div>
+  <div class="foot">4 / 10</div>
+</section></div>
+
+<!-- 5. Re-probing. Screenshot: web/screenshots/lab/97-reprobe-plan-host.png (unstable lab host 10.66.70.20: week heatmap, p_alive 0.37,
+     re-probe plan "POTWIERDZENIE 1/3"; crop: the plan and the host's life lanes). Defaults: docs/API.md re-probing, backoff_minutes [10, 30, 90], budget 200 addresses per hour. -->
+<div class="frame"><section class="slide" id="s5">
+  <h1>Milczy? Sprawdza ponownie tylko ten adres.</h1>
+  <div class="body">
+    <div class="shot" style="--x:631; --y:592; --z:2.02; width:1600px; height:462px;">
+      <img src="../../web/screenshots/lab/97-reprobe-plan-host.png" alt="Rytm tygodnia hosta, prawdopodobieństwo i plan ponownych sprawdzeń">
+    </div>
+    <p class="cap">Po 10, 30 i&nbsp;90 minutach.</p>
+  </div>
+  <div class="foot">5 / 10</div>
+</section></div>
+
+<!-- 6. Time machine. Screenshot: docs/slides/img/time-machine.png, taken by docs/demo/capture-slides.mjs (device scale 2, presentation mode,
+     960 px wide) on the local stack czpitch scanning the lab 10.66.0.0/16, 2026-11-21: run #6 (full /16) selected, 69 hosts up, 81 services.
+     Crop: the run scrubber and the state at that run with the difference to today. -->
+<div class="frame"><section class="slide" id="s6">
+  <h1>Wehikuł czasu: sieć z&nbsp;dowolnego przebiegu.</h1>
+  <div class="body">
+    <div class="shot" style="--w:960; --x:22; --y:170; --z:1.5; width:1374px; height:640px;">
+      <img src="img/time-machine.png" alt="Suwak przebiegów i stan sieci w wybranym przebiegu">
+    </div>
+    <p class="cap">I różnica do dziś.</p>
+  </div>
+  <div class="foot">6 / 10</div>
+</section></div>
+
+<!-- 7. Exposure rule. Screenshot: web/screenshots/lab/93-rule-dry-run.png (starter rule "Panel administracyjny poza siecią zarządzania":
+     11 violations on 76 hosts and 117 services of the lab). Rules: docs/REGULY.md (14 starter rules, dry run 55 ms on 2 000 hosts). -->
+<div class="frame"><section class="slide" id="s7">
+  <h1>Reguła: czego w&nbsp;sieci być nie może.</h1>
+  <div class="body">
+    <div class="shot" style="--x:651; --y:488; --z:2.1; width:1620px; height:440px;">
+      <img src="../../web/screenshots/lab/93-rule-dry-run.png" alt="Reguła zgłosiłaby dziś 11 naruszeń">
+    </div>
+    <p class="cap">Panel administracyjny poza siecią zarządzania.</p>
+  </div>
+  <div class="foot">7 / 10</div>
+</section></div>
+
+<!-- 8. Safety. e2e/full/transcript.txt section 17 (PASS: 100 FAIL: 0, capture by source that sees nmap's raw packets):
+     the stop call took 0.092635 s; no nmap process 1 s later; 5 IP packets after the stop, 0 of them later than 1 s (the last at +0.01 s);
+     the kernel still sent 3 ARP neighbour retries (last at +1.9 s), which are not IP packets. -->
+<div class="frame"><section class="slide" id="s8">
+  <h1>Bezpieczny z&nbsp;konstrukcji: tylko GET i&nbsp;HEAD.</h1>
+  <div class="body">
+    <div class="nums" style="align-items:center;">
+      <div class="num"><span class="big">0,09&nbsp;s</span><span class="biglabel">stop awaryjny</span></div>
+      <div class="num"><span class="big">0</span><span class="biglabel">pakietów IP po 1&nbsp;s</span></div>
+    </div>
+  </div>
+  <div class="foot">8 / 10</div>
+</section></div>
+
+<!-- 9. Deploy. The command runs in deploy/ (README: docker compose -f deploy/docker-compose.yml up -d --build --wait).
+     Two containers: the Go binary with the UI and nmap, PostgreSQL with pg_tde (deploy/docker-compose.yml).
+     SecureCodeBox: https://www.securecodebox.io/docs/getting-started/installation, read 2026-11-21: Kubernetes (4 latest releases) and Helm. -->
+<div class="frame"><section class="slide" id="s9">
+  <h1>Jedno polecenie, dwa kontenery.</h1>
+  <div class="body">
+    <code class="one">docker compose up -d</code>
+    <p class="cap">SecureCodeBox: <b>Kubernetes i&nbsp;Helm</b>. Czujka: <b>Docker Compose</b>.</p>
+  </div>
+  <div class="foot">9 / 10</div>
+</section></div>
+
+<!-- 10. Results. 100/100: e2e/full/transcript.txt ("PASS: 100  FAIL: 0", coordinator branch 839012d). 46 s: czujka.dev stack built and healthy on 4 vCPU / 8 GB,
+     coordinator measurement 2026-11-21. Precision: open slot until docs/WYNIKI.md. -->
+<div class="frame"><section class="slide" id="s10">
+  <h1>Zmierzone. Działa na czujka.dev.</h1>
+  <div class="body">
+    <div class="nums">
+      <div class="num"><span class="big" style="font-size:160px;">100/100</span><span class="biglabel">kontroli e2e</span></div>
+      <div class="num"><span class="big" style="font-size:160px;">46&nbsp;s</span><span class="biglabel">start stosu</span></div>
+      <div class="num slotnum"><span class="tag">DO UZUPEŁNIENIA</span><span class="big" style="font-size:160px;">?</span><span class="biglabel">precyzja</span></div>
+    </div>
+  </div>
+  <div class="foot">10 / 10</div>
+</section></div>
+
+</main>
+<script>
+(function () {
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, parent, text) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  var F = "IBM Plex Sans, sans-serif", M = "IBM Plex Mono, monospace";
+  // Slide 2: week heatmap, schematic of the workstation in TestStabilityScenarios (active Mon-Fri 10-15).
+  var heat = document.getElementById("heat");
+  if (heat) {
+    var cw = 56, ch = 66, gx = 5, gy = 7, ox = 90, oy = 48;
+    el("text", {x: ox, y: 32, fill: "#8d93a0", "font-size": 28, "font-family": M}, heat, "00");
+    el("text", {x: ox + 12 * (cw + gx), y: 32, fill: "#8d93a0", "font-size": 28, "font-family": M}, heat, "12");
+    var weekend = {};
+    [[4,18],[4,22],[5,2],[5,6],[5,10],[5,14],[5,18],[5,22],[6,2],[6,6],[6,10],[6,14],[6,18],[6,22],[0,2],[0,6]].forEach(function (p) { weekend[p[0] + "-" + p[1]] = 1; });
+    for (var d = 0; d < 7; d++) {
+      if (d === 0 || d === 6) el("text", {x: 0, y: oy + d * (ch + gy) + 44, fill: "#b9b7ad", "font-size": 30, "font-family": F}, heat, d === 0 ? "pn" : "nd");
+      for (var hh = 0; hh < 24; hh++) {
+        var on = d < 5 && hh >= 10 && hh <= 15, edge = d < 5 && (hh === 9 || hh === 16);
+        var x = ox + hh * (cw + gx), y = oy + d * (ch + gy);
+        el("rect", {x: x, y: y, width: cw, height: ch, fill: on ? "#6da7ec" : edge ? "#184f95" : "#1b2533"}, heat);
+        if (weekend[d + "-" + hh]) el("circle", {cx: x + cw / 2, cy: y + ch / 2, r: 16, fill: "none", stroke: "#e9e5da", "stroke-width": 3, "stroke-dasharray": "5 4"}, heat);
+      }
+    }
+    [[0,10],[0,14]].forEach(function (p) {
+      var x = ox + p[1] * (cw + gx), y = oy + p[0] * (ch + gy);
+      el("rect", {x: x - 3, y: y - 3, width: cw + 6, height: ch + 6, fill: "none", stroke: "#e5556a", "stroke-width": 5}, heat);
+      el("path", {d: "M" + (x + 14) + " " + (y + ch / 2) + "h" + (cw - 28), stroke: "#e5556a", "stroke-width": 5}, heat);
+    });
+  }
+  function fit() { var s = Math.min(1, (window.innerWidth - 48) / 1920); document.documentElement.style.setProperty("--s", s); }
+  if (!window.matchMedia("print").matches) { fit(); window.addEventListener("resize", fit); }
+  window.addEventListener("beforeprint", function () { document.documentElement.style.setProperty("--s", 1); });
+})();
+</script>
+</body>
+</html>

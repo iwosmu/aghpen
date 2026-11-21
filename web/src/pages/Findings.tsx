@@ -3,12 +3,13 @@ import { Link } from 'react-router';
 import { NextSteps } from '../ui/NextSteps';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidate, useAction, useItem, usePage } from '../api/hooks';
-import { del, patch, post } from '../api/client';
+import { ApiError, del, patch, post } from '../api/client';
 import type { DojoExportResult, Finding, FindingStatus, Severity } from '../api/types';
 import { t, plural } from '../i18n';
-import { fmtDateTime, fmtRelative } from '../lib/format';
+import { cx, fmtDateTime, fmtRelative } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
-import { Button, Dialog, Empty, ErrorState, Field, InlineError, KV, PageHeader, Select, SkeletonRows, TagInput, Tags } from '../ui/kit';
+import { Button, Dialog, Empty, ErrorState, Field, InlineError, KV, PageHeader, Select, SkeletonRows, Tabs, TagInput, Tags } from '../ui/kit';
+import { groupFindings, type FindingGroup } from '../lib/findingGroups';
 import { Icon } from '../ui/Icon';
 import { DataTable, FilterBar, FilterField, Pager, SearchField, type Col } from '../ui/table';
 import { FINDING_STATUSES, FindingStatusMark, Glyph, InterestScore, SEVERITIES, Sev, findingStatusInfo, severityLabel } from '../ui/marks';
@@ -107,6 +108,64 @@ function ManualDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+const STATUS_ORDER = ['new', 'triaged', 'accepted', 'false_positive', 'resolved'];
+
+/** Findings grouped by what they are ("Panel administracyjny poza siecią zarządzania · 7 usług"), each expandable to its addresses. */
+function FindingGroupList({ q, active, onOpen }: { q: ReturnType<typeof usePage<Finding>>; active: boolean; onOpen: (id: number) => void }) {
+  const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
+  const groups = useMemo(() => groupFindings(q.data?.items ?? []), [q.data]);
+  if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
+  if (!q.data) return <div className="px-4 py-3 sm:px-6"><SkeletonRows rows={8} /></div>;
+  if (!groups.length) return <Empty icon="findings" title={active ? t('Żadne znalezisko nie pasuje do filtrów', 'No finding matches the filters') : t('Nie ma otwartych znalezisk', 'There is no open finding')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Rozwiązane i zaakceptowane są pod filtrem „Status: wszystkie”.', 'Resolved and accepted ones are under the filter "Status: all".')} />;
+  const toggle = (k: string) => setOpenKeys((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const shown = q.data.items.length;
+  return (
+    <div className={cx(q.isPlaceholderData && 'opacity-60')} data-testid="finding-groups">
+      <div className="hidden grid-cols-[110px_minmax(0,1fr)_minmax(0,220px)_86px] gap-x-3 border-b border-rule px-4 py-1.5 text-xs text-ink-3 sm:grid sm:px-6">
+        <span>{t('Waga', 'Severity')}</span><span>{t('Znalezisko', 'Finding')}</span><span>{t('Status', 'Status')}</span><span className="text-right">{t('Ciekawość', 'Interest')}</span>
+      </div>
+      <ul>
+        {groups.map((g: FindingGroup) => {
+          const isOpen = openKeys.has(g.key) || groups.length === 1;
+          const statusText = STATUS_ORDER.filter((s) => g.statuses[s]).map((s) => g.statuses[s] + ' ' + findingStatusInfo(s as FindingStatus).label).join(', ');
+          return (
+            <li key={g.key} className="border-b border-rule">
+              <button type="button" aria-expanded={isOpen} onClick={() => toggle(g.key)} data-testid="finding-group"
+                className="grid w-full grid-cols-[110px_minmax(0,1fr)] items-center gap-x-3 px-4 py-2 text-left text-sm hover:bg-raised sm:grid-cols-[110px_minmax(0,1fr)_minmax(0,220px)_86px] sm:px-6">
+                <span><Sev level={g.severity} /></span>
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <Icon name={isOpen ? 'chevronDown' : 'chevronRight'} size={12} className="flex-none self-center text-ink-3" />
+                  <span className="truncate text-ink">{g.title}</span>
+                  <span className="flex-none whitespace-nowrap text-ink-2">· <span className="num">{g.places}</span> {g.items.every((f) => f.port) ? plural(g.places, ['usługa', 'usługi', 'usług'], ['service', 'services']) : plural(g.places, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}</span>
+                </span>
+                <span className="col-start-2 truncate text-xs text-ink-2 sm:col-start-auto">{statusText}</span>
+                <span className="hidden justify-self-end sm:block"><InterestScore value={g.interest} /></span>
+              </button>
+              {isOpen ? (
+                <ul className="pb-1.5" data-testid="finding-group-items">
+                  {g.items.map((f) => (
+                    <li key={f.id}>
+                      <button type="button" onClick={() => onOpen(f.id)} className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-1 pl-[calc(1rem+110px+0.75rem+20px)] pr-4 text-left text-sm hover:bg-raised sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)_86px] sm:pr-6">
+                        <span className="mono truncate text-ink-2">{f.ip}{f.port ? ':' + f.port : ''}{f.manual ? <span className="ml-1.5 font-sans text-2xs text-ink-3">{t('ręczne', 'manual')}</span> : null}</span>
+                        <span className="text-xs"><FindingStatusMark status={f.status} /></span>
+                        <span className="hidden justify-self-end sm:block"><InterestScore value={f.interest} /></span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+      <p className="px-4 py-2 text-xs text-ink-3 sm:px-6">
+        {t(groups.length + ' ' + plural(groups.length, ['rodzaj', 'rodzaje', 'rodzajów'], ['', '']) + ', ' + shown + ' ' + plural(shown, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']), groups.length + ' kinds, ' + shown + ' findings')}
+        {q.data.total > shown ? t('; pokazano ' + shown + ' z ' + q.data.total + ' (zawęź filtry)', '; showing ' + shown + ' of ' + q.data.total + ' (narrow the filters)') : ''}.
+      </p>
+    </div>
+  );
+}
+
 export default function Findings() {
   const u = useUrlState();
   const qc = useQueryClient();
@@ -118,9 +177,16 @@ export default function Findings() {
   const filters = useMemo(() => {
     const q: Record<string, string> = {};
     for (const k of FILTERS) { const v = u.get(k); if (v) q[k] = v; }
+    // Default: open findings only (new and triaged); "all" shows resolved ones too.
+    const st = u.get('status', 'open');
+    if (st === 'all') delete q.status; else q.status = st === 'open' ? 'new,triaged' : st;
     return q;
   }, [u]);
-  const q = usePage<Finding>('/findings', { ...filters, sort: u.get('sort', '-interest'), limit, offset });
+  const view = u.get('view', 'groups');
+  const q = usePage<Finding>('/findings', { ...filters, sort: u.get('sort', '-interest'), limit, offset }, view === 'list');
+  // The grouped view groups every matching finding (the server caps a page at 1000).
+  const gq = usePage<Finding>('/findings', { ...filters, sort: '-interest', limit: 1000 }, view === 'groups');
+  const total = (view === 'groups' ? gq.data?.total : q.data?.total) ?? 0;
   const [selected, setSelected] = useState<Set<string | number>>(new Set());
   const [manual, setManual] = useState(false);
   const [assignee, setAssignee] = useState('');
@@ -132,6 +198,16 @@ export default function Findings() {
   const bulk = useAction(async (body: Record<string, unknown>) => { await Promise.all(ids.map((id) => patch('/findings/' + id, body))); return ids.length; }, {
     success: (n) => t('Zmieniono znalezisk: ' + n, 'Findings updated: ' + n), onSuccess: () => { invalidate(qc, '/findings', '/dashboard'); setSelected(new Set()); },
   });
+  const [confirmAll, setConfirmAll] = useState(false);
+  const dojoFilter = () => {
+    const list = (k: string) => (u.get(k) ? u.get(k).split(',').filter(Boolean) : undefined);
+    return {
+      status: filters.status ? filters.status.split(',') : undefined, severity: list('severity'), type: u.get('type') || undefined, tag: u.get('tag') || undefined, q: u.get('q') || undefined,
+      host_id: u.get('host_id') ? Number(u.get('host_id')) : undefined, min_interest: u.get('min_interest') ? Number(u.get('min_interest')) : undefined,
+      exported: u.get('exported') ? u.get('exported') === 'true' : undefined,
+    };
+  };
+  const exportAll = useAction(() => post<DojoExportResult>('/findings/export/defectdojo', { filter: dojoFilter() }), { silent: true, onSuccess: (r) => { setResult(r); setConfirmAll(false); invalidate(qc, '/findings'); } });
   const exportDojo = useAction(() => post<DojoExportResult>('/findings/export/defectdojo', { ids }), { silent: false, onSuccess: (r) => { setResult(r); invalidate(qc, '/findings'); setSelected(new Set()); } });
   const active = FILTERS.filter((k) => u.get(k)).length;
   const cols: Col<Finding>[] = [
@@ -156,18 +232,24 @@ export default function Findings() {
         title={t('Znaleziska', 'Findings')}
         sub={t('Rzeczy warte decyzji człowieka: panele administracyjne, środowiska testowe, wygasłe certyfikaty, nowe ekspozycje. Każde ma dowód i status.', 'Things that deserve a human decision: admin panels, staging environments, expired certificates, new exposures. Each has evidence and a status.')}
         readOnly={!canEdit}
-        actions={<><ExportButtons kind="findings" query={filters} />{can('results:create') ? <Button variant="primary" icon="plus" onClick={() => setManual(true)}>{t('Dodaj ręcznie', 'Add by hand')}</Button> : null}</>}
+        actions={<>{canExport && total > 0 ? <Button icon="upload" onClick={() => setConfirmAll(true)} disabled={Boolean(u.get('assignee'))} title={u.get('assignee') ? t('Filtr „przypisane” nie działa w eksporcie do DefectDojo: usuń go albo zaznacz znaleziska ręcznie.', 'The assignee filter does not apply to the DefectDojo export: clear it or select findings by hand.') : undefined} data-testid="dojo-export-filtered">{active ? t('Pasujące do DefectDojo', 'Matching to DefectDojo') : t('Wszystkie do DefectDojo', 'All to DefectDojo')}</Button> : null}<ExportButtons kind="findings" query={filters} />{can('results:create') ? <Button variant="primary" icon="plus" onClick={() => setManual(true)}>{t('Dodaj ręcznie', 'Add by hand')}</Button> : null}</>}
       />
+      <div className="px-4 pt-2 sm:px-6">
+        <Tabs value={view} onChange={(v) => u.set({ view: v === 'groups' ? null : v })} tabs={[{ id: 'groups', label: t('Według rodzaju', 'By kind') }, { id: 'list', label: t('Lista', 'List') }]} />
+      </div>
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
         <SearchField value={text} onChange={setText} placeholder={t('tytuł, adres, opis', 'title, address, text')} />
         <FilterField label={t('Status', 'Status')} width={170}>
-          <Select value={u.get('status')} onChange={(v) => u.set({ status: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'new,triaged', label: t('otwarte (nowe i w analizie)', 'open (new and triaged)') }, ...statusOpts()]} />
+          <Select value={u.get('status', 'open')} onChange={(v) => u.set({ status: v === 'open' ? null : v })} options={[{ value: 'open', label: t('otwarte (nowe i w analizie)', 'open (new and triaged)') }, { value: 'all', label: t('wszystkie', 'all') }, ...statusOpts()]} />
         </FilterField>
         <FilterField label={t('Waga', 'Severity')} width={120}><Select value={u.get('severity')} onChange={(v) => u.set({ severity: v })} options={[{ value: '', label: t('dowolna', 'any') }, ...sevOpts()]} /></FilterField>
         <FilterField label={t('Rodzaj', 'Type')} width={130}><Select value={u.get('type')} onChange={(v) => u.set({ type: v })} options={[{ value: '', label: t('dowolny', 'any') }, ...['signature', 'exposure', 'policy-violation', 'tls', 'change', 'manual'].map((x) => ({ value: x, label: typeLabel(x) }))]} /></FilterField>
         <FilterField label="DefectDojo" width={150}><Select value={u.get('exported')} onChange={(v) => u.set({ exported: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'false', label: t('niewyeksportowane', 'not exported') }, { value: 'true', label: t('wyeksportowane', 'exported') }]} /></FilterField>
       </FilterBar>
-      {selected.size > 0 && (canEdit || canExport) ? (
+      {view === 'groups' ? (
+        <FindingGroupList q={gq} active={active > 0} onOpen={(id) => u.set({ open: id }, { keepOffset: true })} />
+      ) : null}
+      {view === 'list' && selected.size > 0 && (canEdit || canExport) ? (
         <div className="sticky top-0 z-20 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-rule-strong bg-accent-wash px-4 py-1.5 text-sm sm:px-6" role="region" aria-label={t('Akcje zbiorcze', 'Bulk actions')} data-testid="bulk-bar">
           <span><span className="num font-medium">{selected.size}</span> {plural(selected.size, ['zaznaczone', 'zaznaczone', 'zaznaczonych'], ['selected', 'selected'])}</span>
           {canEdit ? (
@@ -180,7 +262,7 @@ export default function Findings() {
           <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>{t('Odznacz', 'Clear')}</Button>
         </div>
       ) : null}
-      <DataTable
+      {view === 'list' ? <><DataTable
         rows={q.data?.items} cols={cols} rowKey={(f) => f.id} onRowClick={(f) => u.set({ open: f.id }, { keepOffset: true })} loading={q.isPending} error={q.error} retry={() => q.refetch()} dim={q.isPlaceholderData}
         sort={u.get('sort', '-interest')} onSort={(s) => u.set({ sort: s })}
         selected={canEdit || canExport ? selected : undefined} onSelect={canEdit || canExport ? setSelected : undefined}
@@ -194,9 +276,17 @@ export default function Findings() {
           </div>
         )}
       />
-      {q.data ? <Pager total={q.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}
+      {q.data ? <Pager total={q.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}</> : null}
       {open ? <DetailDialog id={open} onClose={() => u.set({ open: null }, { keepOffset: true })} /> : null}
       {manual ? <ManualDialog onClose={() => setManual(false)} /> : null}
+      <Dialog open={confirmAll} onClose={() => setConfirmAll(false)} width={460} title={t('Eksportować pasujące znaleziska?', 'Export the matching findings?')}
+        footer={<><Button onClick={() => setConfirmAll(false)}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="upload" busy={exportAll.isPending} onClick={() => exportAll.mutate(undefined)} data-testid="dojo-export-filtered-go">{t('Eksportuj', 'Export')} {q.data?.total ?? 0}</Button></>}>
+        <p className="text-sm">{active
+          ? t('Do DefectDojo trafi ' + total + ' ' + plural(q.data?.total ?? 0, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']) + ' pasujących do bieżących filtrów. Te, które już tam są, zostaną zaktualizowane, nie zdublowane.', total + ' findings that match the current filters go to DefectDojo. Those already there are updated, not duplicated.')
+          : t('Do DefectDojo trafią wszystkie znaleziska (' + total + '). Te, które już tam są, zostaną zaktualizowane, nie zdublowane.', 'All findings (' + total + ') go to DefectDojo. Those already there are updated, not duplicated.')}</p>
+        <div className="mt-3"><InlineError error={exportAll.error} /></div>
+        {exportAll.error && !(exportAll.error instanceof ApiError && exportAll.error.code === 'dojo_unconfirmed') ? <p className="mt-2 text-xs text-ink-2" data-testid="dojo-export-retry-hint">{t('Część znalezisk mogła już trafić do DefectDojo. Ponów eksport, gdy DefectDojo odpowiada: Czujka rozpozna je po kluczu i zaktualizuje, bez duplikatów.', 'Some findings may already be in DefectDojo. Repeat the export when DefectDojo answers: Czujka recognises them by key and updates them, without duplicates.')}</p> : null}
+      </Dialog>
       <Dialog open={result !== null} onClose={() => setResult(null)} title={t('Eksport do DefectDojo', 'Export to DefectDojo')} width={480} footer={<Button variant="primary" onClick={() => setResult(null)}>{t('Gotowe', 'Done')}</Button>}>
         {result ? (
           <div className="space-y-3 text-sm" data-testid="dojo-result">
