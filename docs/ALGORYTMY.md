@@ -222,6 +222,26 @@ nmap skanuje hosty jednego procesu równolegle, w tempie przydzielonym grupie (l
 
 Każda zmiana silnika przechodzi przez `e2e/lab-gate.sh` (pełny /16 laboratorium przez API produktu, progi czułości, kontrola pakietów w każdej sekundzie, tablica sąsiadów). Wyniki: `docs/WYNIKI.md`.
 
+### 2.12 Mały zakres: szybka ścieżka, pełny zakres portów, wyniki częściowe
+
+**Szybka ścieżka.** Grupa z co najwyżej 32 otwartymi portami TCP (wszystkie hosty razem) nie czeka na wykrywanie wersji całej grupy. Dla każdego portu działa osobny proces `nmap -sV` (najwyżej 8 naraz), a obok niego etap HTTP. Gdy GET na port zwróci stronę, wykrywanie wersji tego portu kończy się: stronę opisuje kolektor HTTP. Port, którego wykrywanie wersji trwa dłużej niż 30 s, zostaje z nazwą z tablicy portów nmap lub z etapu HTTP. Pomiar na jednym hoście z 7 usługami (nginx, Apache, RabbitMQ AMQP i panel, Gitea, PostgreSQL, OpenSSH): `nmap -sV` na porcie Gitea (3000) trwa 42 s przy każdej intensywności 0–9, bo nmap najpierw wysyła sondy przypisane do portu 3000, a Gitea na nie nie odpowiada (5 s oczekiwania na każdą). Kolektor HTTP rozpoznaje Gitea w mniej niż 1 s. Etap HTTP pomija porty protokołów, które nigdy nie mówią HTTP (ssh, postgresql, amqp, mysql, redis ...), chyba że mają tunel TLS. Druga runda ścieżek sygnatur nie pobiera ponownie strony głównej.
+
+**Pełny zakres portów.** Zakres do 256 adresów z profilem z listą rankingową (`top-N`) albo z `1-65535` dostaje drugi przebieg: reszta zakresu 1-65535 dla żywych hostów, najwyżej 16 w całym przebiegu. Skan reszty zaczyna się zaraz po skanie portów z listy, obok opisu tych portów, z 90 % szybkości grupy. Pozostałe 10 % zostaje dla wykrywania wersji. Jawna lista portów (`80,443,8080`) jest skanowana tak, jak ją zapisano. Oba przebiegi respektują `allowed_ports` i `denied_ports` polityki. Gdy reszta zakresu nie skończy się (limit czasu nmap), host dostaje `ports_unknown`: usługi spoza listy nie znikają.
+
+**Wyniki częściowe.** Na szybkiej ścieżce opisane usługi trafiają do bazy co 2 s, zanim przebieg się skończy. Wynik częściowy ma `ports_unknown`, więc baza nie oznacza żadnej innej usługi hosta jako zniknętej. Liczniki `services_open` i `http_services` rosną od razu; wynik końcowy zastępuje w nich częściowy. Porównanie z poprzednim przebiegiem, ustalenia i reguły powstają raz, na końcu przebiegu.
+
+**`RunStats.passes`.** Tablica jest obecna tylko wtedy, gdy przebieg ma więcej niż jeden przebieg portów: `top_ports` i `full_range` (mały zakres) albo `top_ports` i `dense` (/16). `ports_total` i `ports_done` liczą pary host-port. W trakcie skanu `ports_done` wynika z przypiętej szybkości nmap (`--min-rate` = `--max-rate`); po skanie jest dokładne. Szacunek przebiegu (`full_range_max_hosts`) liczy pakiety drugiego przebiegu.
+
+Pomiar na hoście „jury" (jeden adres w sieci laboratorium, 7 usług, limit 1000 pps, `e2e/small-bench.sh`):
+
+| profil | przed: czas przebiegu | po: pierwsza usługa | po: czas przebiegu | porty |
+| --- | --- | --- | --- | --- |
+| 7 portów z nazwy | 68 s | 3,6 s | 23,6 s | 7 |
+| top-1000 | 63 s | 4,2 s | 117 s | 1-65535 (dwa przebiegi) |
+| profil domyślny | — | 4,1 s | 87 s | 1-65535 (dwa przebiegi) |
+
+Czas „7 portów" ogranicza wykrywanie wersji AMQP (RabbitMQ odpowiada na sondę AMQP nmap dopiero po 22 s). Etap HTTP przy domyślnej polityce (2 żądania/s na host) opisuje 4 usługi WWW w około 20 s.
+
 ## 3. Wykrywanie zmian
 
 `Diff(prev, cur)` porównuje dwa obrazy sieci i zwraca listę zmian oraz podsumowanie. Gdy nie ma poprzedniego przebiegu, nie ma zmian: pierwszy skan to punkt odniesienia.

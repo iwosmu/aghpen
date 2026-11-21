@@ -314,10 +314,14 @@ func (c *Collector) Fingerprint(ctx context.Context, req model.FingerprintReques
 		order = []string{"https", "http"}
 	}
 
-	var fp, plainMisdirected *model.HTTPFingerprint
+	var fp, plainMisdirected, tls404 *model.HTTPFingerprint
 	var scheme string
-	for _, sch := range order {
+	var tlsErr error
+	for i, sch := range order {
 		got, misdirected, err := s.root(ctx, sch)
+		if sch == "https" && err != nil {
+			tlsErr = err
+		}
 		if ctx.Err() != nil {
 			return nil, s.tlsInfo(), ctx.Err()
 		}
@@ -331,6 +335,14 @@ func (c *Collector) Fingerprint(ctx context.Context, req model.FingerprintReques
 			plainMisdirected = got
 			continue
 		}
+		if got != nil && sch == "https" && got.Status == http.StatusNotFound && i+1 < len(order) {
+			// TLS answers but the root is 404: a reverse proxy (Traefik) that
+			// takes TLS on every entrypoint with its default certificate and
+			// has no TLS route. The site may be on plain HTTP on the same
+			// port: try it and keep the richer answer.
+			tls404 = got
+			continue
+		}
 		if got != nil {
 			fp, scheme = got, sch
 			break
@@ -340,8 +352,37 @@ func (c *Collector) Fingerprint(ctx context.Context, req model.FingerprintReques
 			return nil, s.tlsInfo(), nil
 		}
 	}
-	if fp == nil {
+	if tls404 != nil {
+		switch {
+		case fp != nil && fp.Status != http.StatusNotFound:
+			// plain HTTP is the site; the TLS side stays in the evidence
+			fp.Error = strings.TrimPrefix(fp.Error+"; port also answers TLS: HTTPS root 404", "; ")
+			var ti *model.TLSInfo = s.tlsInfo()
+			if req.Opts.Favicon {
+				s.favicon(ctx, scheme, fp)
+			}
+			if len(req.Paths) > 0 && ctx.Err() == nil {
+				s.paths(ctx, scheme, fp)
+			}
+			return fp, ti, nil
+		default:
+			fp, scheme = tls404, "https"
+			fp.Error = strings.TrimPrefix(fp.Error+"; plain HTTP on this port gave no better answer", "; ")
+		}
+	}
+	if fp == nil && plainMisdirected != nil {
+		// The port speaks TLS (it said so to the plain request), but the
+		// handshake failed: no certificate for this name, a client
+		// certificate required, an old protocol. Say that instead of keeping
+		// the "plain HTTP request was sent to HTTPS port" page as the title
+		// (the template's Nginx Proxy Manager on 443).
 		fp, scheme = plainMisdirected, "http"
+		fp.Title = ""
+		note := "TLS, handshake failed"
+		if tlsErr != nil {
+			note += ": " + shortErr(tlsErr)
+		}
+		fp.Error = strings.TrimPrefix(fp.Error+"; "+note, "; ")
 	}
 	if fp == nil {
 		return nil, s.tlsInfo(), nil

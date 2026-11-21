@@ -1,6 +1,7 @@
 package httpfp
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -13,6 +14,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"net/http"
@@ -807,3 +809,178 @@ func TestWaitHookCanStopRequests(t *testing.T) {
 		t.Errorf("a refusing limiter must stop every request: fp=%v hits=%d", fp, hits)
 	}
 }
+
+// A TLS port that answers a plain request with nginx's 400 page and then
+// fails the TLS handshake: no HTTP title from the 400 page, the note says TLS.
+func TestTLSPortWithFailedHandshake(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				buf := make([]byte, 1)
+				if _, err := c.Read(buf); err != nil || buf[0] == 0x16 {
+					return // a TLS ClientHello: close it, like a server without a certificate for this name
+				}
+				body := "<html><head><title>400 The plain HTTP request was sent to HTTPS port</title></head><body>The plain HTTP request was sent to HTTPS port</body></html>"
+				fmt.Fprintf(c, "HTTP/1.1 400 Bad Request\r\nServer: openresty\r\nContent-Type: text/html\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", len(body), body)
+			}(conn)
+		}
+	}()
+	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
+	port, _ := strconv.Atoi(portStr)
+	fp, _, err := New().Fingerprint(context.Background(), model.FingerprintRequest{IP: "127.0.0.1", Port: port, Opts: model.HTTPOpts{TimeoutMs: 2000}})
+	if err != nil || fp == nil {
+		t.Fatalf("fp=%v err=%v", fp, err)
+	}
+	if fp.Title != "" || !strings.Contains(fp.Error, "TLS, handshake failed") {
+		t.Errorf("title %q, note %q", fp.Title, fp.Error)
+	}
+}
+
+// FetchPaths asks for the paths only: the root page is not requested again.
+func TestFetchPathsSkipsTheRoot(t *testing.T) {
+	var mu sync.Mutex
+	hits := map[string]int{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits[r.URL.Path]++
+		mu.Unlock()
+		fmt.Fprint(w, "<title>x</title>")
+	}))
+	defer srv.Close()
+	req := reqFor(t, srv)
+	fp, _, err := New().Fingerprint(context.Background(), req)
+	if err != nil || fp == nil {
+		t.Fatal(fp, err)
+	}
+	req.Paths = []string{"/login", "/version"}
+	out, _, err := New().FetchPaths(context.Background(), req, fp)
+	if err != nil || len(out.Paths) != 2 || len(fp.Paths) != 0 {
+		t.Fatalf("out=%+v err=%v (input paths %d)", out, err, len(fp.Paths))
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if hits["/"] != 1 || hits["/login"] != 1 || hits["/version"] != 1 {
+		t.Errorf("hits = %v", hits)
+	}
+}
+
+// response_ms is the time to the first byte of the first GET: a server that
+// thinks 300 ms and then sends headers slowly over a raw connection gives
+// about 300 ms, not the time the headers took to arrive.
+func TestResponseMsIsTimeToFirstByte(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				buf := make([]byte, 4096)
+				c.Read(buf)
+				time.Sleep(300 * time.Millisecond)
+				c.Write([]byte("HTTP/1.1 200 OK\r\n"))
+				time.Sleep(700 * time.Millisecond) // the rest of the headers comes late (a slow link)
+				c.Write([]byte("Content-Type: text/html\r\nContent-Length: 15\r\nConnection: close\r\n\r\n<title>x</title>"))
+			}(c)
+		}
+	}()
+	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
+	port, _ := strconv.Atoi(portStr)
+	fp, _, err := New().Fingerprint(context.Background(), model.FingerprintRequest{IP: "127.0.0.1", Port: port, Opts: model.HTTPOpts{TimeoutMs: 5000}})
+	if err != nil || fp == nil {
+		t.Fatalf("fp=%v err=%v", fp, err)
+	}
+	if fp.ResponseMs < 290 || fp.ResponseMs > 650 {
+		t.Errorf("response_ms = %d, want about 300 (first byte), not 1000 (all headers)", fp.ResponseMs)
+	}
+}
+
+// T1/T2: a port that answers TLS with a default certificate and 404 on every
+// path, and serves the site on plain HTTP (Traefik's entrypoints do this).
+func TestTLS404FallsBackToPlainHTTP(t *testing.T) {
+	tlsSrv := httptest.NewUnstartedServer(http.NotFoundHandler())
+	tlsSrv.StartTLS()
+	defer tlsSrv.Close()
+	cfg := tlsSrv.TLS
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	site := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "<title>Traefik</title>")
+	})
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				br := bufio.NewReader(c)
+				b, err := br.Peek(1)
+				if err != nil {
+					c.Close()
+					return
+				}
+				pc := &peekedConn{Conn: c, r: br}
+				if b[0] == 0x16 {
+					tc := tls.Server(pc, cfg)
+					(&http.Server{Handler: http.NotFoundHandler()}).Serve(&oneConnListener{c: tc})
+					return
+				}
+				(&http.Server{Handler: site}).Serve(&oneConnListener{c: pc})
+			}(c)
+		}
+	}()
+	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
+	port, _ := strconv.Atoi(portStr)
+	fp, ti, err := New().Fingerprint(context.Background(), model.FingerprintRequest{IP: "127.0.0.1", Port: port, TLSHint: true, Opts: model.HTTPOpts{TimeoutMs: 3000}})
+	if err != nil || fp == nil {
+		t.Fatalf("fp=%v err=%v", fp, err)
+	}
+	if fp.Scheme != "http" || fp.Status != 200 || fp.Title != "Traefik" || ti == nil || !strings.Contains(fp.Error, "also answers TLS") {
+		t.Errorf("scheme %q status %d title %q tls %v note %q", fp.Scheme, fp.Status, fp.Title, ti != nil, fp.Error)
+	}
+}
+
+type peekedConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (p *peekedConn) Read(b []byte) (int, error) { return p.r.Read(b) }
+
+type oneConnListener struct {
+	c    net.Conn
+	done bool
+	mu   sync.Mutex
+}
+
+func (l *oneConnListener) Accept() (net.Conn, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.done {
+		return nil, io.EOF
+	}
+	l.done = true
+	return l.c, nil
+}
+func (l *oneConnListener) Close() error   { return nil }
+func (l *oneConnListener) Addr() net.Addr { return l.c.LocalAddr() }
