@@ -41,17 +41,17 @@ function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: nu
   const hosts = [...new Set(items.map((s) => s.host_id))];
   const anyTime = items.some((s) => s.response_ms !== undefined);
   return (
-    <Panel title={t('Usługi znalezione w tym przebiegu', 'Services found in this run')} count={q.data ? q.data.total - carried : undefined} flush
+    <Panel title={t('Znalezione usługi', 'Services found')} count={q.data ? q.data.total - carried : undefined} flush
       actions={hosts.length === 1 ? <Link to={'/hosts/' + hosts[0]} className="link">{t('Host', 'Host')} <span className="mono">{items[0].ip}</span></Link> : undefined}>
       {q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : !q.data ? <SkeletonRows rows={5} /> : items.length === 0 ? (
-        <p className="p-3 text-sm text-ink-2" data-testid="run-services-empty">{live ? t('Czekam na pierwsze otwarte porty…', 'Waiting for the first open ports…') : t('Ten przebieg nie znalazł otwartej usługi.', 'This run found no open service.')}</p>
+        <p className="p-3 text-sm text-ink-2" data-testid="run-services-empty">{live ? t('Oczekiwanie na otwarte porty…', 'Waiting for open ports…') : t('Brak otwartych usług.', 'No open services.')}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="run-services">
             <thead><tr className="border-b border-rule-strong text-left text-xs text-ink-3">
               {hosts.length > 1 ? <th className="h-[30px] px-3 font-medium">IP</th> : null}
               <th className="h-[30px] px-3 font-medium">{t('Port', 'Port')}</th>
-              <th className="px-3 font-medium" title={live ? t('Port otwarty w tym przebiegu; zniknięcia pokażą się po końcu skanu', 'Port open in this run; gone services show when the scan ends') : t('Stan usługi dziś, po najnowszym skanie', 'The state of the service today, after the latest scan')}>{live ? t('Stan', 'State') : t('Stan dziś', 'State now')}</th>
+              <th className="px-3 font-medium" title={live ? t('Port otwarty w tym przebiegu; zniknięcia pokażą się po końcu skanu', 'Port open in this run; gone services show when the scan ends') : t('Stan usługi dziś, po najnowszym skanie', 'The state of the service today, after the latest scan')}>{live ? t('Stan', 'Status') : t('Stan dziś', 'Status today')}</th>
               <th className="px-3 font-medium">{t('Usługa', 'Service')}</th>
               <th className="px-3 font-medium">{t('Produkt', 'Product')}</th>
               <th className="hidden px-3 font-medium md:table-cell">{t('Tytuł strony', 'Page title')}</th>
@@ -74,10 +74,10 @@ function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: nu
           {q.data.total > items.length ? (
             <p className="border-t border-rule px-3 py-2 text-sm" data-testid="run-services-more">
               <span className="text-ink-2">{t('Pokazano ' + items.length + ' z ' + fmtInt(q.data.total) + ', najciekawsze najpierw.', 'Showing ' + items.length + ' of ' + fmtInt(q.data.total) + ', most interesting first.')}</span>{' '}
-              <Link to={'/services?run_id=' + run.id + '&state=all'} className="link">{t('Wszystkie usługi tego przebiegu', 'All services of this run')}</Link>
+              <Link to={'/services?run_id=' + run.id + '&state=all'} className="link">{t('Wszystkie usługi', 'All services')}</Link>
             </p>
           ) : null}
-          {carried > 0 ? <p className="border-t border-rule px-3 py-2 text-xs text-ink-3" data-testid="run-services-carried">{t('Nie skanowane w tym przebiegu', 'Not scanned in this run')}: {carried} {t('(na końcu listy). Ten skan nie sprawdzał tych portów, więc stan pochodzi z ostatniej obserwacji.', '(at the end of the list). This scan did not check these ports, so the state comes from the last observation.')}</p> : null}
+          {carried > 0 ? <p className="border-t border-rule px-3 py-2 text-xs text-ink-3" data-testid="run-services-carried">{t('Poza tym skanem', 'Outside this scan')}: {carried} {t('(na końcu listy). Ten skan nie sprawdzał tych portów, więc stan pochodzi z ostatniej obserwacji.', '(at the end of the list). This scan did not check these ports, so the state comes from the last observation.')}</p> : null}
         </div>
       )}
     </Panel>
@@ -89,7 +89,7 @@ function NoStory({ run }: { run: ScanRun }) {
   const s = run.summary;
   if (!s) return null;
   const n = s.hosts_new + s.hosts_gone + s.hosts_back + s.services_new + s.services_gone + s.services_changed + (s.services_returned ?? 0) + (s.responses_slower ?? 0) + (s.hosts_missing ?? 0);
-  return n === 0 ? <p className="font-display text-[28px] leading-tight text-ink sm:text-[32px]" data-testid="run-story-none">{t('Bez zmian względem poprzedniego przebiegu.', 'No change since the previous run.')}</p> : null;
+  return n === 0 ? <p className="font-display text-[28px] leading-tight text-ink sm:text-[32px]" data-testid="run-story-none">{t('Bez zmian.', 'No changes.')}</p> : null;
 }
 
 function Fact({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
@@ -175,23 +175,23 @@ export default function RunDetail() {
   return (
     <div>
       <PageHeader
-        back={{ to: '/runs', label: t('Przebiegi skanów', 'Scan runs') }}
-        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{t('Przebieg', 'Run')} #{run.id}</span><span className="font-sans text-base font-normal"><RunStatusMark status={run.status} pauseReason={run.pause_reason} /></span></span>}
-        sub={<>{run.profile_id ? <Link to={'/profiles/' + run.profile_id} className="link">{run.profile_name}</Link> : run.profile_name} · {run.trigger === 'schedule' ? t('z harmonogramu', 'from the schedule') : run.trigger === 'import' ? t('import pliku', 'file import') : run.trigger === 'manual' ? t('uruchomiony ręcznie', 'started by hand') : triggerLabel(run.trigger)} · {fmtDateTime(run.started_at)}
+        back={{ to: '/runs', label: t('Skany', 'Scans') }}
+        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{t('Skan', 'Scan')} #{run.id}</span><span className="font-sans text-base font-normal"><RunStatusMark status={run.status} pauseReason={run.pause_reason} /></span></span>}
+        sub={<>{run.profile_id ? <Link to={'/profiles/' + run.profile_id} className="link">{run.profile_name}</Link> : run.profile_name} · {run.trigger === 'schedule' ? t('z harmonogramu', 'from the schedule') : run.trigger === 'import' ? t('import pliku', 'file import') : run.trigger === 'manual' ? t('uruchomiony ręcznie', 'started manually') : triggerLabel(run.trigger)} · {fmtDateTime(run.started_at)}
           {isLive ? <span className="ml-2 inline-flex items-center gap-1 text-xs text-ink-3"><span className={cx('inline-block h-1.5 w-1.5 rounded-full', connected ? 'bg-st-new' : 'bg-st-changed')} />{connected ? t('na żywo', 'live') : t('łączenie…', 'connecting…')}</span> : null}</>}
         readOnly={!canRun && (isLive || run.status === 'paused')}
         actions={canRun ? (
           <>
             {run.status === 'running' ? <Button icon="pause" busy={act.isPending && act.variables === 'pause'} onClick={() => act.mutate('pause')}>{t('Wstrzymaj', 'Pause')}</Button> : null}
-            {run.status === 'paused' ? <Button variant="primary" icon="play" busy={act.isPending && act.variables === 'resume'} disabled={safety.data?.emergency_stop} title={safety.data?.emergency_stop ? t('Najpierw zwolnij stop awaryjny', 'Release the emergency stop first') : undefined} onClick={() => act.mutate('resume')}>{t('Wznów', 'Resume')}</Button> : null}
-            {['running', 'paused', 'queued'].includes(run.status) ? <Button variant="danger" icon="x" onClick={() => setConfirmCancel(true)}>{t('Anuluj skan', 'Cancel the scan')}</Button> : null}
-            {run.status === 'completed' && run.summary?.prev_run_id ? <Button icon="compare" onClick={() => navigate('/changes/compare?from=' + run.summary!.prev_run_id + '&to=' + run.id)}>{t('Porównaj z poprzednim', 'Compare with the previous')}</Button> : null}
+            {run.status === 'paused' ? <Button variant="primary" icon="play" busy={act.isPending && act.variables === 'resume'} disabled={safety.data?.emergency_stop} title={safety.data?.emergency_stop ? t('Najpierw wyłącz stop awaryjny', 'Turn off the emergency stop first') : undefined} onClick={() => act.mutate('resume')}>{t('Wznów', 'Resume')}</Button> : null}
+            {['running', 'paused', 'queued'].includes(run.status) ? <Button variant="danger" icon="x" onClick={() => setConfirmCancel(true)}>{t('Anuluj skan', 'Cancel scan')}</Button> : null}
+            {run.status === 'completed' && run.summary?.prev_run_id ? <Button icon="compare" onClick={() => navigate('/changes/compare?from=' + run.summary!.prev_run_id + '&to=' + run.id)}>{t('Porównaj z poprzednim', 'Compare with previous')}</Button> : null}
             {reportReady ? <ReportButtons onOpen={openReport} /> : null}
             {run.status === 'completed' && canExport ? <DojoRunButton runId={run.id} /> : null}
           </>
         ) : (
           <>
-            {run.status === 'completed' && run.summary?.prev_run_id ? <Button icon="compare" onClick={() => navigate('/changes/compare?from=' + run.summary!.prev_run_id + '&to=' + run.id)}>{t('Porównaj z poprzednim', 'Compare with the previous')}</Button> : null}
+            {run.status === 'completed' && run.summary?.prev_run_id ? <Button icon="compare" onClick={() => navigate('/changes/compare?from=' + run.summary!.prev_run_id + '&to=' + run.id)}>{t('Porównaj z poprzednim', 'Compare with previous')}</Button> : null}
             {reportReady ? <ReportButtons onOpen={openReport} /> : null}
           </>
         )}
@@ -207,20 +207,20 @@ export default function RunDetail() {
         {run.status === 'paused' && run.pause_reason === 'emergency_stop' ? (
           <div role="status" className="flex items-start gap-2 border border-danger/60 bg-st-gone-wash px-3 py-2 text-sm" data-testid="paused-emergency">
             <Icon name="stop" className="mt-0.5 text-danger" />
-            <span>{t('Skan zatrzymał stop awaryjny. Żaden pakiet nie jest wysyłany. Po zwolnieniu blokady skan zostaje wstrzymany: wznów go ręcznie, gdy będzie bezpiecznie.', 'The emergency stop halted this scan. No packet is sent. After the stop is released the scan stays paused: resume it by hand when it is safe.')}</span>
+            <span>{t('Stop awaryjny wstrzymał ten skan. Po wyłączeniu stopu wznów skan ręcznie.', 'The emergency stop paused this scan. After the stop is off, resume the scan manually.')}</span>
           </div>
         ) : null}
         {run.status === 'paused' && run.pause_reason === 'manual' ? (
           <div role="status" className="flex items-start gap-2 border border-rule-strong bg-raised px-3 py-2 text-sm">
             <Glyph name="pause" tone="neutral" />
-            <span>{t('Skan wstrzymany ręcznie. Gotowe podgrupy są zapisane; wznowienie zaczyna od pierwszej niedokończonej.', 'The scan is paused by hand. Finished chunks are saved; resuming starts at the first unfinished one.')}</span>
+            <span>{t('Skan wstrzymany ręcznie.', 'The scan is paused manually.')}</span>
           </div>
         ) : null}
         {run.status === 'paused' && run.pause_reason === 'window_closed' ? (
           <div className="flex items-start gap-2 border border-rule-strong bg-st-changed-wash px-3 py-2 text-sm">
             <Glyph name="pause" tone="changed" />
             <span>
-              {t('Okno czasowe zamknęło się o ', 'The time window closed at ')}<span className="num">{fmtTime(run.window_end)}</span>{t('. Niedokończone podgrupy są odroczone.', '. The unfinished chunks are deferred.')}{' '}
+              {t('Okno czasowe zamknęło się o ', 'The time window closed at ')}<span className="num">{fmtTime(run.window_end)}</span>{t('.', '.')}{' '}
               {run.resume_at ? <>{t('Skan wznowi się sam w następnym oknie: ', 'The scan resumes by itself in the next window: ')}<span className="num font-medium">{fmtDateTime(run.resume_at)}</span> ({fmtRelative(run.resume_at)}).</> : null}
             </span>
           </div>
@@ -228,7 +228,7 @@ export default function RunDetail() {
 
         {run.status === 'completed' && run.summary?.prev_run_id ? (
           <section className="py-1" data-testid="run-story-panel">
-            <h2 className="mb-2 text-xs text-ink-3">{t('Względem przebiegu', 'Compared with run')} <Link to={'/runs/' + run.summary.prev_run_id} className="num link">#{run.summary.prev_run_id}</Link> · <Link to={'/changes/compare?from=' + run.summary.prev_run_id + '&to=' + run.id} className="link">{t('porównanie', 'comparison')}</Link></h2>
+            <h2 className="mb-2 text-xs text-ink-3">{t('Względem skanu', 'Compared with scan')} <Link to={'/runs/' + run.summary.prev_run_id} className="num link">#{run.summary.prev_run_id}</Link> · <Link to={'/changes/compare?from=' + run.summary.prev_run_id + '&to=' + run.id} className="link">{t('porównanie', 'comparison')}</Link></h2>
             <RunStory runId={run.id} className="space-y-1.5 [&_li]:text-lg" />
             <NoStory run={run} />
           </section>
@@ -254,7 +254,7 @@ export default function RunDetail() {
               {small && isLive ? (
                 <span><span className="font-display text-[44px] leading-none">{fmtInt(s.services_open)}</span> <span className="text-sm text-ink-2">{plural(s.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['open service', 'open services'])} {t('do tej pory', 'so far')}</span></span>
               ) : (
-                <span><span className="font-display text-[44px] leading-none">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów sprawdzonych', 'of addresses probed')}</span></span>
+                <span><span className="font-display text-[44px] leading-none">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów', 'of addresses')}</span></span>
               )}
               <span className="num text-sm text-ink-2">{fmtInt(s.addresses_done)} / {fmtInt(s.addresses_total)}</span>
             </div>
@@ -269,13 +269,13 @@ export default function RunDetail() {
             ) : null}
             <dl className="mt-4 grid grid-cols-2 gap-y-3 border-t border-rule/70 pt-4 sm:grid-cols-4">
               <Fact label={run.status === 'completed' ? t('Czas trwania', 'Duration') : t('Czas aktywny', 'Active time')}><span className="num">{fmtDuration(s.elapsed_sec)}</span></Fact>
-              <Fact label={t('Pozostało (ETA)', 'Remaining (ETA)')}><span className="num">{isLive || run.status === 'paused' ? (run.status === 'analyzing' ? t('analiza', 'analysing') : s.eta_sec > 0 ? fmtDuration(s.eta_sec) : '–') : '–'}</span></Fact>
+              <Fact label={t('Pozostało', 'Remaining')}><span className="num">{isLive || run.status === 'paused' ? (run.status === 'analyzing' ? t('analiza', 'analysing') : s.eta_sec > 0 ? fmtDuration(s.eta_sec) : '–') : '–'}</span></Fact>
               <Fact label={t('Podgrupy', 'Chunks')}><span className="num">{s.chunks_done} / {s.chunks_total}</span></Fact>
               <Fact label={t('Aktywne hosty', 'Hosts up')}><span className="num">{fmtInt(s.hosts_up)}</span></Fact>
               <Fact label={t('Otwarte usługi', 'Open services')}><span className="num">{fmtInt(s.services_open)}</span> <span className="text-xs font-normal text-ink-3">({fmtInt(s.http_services)} WWW)</span></Fact>
-              <Fact label={t('Pakiety prób', 'Probe packets')}><PacketCount sent={s.packets_sent} estimated={s.packets_estimated} /></Fact>
+              <Fact label={t('Pakiety', 'Packets')}><PacketCount sent={s.packets_sent} estimated={s.packets_estimated} /></Fact>
               <Fact label={t('Żądania HTTP', 'HTTP requests')}><span className="num">{fmtInt(s.http_requests)}</span></Fact>
-              <Fact label={t('Ponowione próby', 'Retried hosts')}><span className="num">{fmtInt(s.retried)}</span></Fact>
+              <Fact label={t('Ponowienia', 'Retries')}><span className="num">{fmtInt(s.retried)}</span></Fact>
             </dl>
           </section>
           <section className="card p-4 sm:p-5">
@@ -299,14 +299,14 @@ export default function RunDetail() {
 
           <Panel title={t('Podgrupy adresów', 'Address chunks')} count={sortedChunks.length} flush actions={<span className="text-ink-3">{groupSizes.size ? groupSizes.size + ' ' + plural(groupSizes.size, ['grupa robocza', 'grupy robocze', 'grup roboczych'], ['work group', 'work groups']) + (multiGroups ? ' · ' + t(multiGroups + ' łączonych', multiGroups + ' merged') : '') : null}{groupSizes.size && profile.data?.chunking.adaptive ? ' · ' : ''}{profile.data?.chunking.adaptive ? t('rozmiar adaptacyjny, cel ' + profile.data.chunking.target_seconds + ' s', 'adaptive size, target ' + profile.data.chunking.target_seconds + ' s') : ''}</span>}>
             {chunks.error ? <ErrorState error={chunks.error} retry={() => chunks.refetch()} /> : !chunks.data ? <SkeletonRows rows={8} /> : sortedChunks.length === 0 ? (
-              <p className="p-3 text-sm text-ink-2">{run.trigger === 'import' ? t('Import nie dzieli adresów na podgrupy.', 'An import does not split addresses into chunks.') : t('Plan podgrup pojawi się po starcie skanu.', 'The chunk plan appears when the scan starts.')}</p>
+              <p className="p-3 text-sm text-ink-2">{run.trigger === 'import' ? t('Import nie ma podgrup.', 'An import has no chunks.') : t('Plan podgrup pojawi się po starcie skanu.', 'The chunk plan appears when the scan starts.')}</p>
             ) : (
               <div className="max-h-[520px] overflow-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-panel">
                     <tr className="border-b border-rule-strong text-left text-xs text-ink-3">
                       <th className="h-[30px] w-[36px] pl-3 pr-2 font-medium">#</th>
-                      <th className="px-2 font-medium">{t('Zakres', 'Range')}</th>
+                      <th className="px-2 font-medium">{t('Adresy', 'Addresses')}</th>
                       <th className="px-2 font-medium" title={t('Grupa robocza: podgrupy, które jeden proces skanera wziął razem', 'Work group: the chunks that one scanner process took together')}>{t('Grupa', 'Group')}</th>
                       <th className="px-2 font-medium">{t('Rozmiar', 'Size')}</th>
                       <th className="px-2 font-medium">{t('Stan', 'Status')}</th>
@@ -342,7 +342,7 @@ export default function RunDetail() {
         <div className="grid gap-4 xl:grid-cols-2">
           {!small && (isLive || recent.length > 0) ? (
             <Panel title={t('Ostatnio wykryte hosty', 'Hosts just found')} flush>
-              {recent.length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Czekam na pierwsze odpowiedzi z bieżących podgrup…', 'Waiting for the first answers from the running chunks…')}</p> : (
+              {recent.length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Oczekiwanie na odpowiedzi…', 'Waiting for responses…')}</p> : (
                 <ul>
                   {recent.map((h, i) => (
                     <li key={h.ip + h.at} className="flex h-[30px] items-center gap-3 border-b border-rule px-3 last:border-b-0" style={i === 0 ? { animation: 'rise-in 240ms var(--ease-out-expo)' } : undefined}>
@@ -356,13 +356,13 @@ export default function RunDetail() {
             </Panel>
           ) : null}
           {run.summary ? (
-            <Panel title={t('Zmiany wykryte przez ten przebieg', 'Changes found by this run')} actions={<Link className="link" to={'/changes?run_id=' + run.id}>{t('Lista zmian', 'Change list')}</Link>}>
+            <Panel title={t('Zmiany w tym skanie', 'Changes in this scan')} actions={<Link className="link" to={'/changes?run_id=' + run.id}>{t('Wszystkie', 'All')}</Link>}>
               <dl className="grid grid-cols-2 gap-x-6 sm:grid-cols-3">
                 {([
-                  ['plus', 'new', t('nowe hosty', 'new hosts'), run.summary.hosts_new], ['plus', 'new', t('nowe usługi', 'new services'), run.summary.services_new], ['back', 'new', t('hosty wróciły', 'hosts back'), run.summary.hosts_back], ['returned', 'new', t('usługi wróciły', 'services back'), run.summary.services_returned ?? 0], ['slow', 'changed', t('wolniejsze odpowiedzi', 'slower responses'), run.summary.responses_slower ?? 0],
-                  ['minus', 'gone', t('hosty nieaktywne', 'hosts inactive'), run.summary.hosts_gone], ['minus', 'gone', t('usługi zniknęły', 'services gone'), run.summary.services_gone], ['wave', 'unstable', t('hosty niestabilne', 'hosts unstable'), run.summary.hosts_unstable],
+                  ['plus', 'new', t('nowe hosty', 'new hosts'), run.summary.hosts_new], ['plus', 'new', t('nowe usługi', 'new services'), run.summary.services_new], ['back', 'new', t('hosty wróciły', 'hosts back'), run.summary.hosts_back], ['returned', 'new', t('usługi wróciły', 'services back'), run.summary.services_returned ?? 0], ['slow', 'changed', t('usługi odpowiadają wolniej', 'services respond slower'), run.summary.responses_slower ?? 0],
+                  ['minus', 'gone', t('hosty nieaktywne', 'hosts down'), run.summary.hosts_gone], ['minus', 'gone', t('usługi zniknęły', 'services gone'), run.summary.services_gone], ['wave', 'unstable', t('hosty niestabilne', 'hosts unstable'), run.summary.hosts_unstable],
                   ['delta', 'changed', t('zmienione usługi', 'changed services'), run.summary.services_changed], ['dot', 'accent', t('nowe znaleziska', 'new findings'), run.summary.findings_new],
-                  ['half', 'changed', t('hosty nie odpowiadają (niepotwierdzone)', 'hosts not answering (unconfirmed)'), run.summary.hosts_missing ?? 0], ['half', 'changed', t('usługi nie odpowiadają (niepotwierdzone)', 'services not answering (unconfirmed)'), run.summary.services_unreachable ?? 0],
+                  ['half', 'changed', t('hosty nie odpowiadają (niepotwierdzone)', 'hosts not responding (unconfirmed)'), run.summary.hosts_missing ?? 0], ['half', 'changed', t('usługi nie odpowiadają (niepotwierdzone)', 'services not responding (unconfirmed)'), run.summary.services_unreachable ?? 0],
                 ] as const).map(([g, tone, label, n]) => (
                   <div key={label} className="flex items-center justify-between gap-2 border-b border-rule py-1.5">
                     <dt className="flex items-center gap-1.5 text-sm text-ink-2"><Glyph name={g} tone={n ? tone : 'expected'} />{label}</dt>
@@ -377,9 +377,9 @@ export default function RunDetail() {
 
       <Dialog
         open={confirmCancel} onClose={() => setConfirmCancel(false)} title={t('Anulować skan #' + run.id + '?', 'Cancel run #' + run.id + '?')} width={440}
-        footer={<><Button onClick={() => setConfirmCancel(false)}>{t('Wróć', 'Back')}</Button><Button variant="dangerSolid" busy={act.isPending} onClick={() => act.mutate('cancel', { onSuccess: () => setConfirmCancel(false) })}>{t('Anuluj skan', 'Cancel the scan')}</Button></>}
+        footer={<><Button onClick={() => setConfirmCancel(false)}>{t('Wróć', 'Back')}</Button><Button variant="dangerSolid" busy={act.isPending} onClick={() => act.mutate('cancel', { onSuccess: () => setConfirmCancel(false) })}>{t('Anuluj skan', 'Cancel scan')}</Button></>}
       >
-        <p className="text-sm">{t('Wyniki z gotowych podgrup zostają. Pozostałe adresy nie będą sprawdzone, a anulowanego skanu nie da się wznowić.', 'Results of the finished chunks stay. The remaining addresses are not probed, and a cancelled scan cannot be resumed.')}</p>
+        <p className="text-sm">{t('Wyniki z gotowych podgrup zostają. Anulowanego skanu nie da się wznowić.', 'Results of finished chunks stay. A cancelled scan cannot be resumed.')}</p>
       </Dialog>
     </div>
   );
@@ -399,12 +399,12 @@ function RunNote({ run, canEdit }: { run: ScanRun; canEdit: boolean }) {
     <div className="flex flex-wrap items-start gap-x-3 gap-y-1 text-sm" data-testid="run-note">
       {run.label ? <span className="border border-rule-strong px-1.5 py-0.5 text-xs font-medium">{run.label}</span> : null}
       {run.note ? <p className="max-w-[90ch] whitespace-pre-wrap text-ink-2">{run.note}</p> : null}
-      {canEdit ? <button type="button" className="link text-xs" onClick={() => { setLabel(run.label ?? ''); setNote(run.note ?? ''); setOpen(true); }}>{has ? t('Zmień notatkę', 'Edit the note') : t('Dodaj notatkę lub etykietę', 'Add a note or a label')}</button> : null}
+      {canEdit ? <button type="button" className="link text-xs" onClick={() => { setLabel(run.label ?? ''); setNote(run.note ?? ''); setOpen(true); }}>{has ? t('Zmień notatkę', 'Edit note') : t('Dodaj notatkę lub etykietę', 'Add note or label')}</button> : null}
       <Dialog open={open} onClose={() => setOpen(false)} width={520} title={t('Notatka do przebiegu #' + run.id, 'Note on run #' + run.id)}
         footer={<><Button onClick={() => setOpen(false)}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="check" busy={save.isPending} disabled={label.length > 100 || note.length > 4000} onClick={() => save.mutate(undefined)}>{t('Zapisz', 'Save')}</Button></>}>
         <div className="space-y-3">
-          <Field label={t('Etykieta', 'Label')} hint={t('jedna linia, do 100 znaków, np. „po migracji VLAN”', 'one line, up to 100 characters, for example "after the VLAN move"')}><input className="field" value={label} maxLength={100} onChange={(e) => setLabel(e.target.value.replace(/\n/g, ' '))} data-testid="run-label" /></Field>
-          <Field label={t('Notatka', 'Note')} hint={t('do 4000 znaków; wyszukiwarka listy przebiegów przeszukuje też notatki', 'up to 4000 characters; the run list search also looks in notes')}><textarea className="field" rows={4} value={note} maxLength={4000} onChange={(e) => setNote(e.target.value)} data-testid="run-note-text" /></Field>
+          <Field label={t('Etykieta', 'Label')} hint={t('do 100 znaków', 'up to 100 characters')}><input className="field" value={label} maxLength={100} onChange={(e) => setLabel(e.target.value.replace(/\n/g, ' '))} data-testid="run-label" /></Field>
+          <Field label={t('Notatka', 'Note')} hint={t('do 4000 znaków', 'up to 4000 characters')}><textarea className="field" rows={4} value={note} maxLength={4000} onChange={(e) => setNote(e.target.value)} data-testid="run-note-text" /></Field>
           <InlineError error={save.error} />
         </div>
       </Dialog>
@@ -416,7 +416,7 @@ function RunNote({ run, canEdit }: { run: ScanRun; canEdit: boolean }) {
 export function smallPhaseText(s: ScanRun['stats']): string {
   if (s.http_requests > 0) return t('Rozpoznawanie usług WWW: ' + s.services_open + ' ' + plural(s.services_open, ['otwarty port', 'otwarte porty', 'otwartych portów'], ['', '']) + ' do tej pory.', 'Identifying web services: ' + s.services_open + ' open ' + (s.services_open === 1 ? 'port' : 'ports') + ' so far.');
   if (s.services_open > 0) return t('Rozpoznawanie usług na ' + s.services_open + ' ' + plural(s.services_open, ['otwartym porcie', 'otwartych portach', 'otwartych portach'], ['', '']) + '.', 'Identifying the services on ' + s.services_open + ' open ' + (s.services_open === 1 ? 'port' : 'ports') + '.');
-  return t('Skanowanie portów: wyniki pojawią się poniżej, gdy tylko porty odpowiedzą.', 'Scanning ports: results appear below as soon as ports answer.');
+  return t('Skanowanie portów.', 'Scanning ports.');
 }
 
 /** The phase of a running scan in words, from what the counters show so far. */
@@ -435,21 +435,21 @@ export function DojoRunButton({ runId }: { runId: number }) {
   const send = useAction(() => post<DojoRunResult>('/runs/' + runId + '/export/defectdojo'), { silent: true, onSuccess: setRes });
   return (
     <>
-      <Button icon="upload" busy={send.isPending} onClick={() => send.mutate(undefined)} data-testid="run-dojo" title={t('Wyślij wynik przebiegu do DefectDojo jako import „Nmap Scan”', 'Send the run result to DefectDojo as an "Nmap Scan" import')}>{t('Do DefectDojo', 'To DefectDojo')}</Button>
-      <Dialog open={res !== null || Boolean(send.error)} onClose={() => { setRes(null); send.reset(); }} width={480} title={t('Przebieg w DefectDojo (Nmap Scan)', 'The run in DefectDojo (Nmap Scan)')}
+      <Button icon="upload" busy={send.isPending} onClick={() => send.mutate(undefined)} data-testid="run-dojo" title={t('Wyślij wynik przebiegu do DefectDojo jako import „Nmap Scan”', 'Send the run result to DefectDojo as an "Nmap Scan" import')}>{t('Wyślij do DefectDojo', 'Send to DefectDojo')}</Button>
+      <Dialog open={res !== null || Boolean(send.error)} onClose={() => { setRes(null); send.reset(); }} width={480} title={t('Skan w DefectDojo (Nmap Scan)', 'The scan in DefectDojo (Nmap Scan)')}
         footer={<Button variant="primary" onClick={() => { setRes(null); send.reset(); }}>{t('Gotowe', 'Done')}</Button>}>
         {res ? (
           <div className="space-y-3 text-sm" data-testid="run-dojo-result">
-            <p className="flex items-center gap-2"><Glyph name="check" tone="new" />{(res.mode ?? (res.reimport ? 'reimport' : 'import')) === 'reimport' ? t('Ponowny import (reimport) do testu profilu: DefectDojo zamyka to, czego nowy przebieg już nie widzi.', 'Re-import into the profile test: DefectDojo closes what the new run no longer sees.') : t('Pierwszy import: nowy test w DefectDojo.', 'First import: a new test in DefectDojo.')}</p>
+            <p className="flex items-center gap-2"><Glyph name="check" tone="new" />{(res.mode ?? (res.reimport ? 'reimport' : 'import')) === 'reimport' ? t('Ponowny import. DefectDojo zamknie to, czego ten skan nie widzi.', 'Re-import. DefectDojo closes what this scan no longer sees.') : t('Pierwszy import: nowy test w DefectDojo.', 'First import: a new test in DefectDojo.')}</p>
             <p className="text-xs text-ink-2" data-testid="run-dojo-mode">{t('Tryb', 'Mode')} <span className="mono text-ink">{res.mode ?? (res.reimport ? 'reimport' : 'import')}</span>{res.title ? <> · {t('test', 'test')} <span className="text-ink">{res.title}</span></> : null}</p>
             <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1">
-              <dt className="text-ink-2">{t('Nowe obserwacje', 'New findings')}</dt><dd className="num">{res.created}</dd>
+              <dt className="text-ink-2">{t('Nowe znaleziska', 'New findings')}</dt><dd className="num">{res.created}</dd>
               <dt className="text-ink-2">{t('Zamknięte (zniknęły)', 'Closed (gone)')}</dt><dd className="num">{res.closed}</dd>
               <dt className="text-ink-2">{t('Otwarte ponownie', 'Reopened')}</dt><dd className="num">{res.reactivated}</dd>
               <dt className="text-ink-2">{t('Bez zmian', 'Unchanged')}</dt><dd className="num">{res.untouched}</dd>
               <dt className="text-ink-2">{t('Razem w teście', 'Total in the test')}</dt><dd className="num">{res.total}</dd>
             </dl>
-            <a className="link inline-flex items-center gap-1" href={res.test_url} target="_blank" rel="noreferrer noopener">{t('Otwórz test', 'Open the test')} #{res.test_id}<Icon name="external" size={11} /></a>
+            <a className="link inline-flex items-center gap-1" href={res.test_url} target="_blank" rel="noreferrer noopener">{t('Otwórz test', 'Open test')} #{res.test_id}<Icon name="external" size={11} /></a>
           </div>
         ) : <InlineError error={send.error} />}
       </Dialog>

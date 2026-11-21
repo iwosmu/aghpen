@@ -43,7 +43,7 @@ interface Series { key: keyof Pick<CountPoint, 'hosts' | 'services' | 'changes' 
 export function TrendRows({ points, series }: { points: CountPoint[]; series: Series[] }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [at, setAt] = useState<number | null>(null);
-  if (points.length < 2) return <p className="text-sm text-ink-3">{t('Trend pojawi się po dwóch zakończonych przebiegach.', 'The trend appears after two completed runs.')}</p>;
+  if (points.length < 2) return <p className="text-sm text-ink-3">{t('Trend pojawi się po dwóch skanach.', 'The trend appears after two scans.')}</p>;
   const labelW = 92, valueW = 86, rowH = 40, pad = 6;
   const plotW = Math.max(60, width - labelW - valueW);
   const x = (i: number) => (i / (points.length - 1)) * (plotW - 8) + 4;
@@ -57,7 +57,7 @@ export function TrendRows({ points, series }: { points: CountPoint[]; series: Se
     <div ref={ref}>
       <div
         tabIndex={0} role="group" className="outline-offset-2"
-        aria-label={t('Trend w kolejnych przebiegach. Strzałki w lewo i w prawo wybierają przebieg.', 'Trend over runs. Left and right arrows choose a run.')}
+        aria-label={t('Trend w kolejnych skanach. Strzałki w lewo i w prawo wybierają skan.', 'Trend over scans. Left and right arrows choose a scan.')}
         onKeyDown={(e) => {
           if (e.key === 'ArrowLeft') { e.preventDefault(); setAt(Math.max(0, idx - 1)); }
           if (e.key === 'ArrowRight') { e.preventDefault(); setAt(Math.min(points.length - 1, idx + 1)); }
@@ -128,16 +128,16 @@ export function RateGauge({ current, cap, policyCap, unit = 'pps', basis }: { cu
   return (
     <div data-over={over || undefined}>
       <div className="flex items-baseline justify-between gap-3">
-        <span className={cx('inline-flex items-baseline gap-1', over && 'text-danger')}>{over ? <Icon name="alert" size={14} className="self-center" /> : null}{pace ? <span className="num text-lg font-semibold text-ink-3">≈</span> : null}<span className={cx('num text-lg font-semibold', over ? 'text-danger' : 'text-ink')}>{fmtInt(current)}</span> <span className="text-xs text-ink-3">{unit}</span>{pace ? <span className="ml-1 border border-rule-strong px-1 text-2xs text-ink-2" title={paceTip()} data-testid="rate-pace">{t('tempo zadane', 'set pace')}</span> : basis === 'measured' ? <span className="ml-1 text-2xs text-ink-3" data-testid="rate-measured">{t('zmierzone', 'measured')}</span> : null}</span>
-        <span className="text-xs text-ink-2">{t('limit skanu', 'run cap')} <span className="num text-ink">{fmtInt(cap)}</span></span>
+        <span className={cx('inline-flex items-baseline gap-1', over && 'text-danger')}>{over ? <Icon name="alert" size={14} className="self-center" /> : null}{pace ? <span className="num text-lg font-semibold text-ink-3">≈</span> : null}<span className={cx('num text-lg font-semibold', over ? 'text-danger' : 'text-ink')}>{fmtInt(current)}</span> <span className="text-xs text-ink-3">{unit}</span>{pace ? <span className="ml-1 border border-rule-strong px-1 text-2xs text-ink-2" title={paceTip()} data-testid="rate-pace">{t('zadane', 'set')}</span> : basis === 'measured' ? <span className="ml-1 text-2xs text-ink-3" data-testid="rate-measured">{t('zmierzone', 'measured')}</span> : null}</span>
+        <span className="text-xs text-ink-2">{t('limit skanu', 'scan limit')} <span className="num text-ink">{fmtInt(cap)}</span></span>
       </div>
-      <div className="relative mt-1.5 h-[8px] bg-[color-mix(in_oklch,var(--accent)_14%,var(--raised))]" role="meter" aria-valuemin={0} aria-valuemax={max} aria-valuenow={current} aria-label={t('Tempo pakietów względem limitu', 'Packet rate against the cap')}>
+      <div className="relative mt-1.5 h-[8px] bg-[color-mix(in_oklch,var(--accent)_14%,var(--raised))]" role="meter" aria-valuemin={0} aria-valuemax={max} aria-valuenow={current} aria-label={t('Tempo pakietów względem limitu', 'Packet rate against the limit')}>
         <div className={cx('h-full transition-[width] duration-700 ease-out', over && 'bar-over')} style={{ width: Math.min(100, (current / max) * 100) + '%', background: over ? undefined : 'var(--accent)' }} />
-        <div className="absolute -bottom-1 -top-1 w-[2px] bg-ink" style={{ left: 'calc(' + Math.min(100, (cap / max) * 100) + '% - 1px)' }} title={t('limit skanu', 'run cap')} />
+        <div className="absolute -bottom-1 -top-1 w-[2px] bg-ink" style={{ left: 'calc(' + Math.min(100, (cap / max) * 100) + '% - 1px)' }} title={t('limit skanu', 'scan limit')} />
       </div>
       <div className="mt-1 flex justify-between text-2xs text-ink-3">
         <span className="num">0</span>
-        <span>{t('limit polityki bezpieczeństwa', 'safety policy cap')} <span className="num text-ink-2">{fmtInt(policyCap)}</span></span>
+        <span>{t('limit polityki bezpieczeństwa', 'safety policy limit')} <span className="num text-ink-2">{fmtInt(policyCap)}</span></span>
       </div>
       {over ? (
         <p role="alert" className="mt-2 border-l-2 border-danger pl-2 text-xs text-ink" data-testid="rate-over-cap">

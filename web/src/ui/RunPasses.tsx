@@ -12,9 +12,9 @@ export function passLabel(p: RunPass): string {
 
 export function passState(p: RunPass): string {
   switch (p.state) {
-    case 'done': return t('gotowe', 'done');
+    case 'done': return t('gotowy', 'done');
     case 'skipped': return t('pominięty', 'skipped');
-    case 'pending': return t('czeka', 'waiting');
+    case 'pending': return t('oczekuje', 'pending');
     default: return p.ports_total > 0 ? fmtPct(Math.min(1, p.ports_done / p.ports_total)) : t('w toku', 'running');
   }
 }
