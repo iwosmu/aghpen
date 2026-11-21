@@ -76,10 +76,28 @@ export function fmtDuration(sec: number | null | undefined): string {
   return d + ' ' + plural(d, ['dzień', 'dni', 'dni'], ['day', 'days']) + ' ' + (h % 24) + ' h';
 }
 
+/** A decimal with a fixed number of digits in the UI locale ("0,15" in Polish, "0.15" in English). */
+export function fmtDec(n: number, digits = 2): string {
+  return n.toLocaleString(locale(), { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
 export function fmtBytes(n: number): string {
   if (n < 1024) return n + ' B';
-  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' kB';
-  return (n / 1024 / 1024).toFixed(1) + ' MB';
+  if (n < 1024 * 1024) return fmtDec(n / 1024, 1) + ' kB';
+  return fmtDec(n / 1024 / 1024, 1) + ' MB';
+}
+
+/** A finding title without a trailing " — address" when the address is shown next to it anyway. */
+export function titleWithoutAddress(title: string, ip: string, port?: number | null): string {
+  const tails = [port ? ip + ':' + port : '', ip].filter(Boolean);
+  for (const tail of tails) {
+    for (const sep of [' — ', ' – ', ' - ']) {
+      if (title.endsWith(sep + tail)) return title.slice(0, -(sep.length + tail.length));
+    }
+    const paren = ' (' + tail + ')';
+    if (title.endsWith(paren)) return title.slice(0, -paren.length);
+  }
+  return title;
 }
 
 export function shortHash(h: string | null | undefined, n = 12): string {

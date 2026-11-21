@@ -11,9 +11,15 @@
 @font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("../node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 @font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("../node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-500-normal.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
 
+@font-face { font-family: "Instrument Serif"; font-style: normal; font-weight: 400; font-display: swap; src: url("../node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Instrument Serif"; font-style: italic; font-weight: 400; font-display: swap; src: url("../node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-italic.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Instrument Serif"; font-style: normal; font-weight: 400; font-display: swap; src: url("../node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-ext-400-normal.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Instrument Serif"; font-style: italic; font-weight: 400; font-display: swap; src: url("../node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-ext-400-italic.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
 /* ---------- Tokens: the watch book. Blue-black ink, bone paper, hairline rules. ---------- */
 :root,
-:root[data-theme="dark"] {
+:root[data-theme="dark"],
+.night {
   color-scheme: dark;
   --bg: #0e131b;
   --panel: #131a24;
@@ -129,6 +135,7 @@
   --color-danger-solid: var(--danger-solid);
   --color-danger-ink: var(--danger-ink);
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --text-2xs: 11px;
   --text-2xs--line-height: 14px;
@@ -223,3 +230,35 @@
 
 /* Presentation mode (?present=1 or Shift+P): one step larger for a 1080p recording. */
 html[data-present] { zoom: 1.125; }
+
+/* ---------- The night field of the login page: slow light, film grain, one warm alarm glow. ---------- */
+.night-field { position: absolute; inset: 0; overflow: hidden; background: #060a11; z-index: 0; }
+.night-field::before {
+  content: ""; position: absolute; inset: -25%;
+  background:
+    radial-gradient(42% 38% at 24% 22%, rgb(46 82 150 / 0.42), transparent 70%),
+    radial-gradient(55% 45% at 72% 30%, rgb(24 44 88 / 0.55), transparent 72%),
+    radial-gradient(30% 26% at 80% 80%, rgb(229 85 106 / 0.20), transparent 70%),
+    radial-gradient(60% 40% at 40% 95%, rgb(16 30 60 / 0.6), transparent 75%);
+  animation: night-drift 70s ease-in-out infinite alternate;
+  will-change: transform;
+}
+.night-field::after {
+  content: ""; position: absolute; inset: 0; opacity: 0.11; pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+@keyframes night-drift {
+  from { transform: translate3d(-4%, -3%, 0) scale(1); }
+  to { transform: translate3d(4%, 3%, 0) scale(1.1); }
+}
+/* the rhythm card: one sweep, hour by hour, that stops on the alarm hour */
+.rhythm-sweep { background: rgb(233 229 218 / 0.16); box-shadow: 0 0 24px 4px rgb(110 163 242 / 0.25); animation: rhythm-sweep 4.2s steps(10, jump-none) 0.8s 1 both, rhythm-fade 0.9s ease-out 5.2s 1 forwards; pointer-events: none; }
+@keyframes rhythm-sweep { from { transform: translateX(0); } to { transform: translateX(calc(1000% + 20px)); } }
+@keyframes rhythm-fade { to { opacity: 0; } }
+.rhythm-alarm-ring { animation: rhythm-ring 1.6s var(--ease-out-expo) 5s 1 both; }
+@keyframes rhythm-ring { from { box-shadow: 0 0 0 0 rgb(229 85 106 / 0.85); } to { box-shadow: 0 0 0 14px rgb(229 85 106 / 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .night-field::before { animation: none; }
+  .rhythm-sweep { display: none; }
+  .rhythm-alarm-ring { animation: none; }
+}

@@ -8,7 +8,7 @@ import { useAction, useItem, usePage } from '../api/hooks';
 import { post } from '../api/client';
 import type { Host, ManualEntryResult, NameCount, Page, Scope } from '../api/types';
 import { t, plural } from '../i18n';
-import { cx, fmtDateTime, fmtInt, fmtRelative } from '../lib/format';
+import { cx, fmtDateTime, fmtDec, fmtInt, fmtRelative } from '../lib/format';
 import { useUrlState, useWidth } from '../lib/hooks';
 import { Button, Dialog, Empty, ErrorState, Field, InlineError, PageHeader, Select, SkeletonRows, Spinner, Tags } from '../ui/kit';
 import { Icon } from '../ui/Icon';
@@ -85,7 +85,7 @@ export default function Hosts() {
     { id: 'ports', header: t('Otwarte porty', 'Open ports'), width: 'minmax(120px, 1fr)', min: 900, sort: 'service_count', cell: (h) => (h.open_ports ?? []).length ? <span className="mono block truncate text-ink-2">{(h.open_ports ?? []).join(' ')}</span> : <span className="block truncate text-xs text-ink-3" title={noPortsText(h.status)}>{h.status === 'down' ? noPortsText(h.status) : t('brak otwartych portów', 'no open port')}</span> },
     { id: 'tech', header: t('Technologie', 'Technologies'), width: 'minmax(140px, 1.2fr)', min: 1080, cell: (h) => <span className="block truncate text-ink-2">{(h.technologies ?? []).join(', ') || ((h.open_ports ?? []).length ? '–' : '')}</span> },
     { id: 'tags', header: t('Tagi', 'Tags'), width: '150px', min: 1320, cell: (h) => <Tags tags={h.tags} max={2} /> },
-    { id: 'palive', header: t('Obecność', 'Presence'), width: '62px', min: 760, sort: 'p_alive', align: 'right', cell: (h) => <span className="num text-ink-2">{h.p_alive.toFixed(2)}</span> },
+    { id: 'palive', header: t('Obecność', 'Presence'), width: '62px', min: 760, sort: 'p_alive', align: 'right', cell: (h) => <span className="num text-ink-2">{fmtDec(h.p_alive)}</span> },
     { id: 'seen', header: t('Ostatnio widziany', 'Last seen'), width: '128px', min: 700, sort: 'last_seen', cell: (h) => <span className="num text-ink-2" title={fmtDateTime(h.last_seen)}>{fmtRelative(h.last_seen)}</span> },
     { id: 'interest', header: t('Ciekawość', 'Interest'), width: '86px', min: 0, sort: 'interest', align: 'right', cell: (h) => <InterestScore value={h.interest} /> },
   ];

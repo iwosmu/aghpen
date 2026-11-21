@@ -4,7 +4,7 @@ import { SETUP_DONE_KEY } from './Setup';
 import { useItem, usePage } from '../api/hooks';
 import type { Change, Dashboard as Dash, Page, RunMap, ScanProfile, ScanRun, Scope, Service } from '../api/types';
 import { t, plural, getLang } from '../i18n';
-import { cx, fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtSigned } from '../lib/format';
+import { cx, fmtDateTime, fmtDec, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtSigned, titleWithoutAddress } from '../lib/format';
 import { useLiveRun, useNow } from '../lib/hooks';
 import { ErrorState, Panel, SkeletonRows } from '../ui/kit';
 import { Icon } from '../ui/Icon';
@@ -24,6 +24,7 @@ import { changeSummary } from '../lib/changeText';
 
 function Count({ n, glyph, tone, label, to }: { n: number; glyph: GlyphName; tone: Tone; label: string; to: string }) {
   const zero = n === 0;
+  if (zero) return null; // the handover sentence already says what did not change
   return (
     <Link to={to} className={cx('group inline-flex items-center gap-1.5 whitespace-nowrap py-0.5', zero ? 'text-ink-3' : 'text-ink hover:underline')}>
       <Glyph name={glyph} tone={zero ? 'expected' : tone} />
@@ -126,8 +127,8 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
         </p>
       ) : null}
       {s && !baseline ? <RunStory runId={run.id} className="mt-3 space-y-1" testId="handover-story" /> : null}
-      {s && !baseline ? (
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-0.5 border-t border-rule pt-2.5">
+      {s && !baseline && !(quiet && !expected && !unreachable) ? (
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-0.5 border-t border-rule pt-2.5" data-testid="handover-counts">
           <Count n={s.hosts_new} glyph="plus" tone="new" label={plural(s.hosts_new, ['nowy host', 'nowe hosty', 'nowych hostów'], ['new host', 'new hosts'])} to={'/changes?run_id=' + run.id + '&kind=host_new'} />
           <Count n={s.services_new} glyph="plus" tone="new" label={plural(s.services_new, ['nowa usługa', 'nowe usługi', 'nowych usług'], ['new service', 'new services'])} to={'/changes?run_id=' + run.id + '&kind=service_new'} />
           <Count n={s.hosts_gone} glyph="minus" tone="gone" label={plural(s.hosts_gone, ['host nieaktywny', 'hosty nieaktywne', 'hostów nieaktywnych'], ['host inactive', 'hosts inactive'])} to={'/changes?run_id=' + run.id + '&kind=host_gone&expected=false'} />
@@ -253,7 +254,7 @@ function IdleRun({ d }: { d: Dash }) {
       <div className="flex flex-wrap gap-x-10 gap-y-2 text-sm">
         <span className="text-ink-2">{t('Żaden skan teraz nie działa.', 'No scan is running now.')}</span>
         {run ? <span>{t('Ostatni:', 'Last:')} <Link className="link num" to={'/runs/' + run.id}>#{run.id}</Link> · {fmtDateTime(run.finished_at)} · {fmtDuration(run.stats.elapsed_sec)}</span> : null}
-        <span>{t('Następny:', 'Next:')} {d.next_run_at ? <><span className="num text-ink">{fmtDateTime(d.next_run_at)}</span> <span className="text-ink-3">({fmtRelative(d.next_run_at)})</span></> : t('brak harmonogramu', 'not scheduled')}</span>
+        <span>{t('Następny:', 'Next:')} {d.next_run_at ? <><span className="text-ink">{fmtDateTime(d.next_run_at)}</span> <span className="text-ink-3">({fmtRelative(d.next_run_at)})</span></> : t('brak harmonogramu', 'not scheduled')}</span>
       </div>
     </Panel>
   );
@@ -443,7 +444,7 @@ export default function Dashboard() {
               <Row key={f.id} to={'/findings?open=' + f.id}>
                 <span className="mt-0.5"><Sev level={f.severity} compact /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm text-ink">{f.title}</span>
+                  <span className="block text-sm text-ink">{titleWithoutAddress(f.title, f.ip, f.port)}</span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
                     <span className="mono">{f.ip}{f.port ? ':' + f.port : ''}</span>
                     {f.first_run_id === d.last_run?.id ? <span className="inline-flex items-center gap-1 text-ink-2"><Glyph name="plus" tone="new" size={10} />{t('od ostatniego skanu', 'since the last scan')}</span> : <span>{t('od', 'since')} {fmtRelative(f.first_seen)}</span>}
@@ -502,7 +503,7 @@ export default function Dashboard() {
                 <Link to={'/hosts/' + h.id} className="flex min-h-[30px] items-center gap-3 border-b border-rule px-3 py-1.5 hover:bg-raised">
                   <span className="mono w-[104px] flex-none text-sm">{h.ip}</span>
                   <span className="min-w-0 flex-1 truncate text-xs text-ink-2">{h.pattern}</span>
-                  <span className="num flex-none text-xs text-ink-2" title={t('Prawdopodobieństwo, że host nadal istnieje', 'Probability that the host still exists')}>p {h.p_alive.toFixed(2)}</span>
+                  <span className="num flex-none text-xs text-ink-2" title={t('Prawdopodobieństwo, że host nadal istnieje', 'Probability that the host still exists')}>p {fmtDec(h.p_alive)}</span>
                 </Link>
               </li>
             ))}
