@@ -19,7 +19,7 @@ export function getLang(): Lang { return lang; }
 export function setLang(l: Lang) {
   lang = l;
   try { localStorage.setItem('czujka.lang', l); } catch { /* ignore */ }
-  document.documentElement.lang = l;
+  if (typeof document !== 'undefined') document.documentElement.lang = l;
   listeners.forEach((fn) => fn());
 }
 export function useLang(): Lang {

@@ -95,6 +95,13 @@ function Count({ label, value, now, tone }: { label: string; value: number; now?
 
 const ip24 = (ip: string) => ip.split('.').slice(0, 3).join('.') + '.0/24';
 
+/** The address map of a moment; hidden when the run covered a single /24 block (one machine: the lists say it all). */
+function MapPanel({ runId, frameRunId }: { runId: number; frameRunId?: number }) {
+  const frame = useItem<RunMap>('/runs/' + frameRunId + '/map', undefined, { enabled: Boolean(frameRunId), staleTime: 300_000 });
+  if (frame.data && frame.data.blocks.length <= 1) return null;
+  return <Panel title={t('Mapa przestrzeni adresowej wtedy', 'Address-space map then')}><SnapshotMap runId={runId} frameRunId={frameRunId} /></Panel>;
+}
+
 function SnapshotMap({ runId, frameRunId }: { runId: number; frameRunId?: number }) {
   const hosts = useItem<Page<AtHost>>('/timeline/at/hosts', { run_id: runId, limit: 1000 }, { staleTime: 60_000 });
   const services = useItem<Page<AtService>>('/timeline/at/services', { run_id: runId, limit: 1000 }, { staleTime: 60_000 });
@@ -262,7 +269,7 @@ export default function TimeMachine() {
             )}
           </Panel>
           {runId ? <SnapshotLists runId={runId} /> : null}
-          <Panel title={t('Mapa przestrzeni adresowej wtedy', 'Address-space map then')}>{runId ? <SnapshotMap runId={runId} frameRunId={frameRun?.id} /> : null}</Panel>
+          {runId ? <MapPanel runId={runId} frameRunId={frameRun?.id} /> : null}
         </div>
       </div>
     );
@@ -296,7 +303,7 @@ export default function TimeMachine() {
               </div>
             )}
           </Panel>
-          <Panel title={t('Mapa przestrzeni adresowej wtedy', 'Address-space map then')}>{runId ? <SnapshotMap runId={runId} frameRunId={frameRun?.id} /> : null}</Panel>
+          {runId ? <MapPanel runId={runId} frameRunId={frameRun?.id} /> : null}
         </div>
         {runId ? <SnapshotLists runId={runId} /> : null}
       </div>
@@ -335,7 +342,7 @@ export function HostLifePanel({ hostId }: { hostId: number }) {
       <div className="grid grid-cols-[110px_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 text-xs" data-testid="host-lanes">
         <span className="font-medium">{t('host', 'host')}</span><Lane intervals={L.host ?? []} t0={t0} t1={t1} height={14} />
         {(L.services ?? []).map((s) => (
-          <FragmentLane key={s.service_id} label={<Link to={'/services/' + s.service_id} className="mono link">{s.port}/{s.proto} <span className="text-ink-3">{s.name}</span></Link>} intervals={s.intervals ?? []} versions={s.versions ?? []} t0={t0} t1={t1} />
+          <FragmentLane key={s.service_id} label={<Link to={'/services/' + s.service_id} className="mono link">{s.port}/{s.proto} <span className="text-ink-3">{s.name || t('nierozpoznana', 'unidentified')}</span></Link>} intervals={s.intervals ?? []} versions={s.versions ?? []} t0={t0} t1={t1} />
         ))}
       </div>
       <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-2xs text-ink-3">

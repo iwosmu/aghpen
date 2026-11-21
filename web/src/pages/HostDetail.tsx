@@ -13,6 +13,8 @@ import { useCan } from '../session';
 import { ReprobePanel } from './Reprobe';
 import { HostLifePanel } from './TimeMachine';
 import { isLocalMac } from '../lib/mac';
+import { serviceName, isSelf } from '../lib/serviceName';
+import { ResponseCell, SelfTag } from '../ui/serviceBits';
 
 /** Fewer observations than the model needs: the probes as a strip and when the weekly pattern appears. */
 const MIN_OBS = 8;
@@ -110,10 +112,11 @@ export default function HostDetail() {
   const svcCols: Col<Service>[] = [
     { id: 'port', header: t('Port', 'Port'), width: 90, cell: (s) => <Link to={'/services/' + s.id} className="mono link">{s.port}/{s.proto}</Link> },
     { id: 'state', header: t('Stan', 'State'), cell: (s) => <ServiceStateMark state={s.state} /> },
-    { id: 'name', header: t('Usługa', 'Service'), cell: (s) => <span>{s.name}{s.tls ? <span className="ml-1.5 text-2xs text-ink-3">TLS</span> : null}</span> },
+    { id: 'name', header: t('Usługa', 'Service'), cell: (s) => <span>{serviceName(s)}{s.tls ? <span className="ml-1.5 text-2xs text-ink-3">TLS</span> : null}{isSelf(s) ? <SelfTag /> : null}</span> },
     { id: 'product', header: t('Produkt', 'Product'), hide: 'md', cell: (s) => <span className="text-ink-2">{[s.product, s.version].filter(Boolean).join(' ') || '–'}</span> },
     { id: 'title', header: t('Tytuł / technologie', 'Title / technologies'), wrap: true, cell: (s) => <span className="block min-w-[160px] max-w-[420px] truncate text-ink-2">{s.title || (s.technologies ?? []).map((x) => x.name).join(', ') || '–'}</span> },
     { id: 'class', header: t('Klasy', 'Classes'), hide: 'lg', cell: (s) => <ClassChips classes={s.classes} max={2} /> },
+    ...((services.data ?? []).some((s) => s.response_ms !== undefined) ? [{ id: 'rt', header: t('Czas odpowiedzi', 'Response time'), align: 'right' as const, hide: 'md' as const, cell: (s: Service) => <ResponseCell s={s} /> }] : []),
     { id: 'interest', header: t('Ciekawość', 'Interest'), align: 'right', cell: (s) => <InterestScore value={s.interest} reasons={s.interest_why} /> },
   ];
   return (
@@ -168,7 +171,7 @@ export default function HostDetail() {
               empty={<p className="p-3 text-sm text-ink-2">{t('Skan nie wykrył otwartych usług na tym hoście.', 'The scan found no open service on this host.')}</p>}
               mobile={(s) => (
                 <div>
-                  <div className="flex items-center justify-between gap-2"><span className="mono text-sm">{s.port}/{s.proto} <span className="font-sans text-ink-2">{s.name}</span></span><InterestScore value={s.interest} /></div>
+                  <div className="flex items-center justify-between gap-2"><span className="mono text-sm">{s.port}/{s.proto} <span className="font-sans text-ink-2">{serviceName(s)}</span></span><InterestScore value={s.interest} /></div>
                   <div className="mt-0.5 truncate text-xs text-ink-3">{s.title || [s.product, s.version].filter(Boolean).join(' ') || '–'}</div>
                 </div>
               )} />

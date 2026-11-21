@@ -30,12 +30,14 @@ export function adminPanelServiceNames(services: { classes: string[] | null; tit
 }
 
 /** Parts of the change sentence, only the counts that are not zero. */
-export function changeParts(c: { added: number; gone: number; changed: number; missing: number; unstable: number }, lang: 'pl' | 'en', plural: (n: number, pl: [string, string, string], en: [string, string]) => string): string[] {
+export function changeParts(c: { added: number; gone: number; changed: number; missing: number; unstable: number; returned?: number; slower?: number }, lang: 'pl' | 'en', plural: (n: number, pl: [string, string, string], en: [string, string]) => string): string[] {
   const parts: string[] = [];
   const add = (n: number, pl: [string, string, string], en: [string, string]) => { if (n > 0) parts.push(n + ' ' + plural(n, pl, en)); };
   void lang;
   add(c.added, ['nowa ekspozycja', 'nowe ekspozycje', 'nowych ekspozycji'], ['new exposure', 'new exposures']);
   add(c.gone, ['zniknięcie', 'zniknięcia', 'zniknięć'], ['gone', 'gone']);
+  add(c.returned ?? 0, ['powrót usługi', 'powroty usług', 'powrotów usług'], ['service back', 'services back']);
+  add(c.slower ?? 0, ['wolniejsza odpowiedź', 'wolniejsze odpowiedzi', 'wolniejszych odpowiedzi'], ['slower response', 'slower responses']);
   add(c.changed, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes']);
   add(c.missing, ['host bez odpowiedzi', 'hosty bez odpowiedzi', 'hostów bez odpowiedzi'], ['host missing', 'hosts missing']);
   add(c.unstable, ['host niestabilny', 'hosty niestabilne', 'hostów niestabilnych'], ['unstable host', 'unstable hosts']);

@@ -11,6 +11,8 @@ import { DataTable, FilterBar, FilterField, Pager, SearchField, type Col } from 
 import { ClassChips, InterestScore, SERVICE_CLASSES, ServiceStateMark, classLabel } from '../ui/marks';
 import { ExportButtons, useDraft } from '../ui/edit';
 import { useCan } from '../session';
+import { serviceName, isSelf } from '../lib/serviceName';
+import { ResponseCell, SelfTag } from '../ui/serviceBits';
 
 const FILTERS = ['q', 'state', 'port', 'name', 'tech', 'class', 'tag', 'min_interest', 'tls', 'group_key', 'host_id'];
 
@@ -37,16 +39,18 @@ export default function Services() {
   const [port, setPort] = useDraft(u.get('port'), (v) => u.set({ port: v.replace(/\D/g, '') }));
   const active = FILTERS.filter((k) => u.get(k)).length;
 
+  const anyTime = (list.data?.items ?? []).some((s) => s.response_ms !== undefined);
   const cols: Col<Service>[] = [
     { id: 'addr', header: t('Adres', 'Address'), sort: 'ip', cell: (s) => <Link to={'/services/' + s.id} className="mono link">{s.ip}:{s.port}</Link> },
     { id: 'state', header: t('Stan', 'State'), hide: 'lg', cell: (s) => <ServiceStateMark state={s.state} /> },
-    { id: 'name', header: t('Usługa', 'Service'), sort: 'name', cell: (s) => <span>{s.name}{s.tls ? <span className="ml-1.5 text-2xs text-ink-3">TLS</span> : null}</span> },
+    { id: 'name', header: t('Usługa', 'Service'), sort: 'name', cell: (s) => <span>{serviceName(s)}{s.tls ? <span className="ml-1.5 text-2xs text-ink-3">TLS</span> : null}{isSelf(s) ? <SelfTag /> : null}</span> },
     { id: 'title', header: t('Tytuł / produkt', 'Title / product'), cell: (s) => (
       <span className="block max-w-[300px] truncate" title={s.title}>{s.title || <span className="text-ink-2">{[s.product, s.version].filter(Boolean).join(' ') || '–'}</span>}
         {s.overrides && Object.keys(s.overrides).length ? <span className="ml-1.5 text-2xs text-st-changed" title={t('wartość poprawiona przez analityka', 'value corrected by an analyst')}>{t('popr.', 'edited')}</span> : null}</span>
     ) },
     { id: 'tech', header: t('Technologie', 'Technologies'), hide: 'md', cell: (s) => <span className="block max-w-[210px] truncate text-ink-2">{(s.technologies ?? []).map((x) => x.name + (x.version ? ' ' + x.version : '')).join(', ') || '–'}</span> },
     { id: 'class', header: t('Klasy', 'Classes'), hide: 'lg', cell: (s) => <span className="inline-flex whitespace-nowrap"><ClassChips classes={s.classes} max={1} /></span> },
+    ...(anyTime ? [{ id: 'rt', header: t('Czas odpowiedzi', 'Response time'), align: 'right' as const, hide: 'md' as const, cell: (s: Service) => <ResponseCell s={s} /> }] : []),
     { id: 'group', header: t('Podobne', 'Similar'), align: 'right', hide: 'xl', cell: (s) => s.group_size > 1 ? <Link to={'/services?group_key=' + encodeURIComponent(s.group_key)} className="num link" title={t('usługi o tej samej treści i technologiach', 'services with the same content and technologies')}>×{s.group_size}</Link> : <span className="text-ink-3">–</span> },
     { id: 'interest', header: t('Ciekawość', 'Interest'), sort: 'interest', align: 'right', cell: (s) => <InterestScore value={s.interest} reasons={s.interest_why} /> },
   ];
@@ -105,7 +109,7 @@ export default function Services() {
           mobile={(s) => (
             <div>
               <div className="flex items-center justify-between gap-2"><span className="mono text-sm">{s.ip}:{s.port}</span><InterestScore value={s.interest} /></div>
-              <div className="mt-0.5 truncate text-sm text-ink-2">{s.title || [s.product, s.version].filter(Boolean).join(' ') || s.name}</div>
+              <div className="mt-0.5 truncate text-sm text-ink-2">{s.title || [s.product, s.version].filter(Boolean).join(' ') || serviceName(s)}</div>
               <div className="mt-1"><ClassChips classes={s.classes} max={2} /></div>
             </div>
           )}
