@@ -25,7 +25,14 @@ docker compose -f deploy/docker-compose.yml up -d --build --wait
 
 Skrót: `make up`. `make init` drukuje raz hasło administratora i nie nadpisuje istniejącego `deploy/.env` (`FORCE=1` nadpisuje; stary klucz główny jest wtedy stracony). Zrób kopię `deploy/.env` poza maszyną.
 
-CZAS_OD_KLONU
+Zmierzony czas od `git clone` do zdrowego stosu (`deploy/e2e/clone-timing.sh`, commit 19d57d8, Docker 29.6.2, 15 CPU, 29 GB RAM). Koniec pomiaru to `/healthz` z `status: ok`, `tde: true`, `engine: true`.
+
+| Start | Klon + `make init` | Budowa + start | Razem |
+| --- | --- | --- | --- |
+| zimny: obraz Czujki bez cache (`--no-cache`, npm i moduły Go pobrane od nowa) | 0 s | 32 s | **32 s** |
+| ciepły: drugi czysty klon, cache budowania pełny | 1 s | 13 s | **14 s** |
+
+W obu pomiarach obrazy bazowe (node, golang, alpine) i `czujka-db:17` były już na maszynie. Pierwsze pobranie tych obrazów zależy od łącza i dochodzi do czasu zimnego startu.
 
 Stos startuje także bez `deploy/.env`. Wtedy:
 
@@ -66,7 +73,7 @@ tar -xzf czujka-bundle-<wersja>.tar.gz && cd czujka-bundle-<wersja>
 sh install.sh      # docker load, .env z losowymi sekretami, start stosu, czujka doctor
 ```
 
-DOWOD_PACZKI
+Sprawdzone (`deploy/e2e/bundle-proof.sh`, 9 z 9 kontroli): paczka (350 MiB) trafia do czystego kontenera `docker:28-dind` z `--network none`, czyli bez dostępu do sieci. `install.sh` ładuje obrazy, tworzy `deploy/.env` i uruchamia stos w 29 s. `/healthz` zwraca `ok` z aktywnym `pg_tde`, a administrator loguje się hasłem z instalatora.
 
 ### 2.3 Bez kontenerów: `make release`
 
@@ -193,7 +200,7 @@ sudo sysctl --system
 
 ### 5.2 Instancja publiczna: zabezpieczenia
 
-- **Blokada operatora.** Ustaw `CZUJKA_ALLOWED_NETWORKS` na sieci, które wolno skanować, np. `10.91.0.0/16,127.0.0.1`. To twarda granica wdrożenia. Cel poza nią jest odrzucany przy wpisie do zakresu, w skanie doraźnym, w ponownym sondowaniu i przy planowaniu przebiegu. Nazwa domenowa przechodzi tylko wtedy, gdy każdy jej adres leży w blokadzie. Administrator może zawęzić `allowed_networks` w polityce bezpieczeństwa, ale nie może jej poszerzyć poza blokadę (odpowiedź 422). Polityka w `GET /settings/safety` pokazuje blokadę w polu `operator_networks`. Skradziona sesja administratora nie skieruje więc skanera w internet.
+- **Blokada operatora.** Ustaw `CZUJKA_ALLOWED_NETWORKS` na sieci, które wolno skanować, np. `10.91.0.0/16,127.0.0.1`. To twarda granica wdrożenia. Cel poza nią jest odrzucany przy wpisie do zakresu, w skanie doraźnym, w ponownym sondowaniu i przy planowaniu przebiegu. Nazwa domenowa przechodzi tylko wtedy, gdy każdy jej adres leży w blokadzie. Administrator może zawęzić `allowed_networks` w polityce bezpieczeństwa, ale nie może jej poszerzyć poza blokadę (odpowiedź 422). Polityka w `GET /settings/safety` pokazuje blokadę w polu `operator_networks`. Skradziona sesja administratora nie skieruje więc skanera w internet. Przy każdym starcie Czujka przycina zapisane `allowed_networks` do blokady: sieć wewnątrz zostaje, szersza zostaje zastąpiona częścią leżącą w blokadzie, a sieć bez części wspólnej znika. Zmiana trafia do logu i do dziennika audytu (`safety.lock_clamp`). Polityka zapisana przed ustawieniem blokady nie blokuje więc późniejszych zmian innych pól.
 - **Ograniczenie logowania.** Z jednego adresu klienta: 20 prób na minutę (`CZUJKA_LOGIN_RATE_PER_MIN`), potem 429. Na jedno konto: 5 nieudanych prób (`CZUJKA_LOGIN_MAX_FAILURES`) blokuje konto na 15 minut (`CZUJKA_LOGIN_LOCKOUT`), z każdego adresu. Za serwerem pośredniczącym adres klienta to ostatni wpis `X-Forwarded-For`, więc podrobiony nagłówek od klienta nie omija limitu. Uwaga: blokada konta działa też przeciw atakującemu, który zna adres e-mail. Na instancji publicznej nie używaj domyślnego `admin@czujka.local`.
 - **Nagłówki bezpieczeństwa** na każdej odpowiedzi: `Content-Security-Policy` bez skryptów inline i z `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `Strict-Transport-Security` przy TLS.
 
