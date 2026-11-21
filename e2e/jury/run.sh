@@ -266,6 +266,9 @@ if want quickstart && [ -n "$DEFPROF" ]; then
   c=$(echo "$CH" | jq -r '[.items[] | select(.port == 8787) | .kind] | join(",")')
   [ -z "$c" ] && ok=1 || ok=0
   row scenario 8787 change "run without 8787 in its port list: no change on 8787" "" $ok "${c:-none in run $RUN}"
+  c=$(api GET "/services?run_id=$RUN&port=8787&limit=10" | jq -r '[.items[]? | select(.proto == "tcp") | .carried] | first // "absent"')
+  [ "$c" = true ] && ok=1 || ok=0
+  row scenario 8787 carried "run without 8787 in its port list: 8787 listed with carried=true" "" $ok "carried=$c in /services?run_id=$RUN"
 fi
 
 if want custom-network; then
