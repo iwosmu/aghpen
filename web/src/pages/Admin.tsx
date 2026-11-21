@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useAction, useItem, usePage } from '../api/hooks';
 import { ApiError, del, patch, post, put } from '../api/client';
-import type { WebhookSettings, WebhookTestResult, AuditEntry, DefectDojoSettings, DojoPullResult, DojoScopeMapping, DojoSyncResult, DojoTestResult, Permission, PermissionInfo, Role, SafetyPolicy, Scope, User } from '../api/types';
+import type { WebhookSettings, WebhookTestResult, AuditEntry, DefectDojoSettings, DojoPullResult, DojoScopeMapping, DojoSyncResult, DojoTestResult, KernelCap, Permission, PermissionInfo, Role, SafetyPolicy, Scope, User } from '../api/types';
 import { t, getLang, plural } from '../i18n';
 import { routeMissing } from '../lib/route';
 
@@ -201,6 +201,18 @@ function AuditTab() {
 }
 
 // ---------- safety ----------
+/** One line under the pps limit: the kernel's own packet cap, from the server. */
+function KernelCapLine({ k }: { k: KernelCap }) {
+  return (
+    <p className="mt-2 text-xs text-ink-2" data-testid="kernel-cap" title={k.active ? undefined : k.reason || undefined}>
+      {t('Limit w jądrze: ', 'Kernel limit: ')}
+      {k.active
+        ? <><span className="num text-ink">{fmtInt(k.pps)}</span> {t('pakietów/s', 'packets/s')}{k.dropped > 0 ? <> · {t('odrzucone: ', 'dropped: ')}<span className="num text-ink">{fmtInt(k.dropped)}</span></> : null}</>
+        : t('wyłączony', 'off')}
+    </p>
+  );
+}
+
 function SafetyTab() {
   const { can } = useSession();
   const canManage = can('safety:manage');
@@ -211,7 +223,7 @@ function SafetyTab() {
   const [confirmStop, setConfirmStop] = useState(false);
   useEffect(() => { if (q.data) { setF(q.data); setExcl((q.data.exclusions ?? []).join('\n')); setNets((q.data.allowed_networks ?? []).join('\n')); } }, [q.data]);
   const lines = (s: string) => s.split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
-  const save = useAction(() => put<SafetyPolicy>('/settings/safety', { ...f, exclusions: lines(excl), allowed_networks: lines(nets) }), { invalidate: ['/settings/safety', '/dashboard', '/audit'], silent: true, success: t('Polityka zapisana', 'Policy saved') });
+  const save = useAction(() => put<SafetyPolicy>('/settings/safety', { ...f, kernel_cap: undefined, exclusions: lines(excl), allowed_networks: lines(nets) }), { invalidate: ['/settings/safety', '/dashboard', '/audit'], silent: true, success: t('Polityka zapisana', 'Policy saved') });
   const stop = useAction(() => post<SafetyPolicy>('/emergency-stop'), { invalidate: ['/settings/safety', '/dashboard', '/runs', '/audit'], onSuccess: () => setConfirmStop(false) });
   const release = useAction(() => post<SafetyPolicy>('/emergency-stop/release'), { invalidate: ['/settings/safety', '/dashboard', '/audit'], success: t('Stop awaryjny wyłączony', 'Emergency stop is off') });
   if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
@@ -236,6 +248,7 @@ function SafetyTab() {
           {num('max_per_host_rps', t('Żądania na host', 'Requests per host'), 'rps')}
           {num('max_paths_per_host', t('Ścieżki na usługę', 'Paths per service'), t('maks.', 'max'))}
         </div>
+        {q.data.kernel_cap ? <KernelCapLine k={q.data.kernel_cap} /> : null}
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label={t('Dozwolone porty', 'Allowed ports')} hint={t('puste: wszystkie', 'empty: all')}><input className="field mono" disabled={!canManage} value={f.allowed_ports} onChange={(e) => setF({ ...f, allowed_ports: e.target.value })} /></Field>
           <Field label={t('Zabronione porty', 'Denied ports')} hint={t('np. 9100 (drukarki)', 'for example 9100 (printers)')}><input className="field mono" disabled={!canManage} value={f.denied_ports} onChange={(e) => setF({ ...f, denied_ports: e.target.value })} /></Field>
