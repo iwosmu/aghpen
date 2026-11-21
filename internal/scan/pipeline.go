@@ -699,6 +699,7 @@ func (r *run) interimHost(gs *groupStats, res model.HostResult) {
 		return
 	}
 	res.PortsUnknown = true
+	res.Interim = true // the store keeps the service's last full data until the final result
 	open, web := serviceCounts(res)
 	gs.mu.Lock()
 	if gs.interim == nil {

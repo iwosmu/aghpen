@@ -990,8 +990,8 @@ func TestQuickPathStoresAPartialResultFirst(t *testing.T) {
 	}
 	part, final := reports[0], reports[len(reports)-1]
 	for _, p := range reports[:len(reports)-1] {
-		if !p.PortsUnknown {
-			t.Errorf("a partial result must be marked PortsUnknown: %+v", p)
+		if !p.PortsUnknown || !p.Interim {
+			t.Errorf("a partial result must be marked PortsUnknown and Interim: %+v", p)
 		}
 	}
 	// the first partial comes before the slow version detection of ssh ended
