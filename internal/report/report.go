@@ -63,7 +63,11 @@ type Input struct {
 
 	Findings []model.Finding // candidates for "top findings"; the report sorts and cuts
 	Services []model.Service // candidates for "top services by interest"
-	Hosts    []model.Host    // unstable, expected-offline and inactive hosts
+	// Carried counts the services this run did not scan (their ports were
+	// outside the run's coverage); they keep the state of an earlier run and
+	// are not in Run.Stats.ServicesOpen.
+	Carried int
+	Hosts   []model.Host // unstable, expected-offline and inactive hosts
 
 	Limits Limits
 }
@@ -681,6 +685,9 @@ func build(in Input) doc {
 			what = sv.Hostname + " · " + what
 		}
 		row.What = oneLine(what, 140)
+		if sv.Carried {
+			row.What += " · nie skanowana w tym przebiegu (stan z wcześniejszego)"
+		}
 		for j, w := range sv.InterestWhy {
 			if j == 2 {
 				if rest := len(sv.InterestWhy) - j; rest > 0 {
@@ -773,7 +780,18 @@ func build(in Input) doc {
 		return "+" + num(int64(plus)) + " / −" + num(int64(minus))
 	}
 	fig(int64(st.HostsUp), plural(st.HostsUp, "aktywny host", "aktywne hosty", "aktywnych hostów"), delta(s.HostsNew+s.HostsBack, s.HostsGone))
-	fig(int64(st.ServicesOpen), plural(st.ServicesOpen, "otwarta usługa", "otwarte usługi", "otwartych usług"), delta(s.ServicesNew, s.ServicesGone))
+	// Run.Stats.ServicesOpen counts the open services this run saw; services
+	// it did not scan (carried) are named in the note, not counted.
+	svcNote := delta(s.ServicesNew, s.ServicesGone)
+	if in.Carried > 0 {
+		c := "bez " + num(int64(in.Carried)) + " " + plural(in.Carried, "usługi nieskanowanej", "usług nieskanowanych", "usług nieskanowanych") + " w tym przebiegu (stan zachowany)"
+		if svcNote != "" {
+			svcNote += "; " + c
+		} else {
+			svcNote = c
+		}
+	}
+	fig(int64(st.ServicesOpen), plural(st.ServicesOpen, "otwarta usługa", "otwarte usługi", "otwartych usług"), svcNote)
 	fig(int64(st.HTTPServices), plural(st.HTTPServices, "usługa WWW", "usługi WWW", "usług WWW"), "")
 	exNote := ""
 	if nExpected > 0 {

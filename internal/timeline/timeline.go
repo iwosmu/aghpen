@@ -133,6 +133,9 @@ type AtService struct {
 	RunID        int64     `json:"run_id"` // run of the observation used (may be earlier than the asked run)
 	StateNow     string    `json:"state_now"`
 	ChangedSince bool      `json:"changed_since"` // product, version or title differ today
+	// Carried: the observation used is a copy the run made without scanning
+	// the port (outside its coverage); the data come from an earlier run.
+	Carried bool `json:"carried"`
 }
 
 // AtFinding is one finding that was open at a run.

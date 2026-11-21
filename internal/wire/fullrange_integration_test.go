@@ -8,6 +8,7 @@ import (
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/store"
 	"github.com/iwosmu/aghpen/internal/store/storetest"
+	"github.com/iwosmu/aghpen/internal/timeline"
 )
 
 // cov is a coverage of TCP ranges.
@@ -32,6 +33,7 @@ func TestFullRangeOnlyPortGoneAndBack(t *testing.T) {
 	svc80 := model.ServiceResult{Port: 80, Proto: "tcp", State: "open", Name: "http", Product: "nginx"}
 	svc8787 := model.ServiceResult{Port: 8787, Proto: "tcp", State: "open", Name: "http", Product: "nginx", HTTP: &model.HTTPFingerprint{Scheme: "http", URL: "http://x:8787/", Status: 200, Title: "Shop", ResponseMs: 5}}
 
+	var last int64 // the newest run of the subtest
 	setup := func(t *testing.T) (*store.Store, func(t *testing.T, c *model.PortCoverage, svcs ...model.ServiceResult) map[string]int) {
 		st := storetest.New(t)
 		ctx := context.Background()
@@ -47,6 +49,7 @@ func TestFullRangeOnlyPortGoneAndBack(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			last = r.ID
 			at = at.Add(10 * time.Minute)
 			h := model.HostResult{RunID: r.ID, ObservedAt: at, IP: ip, Up: true, Reason: "syn-ack", Services: svcs, Coverage: c}
 			if err := st.IngestHosts(ctx, []model.HostResult{h}, store.SinkOptions{Source: "scan", MarkMissing: true}); err != nil {
@@ -102,6 +105,52 @@ func TestFullRangeOnlyPortGoneAndBack(t *testing.T) {
 		if err := st.Pool().QueryRow(context.Background(), `SELECT COALESCE((result->>'carried')::boolean, false) FROM service_observations o
 			JOIN services s ON s.id = o.service_id WHERE s.port = 8787 ORDER BY o.run_id DESC LIMIT 1`).Scan(&carried); err != nil || !carried {
 			t.Errorf("run B has no carried observation of 8787 (%v)", err)
+		}
+		// what the UI, the timeline, the exports and the report see of run B
+		runB := last
+		ctx := context.Background()
+		carriedOf := func(items []model.Service) map[int]bool {
+			m := map[int]bool{}
+			for _, s := range items {
+				m[s.Port] = s.Carried
+			}
+			return m
+		}
+		page, err := st.ListServices(ctx, store.ServiceFilter{RunID: runB, ListOpts: store.ListOpts{Limit: 10}})
+		if c := carriedOf(page.Items); err != nil || len(c) != 2 || c[80] || !c[8787] {
+			t.Errorf("services of run B: carried %v (%v), want 8787 only", c, err)
+		}
+		page, _ = st.ListServices(ctx, store.ServiceFilter{ListOpts: store.ListOpts{Limit: 10}})
+		if c := carriedOf(page.Items); c[8787] {
+			t.Error("carried is set without a run")
+		}
+		if n, err := st.CountCarried(ctx, runB); err != nil || n != 1 {
+			t.Errorf("CountCarried(run B) = %d, %v", n, err)
+		}
+		at, err := timeline.New(st, quiet()).AtServices(ctx, runB, timeline.ServiceFilter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		tc := map[int]timeline.AtService{}
+		for _, s := range at.Items {
+			tc[s.Port] = s
+		}
+		if s := tc[8787]; !s.Carried || s.State != "open" || s.RunID != runB || tc[80].Carried {
+			t.Errorf("timeline as of run B: %+v / %+v, want 8787 open and carried", tc[8787], tc[80])
+		}
+		exported := map[int]bool{}
+		_ = st.EachRunResult(ctx, runB, func(h *model.HostResult) error {
+			for _, s := range h.Services {
+				exported[s.Port] = s.Carried
+			}
+			return nil
+		})
+		if exported[80] || !exported[8787] {
+			t.Errorf("run B export: carried %v", exported)
+		}
+		in, err := Reporter{st: st, loc: time.UTC}.Input(ctx, runB)
+		if err != nil || in.Carried != 1 {
+			t.Errorf("report input of run B: carried %d (%v)", in.Carried, err)
 		}
 		// next run with the full range: 8787 still there, so nothing (no false "returned")
 		if k := scan(t, full, svc80, svc8787); len(k) != 0 {

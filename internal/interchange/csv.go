@@ -190,6 +190,9 @@ func (c *csvWriter) WriteHost(h model.HostResult) error {
 		if s.Confidence > 0 {
 			v[FConfidence] = strconv.FormatFloat(s.Confidence, 'f', -1, 64)
 		}
+		if s.Carried {
+			v[FCarried] = "true"
+		}
 		techs := make([]string, 0, len(s.Technologies))
 		for _, t := range s.Technologies {
 			if t.Name != "" {

@@ -475,6 +475,9 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 			seen := map[svcKey]bool{}
 			for i := range r.Services {
 				sv := &r.Services[i]
+				if sv.Carried {
+					continue // an exported copy of an earlier observation (re-import): not observed now
+				}
 				proto := strings.ToLower(sv.Proto)
 				if proto == "" {
 					proto = "tcp"

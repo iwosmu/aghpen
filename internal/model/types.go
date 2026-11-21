@@ -860,6 +860,10 @@ type Service struct {
 	// slow against the service's own baseline (analyze.ResponseSeries).
 	ResponseMs   *int `json:"response_ms"`
 	ResponseSlow bool `json:"response_slow"`
+	// Carried is set only in a list for one run (run_id): the run did not
+	// scan this port on the host (outside its coverage), so the service's
+	// state and data come from an earlier run.
+	Carried bool `json:"carried,omitempty"`
 }
 
 type InterestReason struct {

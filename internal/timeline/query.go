@@ -448,7 +448,8 @@ func (t *Timeline) AtServices(ctx context.Context, run int64, f ServiceFilter) (
 	q := `SELECT s.id, s.host_id, host(s.ip), s.port, s.proto, ` + svcStateThen + `, o.name, o.product, o.version, o.title, o.http_status, o.tls,
 		ARRAY(SELECT DISTINCT x->>'name' FROM jsonb_array_elements(CASE WHEN jsonb_typeof(o.result->'technologies') = 'array' THEN o.result->'technologies' ELSE '[]'::jsonb END) x WHERE x->>'name' <> ''),
 		ARRAY(SELECT x FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(o.result->'classes') = 'array' THEN o.result->'classes' ELSE '[]'::jsonb END) x),
-		o.at, o.run_id, s.state, (s.product, s.version, s.title) IS DISTINCT FROM (o.product, o.version, o.title), count(*) OVER () ` +
+		o.at, o.run_id, s.state, (s.product, s.version, s.title) IS DISTINCT FROM (o.product, o.version, o.title),
+		COALESCE((o.result->>'carried')::boolean, false), count(*) OVER () ` +
 		svcAsOf + w + " ORDER BY " + order + " LIMIT " + a.add(f.Limit) + " OFFSET " + a.add(f.Offset)
 	rows, err := t.st.Pool().Query(ctx, q, a.v...)
 	if err != nil {
@@ -459,7 +460,7 @@ func (t *Timeline) AtServices(ctx context.Context, run int64, f ServiceFilter) (
 	for rows.Next() {
 		var s AtService
 		if err := rows.Scan(&s.ID, &s.HostID, &s.IP, &s.Port, &s.Proto, &s.State, &s.Name, &s.Product, &s.Version, &s.Title, &s.HTTPStatus, &s.TLS,
-			&s.Technologies, &s.Classes, &s.ObservedAt, &s.RunID, &s.StateNow, &s.ChangedSince, &page.Total); err != nil {
+			&s.Technologies, &s.Classes, &s.ObservedAt, &s.RunID, &s.StateNow, &s.ChangedSince, &s.Carried, &page.Total); err != nil {
 			return page, err
 		}
 		page.Items = append(page.Items, s)

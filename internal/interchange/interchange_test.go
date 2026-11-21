@@ -479,3 +479,29 @@ func TestStreamingWriterRejectsUseAfterClose(t *testing.T) {
 		t.Errorf("unknown format must fail")
 	}
 }
+
+// A service the run did not scan is exported as such (CSV column "carried",
+// nmap XML port reason czujka-not-scanned) and reads back with Carried set.
+func TestCarriedServiceExportRoundTrip(t *testing.T) {
+	h := model.HostResult{IP: "10.0.0.5", Up: true, ObservedAt: fixedNow, Services: []model.ServiceResult{
+		{Port: 80, Proto: "tcp", State: "open", Name: "http"},
+		{Port: 8787, Proto: "tcp", State: "open", Name: "http", Carried: true},
+	}}
+	for _, format := range []string{FormatCSV, FormatNmapXML, FormatJSON} {
+		var buf bytes.Buffer
+		if err := Export(&buf, format, []model.HostResult{h}, Meta{GeneratedAt: fixedNow, RunID: 7}); err != nil {
+			t.Fatal(err)
+		}
+		if format == FormatNmapXML && !strings.Contains(buf.String(), `portid="8787"><state state="open" reason="czujka-not-scanned"`) {
+			t.Errorf("xml: %s", buf.String())
+		}
+		back, _ := mustImport(t, buf.Bytes(), Options{})
+		got := map[int]bool{}
+		for _, s := range back[0].Services {
+			got[s.Port] = s.Carried
+		}
+		if got[80] || !got[8787] {
+			t.Errorf("%s round trip: carried %v", format, got)
+		}
+	}
+}
