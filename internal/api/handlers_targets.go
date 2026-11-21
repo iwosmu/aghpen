@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/iwosmu/aghpen/internal/model"
+	"github.com/iwosmu/aghpen/internal/runner"
 )
 
 func (s *Server) listScopes(w http.ResponseWriter, r *http.Request) {
@@ -151,6 +152,22 @@ func (s *Server) preview(r *http.Request, valid []model.Target, invalid []model.
 	policy, err := s.st.GetSafetyPolicy(r.Context())
 	if err != nil {
 		return p, err
+	}
+	if len(policy.AllowedNetworks) > 0 {
+		// A target outside the allowed networks of the policy is refused at entry.
+		kept, dropped, err := runner.FilterAllowed(r.Context(), p.Valid, policy, s.lookup)
+		if err != nil {
+			return p, err
+		}
+		p.Valid = append([]model.Target{}, kept...)
+		p.AddressCount = 0
+		for _, t := range p.Valid {
+			p.AddressCount += t.Addresses
+		}
+		for _, d := range dropped {
+			d.Line = 0
+			p.Invalid = append(p.Invalid, d)
+		}
 	}
 	p.Excluded = s.targets.Excluded(p.Valid, policy.Exclusions)
 	return p, nil

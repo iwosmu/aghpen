@@ -119,8 +119,11 @@ func TestPrincipalAndCSRF(t *testing.T) {
 	if !p.CheckCSRF("csrf-abc") || p.CheckCSRF("") || p.CheckCSRF("csrf-abd") {
 		t.Fatal("CheckCSRF is wrong")
 	}
-	if slugify("  Zespół SOC / Noc ") != "zesp-soc-noc" {
+	if slugify("  Zespół SOC / Noc ") != "zespol-soc-noc" {
 		t.Fatalf("slugify: %q", slugify("  Zespół SOC / Noc "))
+	}
+	if got := slugify("Dyżurny zmian"); got != "dyzurny-zmian" {
+		t.Fatalf("slugify transliterates Polish letters: %q", got)
 	}
 }
 
@@ -285,7 +288,7 @@ func TestRBACRules(t *testing.T) {
 
 	// A custom role "user manager" without admin permissions.
 	mgrRole, err := svc.CreateRole(ctx, admin, model.Role{Name: "Kierownik zespołu", Permissions: []model.Permission{model.PermUsersManage, model.PermRolesManage, model.PermResultsRead}})
-	if err != nil || mgrRole.Slug != "kierownik-zespo-u" || mgrRole.Builtin {
+	if err != nil || mgrRole.Slug != "kierownik-zespolu" || mgrRole.Builtin {
 		t.Fatalf("custom role: %+v %v", mgrRole, err)
 	}
 	if _, err := svc.CreateUser(ctx, admin, "kier@example.org", "Kier", "haslo-kierownika", mgrRole.ID); err != nil {

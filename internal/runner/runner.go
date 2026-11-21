@@ -10,6 +10,8 @@ import (
 
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/store"
+	"net/netip"
+	"strings"
 )
 
 var (
@@ -52,6 +54,8 @@ type Options struct {
 	// engine reads with context.Cause (internal/scan: scan.PauseCause). Nil
 	// cancels without a cause; the manager then relies on its own intent.
 	PauseCause func(reason string) error
+	// Lookup resolves domain targets for the allowed-networks check; nil uses DefaultLookup.
+	Lookup LookupFunc
 }
 
 // Manager runs scans. One Manager exists per process.
@@ -148,15 +152,40 @@ func (m *Manager) BuildPlan(ctx context.Context, profile model.ScanProfile, run 
 	if plan.Policy, err = m.st.GetSafetyPolicy(ctx); err != nil {
 		return plan, err
 	}
-	if len(profile.ScopeIDs) == 0 {
+	adHoc := run != nil && run.AdHoc != nil
+	switch {
+	case adHoc:
+		// A run on chosen addresses and ports (re-probe): the targets and the
+		// ports come from the run, everything else from the profile.
+		if plan.Targets, err = AdHocTargets(run.AdHoc.Addresses); err != nil {
+			return plan, err
+		}
+		if p := strings.TrimSpace(run.AdHoc.Ports); p != "" {
+			plan.Profile.Ports = p
+		}
+	case len(profile.ScopeIDs) == 0:
 		return plan, fmt.Errorf("%w: the profile has no scope", ErrInvalid)
-	}
-	if plan.Targets, err = m.st.EnabledTargets(ctx, profile.ScopeIDs); err != nil {
-		return plan, err
+	default:
+		if plan.Targets, err = m.st.EnabledTargets(ctx, profile.ScopeIDs); err != nil {
+			return plan, err
+		}
 	}
 	if len(plan.Targets) == 0 {
 		return plan, fmt.Errorf("%w: the scopes of the profile have no enabled target", ErrInvalid)
 	}
+	// Defence in depth: the API rejects targets outside the allowed networks at
+	// entry; the plan drops them again, also targets stored before the policy changed.
+	kept, dropped, err := FilterAllowed(ctx, plan.Targets, plan.Policy, m.opt.Lookup)
+	if err != nil {
+		return plan, fmt.Errorf("%w: allowed_networks: %v", ErrInvalid, err)
+	}
+	for _, d := range dropped {
+		m.log.Warn("target outside the allowed networks dropped from the plan", "target", d.Value, "reason", d.Reason)
+	}
+	if len(kept) == 0 {
+		return plan, fmt.Errorf("%w: every target of the profile lies outside the allowed networks of the safety policy", ErrInvalid)
+	}
+	plan.Targets = kept
 	if plan.Hints, err = m.st.HostHints(ctx, profile.ScopeIDs); err != nil {
 		return plan, err
 	}
@@ -198,15 +227,15 @@ func (m *Manager) Estimate(ctx context.Context, profileID int64) (model.ScanEsti
 // Start creates a run from a profile and starts it in the background.
 // trigger is "manual" or "schedule".
 func (m *Manager) Start(ctx context.Context, profileID int64, userID *int64, trigger string) (model.ScanRun, error) {
-	if m.opt.Engine == nil {
-		return model.ScanRun{}, ErrNotWired
-	}
 	policy, err := m.st.GetSafetyPolicy(ctx)
 	if err != nil {
 		return model.ScanRun{}, err
 	}
-	if policy.EmergencyStop {
+	if policy.EmergencyStop { // checked first: the stop answers 409 also in a build without an engine
 		return model.ScanRun{}, ErrEmergencyStop
+	}
+	if m.opt.Engine == nil {
+		return model.ScanRun{}, ErrNotWired
 	}
 	p, err := m.st.GetProfile(ctx, profileID)
 	if err != nil {
@@ -294,7 +323,8 @@ func (m *Manager) execute(ctx context.Context, a *activeRun, p model.ScanProfile
 	a.mu.Unlock()
 	m.save(a, EventProgress)
 
-	sink := &eventSink{inner: m.st.NewSink(store.SinkOptions{BatchSize: m.opt.IngestBatch, Source: "scan", MarkMissing: true}), m: m, a: a}
+	// An ad-hoc run probes chosen ports only: it must not mark the other services of its hosts missing.
+	sink := &eventSink{inner: m.st.NewSink(store.SinkOptions{BatchSize: m.opt.IngestBatch, Source: "scan", MarkMissing: run.AdHoc == nil}), m: m, a: a}
 	var outcome model.RunOutcome
 	if stopped { // paused or cancelled before the engine started
 		outcome = model.RunOutcome{Status: model.RunPaused, Stats: run.Stats}
@@ -363,13 +393,21 @@ func (m *Manager) execute(ctx context.Context, a *activeRun, p model.ScanProfile
 				a.mu.Unlock()
 			}
 		}
-		m.save(a, EventDone)
+		ev := EventDone
+		if status == model.RunPaused {
+			ev = EventPaused // resumable: not the end of the run
+		}
+		m.save(a, ev)
 		if partial {
 			m.publishResults(bg, run.ID)
 		}
 		return
 	}
 	m.save(a, EventProgress)
+	if run.AdHoc != nil {
+		m.finish(bg, a, nil) // an ad-hoc run does not change the speed history of the profile
+		return
+	}
 	m.finish(bg, a, &p)
 }
 
@@ -479,9 +517,6 @@ func (m *Manager) Pause(ctx context.Context, runID int64) (model.ScanRun, error)
 
 // Resume continues a paused run with its remaining chunks.
 func (m *Manager) Resume(ctx context.Context, runID int64) (model.ScanRun, error) {
-	if m.opt.Engine == nil {
-		return model.ScanRun{}, ErrNotWired
-	}
 	run, err := m.st.GetRun(ctx, runID)
 	if err != nil {
 		return run, err
@@ -496,10 +531,19 @@ func (m *Manager) Resume(ctx context.Context, runID int64) (model.ScanRun, error
 	if policy.EmergencyStop {
 		return run, ErrEmergencyStop
 	}
-	if run.ProfileID == nil {
+	if m.opt.Engine == nil {
+		return run, ErrNotWired
+	}
+	var profileID int64
+	switch {
+	case run.AdHoc != nil:
+		profileID = run.AdHoc.ProfileID
+	case run.ProfileID != nil:
+		profileID = *run.ProfileID
+	default:
 		return run, fmt.Errorf("%w: the run has no profile", ErrBadState)
 	}
-	p, err := m.st.GetProfile(ctx, *run.ProfileID)
+	p, err := m.st.GetProfile(ctx, profileID)
 	if err != nil {
 		return run, err
 	}
@@ -623,7 +667,7 @@ func (m *Manager) Recover(ctx context.Context, autoResume bool) (recovered []int
 			return recovered, err
 		}
 		run.Status, run.PauseReason = model.RunPaused, PauseRestart
-		if run.Trigger == "import" || run.ProfileID == nil {
+		if run.Trigger == "import" || run.Trigger == TriggerManualEntry || (run.ProfileID == nil && run.AdHoc == nil) {
 			now := time.Now().UTC()
 			run.Status, run.PauseReason, run.FinishedAt, run.Error = model.RunFailed, "", &now, "interrupted by a restart"
 		}
@@ -665,8 +709,117 @@ func (m *Manager) ResumeDue(ctx context.Context, now time.Time) ([]int64, error)
 // run with trigger "import". The records take the same path as scanned
 // results: the store sink, then the analysis hook.
 func (m *Manager) Import(ctx context.Context, filename string, hosts []model.HostResult, userID *int64) (model.ScanRun, error) {
+	return m.Ingest(ctx, "import", filename, hosts, userID)
+}
+
+// Trigger names of runs that do not come from a profile.
+const (
+	TriggerManualEntry = "manual-entry" // hosts and services entered by hand (POST /hosts, POST /hosts/{id}/services)
+	TriggerReprobe     = "reprobe"      // chosen addresses and ports probed again (StartAdHoc)
+)
+
+// MaxAdHocAddresses caps the addresses of one ad-hoc run.
+const MaxAdHocAddresses = 65536
+
+// AdHocTargets turns the addresses of an ad-hoc run (IPs or CIDRs) into targets.
+func AdHocTargets(addrs []string) ([]model.Target, error) {
+	var out []model.Target
+	var total int64
+	for _, v := range addrs {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		t := model.Target{Value: v, Enabled: true, Tags: []string{}, Source: "api"}
+		if strings.Contains(v, "/") {
+			p, err := netip.ParsePrefix(v)
+			if err != nil {
+				return nil, fmt.Errorf("%w: %q is not an IP address or CIDR", ErrInvalid, v)
+			}
+			p = p.Masked()
+			host := p.Addr().BitLen() - p.Bits()
+			if host > 16 {
+				return nil, fmt.Errorf("%w: %q is larger than a /16", ErrInvalid, v)
+			}
+			t.Kind, t.Value, t.Addresses = model.TargetCIDR, p.String(), int64(1)<<host
+		} else {
+			a, err := netip.ParseAddr(v)
+			if err != nil {
+				return nil, fmt.Errorf("%w: %q is not an IP address or CIDR", ErrInvalid, v)
+			}
+			t.Kind, t.Value, t.Addresses = model.TargetIP, a.Unmap().String(), 1
+		}
+		total += t.Addresses
+		out = append(out, t)
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("%w: no address to probe", ErrInvalid)
+	}
+	if total > MaxAdHocAddresses {
+		return nil, fmt.Errorf("%w: %d addresses is more than %d", ErrInvalid, total, MaxAdHocAddresses)
+	}
+	return out, nil
+}
+
+// StartAdHoc starts a run on chosen addresses and ports through the normal
+// engine, sink and analysis. The run uses the rate limits and options of
+// scope.ProfileID (0: the first profile), has no profile of its own (so it
+// never collides with a scheduled run of that profile) and keeps its scope
+// in ScanRun.AdHoc for a resume. trigger is usually TriggerReprobe.
+func (m *Manager) StartAdHoc(ctx context.Context, scope model.AdHocScope, userID *int64, trigger string) (model.ScanRun, error) {
+	policy, err := m.st.GetSafetyPolicy(ctx)
+	if err != nil {
+		return model.ScanRun{}, err
+	}
+	if policy.EmergencyStop {
+		return model.ScanRun{}, ErrEmergencyStop
+	}
+	if m.opt.Engine == nil {
+		return model.ScanRun{}, ErrNotWired
+	}
+	if scope.ProfileID == 0 {
+		page, err := m.st.ListProfiles(ctx, store.ListOpts{Limit: 1, Sort: "id"})
+		if err != nil {
+			return model.ScanRun{}, err
+		}
+		if len(page.Items) == 0 {
+			return model.ScanRun{}, fmt.Errorf("%w: no scan profile exists", ErrInvalid)
+		}
+		scope.ProfileID = page.Items[0].ID
+	}
+	p, err := m.st.GetProfile(ctx, scope.ProfileID)
+	if err != nil {
+		return model.ScanRun{}, err
+	}
+	if strings.ContainsAny(scope.Ports, " ;|&$`'\"\\\n") {
+		return model.ScanRun{}, fmt.Errorf("%w: ports must be an nmap port list", ErrInvalid)
+	}
+	if trigger == "" {
+		trigger = TriggerReprobe
+	}
+	probe := model.ScanRun{Status: model.RunQueued, Trigger: trigger, ProfileName: p.Name, CreatedBy: userID, AdHoc: &scope}
+	if _, err := m.BuildPlan(ctx, p, &probe, false); err != nil { // fail early: addresses, allowed networks
+		return model.ScanRun{}, err
+	}
+	run, err := m.st.CreateRun(ctx, probe)
+	if err != nil {
+		return model.ScanRun{}, err
+	}
+	m.launch(run, p, false)
+	return run, nil
+}
+
+// Ingest stores host results that do not come from the engine (a file, a
+// manual entry) as a run with the given trigger. The records take the same
+// path as scanned results: the store sink, then the analysis hook.
+func (m *Manager) Ingest(ctx context.Context, trigger, name string, hosts []model.HostResult, userID *int64) (model.ScanRun, error) {
 	now := time.Now().UTC()
-	run, err := m.st.CreateRun(ctx, model.ScanRun{Status: model.RunRunning, Trigger: "import", ProfileName: "import", ImportFile: filename, CreatedBy: userID, StartedAt: &now})
+	profileName := "import"
+	reason := "imported"
+	if trigger == TriggerManualEntry {
+		profileName, reason = "wpis ręczny", "manual"
+	}
+	run, err := m.st.CreateRun(ctx, model.ScanRun{Status: model.RunRunning, Trigger: trigger, ProfileName: profileName, ImportFile: name, CreatedBy: userID, StartedAt: &now})
 	if err != nil {
 		return run, err
 	}
@@ -674,7 +827,7 @@ func (m *Manager) Import(ctx context.Context, filename string, hosts []model.Hos
 	for i := range hosts {
 		hosts[i].RunID = run.ID
 		if hosts[i].Reason == "" {
-			hosts[i].Reason = "imported"
+			hosts[i].Reason = reason
 		}
 		if hosts[i].ObservedAt.IsZero() {
 			hosts[i].ObservedAt = now
@@ -693,7 +846,7 @@ func (m *Manager) Import(ctx context.Context, filename string, hosts []model.Hos
 	}
 	a := &activeRun{run: run, cancel: func(error) {}, done: make(chan struct{})}
 	a.run.Stats = stats
-	sink := m.st.NewSink(store.SinkOptions{BatchSize: m.opt.IngestBatch, Source: "import", MarkMissing: false})
+	sink := m.st.NewSink(store.SinkOptions{BatchSize: m.opt.IngestBatch, Source: map[bool]string{true: "manual", false: "import"}[trigger == TriggerManualEntry], MarkMissing: false})
 	for i := range hosts {
 		if err = sink.OnHost(ctx, hosts[i]); err != nil {
 			break

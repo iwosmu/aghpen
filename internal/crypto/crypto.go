@@ -124,12 +124,24 @@ func LoadKeyring(key, keyFile string, oldKeys []string) (kr *Keyring, created bo
 	if key == "" {
 		return nil, false, errors.New("crypto: no master key: set CZUJKA_MASTER_KEY or CZUJKA_MASTER_KEY_FILE")
 	}
+	if keyFile != "" {
+		retired, err := readOldKeys(keyFile)
+		if err != nil {
+			return nil, false, err
+		}
+		oldKeys = append(append([]string{}, oldKeys...), retired...)
+	}
 	cur, err := ParseKey(key)
 	if err != nil {
 		return nil, false, err
 	}
 	var old [][]byte
+	seen := map[string]bool{key: true}
 	for _, o := range oldKeys {
+		if o = strings.TrimSpace(o); o == "" || seen[o] {
+			continue
+		}
+		seen[o] = true
 		k, err := ParseKey(o)
 		if err != nil {
 			return nil, false, fmt.Errorf("old master key: %w", err)
@@ -306,3 +318,56 @@ func TokenKeyID(s string) string {
 
 // IsToken reports whether s looks like a ciphertext token of this package.
 func IsToken(s string) bool { return strings.HasPrefix(s, prefix+".") && TokenKeyID(s) != "" }
+
+// OldKeyFile is the file next to the key file with the retired master keys,
+// one per line. rotate-key appends to it; LoadKeyring reads it, so values
+// still under a retired key stay readable.
+func OldKeyFile(keyFile string) string { return keyFile + ".old" }
+
+func readOldKeys(keyFile string) ([]string, error) {
+	b, err := os.ReadFile(OldKeyFile(keyFile))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("crypto: read old key file: %w", err)
+	}
+	var out []string
+	for _, line := range strings.Split(string(b), "\n") {
+		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "#") {
+			out = append(out, line)
+		}
+	}
+	return out, nil
+}
+
+// AppendOldKey adds a retired key to the old key file of keyFile (mode 0600,
+// fsync). A key that is in the file already is not added again.
+func AppendOldKey(keyFile, key string) error {
+	key = strings.TrimSpace(key)
+	if _, err := ParseKey(key); err != nil {
+		return err
+	}
+	have, err := readOldKeys(keyFile)
+	if err != nil {
+		return err
+	}
+	for _, k := range have {
+		if k == key {
+			return nil
+		}
+	}
+	f, err := os.OpenFile(OldKeyFile(keyFile), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.WriteString(key + "\n"); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
+}

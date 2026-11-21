@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/iwosmu/aghpen/internal/auth"
+	"github.com/iwosmu/aghpen/internal/defectdojo"
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/passive"
 	"github.com/iwosmu/aghpen/internal/runner"
@@ -32,6 +33,10 @@ type RunManager interface {
 	// Estimate is the Estimator seam: it builds the plan and asks model.Engine.Estimate.
 	Estimate(ctx context.Context, profileID int64) (model.ScanEstimate, error)
 	Import(ctx context.Context, filename string, hosts []model.HostResult, userID *int64) (model.ScanRun, error)
+	// Ingest stores host results that do not come from the engine (trigger manual-entry) through the same sink and analysis.
+	Ingest(ctx context.Context, trigger, name string, hosts []model.HostResult, userID *int64) (model.ScanRun, error)
+	// StartAdHoc probes chosen addresses and ports through the normal engine, sink and analysis (trigger reprobe).
+	StartAdHoc(ctx context.Context, scope model.AdHocScope, userID *int64, trigger string) (model.ScanRun, error)
 	EngineWired() bool
 }
 
@@ -84,8 +89,19 @@ type DojoLink struct {
 	URL       string
 }
 
+// DojoPull is the answer of the status pull: the proposed updates, the
+// conflicts where the Czujka analyst wins, and how many updates were applied.
+type DojoPull struct {
+	defectdojo.StatusPull
+	Applied int `json:"applied"`
+}
+
 // DojoClient talks to DefectDojo API v2. Implemented by internal/defectdojo.
 type DojoClient interface {
+	// PullStatus reads the DefectDojo state of exported findings; apply writes the proposed status updates.
+	PullStatus(ctx context.Context, settings model.DefectDojoSettings, apply bool) (DojoPull, error)
+	// SyncLifecycle closes resolved findings in DefectDojo and reopens observed ones.
+	SyncLifecycle(ctx context.Context, settings model.DefectDojoSettings) (defectdojo.LifecycleResult, error)
 	Test(ctx context.Context, settings model.DefectDojoSettings) (ok bool, message, version string)
 	Export(ctx context.Context, settings model.DefectDojoSettings, findings []model.Finding) (model.DojoExportResult, []DojoLink, error)
 	// UploadNmap sends the nmap XML of one run as an "Nmap Scan" import; the same title re-imports into the same test.
@@ -192,6 +208,12 @@ type Deps struct {
 	Passive      PassiveSources
 	Analyzer     Analyzer
 	Hooks        Hooks
+
+	// Mounts are sub-routers of other packages, mounted under /api/v1.
+	Mounts []Mount
+
+	// Lookup resolves domain targets for the allowed-networks check; nil uses the system resolver.
+	Lookup runner.LookupFunc
 
 	// EngineInfo describes the prober for /healthz (prober, mode, raw_sockets); nil omits it.
 	EngineInfo func() map[string]any
