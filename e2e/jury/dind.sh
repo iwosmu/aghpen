@@ -43,12 +43,13 @@ for img in $IMAGES; do
 done
 
 GW=$(inner "docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}'")
-log "starting Czujka inside; operator lock CZUJKA_ALLOWED_NETWORKS=$GW/32 (the jury machine itself)"
-inner "cd /work && CZUJKA_VERSION=$TAG CZUJKA_BIND=0.0.0.0 CZUJKA_PORT=18080 CZUJKA_ADMIN_PASSWORD='$PW' CZUJKA_ALLOWED_NETWORKS=$GW/32 \
+HIP=${JURY_HOST_IP:-172.31.250.10}
+log "starting Czujka inside; operator lock CZUJKA_ALLOWED_NETWORKS=$GW/32,$HIP/32 (the jury machine itself and the second test host)"
+inner "cd /work && CZUJKA_VERSION=$TAG CZUJKA_BIND=0.0.0.0 CZUJKA_PORT=18080 CZUJKA_ADMIN_PASSWORD='$PW' CZUJKA_ALLOWED_NETWORKS=$GW/32,$HIP/32 \
   docker compose -p czujka -f deploy/docker-compose.yml up -d --no-build --wait 2>&1 | tail -2" || exit 1
 log "Czujka UI: http://127.0.0.1:$UI (admin@czujka.local; the password is printed only to this terminal: $PW)"
 
-docker exec -e CZ_URL=http://127.0.0.1:18080 -e CZ_PASSWORD="$PW" -e JURY_TARGET="${JURY_TARGET:-localhost}" -e JURY_GUARD=0 -e JURY_ONLY="${JURY_ONLY:-}" "$N" \
+docker exec -e CZ_URL=http://127.0.0.1:18080 -e CZ_PASSWORD="$PW" -e JURY_TARGET="${JURY_TARGET:-localhost}" -e JURY_GUARD=0 -e JURY_HOST_IP="$HIP" -e JURY_ONLY="${JURY_ONLY:-}" "$N" \
   bash -c 'cd /work && [ -n "$JURY_ONLY" ] || unset JURY_ONLY; bash e2e/jury/run.sh' 2>&1 | sed "s/$PW/<hasło>/g" | tee "$OUT"
 RC=${PIPESTATUS[0]}
 log "transcript: $OUT (exit $RC)"

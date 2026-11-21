@@ -37,6 +37,8 @@ proxy	8085	finding	Niedokończona instalacja aplikacji
 proxy	8086	open	-		Traefik v3.1 dashboard and API with api.insecure=true
 proxy	8086	tech	Traefik
 proxy	8086	sig	traefik-api-insecure
+proxy	8086	class	unauth-control-api
+proxy	8086	finding	API sterujące bez uwierzytelniania
 proxy	8474	open	-		Toxiproxy 2.12.0 control API, no authentication
 proxy	8474	tech	Toxiproxy@2.12.0
 proxy	8474	sig	toxiproxy-api

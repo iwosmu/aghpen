@@ -8,6 +8,7 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 | --- | --- | --- |
 | [`README.md`](../README.md) | polski | każdy: czym jest Czujka, szybki start |
 | [`docs/ZGODNOSC.md`](ZGODNOSC.md) | polski | jury: wymagania zadania, stan i dowody |
+| [`docs/TEST-JURY.md`](TEST-JURY.md) | polski | jury: test na szablonie organizatorów `lab/jury`, wyniki na każdym stosie, jedna komenda |
 | [`docs/slides/czujka.pdf`](slides/czujka.pdf) | polski | jury: prezentacja, 10 slajdów |
 | [`docs/DEMO.md`](DEMO.md) | polski | jury, zespół: lista ujęć, pokaz, notatki do slajdów, przygotowanie, pytania |
 | [`docs/demo/README.md`](demo/README.md) | polski | zespół: nagrywanie filmu demo jednym poleceniem |
