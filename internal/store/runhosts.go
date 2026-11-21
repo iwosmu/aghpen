@@ -325,11 +325,10 @@ const DefaultPorts = "top-1000," +
 	"2375,2376,4243,6443,9443,10250,10255," + // container and cluster APIs
 	"3000,5601,9090,9093,9100,9113,9187,9216," + // monitoring and metrics
 	"5985,5986,18080,50000," + // remote management, CI agents
-	// Ports that containers publish on a single machine and top 1000 leaves
-	// out: alternative SSH, Vite dev server, second RabbitMQ (AMQP and
-	// management), Toxiproxy API, Flask/RStudio, second PostgreSQL, and a
-	// containerised FTP passive range. "Ten komputer" copies this profile.
-	"2223,5173,5673,8474,8787,15432,15673,21000-21010"
+	"5173" // Vite dev server
+	// Ports that only one test template publishes are not listed: a small
+	// scope (one machine, "Ten komputer") is scanned over the full port range
+	// (docs/ALGORYTMY.md 2.12), which finds them without a list.
 
 // DefaultProfile is the scan profile of a new installation: the profile we
 // measured on the 70-host lab (docs/WYNIKI.md), under the caps of the default

@@ -55,7 +55,7 @@ cd lab/jury && ./quickstart.sh up
 ```
 
 1. Otwórz `http://127.0.0.1:9180` i zaloguj się danymi z logu.
-2. Naciśnij „Ten komputer” i „Uruchom skan”. Profil domyślny obejmuje porty szablonu spoza top 1000 (`2223,5673,8474,8787,15432,15673,21000-21010`). Na komputerze z innymi programami nie skanuj `localhost` pełnym zakresem portów: sondy wykrywania wersji trafiają wtedy także w lokalne usługi tych programów.
+2. Naciśnij „Ten komputer” i „Uruchom skan”. Mały zakres (jeden komputer) profil domyślny skanuje pełnym zakresem portów, więc znajduje też porty szablonu spoza top 1000. Na komputerze z innymi programami nie skanuj `localhost` pełnym zakresem portów: sondy wykrywania wersji trafiają wtedy także w lokalne usługi tych programów.
 3. Wykonaj `./quickstart.sh change`, uruchom drugi skan („Przebiegi skanów” → „Uruchom skan”, profil „Ten komputer: …”): „Usługa …:8787 zniknęła”. Wykonaj `./quickstart.sh up`, skanuj trzeci raz: „Usługa …:8787 wróciła” z czasem nieobecności i liczbą skanów bez niej.
 
 Czas odpowiedzi: Czujka zapisuje czas odpowiedzi HTTP każdej usługi i porównuje go z jej własną bazą (mediana ostatnich 5 pomiarów). Odpowiedź co najmniej 2 razy wolniejsza i dłuższa o co najmniej 300 ms to zmiana „Wolniejsza odpowiedź”. Powrót do normy to „Odpowiedź w normie”. Na stosie `modern-proxy` skanuj raz bez opóźnienia i raz z `ENABLE_LATENCY=true` w `.env`. Port otwarty, na którym HTTP nie odpowiada w czasie, to „HTTP nie odpowiedział”, a nie zniknięcie usługi.
