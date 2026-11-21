@@ -3,6 +3,7 @@ package defectdojo
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,6 +34,10 @@ type fakeDojo struct {
 	findings []map[string]any
 	calls    map[string]int
 	delay    time.Duration
+	forms    []map[string]string // form fields of every import-scan and reimport-scan call
+	// dropReads closes the connection of every GET findings/ while it is
+	// above zero (an outage right after an import), and counts down.
+	dropReads int
 }
 
 func newFake() *fakeDojo {
@@ -135,6 +140,10 @@ func (f *fakeDojo) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		create(&f.engs)
 	case path == "tests/":
 		list(f.tests, and(contains("title"), eq("engagement", "engagement")))
+	case path == "findings/" && f.dropReads > 0:
+		f.dropReads--
+		conn, _, _ := w.(http.Hijacker).Hijack()
+		conn.Close()
 	case path == "findings/":
 		list(f.findings, eq("test", "test"))
 	case strings.HasPrefix(path, "findings/") && r.Method == http.MethodPatch:
@@ -165,6 +174,11 @@ func (f *fakeDojo) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		data, _ := io.ReadAll(file)
+		form := map[string]string{"path": path}
+		for k, v := range r.MultipartForm.Value {
+			form[k] = v[0]
+		}
+		f.forms = append(f.forms, form)
 		var testID int64
 		if path == "import-scan/" {
 			testID = f.id()
@@ -411,6 +425,12 @@ func TestImportNmapXMLReimportsIntoTheSameTest(t *testing.T) {
 	if err != nil || !second.Reimport || second.Created != 0 || second.Untouched != 2 || second.TestID != first.TestID {
 		t.Fatalf("second = %+v err = %v", second, err)
 	}
+	// The first upload keeps old findings; a later run of the same profile
+	// replaces the picture of the test (close_old_findings).
+	if f0, f1 := fake.forms[0], fake.forms[1]; f0["path"] != "import-scan/" || f0["close_old_findings"] != "false" ||
+		f1["path"] != "reimport-scan/" || f1["close_old_findings"] != "true" || f1["close_old_findings_product_scope"] != "false" {
+		t.Fatalf("import form = %v, reimport form = %v", f0, f1)
+	}
 	other, err := c.ImportNmapXML(context.Background(), Target{}, "Czujka nmap run 8", strings.NewReader(xml), time.Now())
 	if err != nil || other.Reimport || other.TestID == first.TestID || len(fake.tests) != 2 {
 		t.Fatalf("other run = %+v err = %v", other, err)
@@ -507,5 +527,75 @@ func TestDescriptionTagsSeverity(t *testing.T) {
 	}
 	if cfg := FromSettings(model.DefectDojoSettings{URL: "u", APIKey: "k", VerifyTLS: true}); cfg.URL != "u" || cfg.APIKey != "k" || !cfg.VerifyTLS {
 		t.Errorf("config = %+v", cfg)
+	}
+}
+
+func TestLinkURLIsTheBaseOfEveryLink(t *testing.T) {
+	fake := newFake()
+	srv := httptest.NewServer(fake)
+	t.Cleanup(srv.Close)
+	c, err := New(Config{URL: srv.URL, APIKey: fake.token, LinkURL: "https://dojo.example.org/api/v2/"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := c.ExportFindings(context.Background(), Target{}, sampleFindings(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(out.Result.TestURL, "https://dojo.example.org/test/") {
+		t.Errorf("test url = %q", out.Result.TestURL)
+	}
+	for _, ref := range out.Findings {
+		if !strings.HasPrefix(ref.URL, "https://dojo.example.org/finding/") {
+			t.Errorf("finding url = %q", ref.URL)
+		}
+	}
+	nm, err := c.ImportNmapXML(context.Background(), Target{}, "t", strings.NewReader("<nmaprun><port portid=\"1\"/></nmaprun>"), time.Now())
+	if err != nil || !strings.HasPrefix(nm.TestURL, "https://dojo.example.org/test/") {
+		t.Errorf("nmap test url = %q err = %v", nm.TestURL, err)
+	}
+	// Empty link_url: the API address.
+	_, c2 := setup(t)
+	out2, _ := c2.ExportFindings(context.Background(), Target{}, sampleFindings(1))
+	if !strings.HasPrefix(out2.Result.TestURL, strings.TrimSuffix(c2.BaseURL(), "/")+"/test/") {
+		t.Errorf("default test url = %q, base %q", out2.Result.TestURL, c2.BaseURL())
+	}
+	if _, err := New(Config{URL: srv.URL, APIKey: "k", LinkURL: "dojo.example.org"}); err == nil {
+		t.Error("a link url without a scheme must be refused")
+	}
+}
+
+// DefectDojo dies after import-scan and before the read that confirms it:
+// the error says "sent, not confirmed", and the next export or LinkOrphans
+// links the findings by key, without duplicates.
+func TestUnconfirmedExportIsLinkedByKeyLater(t *testing.T) {
+	fake, c := setup(t)
+	fs := sampleFindings(3)
+	// The first export creates the test, so the read before the import
+	// finds nothing to read; the reads after it are dropped (the transport
+	// retries a GET on a dropped reused connection, so drop a few).
+	fake.dropReads = 5
+	out, err := c.ExportFindings(context.Background(), Target{}, fs)
+	fake.dropReads = 0
+	var ue *UnconfirmedError
+	if !errors.As(err, &ue) || ue.Sent != 3 || !strings.HasPrefix(err.Error(), MsgUnconfirmed) {
+		t.Fatalf("err = %v", err)
+	}
+	if len(out.Findings) != 0 || len(fake.findings) != 3 {
+		t.Fatalf("links %d, findings in DefectDojo %d", len(out.Findings), len(fake.findings))
+	}
+	keys := []string{fs[0].Key, fs[1].Key, fs[2].Key, "not-there"}
+	refs, err := c.LinkOrphans(context.Background(), Target{}, keys)
+	if err != nil || len(refs) != 3 || refs[fs[1].Key].ID == 0 || !strings.Contains(refs[fs[1].Key].URL, "/finding/") {
+		t.Fatalf("orphans = %+v err = %v", refs, err)
+	}
+	again, err := c.ExportFindings(context.Background(), Target{}, fs)
+	if err != nil || len(again.Findings) != 3 || again.Result.Updated != 3 || len(fake.findings) != 3 {
+		t.Fatalf("repeat: %+v err = %v, findings in DefectDojo %d", again.Result, err, len(fake.findings))
+	}
+	// Nothing exists for another target: no links, nothing created.
+	before := len(fake.products)
+	if refs, err := c.LinkOrphans(context.Background(), Target{ProductName: "Inny"}, keys); err != nil || len(refs) != 0 || len(fake.products) != before {
+		t.Fatalf("other target: %+v %v", refs, err)
 	}
 }

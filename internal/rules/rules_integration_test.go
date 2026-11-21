@@ -339,3 +339,75 @@ func TestScale2000Hosts(t *testing.T) {
 		t.Fatalf("second evaluation must be a no-op: %+v", rep2)
 	}
 }
+
+// The reopen rule for policy findings: an analyst's "resolved" survives
+// evaluations over unchanged data; a new scan that sees the cause reopens it
+// once (with an audit entry); accepted and false positive are never reopened.
+func TestPolicyFindingReopenRule(t *testing.T) {
+	st := storetest.New(t)
+	ctx := context.Background()
+	svc := rules.New(st, nil)
+	svc.EvalOnChange = false
+	if err := svc.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	mysql := model.ServiceResult{Port: 3306, Proto: "tcp", State: "open", Name: "mysql", Product: "MySQL"}
+	key := "policy-violation|database-port-exposed|10.66.2.11|3306/tcp"
+	scan := func() {
+		t.Helper()
+		run := ingest(t, st, []model.HostResult{{IP: "10.66.2.11", Services: []model.ServiceResult{mysql}}})
+		if _, err := svc.Evaluate(ctx, run); err != nil {
+			t.Fatal(err)
+		}
+	}
+	get := func() model.Finding {
+		t.Helper()
+		f, ok := findings(t, st)[key]
+		if !ok {
+			t.Fatalf("no finding %s", key)
+		}
+		return f
+	}
+	set := func(s model.FindingStatus) {
+		t.Helper()
+		if _, err := st.PatchFinding(ctx, get().ID, map[string]json.RawMessage{"status": json.RawMessage(`"` + string(s) + `"`)}, "analityk"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reopens := func() int {
+		var n int
+		if err := st.Pool().QueryRow(ctx, `SELECT count(*) FROM audit_log WHERE action = 'finding.reopen' AND entity_id = $1`, fmt.Sprint(get().ID)).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	scan()
+	set(model.FindingResolved)
+	for i := 0; i < 3; i++ { // rule evaluations without a new observation
+		if _, err := svc.Evaluate(ctx, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if f := get(); f.Status != model.FindingResolved || reopens() != 0 {
+		t.Fatalf("an evaluation over unchanged data reopened the finding: %s, %d", f.Status, reopens())
+	}
+	time.Sleep(10 * time.Millisecond) // the new scan observes after the resolution
+	scan()
+	if f := get(); f.Status != model.FindingNew || reopens() != 1 {
+		t.Fatalf("a new observation must reopen once: %s, %d", f.Status, reopens())
+	}
+	if _, err := svc.Evaluate(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	if reopens() != 1 {
+		t.Fatalf("reopened again without a resolution: %d", reopens())
+	}
+	for _, s := range []model.FindingStatus{model.FindingAccepted, model.FindingFalsePositive} {
+		set(s)
+		time.Sleep(10 * time.Millisecond)
+		scan()
+		if f := get(); f.Status != s {
+			t.Fatalf("%s was changed by a scan to %s", s, f.Status)
+		}
+	}
+}

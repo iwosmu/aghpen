@@ -388,6 +388,12 @@ func checkDojo(d *model.DefectDojoSettings) error {
 	if d.Enabled && d.URL == "" {
 		return invalid("url is required when the integration is enabled")
 	}
+	d.LinkURL = strings.TrimRight(strings.TrimSpace(d.LinkURL), "/")
+	if d.LinkURL != "" {
+		if u, err := url.Parse(d.LinkURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return invalid("link_url must be an http or https address that a browser opens")
+		}
+	}
 	if d.MinInterest < 0 || d.MinInterest > 100 {
 		return invalid("min_interest must be between 0 and 100")
 	}
@@ -829,7 +835,10 @@ func (s *Server) exportRun(w http.ResponseWriter, r *http.Request) {
 }
 
 // exportRunDojo uploads the nmap XML of one run to DefectDojo as an "Nmap
-// Scan" import. A second upload of the same run re-imports into the same test.
+// Scan" import. The test is keyed by the profile and the engagement
+// (NmapTestTitle): the first upload of a profile imports a new test, every
+// later run of that profile re-imports into the same test with
+// close_old_findings. A run without a profile has a test of its own.
 func (s *Server) exportRunDojo(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
 	if !ok {
@@ -882,13 +891,29 @@ func (s *Server) exportRunDojo(w http.ResponseWriter, r *http.Request) {
 	if run.FinishedAt != nil {
 		at = *run.FinishedAt
 	}
-	up, err := s.d.Dojo.UploadNmap(r.Context(), settings, fmt.Sprintf("Czujka run %d", id), &buf, at)
-	auditSet(r, "", "", nil, map[string]any{"hosts": hosts, "test_id": up.TestID, "reimport": up.Reimport, "created": up.Created})
+	title := NmapTestTitle(run)
+	up, err := s.d.Dojo.UploadNmap(r.Context(), settings, title, &buf, at)
+	up.Title, up.Mode = title, "import"
+	if up.Reimport {
+		up.Mode = "reimport"
+	}
+	auditSet(r, "", "", nil, map[string]any{"hosts": hosts, "test_id": up.TestID, "title": title, "mode": up.Mode, "created": up.Created, "closed": up.Closed})
 	if err != nil {
 		writeErrDetails(w, http.StatusBadGateway, "internal", "DefectDojo upload failed: "+err.Error(), up)
 		return
 	}
 	writeJSON(w, http.StatusOK, up)
+}
+
+// NmapTestTitle is the title, and so the key, of the DefectDojo test that
+// receives the nmap XML of a run: one test per profile in the engagement.
+// The profile id (not its name) keeps the key stable when the profile is
+// renamed. A run without a profile (ad hoc) gets its own test.
+func NmapTestTitle(run model.ScanRun) string {
+	if run.ProfileID != nil && *run.ProfileID != 0 {
+		return fmt.Sprintf("Czujka nmap: profil %d", *run.ProfileID)
+	}
+	return fmt.Sprintf("Czujka nmap: przebieg %d", run.ID)
 }
 
 // ---------- web UI ----------

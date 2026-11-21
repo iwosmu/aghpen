@@ -73,9 +73,13 @@ type Exporter interface {
 
 // DojoUpload is the outcome of the upload of a run's nmap XML to DefectDojo.
 type DojoUpload struct {
-	TestID      int64  `json:"test_id"`
-	TestURL     string `json:"test_url"`
-	Reimport    bool   `json:"reimport"` // the test existed and was updated
+	TestID   int64  `json:"test_id"`
+	TestURL  string `json:"test_url"`
+	Reimport bool   `json:"reimport"` // the test existed and was updated
+	// Mode is "import" (first upload: a new test) or "reimport" (a later run
+	// of the same profile into the same test, with close_old_findings).
+	Mode        string `json:"mode"`
+	Title       string `json:"title"` // the test title, the key of the test in the engagement
 	Created     int    `json:"created"`
 	Closed      int    `json:"closed"`
 	Reactivated int    `json:"reactivated"`
@@ -95,6 +99,9 @@ type DojoLink struct {
 type DojoPull struct {
 	defectdojo.StatusPull
 	Applied int `json:"applied"`
+	// Linked counts findings that an unconfirmed export had sent and that
+	// the pull linked by key (dojo_id and dojo_url set).
+	Linked int `json:"linked"`
 }
 
 // DojoClient talks to DefectDojo API v2. Implemented by internal/defectdojo.

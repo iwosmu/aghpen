@@ -4,10 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/iwosmu/aghpen/internal/defectdojo"
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/store"
 )
@@ -586,6 +588,15 @@ func (s *Server) exportDojo(w http.ResponseWriter, r *http.Request) {
 		res.Errors = []string{}
 	}
 	auditSet(r, "", "", nil, map[string]any{"selected": len(findings), "exported": res.Exported, "updated": res.Updated, "failed": res.Failed})
+	var unconfirmed *defectdojo.UnconfirmedError
+	if errors.As(err, &unconfirmed) {
+		// The import went through and DefectDojo stopped answering before the
+		// read that confirms it. No raw transport error for the analyst.
+		writeErrDetails(w, http.StatusBadGateway, "dojo_unconfirmed",
+			"Wysłano, nie potwierdzono: powtórz eksport. DefectDojo przyjął dane, ale przestał odpowiadać przed potwierdzeniem. "+
+				"Ponowny eksport albo pobranie statusów połączy te obserwacje po kluczu, bez duplikatów.", res)
+		return
+	}
 	if err != nil {
 		writeErrDetails(w, http.StatusBadGateway, "internal", "DefectDojo export failed: "+err.Error(), res)
 		return
