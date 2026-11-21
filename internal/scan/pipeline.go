@@ -369,20 +369,34 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 	for _, h := range up {
 		found[h.IP] = true
 	}
-	results, err := r.describeHosts(ctx, g, up, attempts, rate, gs, true, true)
-	if err != nil {
-		return err
+	describeRate := rate
+	var wide chan fullScan
+	if full {
+		// The rest of the range starts now, beside the description of the
+		// top ports: the port scan gets 90 % of the rate, version detection
+		// (a few connects per port) and its 1-port SYN scans the rest.
+		wide = make(chan fullScan, 1)
+		go func() { wide <- r.fullRangeScan(ctx, g, up, rate*9/10, gs) }()
+		describeRate = max(1, rate/10)
 	}
-	if full && ctx.Err() == nil {
-		// the top ports are known: store them now, then scan the rest
+	results, err := r.describeHosts(ctx, g, up, attempts, describeRate, gs, true, true)
+	if full {
+		fs := <-wide
+		if err != nil {
+			return err
+		}
+		if ctx.Err() != nil {
+			return context.Cause(ctx)
+		}
+		// the top ports are known: store them now, then describe the rest
 		for _, res := range results {
 			r.interimHost(gs, res)
 		}
-		if err := r.fullRangePass(ctx, g, up, results, attempts, rate, gs); err != nil {
+		if err := r.fullRangeFinish(ctx, g, up, results, fs, attempts, rate, gs); err != nil {
 			return err
 		}
-	} else if full {
-		return context.Cause(ctx)
+	} else if err != nil {
+		return err
 	}
 	for _, res := range results {
 		if unknown[res.IP] {
@@ -790,6 +804,10 @@ const (
 	quickMaxProcs       = 8                // nmap processes at one time on the quick path
 )
 
+// quickStoreEvery is the pace of partial results of a host being described
+// (a variable for tests).
+var quickStoreEvery = 2 * time.Second
+
 func (r *run) quickEligible(up []probe.Host) bool {
 	if !r.plan.Profile.ServiceDetection || r.e.deps.Fingerprinter == nil || !r.plan.Profile.HTTP.Enabled {
 		return false
@@ -858,7 +876,9 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 	res := r.newHostResult(h, attempts)
 	cancels := map[int]context.CancelFunc{}
 	var mu sync.Mutex
-	detected := map[int]probe.Port{}
+	detected := map[int]probe.Port{}           // version detection answers
+	described := map[int]model.ServiceResult{} // services whose HTTP stage ended
+	changed := false
 	var svwg sync.WaitGroup
 	for _, p := range h.Ports {
 		if (p.Proto != "" && p.Proto != "tcp") || p.State != "open" {
@@ -890,35 +910,73 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 				for _, d := range sh.Ports {
 					if d.Port == port {
 						mu.Lock()
-						detected[port] = d
+						detected[port], changed = d, true
 						mu.Unlock()
 					}
 				}
 			}
 		}()
 	}
+
+	// Partial results go to the store every quickStoreEvery while ports are
+	// described, so the first services show within seconds. A partial result
+	// lists only the described services and is marked PortsUnknown.
+	stop := make(chan struct{})
+	var pwg sync.WaitGroup
+	if store != nil {
+		pwg.Add(1)
+		go func() {
+			defer pwg.Done()
+			t := time.NewTicker(quickStoreEvery)
+			defer t.Stop()
+			for {
+				select {
+				case <-stop:
+					return
+				case <-ctx.Done():
+					return
+				case <-t.C:
+				}
+				mu.Lock()
+				if !changed {
+					mu.Unlock()
+					continue
+				}
+				changed = false
+				part := r.newHostResult(probe.Host{IP: h.IP, Reason: h.Reason, RTTMs: h.RTTMs, MAC: h.MAC, Vendor: h.Vendor, Hostnames: h.Hostnames}, attempts)
+				for _, p := range h.Ports {
+					s, ok := described[p.Port]
+					if !ok {
+						if _, svOK := detected[p.Port]; !svOK || p.Proto == "udp" {
+							continue
+						}
+						s = toService(p)
+					}
+					part.Services = append(part.Services, s)
+				}
+				part = quickMerge(part, detected)
+				mu.Unlock()
+				r.finishHost(&part)
+				if ctx.Err() == nil && len(part.Services) > 0 {
+					store(part)
+				}
+			}
+		}()
+	}
+
 	r.httpHost(ctx, &res, func(svc *model.ServiceResult) {
+		mu.Lock()
+		described[svc.Port], changed = *svc, true
+		mu.Unlock()
 		if svc.HTTP != nil {
 			if c := cancels[svc.Port]; c != nil {
 				c()
 			}
 		}
 	})
-	svDone := make(chan struct{})
-	go func() { svwg.Wait(); close(svDone) }()
-	select {
-	case <-svDone:
-	default:
-		// version detection still runs (a slow protocol): store what is known
-		mu.Lock()
-		part := quickMerge(res, detected)
-		mu.Unlock()
-		r.finishHost(&part)
-		if ctx.Err() == nil && store != nil {
-			store(part)
-		}
-		<-svDone
-	}
+	svwg.Wait()
+	close(stop)
+	pwg.Wait()
 	res = quickMerge(res, detected)
 	r.finishHost(&res)
 	return res
@@ -1004,27 +1062,29 @@ func (r *run) claimFullRange(hosts []probe.Host, scanned map[string]*probe.Host)
 	}
 }
 
-// fullRangePass scans the ports outside the profile's list on the live
-// hosts, describes the new open ports and adds them to results.
-func (r *run) fullRangePass(ctx context.Context, g *group, up []probe.Host, results []model.HostResult, attempts, rate int, gs *groupStats) error {
+// fullScan is the outcome of the full-range port scan.
+type fullScan struct {
+	res   *probe.Result
+	err   error
+	ports int
+	start time.Time
+}
+
+// fullRangeScan scans the ports outside the profile's list on the live hosts.
+func (r *run) fullRangeScan(ctx context.Context, g *group, up []probe.Host, rate int, gs *groupStats) fullScan {
 	rest, err := probe.ParsePorts("1-65535")
 	if err != nil {
-		return nil
+		return fullScan{err: err}
 	}
 	rest.Remove(r.ports)
-	var ips []string
-	byIP := map[string]int{}
-	for i, res := range results {
-		if res.Up {
-			ips = append(ips, res.IP)
-			byIP[res.IP] = i
-		}
-	}
-	if len(ips) == 0 || rest.Count() == 0 {
-		r.stats.passState(model.PassFullRange, model.PassSkipped)
-		return nil
+	ips := make([]string, len(up))
+	for i, h := range up {
+		ips[i] = h.IP
 	}
 	t0 := r.e.now()
+	if len(ips) == 0 || rest.Count() == 0 {
+		return fullScan{start: t0}
+	}
 	end := r.stats.begin(rate)
 	endPass := r.stats.passBegin(model.PassFullRange, len(ips), int64(len(ips)*rest.Count()), rate)
 	ps, err := r.prober.PortScan(ctx, probe.PortScanRequest{
@@ -1033,6 +1093,25 @@ func (r *run) fullRangePass(ctx context.Context, g *group, up []probe.Host, resu
 	endPass()
 	end()
 	r.account(gs, ps, t0)
+	return fullScan{res: ps, err: err, ports: rest.Count(), start: t0}
+}
+
+// fullRangeFinish describes the new open ports of the full-range scan and
+// adds them to results.
+func (r *run) fullRangeFinish(ctx context.Context, g *group, up []probe.Host, results []model.HostResult, fs fullScan, attempts, rate int, gs *groupStats) error {
+	var ips []string
+	byIP := map[string]int{}
+	for i, res := range results {
+		if res.Up {
+			ips = append(ips, res.IP)
+			byIP[res.IP] = i
+		}
+	}
+	if fs.res == nil && fs.err == nil {
+		r.stats.passState(model.PassFullRange, model.PassSkipped)
+		return nil
+	}
+	ps, err, t0 := fs.res, fs.err, fs.start
 	if err != nil {
 		if ctx.Err() != nil {
 			return context.Cause(ctx)
@@ -1086,6 +1165,6 @@ func (r *run) fullRangePass(ctx context.Context, g *group, up []probe.Host, resu
 		}
 	}
 	r.stats.passState(model.PassFullRange, model.PassDone)
-	r.log.Info("full port range pass", "group", g.id, "hosts", len(ips), "ports", rest.Count(), "new_open", newOpen, "ms", r.e.now().Sub(t0).Milliseconds())
+	r.log.Info("full port range pass", "group", g.id, "hosts", len(ips), "ports", fs.ports, "new_open", newOpen, "ms", r.e.now().Sub(t0).Milliseconds())
 	return nil
 }

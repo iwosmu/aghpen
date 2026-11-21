@@ -969,6 +969,8 @@ func (s slowSSH) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*pr
 }
 
 func TestQuickPathStoresAPartialResultFirst(t *testing.T) {
+	defer func(d time.Duration) { quickStoreEvery = d }(quickStoreEvery)
+	quickStoreEvery = 50 * time.Millisecond
 	netw := slowSSH{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 80, 8080}}}}
 	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
 	plan := basePlan("10.7.0.5")
@@ -982,12 +984,23 @@ func TestQuickPathStoresAPartialResultFirst(t *testing.T) {
 	sink.mu.Lock()
 	reports := append([]model.HostResult(nil), sink.hosts...)
 	sink.mu.Unlock()
-	if len(reports) != 2 {
-		t.Fatalf("reports = %d, want a partial one and the final one", len(reports))
+	if len(reports) < 2 {
+		t.Fatalf("reports = %d, want partial ones and the final one", len(reports))
 	}
-	part, final := reports[0], reports[1]
-	if !part.PortsUnknown || part.Services[1].HTTP == nil || part.Services[0].Product != "" {
-		t.Errorf("partial = %+v", part)
+	part, final := reports[0], reports[len(reports)-1]
+	for _, p := range reports[:len(reports)-1] {
+		if !p.PortsUnknown {
+			t.Errorf("a partial result must be marked PortsUnknown: %+v", p)
+		}
+	}
+	// the first partial comes before the slow version detection of ssh ended
+	for _, s := range part.Services {
+		if s.Port == 22 && s.Product != "" {
+			t.Errorf("partial = %+v", part)
+		}
+	}
+	if len(part.Services) == 0 {
+		t.Errorf("empty partial")
 	}
 	if final.PortsUnknown || final.Services[0].Product != "OpenSSH" {
 		t.Errorf("final = %+v", final)
