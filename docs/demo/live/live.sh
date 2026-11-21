@@ -59,6 +59,6 @@ help|-h|--help) sed -n 2,14p "$0" ;;
   running || { echo "the machine is not running: docs/demo/live/live.sh start"; exit 1; }
   # keep the scripts in the machine in step with this checkout
   COPYFILE_DISABLE=1 tar --exclude='._*' -c docs/demo/live e2e/jury | docker exec -i "$N" sh -c 'tar -x -C /work'
-  cmd=$1; shift; case $cmd in [1-7]) cmd=c$cmd ;; reset|run|changes_after) ;; *) echo "unknown command: $cmd (live.sh help)"; exit 2 ;; esac
+  cmd=$1; shift; case $cmd in [1-7]) cmd=c$cmd ;; reset|run|changes_after|full) ;; *) echo "unknown command: $cmd (live.sh help)"; exit 2 ;; esac
   docker exec -e LIVE_UI="http://127.0.0.1:$UI" "$N" bash /work/docs/demo/live/inner.sh "$cmd" "$@" ;;
 esac

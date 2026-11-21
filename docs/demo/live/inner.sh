@@ -139,6 +139,8 @@ c5() { # roles
   case ${1:-prep} in
   prep) reset; ( cd $J && bash quickstart.sh up >/dev/null 2>&1 ); wait_ports 2223 3001 5673 8787 15673
     login; S=$(scope "Ten komputer" localhost); P=$(profile_ports "Quickstart" "$S" 2223,3001,5673,8787,15673); scan "$P"
+    c5 accounts; ready ;;
+  accounts) login
     echo; echo "  Accounts (passwords shown only now):"
     local slug email pw rid
     for slug in viewer analyst editor admin; do
@@ -147,8 +149,7 @@ c5() { # roles
       pw="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 14)-Cz1"
       api POST /users "$(jq -nc --arg e "$email" --arg n "$slug" --arg p "$pw" --argjson r "$rid" '{email:$e,name:$n,password:$p,role_id:$r}')" >/dev/null
       printf '    %-22s %-10s %s\n' "$email" "$slug" "$pw"
-    done
-    ready ;;
+    done ;;
   esac
 }
 c6() { # a signature from a real service
@@ -164,5 +165,15 @@ c7() { # import, edit, a second scan keeps the edit
     login; S=$(scope "Ten komputer" localhost); P=$(profile_ports "Quickstart" "$S" 2223,3001,5673,8787,15673); scan "$P"
     ready; say "Files to import: docs/demo/live/samples/ (on this laptop)"; say "Next: Import -> results file, findings file; edit a finding; 'Uruchom skan' on 'Quickstart'" ;;
   esac
+}
+full() { # every stack at once (their ports do not overlap), two scans with a change between them, imports, role accounts
+  reset; stack custom; stack modern; stack proxy proxy-base; stack vulnerable
+  wait_ports $(echo "$TEMPLATE_PORTS" | tr ',' ' ' | sed 's/21000-21010//'); wait_http 8080 /wp-admin/install.php; wait_http 8085 /wp-admin/install.php; wait_http 15673 /
+  login; S=$(scope "Ten komputer" localhost); P=$(profile_ports "Porty szablonu" "$S" "$TEMPLATE_PORTS"); scan "$P"
+  ( cd $J && bash quickstart.sh change >/dev/null 2>&1 ); scan "$P"; changes "$RUN"
+  curl -s -b "$JAR" -H "X-CSRF-Token: $CSRF" -F file=@/work/docs/demo/live/samples/wyniki-nmap.xml "$API/import/results" | jq -c '{import_run: .run_id, hosts, services}'
+  curl -s -b "$JAR" -H "X-CSRF-Token: $CSRF" -F file=@/work/docs/demo/live/samples/znaleziska-dojo-generic.json "$API/import/findings" | jq -c '{findings, created}'
+  c5 accounts
+  ready
 }
 "$@"
