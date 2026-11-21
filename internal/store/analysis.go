@@ -13,7 +13,7 @@ import (
 // ---------- changes ----------
 
 const changeCols = `c.id, c.run_id, c.prev_run_id, c.at, c.kind, c.severity, c.host_id, COALESCE(host(c.ip), '') AS ip, c.service_id, c.port,
-  c.summary, c.field, c.before, c.after, c.expected, c.acked_by, c.acked_at`
+  c.summary, c.field, c.before, c.after, c.expected, c.acked_by, c.acked_at, c.deep_pass`
 
 // ChangeFilter are the filters of GET /changes.
 type ChangeFilter struct {
@@ -100,10 +100,12 @@ func (s *Store) InsertChanges(ctx context.Context, changes []model.Change) error
 		}
 		rows = append(rows, r)
 	}
-	_, err := s.db.Exec(ctx, `INSERT INTO changes (run_id, prev_run_id, at, kind, severity, host_id, ip, service_id, port, summary, field, before, after, expected)
-		SELECT d.run_id, d.prev_run_id, d.at, d.kind, d.severity, d.host_id, d.ip_addr, d.service_id, d.port, d.summary, d.field, d.before, d.after, d.expected
+	// deep_pass: the service was scanned by the deep pass of this run (services.deep_run_id)
+	_, err := s.db.Exec(ctx, `INSERT INTO changes (run_id, prev_run_id, at, kind, severity, host_id, ip, service_id, port, summary, field, before, after, expected, deep_pass)
+		SELECT d.run_id, d.prev_run_id, d.at, d.kind, d.severity, d.host_id, d.ip_addr, d.service_id, d.port, d.summary, d.field, d.before, d.after, d.expected,
+			d.deep_pass OR EXISTS (SELECT 1 FROM services s WHERE s.id = d.service_id AND s.deep_run_id = d.run_id)
 		FROM jsonb_to_recordset($1::jsonb) AS d(run_id bigint, prev_run_id bigint, at timestamptz, kind text, severity text, host_id bigint, ip_addr inet,
-			service_id bigint, port int, summary text, field text, before jsonb, after jsonb, expected boolean)`, js(rows))
+			service_id bigint, port int, summary text, field text, before jsonb, after jsonb, expected boolean, deep_pass boolean)`, js(rows))
 	return mapErr(err)
 }
 

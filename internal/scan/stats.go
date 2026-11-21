@@ -117,6 +117,11 @@ func (k *statsKeeper) finishPasses(completed bool) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	for _, p := range k.passes {
+		if p.st.Name == model.PassDeep && p.st.Hosts > 0 {
+			if note := deepNote(p.st.Hosts, p.st.HostsSkipped); !slices.Contains(k.s.Notes, note) {
+				k.s.Notes = append(k.s.Notes, note)
+			}
+		}
 		if p.st.Name == model.PassFullRange && p.st.HostsSkipped > 0 {
 			note := fmt.Sprintf("pełny zakres portów (1-65535) objął %d z %d aktywnych hostów; pozostałe: porty z profilu",
 				p.st.Hosts, p.st.Hosts+p.st.HostsSkipped)

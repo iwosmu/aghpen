@@ -220,6 +220,12 @@ type run struct {
 	fullPassed  map[int]bool
 	fullWake    chan struct{}
 	fullPlanned bool
+	// the rotating deep pass (deeppass.go): the final results of live hosts
+	deepPlanned bool
+	finalMu     sync.Mutex
+	finals      map[string]model.HostResult
+	// fullDone holds the IPs whose full-range pass finished in this run
+	fullDone sync.Map
 
 	e       *Engine
 	log     *slog.Logger
@@ -348,6 +354,7 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 		hostSem:   make(chan struct{}, lim.ParallelHosts),
 		hostnames: exp.Hostnames,
 		hints:     map[string]model.HostHint{},
+		finals:    map[string]model.HostResult{},
 	}
 	r.global, r.globalHTTP = e.shared(plan.Policy)
 	r.polPerHost = EffectiveLimits(model.ScanProfile{}, plan.Policy).PerHostRPS
@@ -426,6 +433,11 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 		s.AddressesTotal = s.AddressesDone + total
 		s.ChunksTotal = s.ChunksDone + len(units)
 	})
+	if !r.fullRangePlanned(int64(total)) && deepFor(plan.Profile.Ports, r.ports, int64(total)) {
+		r.deepPlanned = true
+		r.stats.addPass(model.PassTopPorts)
+		r.stats.addPass(model.PassDeep)
+	}
 	if r.fullPlanned = r.fullRangePlanned(int64(total)); r.fullPlanned {
 		if r.ports.Count() >= 65535 {
 			// every port asked for: the top ports go first, so their services
@@ -520,9 +532,25 @@ loop:
 		}()
 	}
 	wg.Wait()
+	if r.deepPlanned && workCtx.Err() == nil && r.allChunksDone() {
+		r.deepPass(workCtx)
+	}
 	close(progStop)
 	progWG.Wait()
 	return r.finish(ctx, workCtx)
+}
+
+// allChunksDone reports whether every chunk of the run is done (the
+// general pass ended without a pause, a failure or a deferred chunk).
+func (r *run) allChunksDone() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, u := range r.all {
+		if u.c.Status != model.ChunkDone {
+			return false
+		}
+	}
+	return true
 }
 
 // claim takes the next work group, or nil when nothing may start: no chunk
@@ -663,6 +691,8 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 		for _, h := range gs.hosts {
 			if h.Up && !h.PortsUnknown && !h.Interim {
 				h.Coverage = r.coverage(h.IP)
+				_, h.FullPorts = r.fullDone.Load(h.IP)
+				r.keepFinal(h)
 			}
 			if err := r.sink.OnHost(r.sinkCtx, h); err != nil {
 				r.log.Warn("sink OnHost failed", "ip", h.IP, "error", err.Error())
@@ -832,10 +862,17 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 	}
 
 	nPorts := 100.0
-	fullRange := false
+	fullRange, deep := false, false
 	if ports, err := probe.EffectivePorts(plan.Profile.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil {
 		nPorts = float64(ports.Count())
 		fullRange = fullRangeFor(plan.Profile.Ports, ports, est.Addresses)
+		deep = !fullRange && deepFor(plan.Profile.Ports, ports, est.Addresses)
+	}
+	if deep {
+		// the rotating deep pass: up to deepPassHosts live hosts get the rest of
+		// 1-65535; the known live hosts beyond that wait for later runs
+		est.DeepMaxHosts = deepPassHosts
+		est.DeepWaitingHosts = max(0, len(plan.Hints)-deepPassHosts)
 	}
 	if fullRange {
 		est.FullRangeMaxHosts = fullRangeMaxHosts
@@ -891,6 +928,9 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 				fh = float64(est.Addresses)
 			}
 			packets += math.Min(fh, fullRangeMaxHosts) * (65535 - nPorts) * 1.02
+		}
+		if deep {
+			packets += math.Min(live, deepPassHosts) * (65535 - nPorts) * 1.02
 		}
 		if plan.Profile.ServiceDetection {
 			packets += live * 3 * 14 // about 3 open ports per host, about 14 packets per version probe

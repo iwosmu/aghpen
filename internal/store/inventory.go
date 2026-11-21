@@ -126,7 +126,7 @@ func (s *Store) DeleteHost(ctx context.Context, id int64) error {
 // HostHints returns what the inventory knows about the hosts of the given
 // scopes. The engine scans known live blocks first and retries known hosts.
 func (s *Store) HostHints(ctx context.Context, scopeIDs []int64) ([]model.HostHint, error) {
-	return jsonRows[model.HostHint](ctx, s.db, wrapJSON(`SELECT host(h.ip) AS "IP", h.open_ports AS "OpenPorts", h.stability AS "Stability", h.last_up AS "LastUp"
+	return jsonRows[model.HostHint](ctx, s.db, wrapJSON(`SELECT host(h.ip) AS "IP", h.open_ports AS "OpenPorts", h.stability AS "Stability", h.last_up AS "LastUp", h.deep_scan_at AS "DeepAt"
 		FROM hosts h WHERE h.scope_ids && $1::bigint[] AND h.last_up IS NOT NULL AND h.status <> 'down' ORDER BY h.ip`), nonNil(scopeIDs))
 }
 
@@ -146,7 +146,7 @@ func (s *Store) HostHintsIn(ctx context.Context, addrs []string) ([]model.HostHi
 	if len(nets) == 0 {
 		return []model.HostHint{}, nil
 	}
-	return jsonRows[model.HostHint](ctx, s.db, wrapJSON(`SELECT host(h.ip) AS "IP", h.open_ports AS "OpenPorts", h.stability AS "Stability", h.last_up AS "LastUp"
+	return jsonRows[model.HostHint](ctx, s.db, wrapJSON(`SELECT host(h.ip) AS "IP", h.open_ports AS "OpenPorts", h.stability AS "Stability", h.last_up AS "LastUp", h.deep_scan_at AS "DeepAt"
 		FROM hosts h WHERE h.ip <<= ANY($1::cidr[]) AND h.last_up IS NOT NULL ORDER BY h.ip`), nets)
 }
 

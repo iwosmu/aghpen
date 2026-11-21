@@ -1403,6 +1403,7 @@ func (r *run) fullRangeFinish(ctx context.Context, g *group, up []probe.Host, re
 	if fs.rest != nil {
 		for _, ip := range finished(ps) {
 			if _, ok := byIP[ip]; ok {
+				r.fullDone.Store(ip, true)
 				r.cover(ip, fs.rest) // every port of 1-65535 the policy allows was scanned on this host
 			}
 		}
