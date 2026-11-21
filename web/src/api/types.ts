@@ -243,7 +243,7 @@ export interface ServiceGroup {
 }
 
 export type ChangeKind =
-  | 'host_new' | 'host_gone' | 'host_back' | 'host_unstable' | 'host_missing' | 'service_new' | 'service_gone' | 'service_changed'
+  | 'host_new' | 'host_gone' | 'host_back' | 'host_unstable' | 'host_missing' | 'service_unreachable' | 'service_new' | 'service_gone' | 'service_changed'
   | 'tech_new' | 'tech_gone' | 'tech_version' | 'title_changed' | 'status_changed' | 'cert_changed'
   | 'headers_changed' | 'cookies_changed' | 'content_changed' | 'redirect_changed' | 'class_changed'
   | 'service_returned' | 'response_slower' | 'response_recovered';

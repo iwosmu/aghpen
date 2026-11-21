@@ -77,6 +77,14 @@ export function changeSummary(c: Change): string {
       const ms = field(c.after, 'ms');
       return 'Service ' + where + ' answers in its usual time again' + (typeof ms === 'number' ? ': ' + fmtMs(ms) : '') + usualText;
     }
+    case 'host_gone':
+      return 'Host ' + c.ip + ' reported inactive';
+    case 'service_gone':
+      return 'Service ' + where + ' is gone';
+    case 'host_missing':
+      return 'Host ' + c.ip + ' is not answering (unconfirmed): it answered in the previous run; Czujka checks it again';
+    case 'service_unreachable':
+      return 'Service ' + where + ' is not answering (unconfirmed): the host did not answer in this run';
     default: return c.summary;
   }
 }

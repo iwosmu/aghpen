@@ -79,7 +79,7 @@ export default function Changes() {
         actions={<><ExportButtons kind="changes" query={filters} /><LinkButton to="/changes/compare" icon="compare">{t('Porównaj dwa skany', 'Compare two runs')}</LinkButton></>}
       />
       <div className="flex flex-wrap items-center gap-1.5 border-b border-rule px-4 py-2 sm:px-6" role="group" aria-label={t('Szybkie filtry', 'Quick filters')} data-testid="change-quick">
-        {(['service_gone', 'service_returned', 'service_new', 'response_slower', 'response_recovered'] as const).map((k) => {
+        {(['service_gone', 'host_missing', 'service_unreachable', 'service_returned', 'service_new', 'response_slower', 'response_recovered'] as const).map((k) => {
           const i = changeKindInfo(k);
           const on = u.get('kind') === k;
           return (
