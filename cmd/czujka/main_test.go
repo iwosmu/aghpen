@@ -41,9 +41,14 @@ func TestUserCommandNeedsArguments(t *testing.T) {
 	}
 }
 
-func TestWireLeavesSeamsEmpty(t *testing.T) {
-	// Nothing is faked: what other packages supply stays nil until the integration step sets it.
-	if w := wire(config.Config{}, nil, nil); w.Engine != nil || w.API.Importer != nil || w.API.Dojo != nil {
-		t.Fatalf("unexpected default wiring: %+v", w)
+func TestWiring(t *testing.T) {
+	w := wire2(config.Config{Timezone: "Europe/Warsaw"}, nil, nil)
+	// Wired: analysis, import and export, DefectDojo.
+	if w.RunAnalyzer == nil || w.API.Analyzer == nil || w.API.Importer == nil || w.API.Exporter == nil || w.API.Dojo == nil {
+		t.Fatalf("missing wiring: %+v", w)
+	}
+	// Not merged yet: nothing is faked, the seams stay nil and the API answers 501.
+	if w.Engine != nil || w.Window != nil || w.API.Signatures != nil || w.API.RetroHunter != nil || w.API.WebFS != nil {
+		t.Fatalf("unexpected wiring: %+v", w)
 	}
 }

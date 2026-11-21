@@ -148,6 +148,8 @@ type FindingFilter struct {
 	Exported    *bool
 	IDs         []int64
 	FirstRunID  int64
+	LastRunID   int64
+	HostIDs     []int64
 }
 
 func (f FindingFilter) where() *where {
@@ -185,6 +187,12 @@ func (f FindingFilter) where() *where {
 	}
 	if f.FirstRunID != 0 {
 		w.add("f.first_run_id = ?", f.FirstRunID)
+	}
+	if f.LastRunID != 0 {
+		w.add("f.last_run_id = ?", f.LastRunID)
+	}
+	if len(f.HostIDs) > 0 {
+		w.add("f.host_id = ANY(?)", f.HostIDs)
 	}
 	if f.Q != "" {
 		q := like(f.Q)
@@ -440,7 +448,7 @@ type HostAnalysis struct {
 	Status   model.HostStatus `json:"status"`
 	PAlive   float64          `json:"p_alive"`
 	Pattern  string           `json:"pattern"`
-	Interest int              `json:"interest"`
+	Interest int              `json:"interest"` // a negative value keeps the stored score
 }
 
 // UpdateHostAnalysis stores model results for many hosts in one statement.
@@ -448,7 +456,7 @@ func (s *Store) UpdateHostAnalysis(ctx context.Context, rows []HostAnalysis) err
 	if len(rows) == 0 {
 		return nil
 	}
-	_, err := s.db.Exec(ctx, `UPDATE hosts h SET status = d.status, p_alive = d.p_alive, pattern = d.pattern, interest = d.interest
+	_, err := s.db.Exec(ctx, `UPDATE hosts h SET status = d.status, p_alive = d.p_alive, pattern = d.pattern, interest = CASE WHEN d.interest < 0 THEN h.interest ELSE d.interest END
 		FROM jsonb_to_recordset($1::jsonb) AS d(id bigint, status text, p_alive float8, pattern text, interest int) WHERE h.id = d.id`, js(rows))
 	return mapErr(err)
 }
@@ -459,6 +467,7 @@ type ServiceAnalysis struct {
 	Interest    int                    `json:"interest"`
 	InterestWhy []model.InterestReason `json:"interest_why"`
 	GroupKey    string                 `json:"group_key"`
+	Classes     []string               `json:"classes"` // effective classes; nil keeps the stored ones; an analyst override always wins
 }
 
 // UpdateServiceAnalysis stores interest and grouping for many services in one statement.
@@ -469,8 +478,9 @@ func (s *Store) UpdateServiceAnalysis(ctx context.Context, rows []ServiceAnalysi
 	for i := range rows {
 		rows[i].InterestWhy = nonNil(rows[i].InterestWhy)
 	}
-	_, err := s.db.Exec(ctx, `UPDATE services s SET interest = d.interest, interest_why = d.interest_why, group_key = d.group_key
-		FROM jsonb_to_recordset($1::jsonb) AS d(id bigint, interest int, interest_why jsonb, group_key text) WHERE s.id = d.id`, js(rows))
+	_, err := s.db.Exec(ctx, `UPDATE services s SET interest = d.interest, interest_why = d.interest_why, group_key = d.group_key,
+			classes = CASE WHEN s.overrides ? 'classes' OR d.classes IS NULL THEN s.classes ELSE d.classes END
+		FROM jsonb_to_recordset($1::jsonb) AS d(id bigint, interest int, interest_why jsonb, group_key text, classes text[]) WHERE s.id = d.id`, js(rows))
 	return mapErr(err)
 }
 

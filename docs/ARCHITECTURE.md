@@ -66,7 +66,7 @@ The seams are the interfaces in `internal/model/contracts.go`. A package depends
 
 - One token bucket for probe packets (`min(profile.max_pps, policy.max_pps)`), split between parallel nmap processes through `--max-rate`.
 - One token bucket for HTTP requests, plus a per-host limiter and per-host concurrency.
-- The safety policy also filters ports (`allowed_ports`, `denied_ports`) and subtracts exclusions before planning. `emergency_stop` cancels running runs and blocks new ones.
+- The safety policy also filters ports (`allowed_ports`, `denied_ports`) and subtracts exclusions before planning. `emergency_stop` cancels the context of every running engine at once (traffic stops within about a second), sets the runs to `paused` with reason `emergency_stop`, and blocks new runs and resumes. No result is lost: after the release an operator resumes a paused run and it continues with its remaining chunks.
 
 ### 4.3 Unstable hosts: when is a host inactive?
 

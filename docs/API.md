@@ -59,7 +59,8 @@ Base path `/api/v1`. JSON bodies use the types of `internal/model/types.go` (the
 | POST `/findings` | results:create | manual `Finding` |
 | PATCH `/findings/{id}` | results:update | `title, description, severity, status, note, tags, assignee` |
 | DELETE `/findings/{id}` | results:delete | |
-| POST `/findings/export/defectdojo` | export:run | `{ids}` or `{filter}` → `DojoExportResult` |
+| POST `/findings/export/defectdojo` | export:run | `{ids}` or `{filter}` → `DojoExportResult`; writes `dojo_id` and `dojo_url` back to each finding; a second export updates and does not duplicate |
+| POST `/runs/{id}/export/defectdojo` | export:run | uploads the nmap XML of the run as an "Nmap Scan" import → `{test_id, test_url, reimport, created, closed, reactivated, untouched, total}`; a second upload of the same run re-imports into the same test |
 | GET `/signatures` · GET `/signatures/{id}` | signatures:read | filters `category, enabled, builtin, tag` → `Signature` |
 | POST `/signatures` | signatures:create | `{yaml, enabled}` → `Signature` (rejected with `unsafe_signature` when the validator finds a safety issue) |
 | PATCH `/signatures/{id}` | signatures:update | `{yaml, enabled}` |
@@ -67,12 +68,12 @@ Base path `/api/v1`. JSON bodies use the types of `internal/model/types.go` (the
 | POST `/signatures/validate` | signatures:read | `{yaml}` → `SignatureValidation` |
 | POST `/signatures/retrohunt` | signatures:read | `{yaml}` or `{id}`, optional `{latest_only}` → `RetroHuntResult` |
 | GET `/tags` | results:read | → `NameCount[]` |
-| POST `/import/results` | results:create | multipart `file` (nmap XML, Czujka JSON, CSV), optional `scope_id` → `ImportReport` |
-| GET `/export/{kind}.{fmt}` | export:run | kind `hosts, services, findings, changes, signatures`; fmt `json, csv`; list filters apply; `/export/runs/{id}.{json,csv,xml}` (xml = nmap XML for DefectDojo "Nmap Scan") |
+| POST `/import/results` | results:create | multipart `file` (nmap XML, Czujka JSON, CSV; the format is detected) → `ImportReport`. Imported hosts take the same ingest and analysis as scanned ones (run with `trigger: "import"`). A host that the file reports as down is kept only when the inventory already knows it |
+| GET `/export/{kind}.{fmt}` | export:run | kind `hosts, services, findings, changes, signatures`; fmt `json, csv`; list filters apply; `/export/runs/{id}.{json,csv,xml}`: json = Czujka JSON (lossless `HostResult` records), csv = one row per service, xml = nmap XML (for DefectDojo "Nmap Scan"); each of the three imports again through `/import/results` |
 | GET `/dashboard` | results:read | → `Dashboard` |
 | GET `/settings/safety` | scans:read | → `SafetyPolicy` |
 | PUT `/settings/safety` | safety:manage | `SafetyPolicy` |
-| POST `/emergency-stop` | safety:stop | → `SafetyPolicy` (sets the flag, cancels running runs) |
-| POST `/emergency-stop/release` | safety:manage | → `SafetyPolicy` |
+| POST `/emergency-stop` | safety:stop | → `SafetyPolicy` (sets the flag; every running run stops at once and becomes `paused` with `pause_reason: "emergency_stop"`; new runs and resumes answer 409 `emergency_stop`) |
+| POST `/emergency-stop/release` | safety:manage | → `SafetyPolicy` (clears the flag; paused runs stay paused until someone calls `/runs/{id}/resume`) |
 | GET `/settings/defectdojo` · PUT · POST `/settings/defectdojo/test` | integrations:manage | `DefectDojoSettings` → `{ok, message, version}` |
 | GET `/healthz` | public | → `{status, version, db, tde}` |

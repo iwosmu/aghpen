@@ -467,6 +467,7 @@ type ObsFilter struct {
 	RunID      int64 // 0 = every run
 	LatestOnly bool  // only the newest observation of every service
 	ServiceID  int64
+	OpenOnly   bool // only services that are open now
 }
 
 // EachObservation streams stored observations, decrypted, without keeping them in memory.
@@ -478,6 +479,9 @@ func (s *Store) EachObservation(ctx context.Context, f ObsFilter, fn func(*Obser
 	if f.ServiceID != 0 {
 		w.add("o.service_id = ?", f.ServiceID)
 	}
+	if f.OpenOnly {
+		w.add("s.state = 'open'")
+	}
 	sql := "SELECT " + obsCols + " FROM " + obsFrom + w.sql() + " ORDER BY o.service_id, o.at DESC, o.id DESC"
 	if f.LatestOnly {
 		sql = "SELECT DISTINCT ON (o.service_id) " + obsCols + " FROM " + obsFrom + w.sql() + " ORDER BY o.service_id, o.at DESC, o.id DESC"
@@ -488,55 +492,6 @@ func (s *Store) EachObservation(ctx context.Context, f ObsFilter, fn func(*Obser
 		}
 		return fn(o)
 	})
-}
-
-// EachRunResult rebuilds the HostResult records of one run from the stored
-// observations and streams them in address order (for exports).
-func (s *Store) EachRunResult(ctx context.Context, runID int64, fn func(*model.HostResult) error) error {
-	type hostRow struct {
-		HostID int64 `json:"host_id"`
-		model.HostResult
-	}
-	const batch = 500
-	lastID := int64(0)
-	for {
-		hosts, err := jsonRows[hostRow](ctx, s.db, wrapJSON(`SELECT DISTINCT ON (h.id) h.id AS host_id, o.run_id, host(h.ip) AS ip, h.hostnames, o.up, o.reason, o.rtt_ms,
-			o.attempts, h.mac, h.vendor, h.os_guess, o.at AS observed_at
-			FROM host_observations o JOIN hosts h ON h.id = o.host_id WHERE o.run_id = $1 AND h.id > $2 ORDER BY h.id, o.at DESC LIMIT `+itoa(batch)), runID, lastID)
-		if err != nil {
-			return err
-		}
-		if len(hosts) == 0 {
-			return nil
-		}
-		ids := make([]int64, len(hosts))
-		byHost := map[int64][]model.ServiceResult{}
-		for i, h := range hosts {
-			ids[i] = h.HostID
-		}
-		w := &where{}
-		w.add("o.run_id = ?", runID)
-		w.add("o.host_id = ANY(?)", ids)
-		err = eachJSON(ctx, s.db, wrapJSON("SELECT DISTINCT ON (o.service_id) "+obsCols+" FROM "+obsFrom+w.sql()+" ORDER BY o.service_id, o.at DESC"), w.args, func(o *ObservationRow) error {
-			if err := s.postObs(o); err != nil {
-				return err
-			}
-			byHost[o.HostID] = append(byHost[o.HostID], o.Result)
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-		for i := range hosts {
-			h := hosts[i].HostResult
-			h.Services = nonNil(byHost[hosts[i].HostID])
-			h.Hostnames = nonNil(h.Hostnames)
-			if err := fn(&h); err != nil {
-				return err
-			}
-		}
-		lastID = ids[len(ids)-1]
-	}
 }
 
 // ---------- groups, technologies, tags ----------
