@@ -221,7 +221,7 @@ func TestEvidenceNamesMatchedFields(t *testing.T) {
 	}
 	r := mustParse(t, "id: adm\nseverity: high\nremediation: Zamknij.\nmatch: {class: admin-panel}")
 	f := v.Finding(r, 42, now)
-	if f.Type != FindingType || f.Key != v.Key || f.LastRunID != 42 || f.Signature != "policy:adm" || !strings.Contains(f.Description, "Zamknij.") || f.Interest < 80 {
+	if f.Type != FindingType || f.Key != v.Key || f.LastRunID != 42 || f.Signature != "policy:adm" || !strings.Contains(f.Description, "Zamknij.") || f.Interest < 60 || f.Interest >= 75 {
 		t.Fatalf("bad finding: %+v", f)
 	}
 }
@@ -287,5 +287,18 @@ func TestDryRunMessage(t *testing.T) {
 		if got := DryRunMessage(r, n, 10, 20); !strings.Contains(got, "zgłosiłaby dziś "+want) {
 			t.Errorf("%d: %s", n, got)
 		}
+	}
+}
+
+// A policy finding ranks below the engine's finding about the same fact
+// (admin panel: 75), whatever the service's own interest.
+func TestPolicyInterestStaysUnderTheEngineFinding(t *testing.T) {
+	for _, sev := range []model.Severity{model.SevHigh, model.SevMedium, model.SevLow, model.SevInfo} {
+		if got := sevInterest(sev) + 99/10; got >= 75 {
+			t.Errorf("%s: %d", sev, got)
+		}
+	}
+	if sevInterest(model.SevHigh) <= sevInterest(model.SevMedium) || sevInterest(model.SevMedium) <= sevInterest(model.SevLow) {
+		t.Error("severity order lost")
 	}
 }
