@@ -33,12 +33,28 @@ docker rm -f czsb-toxi >/dev/null 2>&1
 docker run -d --name czsb-toxi --network czujka-lab --ip "$TOXI" ghcr.io/shopify/toxiproxy:2.12.0 >/dev/null 2>&1; docker start czsb-toxi >/dev/null 2>&1
 sleep 3
 T() { docker exec czsb-toxi /toxiproxy-cli "$@" >/dev/null; }
-for p in 18000 18001 18002 18003 18004; do T create -l 0.0.0.0:$p -u $HOST:80 p$p; done
+for p in 18000 18001 18002 18003 18004 18005; do T create -l 0.0.0.0:$p -u $HOST:80 p$p; done
 T toxic add -t latency -a latency=500 -a jitter=100 p18001
 T toxic add -t bandwidth -a rate=12 p18002
 T toxic add -t timeout -a timeout=0 p18003
 T toxic add -t slow_close -a delay=5000 p18004
+T toxic add -t timeout -a timeout=1000 p18005
 docker exec czsb-toxi /toxiproxy-cli list | tee "$OUT/toxics.txt"
+# the template's modern-proxy shape: Traefik v3.1 (web :80 to toxiproxy 18005 with a
+# 1 s timeout toxic, insecure API :8080), at TRAEFIK (10.66.251.21)
+TRAEFIK=10.66.251.21
+mkdir -p "$OUT/traefik"
+cat > "$OUT/traefik/route.yml" <<EOF
+http:
+  routers:
+    site: {entryPoints: [web], rule: "PathPrefix(\`/\`)", service: site}
+  services:
+    site: {loadBalancer: {servers: [{url: "http://$TOXI:18005"}]}}
+EOF
+docker rm -f czsb-traefik >/dev/null 2>&1
+docker run -d --name czsb-traefik --network czujka-lab --ip $TRAEFIK -v "$PWD/$OUT/traefik:/etc/traefik/dynamic:ro" traefik:v3.1 \
+  --api.dashboard=true --api.insecure=true --providers.file.directory=/etc/traefik/dynamic --entrypoints.web.address=:80 >/dev/null 2>&1
+docker start czsb-traefik >/dev/null 2>&1
 
 # ---- product ----
 export CZUJKA_PORT=$PORT CZUJKA_ADMIN_EMAIL=$ADMIN CZUJKA_ADMIN_PASSWORD=$ADMIN_PW CZUJKA_SCHED_INTERVAL=10s CZUJKA_TZ=Europe/Warsaw
@@ -48,9 +64,9 @@ $DC down -v --remove-orphans >/dev/null 2>&1
 $DC up -d --wait > "$OUT/compose.log" 2>&1 || { tail -20 "$OUT/compose.log"; exit 1; }
 CSRF=$(curl -sS -c "$JAR" -H "Content-Type: application/json" -d "{\"email\":\"$ADMIN\",\"password\":\"$ADMIN_PW\"}" $API/auth/login | jq -r .csrf_token)
 SCOPE=$(api POST /scopes '{"name":"toxiproxy","criticality":3}' | jq -r .id)
-api POST /scopes/$SCOPE/targets "{\"text\":\"$TOXI\"}" >/dev/null
+api POST /scopes/$SCOPE/targets "{\"text\":\"$TOXI\n$TRAEFIK\"}" >/dev/null
 DEF=$(api GET "/profiles?limit=50" | jq -c '[.items[]][0] | del(.id, .created_at, .updated_at, .last_run_id, .next_run_at)')
-PROF=$(echo "$DEF" | jq -c --argjson s "$SCOPE" '.name="toxiproxy" | .ports="18000-18004" | .scope_ids=[$s] | .udp.enabled=false | .schedule.enabled=false')
+PROF=$(echo "$DEF" | jq -c --argjson s "$SCOPE" '.name="toxiproxy" | .ports="80,8080,18000-18005" | .scope_ids=[$s] | .udp.enabled=false | .schedule.enabled=false')
 PID=$(api POST /profiles "$PROF" | jq -r .id)
 for n in 1 2; do
   T0=$(date +%s)
@@ -62,15 +78,17 @@ for n in 1 2; do
   log "run $n ($RUN): $ST in $(cat "$OUT/wall-$n.txt") s"
 done
 {
-echo "| port | toxic | stan | nazwa | response_ms (1) | response_ms (2) |"
-echo "| --- | --- | --- | --- | --- | --- |"
-for p in 18000 18001 18002 18003 18004; do
-  case $p in 18000) t="brak" ;; 18001) t="opóźnienie 500 ms ± 100 ms" ;; 18002) t="przepustowość 12 KB/s" ;; 18003) t="timeout (brak danych)" ;; 18004) t="wolne zamknięcie 5 s" ;; esac
-  a=$(jq -r --argjson p $p '[.items[] | select(.port == $p)][0] | "\(.state // "–") | \(.name // "–") | \(.response_ms // .http.response_ms // "–")"' "$OUT/services-1.json")
-  b=$(jq -r --argjson p $p '[.items[] | select(.port == $p)][0] | "\(.response_ms // .http.response_ms // "–")"' "$OUT/services-2.json")
-  echo "| $p | $t | $a | $b |"
+echo "| port | toxic | stan | nazwa | HTTP | technologie | response_ms (1) | response_ms (2) |"
+echo "| --- | --- | --- | --- | --- | --- | --- | --- |"
+for hp in $TOXI:18000 $TOXI:18001 $TOXI:18002 $TOXI:18003 $TOXI:18004 $TOXI:18005 $TRAEFIK:80 $TRAEFIK:8080; do
+  ip=${hp%:*} p=${hp#*:}
+  case $hp in *:18000) t="brak" ;; *:18001) t="opóźnienie 500 ms ± 100 ms" ;; *:18002) t="przepustowość 12 KB/s" ;; *:18003) t="timeout (brak danych)" ;; *:18004) t="wolne zamknięcie 5 s" ;; *:18005) t="timeout 1 s" ;; *:80) t="Traefik → timeout 1 s" ;; *:8080) t="Traefik API" ;; esac
+  q='[.items[] | select(.port == $p and ((.ip // .host_ip // $ip) == $ip))][0]'
+  a=$(jq -r --argjson p $p --arg ip $ip "$q"' | "\(.state // "–") | \(.name // "–") | \(.http_status // .http.status // "–") | \([.technologies[]?.name] | join(",")) | \(.response_ms // .http.response_ms // "–")"' "$OUT/services-1.json")
+  b=$(jq -r --argjson p $p --arg ip $ip "$q"' | "\(.response_ms // .http.response_ms // "–")"' "$OUT/services-2.json")
+  echo "| $hp | $t | $a | $b |"
 done
 echo
 echo "czas przebiegu: $(cat "$OUT/wall-1.txt") s i $(cat "$OUT/wall-2.txt") s; usługi: $(jq .stats.services_open "$OUT/run-1.json") i $(jq .stats.services_open "$OUT/run-2.json"); zmiany w 2. przebiegu: $(api GET "/changes?run_id=$RUN&limit=50" | jq -c '[.items[]? | .type] ')"
 } | tee "$OUT/table.md"
-[ "${TB_KEEP:-0}" = 1 ] || { $DC down -v --remove-orphans >/dev/null 2>&1; docker rm -f czsb-toxi >/dev/null 2>&1; }
+[ "${TB_KEEP:-0}" = 1 ] || { $DC down -v --remove-orphans >/dev/null 2>&1; docker rm -f czsb-toxi czsb-traefik >/dev/null 2>&1; }

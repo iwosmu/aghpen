@@ -668,6 +668,18 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 	}
 	if fullRange {
 		est.FullRangeMaxHosts = fullRangeMaxHosts
+		est.FullRangeMaxAddresses = fullRangeMaxAddresses
+		if all, err := probe.EffectivePorts("1-65535", plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil {
+			first, _ := probe.EffectivePorts(plan.Profile.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts)
+			if first != nil && first.Count() >= 65535 { // 1-65535: the top ports go first
+				first, _ = probe.EffectivePorts("top-1000", plan.Policy.AllowedPorts, plan.Policy.DeniedPorts)
+			}
+			if first != nil {
+				all.Remove(first)
+			}
+			est.FullRangePorts = all.Count()
+			est.EstFullRangeSecPerHost = math.Round(float64(est.FullRangePorts)/(float64(lim.ProbePPS())*0.9)*10) / 10
+		}
 	}
 	disc := probe.NormalizeDiscovery(plan.Profile.Discovery)
 	privileged := e.Prober().Privileged()

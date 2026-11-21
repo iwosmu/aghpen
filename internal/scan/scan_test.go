@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net"
 	"reflect"
 	"sort"
@@ -1084,7 +1085,8 @@ func TestEstimateCountsTheFullRange(t *testing.T) {
 	plan := basePlan("10.7.0.5")
 	plan.Profile.Ports = "top-1000"
 	est := e.Estimate(plan)
-	if est.FullRangeMaxHosts != fullRangeMaxHosts || est.EstPackets < 64000 || est.EstDurationSec < 60 {
+	if est.FullRangeMaxHosts != fullRangeMaxHosts || est.EstPackets < 64000 || est.EstDurationSec < 60 ||
+		est.FullRangeMaxAddresses != 256 || est.FullRangePorts != 64535 || math.Abs(est.EstFullRangeSecPerHost-64535/(float64(EffectiveLimits(plan.Profile, plan.Policy).ProbePPS())*0.9)) > 0.1 {
 		t.Errorf("one host with top-1000: %+v", est)
 	}
 	plan.Profile.Ports = "22,80,443"

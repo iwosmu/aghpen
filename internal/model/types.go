@@ -326,6 +326,13 @@ type ScanEstimate struct {
 	// list, up to this many live hosts also get the rest of 1-65535 (counted
 	// in the packets and the duration).
 	FullRangeMaxHosts int `json:"full_range_max_hosts,omitempty"`
+	// FullRangeMaxAddresses is the scope size up to which the second pass
+	// applies; FullRangePorts the ports per host it scans (policy applied);
+	// EstFullRangeSecPerHost its seconds for one live host at this profile's
+	// effective rate (the pass gets 90 % of it). Set with FullRangeMaxHosts.
+	FullRangeMaxAddresses  int     `json:"full_range_max_addresses,omitempty"`
+	FullRangePorts         int     `json:"full_range_ports,omitempty"`
+	EstFullRangeSecPerHost float64 `json:"est_full_range_sec_per_host,omitempty"`
 }
 
 // ---------- Scan runs ----------
