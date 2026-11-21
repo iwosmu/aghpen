@@ -4,7 +4,7 @@ Skrót dla jury. Każde wymaganie z `docs/PROBLEM_DEFINITION.md`, każdy z 12 pu
 
 | | |
 | --- | --- |
-| Stan na | 2026-11-21, gałąź `iwosmu/agh-orchestrated-kickoff`, kod z commitu `f7d69c9` |
+| Stan na | 2026-11-21, gałąź `iwosmu/agh-orchestrated-kickoff`, kod z commitu `aa386fd` |
 | Metoda | czytanie kodu i tras API (`internal/api/server.go`, `internal/wire/wire.go`, `cmd/czujka/reprobe.go`), nazwy testów w kodzie, zapis testu e2e `e2e/full/transcript.txt` (52 z 52), raport interfejsu na laboratorium `web/REPORT-LAB.md` i zrzuty `web/screenshots/lab/` |
 | Nie jest źródłem | poprzednia wersja tego pliku; każdy status sprawdzono od nowa |
 | Publiczna instancja | `https://czujka.dev` z laboratorium 70 hostów; konto do odczytu dla jury: dane logowania w zgłoszeniu |
@@ -15,9 +15,9 @@ Numery zrzutów (`40`, `47` …) to pliki w `web/screenshots/lab/`. „Krok N”
 
 | Status | Znaczenie | Wierszy |
 | --- | --- | --- |
-| **udowodnione** | Działa w produkcie. Dowód z działającego produktu: zapis testu e2e, raport z laboratorium, zrzut na prawdziwych danych albo test integracyjny przez REST API na PostgreSQL z `pg_tde`. | 69 |
-| **gotowe** | Działa w produkcie i ma testy, ale brak zapisu przebiegu na prawdziwych danych albo dowód jest do powtórzenia. | 17 |
-| **częściowe** | Działa tylko część wymagania albo brakuje pomiaru, o który pyta wymaganie. | 10 |
+| **udowodnione** | Działa w produkcie. Dowód z działającego produktu: zapis testu e2e, raport z laboratorium, zrzut na prawdziwych danych albo test integracyjny przez REST API na PostgreSQL z `pg_tde`. | 74 |
+| **gotowe** | Działa w produkcie i ma testy, ale brak zapisu przebiegu na prawdziwych danych albo dowód jest do powtórzenia. | 13 |
+| **częściowe** | Działa tylko część wymagania albo brakuje pomiaru, o który pyta wymaganie. | 9 |
 | **brak** | Nie ma tego w kodzie. | 0 |
 
 Razem 96 wierszy.
@@ -61,7 +61,7 @@ Razem 96 wierszy.
 | 14 | Edycja niezależna od stanu skanu, zachowana przy kolejnych skanach | Edycja pola skanera zapisuje nadpisanie z wartością skanera obok; pola analityka nigdy nie są nadpisywane; edycja działa także w trakcie przebiegu. Przebieg ma edytowalną notatkę i etykietę. | szczegóły hosta i usługi (ołówek przy polu), „Znaleziska” | e2e: notatka i tagi usługi oraz akceptacja znaleziska przetrwały drugi skan (krok 11); `TestEditsSurviveScans`; notatka przebiegu: `web/REPORT-LAB.md` §3 | **udowodnione** |
 | 15 | Czytelny interfejs dla każdej roli i główny dashboard | Pulpit zaczyna się zdaniem „co się zmieniło od ostatniego skanu”, potem liczby, trwający skan, listy. Polski i angielski, motyw ciemny i jasny, telefon i komputer; kontrolki niedostępne dla roli nie są rysowane. | „Pulpit” | zrzuty `40`–`47` na danych laboratorium /16 (`web/REPORT-LAB.md` §6) | **udowodnione** |
 | 16 | Szyfrowanie w spoczynku dla pól wrażliwych | Warstwa 1: PostgreSQL 17 z `pg_tde`, wszystkie tabele i WAL. Warstwa 2: AES-256-GCM dla klucza API DefectDojo, wartości ciasteczek, fragmentów treści, dowodów, notatek; rotacja klucza. | `/healthz` → `"tde":true` | e2e: `"tde":true` (krok 2); `TestMigrateIsIdempotentAndTablesAreEncrypted`, `TestIngestInventoryAndFieldEncryption`, `TestKeyRotation` | **udowodnione** |
-| 16a | – kopia zapasowa | Zrzut `pg_dump` jest jawny poza kolumnami warstwy 2; trzeba go szyfrować osobno. | `docs/WDROZENIE.md` §6 | `docs/BEZPIECZENSTWO.md` §3 | **częściowe** |
+| 16a | – kopia zapasowa | `czujka backup` zapisuje `pg_dump` w jednym archiwum szyfrowanym AES-256-GCM kluczem pochodnym od klucza głównego; zmienione albo ucięte archiwum się nie otwiera. `czujka restore` odmawia innego klucza i sprawdza liczby wierszy, klucz i `pg_tde`. | `docker compose -f deploy/docker-compose.yml exec czujka czujka backup` | `cmd/czujka/backup.go`; `deploy/e2e/backup-restore.sh` (dwa czyste stosy, dane A odtworzone w B; 11 kontroli według commitu `692f8da`, przebiegu nie powtórzyłem) | **gotowe** |
 
 ## 2. Akapit o module sygnatur
 
@@ -114,16 +114,16 @@ Razem 96 wierszy.
 | harmonogram cyklicznych skanów | rozdz. 3 | „Profile skanów” | `web/REPORT-LAB.md` §1 | **udowodnione** |
 | wykrywanie różnic zależnych od pory dnia | Histogram 168 godzin tygodnia na host i model Bayesa: brak w porze, w której host zwykle milczy, dostaje status `expected-offline` i nie trafia do alarmów. | szczegóły hosta: „Dostępność w tygodniu”, `p_alive` | `TestStabilityScenarios` (`docs/ALGORYTMY.md` §2.6); e2e: `host_unstable` zamiast „zniknął” (krok 11); rytm na prawdziwym zegarze laboratorium czeka na `lab/story.sh` | **gotowe** |
 | ocena „ciekawości” | Punkty 0–100, zawsze z listą powodów. | „Usługi” → „Dlaczego ciekawa” | e2e: `interest=98 why=signature+40 staging+20 …` (krok 7); zrzut `44` | **udowodnione** |
-| powtarzanie pomiarów dla hostów niestabilnych | W przebiegu: dodatkowe próby znanego hosta. Po przebiegu: plan ponownych sprawdzeń jednego adresu po 10, 30, 90 min albo w godzinie, w której model spodziewa się odpowiedzi; budżet 200 adresów na godzinę; domyślnie wyłączony. | „Pulpit” i szczegóły hosta: „Plan ponownych sprawdzeń” | e2e: przebieg 2 `retried: 1` (krok 11); `internal/reprobe` (`reprobe_integration_test.go`); sprawdzenie „host_gone przez ponowne sprawdzenia” w `e2e/full/run.sh` krok 11b, zapis przebiegu w toku | **gotowe** |
+| powtarzanie pomiarów dla hostów niestabilnych | W przebiegu: dodatkowe próby znanego hosta. Po przebiegu: plan ponownych sprawdzeń jednego adresu po 10, 30, 90 min albo w godzinie, w której model spodziewa się odpowiedzi; budżet 200 adresów na godzinę; domyślnie wyłączony. | „Pulpit” i szczegóły hosta: „Plan ponownych sprawdzeń” | e2e: przebieg 2 `retried: 1` (krok 11); `internal/reprobe` (`reprobe_integration_test.go`); sprawdzenie „host_gone przez ponowne sprawdzenia” w `e2e/full/run.sh` krok 11b, zapis przebiegu w toku; zrzuty `96`, `97` na laboratorium (plan dla hosta niestabilnego 10.66.70.20) | **udowodnione** |
 | moduł HTTP/HTTPS fingerprinting | wiersze 5a–5f | szczegóły usługi | wiersze 5a–5f | **udowodnione** |
 | proste wykrywanie CMS-ów lub technologii | wiersz 6 | „Usługi” | wiersz 6 | **udowodnione** |
 | grupowanie podobnych usług | Klucz grupy z ikony, szablonu tytułu, technologii, nazw nagłówków i skrótu treści. | `GET /service-groups`; „Usługi” | testy `internal/analyze` (`group.go`) | **gotowe** |
 | obsługa tagów | Tagi na celach, hostach, usługach, znaleziskach; filtr; `GET /tags`. | pole „Tagi” w szczegółach | e2e: tag `e2e` na usłudze przetrwał skan (krok 11) | **udowodnione** |
 | eksport wybranych obserwacji do DefectDojo | rozdz. 3, wiersz „Narzędzia integrujące się z DefectDojo” | „Znaleziska” → zaznacz → „Eksport do DefectDojo” | jak w rozdz. 3 | **częściowe** |
-| wizualizacja zmian w czasie | Mapa cieplna tygodnia, pasma życia hosta i usług, historia pól usługi, wehikuł czasu (suwak przebiegów), trend na pulpicie, mapa adresów. | szczegóły hosta i usługi; „Wehikuł czasu” | `internal/timeline` (`history_integration_test.go`); sprawdzenia wehikułu w `e2e/full/run.sh` krok 11b; zrzuty wehikułu na danych laboratorium w toku | **gotowe** |
+| wizualizacja zmian w czasie | Mapa cieplna tygodnia, pasma życia hosta i usług, historia pól usługi, wehikuł czasu (suwak przebiegów), trend na pulpicie, mapa adresów. | szczegóły hosta i usługi; „Wehikuł czasu” | `internal/timeline` (`history_integration_test.go`); sprawdzenia wehikułu w `e2e/full/run.sh` krok 11b; zrzuty `90`, `91`, `92`, `95` na danych laboratorium /16 | **udowodnione** |
 | integracja z pasywnymi źródłami danych | Pliki (CSV, JSON, JSON Lines, strefa DNS), odwrotny DNS, crt.sh (domyślnie wyłączone). | „Import / eksport” → źródła pasywne | e2e krok 15; zrzuty `52`–`54` | **udowodnione** |
-| (własne) reguły ekspozycji | Reguły w YAML: czego w sieci być nie może albo co musi być; sprawdzane po każdym skanie i imporcie, bez pakietów; 14 reguł startowych. | „Reguły ekspozycji”; znaleziska `policy-violation` | `internal/rules` (`rules_integration_test.go`); próba na sucho 55 ms na 2000 hostach (`docs/REGULY.md` §7); sprawdzenia w `e2e/full/run.sh` krok 11b | **gotowe** |
-| (własne) sygnatura z przykładu | Usługa → rzadkie i stałe cechy → walidator → retro-hunt. | usługa → „Zaproponuj sygnaturę” | `internal/sigsuggest` (`proof_integration_test.go`); przykład InfoKiosk w `docs/REGULY.md` §10 | **gotowe** |
+| (własne) reguły ekspozycji | Reguły w YAML: czego w sieci być nie może albo co musi być; sprawdzane po każdym skanie i imporcie, bez pakietów; 14 reguł startowych. | „Reguły ekspozycji”; znaleziska `policy-violation` | `internal/rules` (`rules_integration_test.go`); próba na sucho 55 ms na 2000 hostach (`docs/REGULY.md` §7); sprawdzenia w `e2e/full/run.sh` krok 11b; zrzut `93`: reguła startowa zgłasza 11 naruszeń na 76 hostach i 117 usługach laboratorium | **udowodnione** |
+| (własne) sygnatura z przykładu | Usługa → rzadkie i stałe cechy → walidator → retro-hunt. | usługa → „Zaproponuj sygnaturę” | `internal/sigsuggest` (`proof_integration_test.go`); przykład InfoKiosk w `docs/REGULY.md` §10; zrzut `94`: sygnatura z 10.66.1.10:80 pasuje do przykładu i do żadnej z 116 innych usług | **udowodnione** |
 
 ## 6. Wymagania formalne i techniczne
 
@@ -131,7 +131,7 @@ Razem 96 wierszy.
 | --- | --- | --- | --- |
 | Repozytorium kodu źródłowego | to repozytorium; `go build ./...` przechodzi | `README.md` | **udowodnione** |
 | Dokumentacja techniczna | spis w `docs/DOKUMENTACJA.md`; wdrożenie, bezpieczeństwo, algorytmy, sygnatury, reguły, integracje, API | `docs/` | **gotowe** |
-| Prezentacja do 10 slajdów | 10 slajdów, PDF i HTML. 5 miejsc czeka na pomiary i zrzuty (`DO UZUPEŁNIENIA`). | `docs/slides/czujka.pdf` | **częściowe** |
+| Prezentacja do 10 slajdów | 10 slajdów, PDF i HTML, zrzuty z laboratorium. 2 miejsca czekają na pomiary (`DO UZUPEŁNIENIA`): pakiety po stopie awaryjnym, precyzja i czułość. | `docs/slides/czujka.pdf` | **częściowe** |
 | Działające demo, lokalnie lub w środowisku testowym | Stos startuje jednym poleceniem; laboratorium 70 hostów lokalnie; publiczna instancja `https://czujka.dev` z laboratorium i zaplanowanym skanem. Scenariusz i lista ujęć: `docs/DEMO.md`. Nagranie jeszcze nie powstało. | `docs/DEMO.md`; `https://czujka.dev` | **gotowe** |
 | Technologie bezpłatne i open-source | Go, PostgreSQL (Percona z `pg_tde`), nmap, chi, pgx, React, Vite. Bez płatnych API. | `go.mod`, `web/package.json` | **udowodnione** |
 | Język o niskim zużyciu zasobów | Go; obraz 107 MB (`docker images`, 2026-11-21); najwyżej 99,9 MiB pamięci kontenera w czasie skanów | `e2e/full/transcript.txt` krok 18 | **udowodnione** |
@@ -158,11 +158,11 @@ Razem 96 wierszy.
 | Waga | Kryterium | Stan | Status |
 | --- | --- | --- | --- |
 | 30% | Skuteczność discovery i identyfikacji usług w dużej infrastrukturze | /16 (65 535 adresów) w 7 min 24 s przy limicie 2000 pps; 66 aktywnych hostów, 71 usług. Brak liczb precyzji i czułości (`docs/WYNIKI.md` w toku). | **częściowe** |
-| 15% | Zmiany w czasie, niestabilne hosty, raportowanie | Zmiany i porównanie udowodnione w e2e. Model rytmu, ponowne sprawdzenia, wehikuł czasu i reguły: gotowe z testami; zapis przebiegu e2e i zrzuty w toku. | **gotowe** |
-| 20% | Jakość techniczna, dokumentacja, prezentacja, uruchomienie, import/eksport, DefectDojo | Jedno polecenie; e2e 52 z 52; czujka.dev działa; import i eksport udowodnione; prezentacja z 5 miejscami do uzupełnienia; wysyłka do żywego DefectDojo z produktu bez zapisu. | **gotowe** |
+| 15% | Zmiany w czasie, niestabilne hosty, raportowanie | Zmiany i porównanie udowodnione w e2e. Ponowne sprawdzenia, wehikuł czasu i reguły udowodnione zrzutami na laboratorium (`90`–`97`). Model rytmu: testy i scenariusze w `docs/ALGORYTMY.md` §2.6. | **udowodnione** |
+| 20% | Jakość techniczna, dokumentacja, prezentacja, uruchomienie, import/eksport, DefectDojo | Jedno polecenie; e2e 52 z 52; czujka.dev działa; import i eksport udowodnione; prezentacja z 2 miejscami do uzupełnienia; wysyłka do żywego DefectDojo z produktu bez zapisu. | **gotowe** |
 | 15% | Bezpieczeństwo, kontrola intensywności, przejrzystość dashboardu | Mechanizmy udowodnione (krok 14, 16, 17); pulpit na danych laboratorium. Liczby pakietów do ponownego pomiaru. | **gotowe** |
 | 10% | Fingerprinting, technologie, CMS, nagłówki, ciasteczka, sygnatury | 386 sygnatur, wersje z dowodami, własne sygnatury i sygnatura z przykładu. | **udowodnione** |
-| 10% | Role i zabezpieczenie danych | 4 role i własne role, 22 uprawnienia, `pg_tde` i AES-256-GCM, audyt. Kopia `pg_dump` wymaga osobnego szyfrowania. | **udowodnione** |
+| 10% | Role i zabezpieczenie danych | 4 role i własne role, 22 uprawnienia, `pg_tde` i AES-256-GCM, audyt. Kopia zapasowa szyfrowana (`czujka backup`). | **udowodnione** |
 
 ## 9. Jak powtórzyć sprawdzenie
 

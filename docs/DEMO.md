@@ -259,7 +259,7 @@ Skrypt `lab/story.sh` pisze zespół dokładności: zaplanowana seria prawdziwyc
 | hosta, który milknie poza swoim rytmem | 5 | plan ponownych sprawdzeń i zmiana `host_gone` po krokach `[10, 30, 90]` min |
 | przejścia `t0` → `t1` między dwoma skanami | 4, 6, 7 | zmiany, dwa punkty na suwaku wehikułu, `shadow-adminer` dla reguły |
 | kiosków `kiosk-1` i `kiosk-2` w obu stanach | 8 | „Zaproponuj sygnaturę” potrzebuje przykładu i podobnej instancji |
-| stanu końcowego zapisanego w wolumenie bazy | wszystkie | pokaz nie może czekać godzinami: kopia `pg_dump` z `docs/WDROZENIE.md` §6 przed wyjazdem |
+| stanu końcowego zapisanego w wolumenie bazy | wszystkie | pokaz nie może czekać godzinami: archiwum `czujka backup` (szyfrowane) przed wyjazdem, na miejscu `czujka restore` |
 
 ### 3.4 Reset
 

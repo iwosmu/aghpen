@@ -225,8 +225,11 @@ table.cmp td.them { color: var(--ink-2); }
       </div>
       <div class="col" style="flex:1;">
         <h2>Wehikuł czasu</h2>
-        <div class="slot" style="height:420px;">DO UZUPEŁNIENIA: zrzut ekranu wehikułu czasu (/time) na danych z laboratorium</div>
-        <p style="color:var(--ink-2); font-size:26px; margin-top:16px;">Sieć taka, jaka była w dowolnym przebiegu.</p>
+        <!-- Screenshot: web/screenshots/lab/90-time-machine-latest.png (time machine on the lab, run #44). -->
+        <div class="shot" style="--x:237; --y:150; --z:0.82; width:464px; height:330px;">
+          <img src="../../web/screenshots/lab/90-time-machine-latest.png" alt="Wehikuł czasu: suwak przebiegów i stan sieci w wybranym przebiegu">
+        </div>
+        <p style="color:var(--ink-2); font-size:26px; margin-top:16px;">Sieć taka, jaka była w dowolnym przebiegu, i różnica do dziś.</p>
       </div>
     </div>
   </div>
@@ -249,8 +252,11 @@ table.cmp td.them { color: var(--ink-2); }
 <span class="k">match:</span>
   <span class="k">class:</span> admin-panel
 <span class="k">expect:</span> absent</pre>
-        <p style="color:var(--ink-2); font-size:26px; margin-top:16px;">Sprawdzana po każdym skanie i imporcie, bez pakietów. Próba na sucho: 55 ms na 2 000 hostach. 14 reguł startowych.</p>
-        <div class="slot" style="height:150px; margin-top:20px;">DO UZUPEŁNIENIA: zrzut ekranu reguł (/rules) z naruszeniem z laboratorium</div>
+        <p style="color:var(--ink-2); font-size:26px; margin-top:16px;">Sprawdzana po każdym skanie i imporcie, bez pakietów. 14 reguł startowych. W laboratorium jedna z nich zgłasza 11 paneli poza siecią zarządzania.</p>
+        <!-- Screenshot: web/screenshots/lab/93-rule-dry-run.png (starter rule on the lab: 11 violations, 76 hosts, 117 services). -->
+        <div class="shot" style="--x:652; --y:488; --z:1.06; width:820px; height:150px; margin-top:20px;">
+          <img src="../../web/screenshots/lab/93-rule-dry-run.png" alt="Próba na sucho: reguła zgłosiłaby dziś 11 naruszeń">
+        </div>
       </div>
       <div class="col" style="flex:1;">
         <h2>Sygnatura z przykładu</h2>
@@ -258,7 +264,10 @@ table.cmp td.them { color: var(--ink-2); }
         <div class="shot" style="--x:876; --y:285; --z:1.2; width:652px; height:300px; margin-top:20px;">
           <img src="../../web/screenshots/lab/51-signature-retrohunt.png" alt="Test sygnatury na zapisanych wynikach: wysłano 0 pakietów">
         </div>
-        <div class="slot" style="height:150px; margin-top:20px;">DO UZUPEŁNIENIA: zrzut ekranu „Zaproponuj sygnaturę” na usłudze z laboratorium</div>
+        <!-- Screenshot: web/screenshots/lab/94-suggest-signature.png (signature from 10.66.1.10:80: matches the example and none of 116 other services). -->
+        <div class="shot" style="--x:362; --y:152; --z:1.1; width:790px; height:170px; margin-top:20px;">
+          <img src="../../web/screenshots/lab/94-suggest-signature.png" alt="Sygnatura z przykładu pasuje do przykładu i do żadnej innej z 116 usług">
+        </div>
       </div>
     </div>
   </div>
