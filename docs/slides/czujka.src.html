@@ -166,7 +166,7 @@ table.cmp td.them { color: var(--ink-2); }
         <div class="kv">
           <div style="grid-template-columns:1fr;"><span class="n">65 535</span><span class="t">adresów w laboratorium /16</span></div>
           <div style="grid-template-columns:1fr;"><span class="n">7 min 24 s</span><span class="t">cały przebieg: 66 hostów, 71 usług</span></div>
-          <div style="grid-template-columns:1fr;"><span class="n">1 091 pps</span><span class="t">średnio, przy limicie polityki 2 000</span></div>
+          <div style="grid-template-columns:1fr;"><span class="n">1 091 pps</span><span class="t">średnio według licznika Czujki, przy limicie polityki 2 000</span></div>
           <div style="grid-template-columns:1fr;"><span class="n">256 → 108</span><span class="t">bloków /24 w grupach roboczych; rozmiar grupy idzie za zmierzonym tempem</span></div>
         </div>
       </div>
@@ -285,7 +285,8 @@ table.cmp td.them { color: var(--ink-2); }
 </section></div>
 
 <!-- ============ 8. Safe by construction; roles and encryption ============ -->
-<!-- Emergency stop 0.06 s, 0 IP packets later than 1 s: e2e/full/transcript.txt section 17.
+<!-- Emergency stop: the API call took 0.06 s and no nmap process was alive 1 s later: e2e/full/transcript.txt section 17 (process evidence).
+     The packet counts of that transcript are unverified (tcpdump -Q out misses nmap's raw-socket packets): slot until re-measured.
      Unsafe signature rejected (POST, body): transcript section 14. Limits: docs/BEZPIECZENSTWO.md §1.2.
      Window pause and resume: transcript section 16. Roles and 22 permissions: internal/model/types.go, internal/auth/roles.go.
      Encryption: docs/BEZPIECZENSTWO.md §2.1–2.3 (pg_tde for tables and WAL, AES-256-GCM fields, key rotation). -->
@@ -294,13 +295,14 @@ table.cmp td.them { color: var(--ink-2); }
   <div class="body" style="top:250px;">
     <div class="row" style="gap:96px;">
       <div class="col" style="flex:1;">
-        <div style="display:flex; align-items:baseline; gap:24px;"><span class="big">0,06 s</span><span style="font-size:28px; color:var(--ink-2);">stop awaryjny; po 1 s zero pakietów IP</span></div>
+        <div style="display:flex; align-items:baseline; gap:24px;"><span class="big">0,06 s</span><span style="font-size:28px; color:var(--ink-2);">stop awaryjny; po 1 s żaden proces nmap</span></div>
         <ul class="list" style="margin-top:32px;">
           <li><svg width="26" height="26"><use href="#g-ok"/></svg><span>Tylko GET i HEAD. Bez logowania, ładunków i skryptów NSE.</span></li>
           <li><svg width="26" height="26"><use href="#g-ok"/></svg><span>Walidator odrzuca sygnaturę z POST, treścią żądania albo hasłem.</span></li>
           <li><svg width="26" height="26"><use href="#g-ok"/></svg><span>Limit polityki zawsze wygrywa z profilem: pakiety, HTTP, jeden host.</span></li>
           <li><svg width="26" height="26"><use href="#g-ok"/></svg><span>Okno czasowe się zamyka: skan staje i wraca w następnym oknie.</span></li>
         </ul>
+        <div class="slot" style="height:110px; margin-top:20px;">DO UZUPEŁNIENIA: pakiety po stopie awaryjnym (ponowny pomiar)</div>
       </div>
       <div class="col" style="flex:1;">
         <div style="display:flex; align-items:baseline; gap:24px;"><span class="big">4 role</span><span style="font-size:28px; color:var(--ink-2);">z treści zadania i własne, z 22 uprawnień</span></div>
@@ -321,7 +323,8 @@ table.cmp td.them { color: var(--ink-2); }
      Image 107 MB: docker images czujka:czfull (2026-11-21). Memory max 99.9 MiB: e2e/full/transcript.txt section 18.
      SecureCodeBox: https://www.securecodebox.io/docs/getting-started/installation, read 2026-11-21:
      "running on Kubernetes", supports the 4 latest Kubernetes releases (v1.34–v1.37), "you need Helm", operator in securecodebox-system,
-     bundled Garage S3 store "only for development, testing, and quickstart", one Helm chart per scanner, no web UI described. -->
+     bundled Garage S3 store "only for development, testing, and quickstart", one Helm chart per scanner, no web UI described.
+     czujka.dev: product stack built and healthy in 46 s on 4 vCPU / 8 GB (amd64); coordinator measurement 2026-11-21, not yet in a repository file. -->
 <div class="frame"><section class="slide" id="s9">
   <h1>W poniedziałek rano: jedno polecenie.</h1>
   <div class="body" style="top:230px;">
@@ -344,7 +347,7 @@ docker compose -f deploy/docker-compose.yml \
             <tr><th>Wymaga</th><td class="us">Docker z Compose</td><td class="them">Kubernetes (4 ostatnie wydania, v1.34–v1.37) i Helm</td></tr>
             <tr><th>Składniki</th><td class="us">2 kontenery: binarka Go i PostgreSQL</td><td class="them">operator, magazyn S3, osobny chart Helm na każdy skaner</td></tr>
             <tr><th>Wyniki</th><td class="us">baza z pg_tde, konsola WWW po polsku</td><td class="them">pliki w S3, bez własnego interfejsu</td></tr>
-            <tr><th>Zasoby</th><td class="us">obraz 107 MB, do 100 MiB RAM w skanie</td><td class="them">klaster Kubernetes</td></tr>
+            <tr><th>Zasoby</th><td class="us">obraz 107 MB; czujka.dev gotowa w 46 s na 4 vCPU</td><td class="them">klaster Kubernetes</td></tr>
           </tbody>
         </table>
         <p style="margin-top:20px; color:var(--ink-2); font-size:26px;">SecureCodeBox orkiestruje wiele skanerów (ZAP, nikto, trivy). Czujka robi jedno: discovery, które pamięta czas.</p>
@@ -356,7 +359,7 @@ docker compose -f deploy/docker-compose.yml \
 </section></div>
 
 <!-- ============ 10. Measured results and what comes next ============ -->
-<!-- 52/52: e2e/full/transcript.txt ("PASS: 52  FAIL: 0"). Retro-hunt 0 packets: transcript section 9.
+<!-- 52/52: e2e/full/transcript.txt ("PASS: 52  FAIL: 0"). czujka.dev 46 s and the read-only jury account: coordinator message 2026-11-21 (password only in the submission).
      19.9 s: web/REPORT-LAB.md §5. 99.9 MiB: transcript section 18.
      Accuracy (precision/recall on the 70-host lab) is pending in docs/WYNIKI.md (accuracy worker). IPv6: internal/targets/parse.go (single addresses only). -->
 <div class="frame"><section class="slide" id="s10">
@@ -366,11 +369,12 @@ docker compose -f deploy/docker-compose.yml \
       <div class="col" style="width:980px;">
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:0; border-top:1px solid var(--rule);">
           <div style="padding:24px 24px 24px 0; border-bottom:1px solid var(--rule);"><div class="n mono" style="font-size:56px; font-weight:500;">52 / 52</div><p style="color:var(--ink-2); font-size:26px;">kontroli e2e przez REST API, prawdziwe skany</p></div>
-          <div style="padding:24px 0 24px 24px; border-bottom:1px solid var(--rule); border-left:1px solid var(--rule);"><div class="n mono" style="font-size:56px; font-weight:500;">0 pakietów</div><p style="color:var(--ink-2); font-size:26px;">retro-hunt nowej sygnatury po historii</p></div>
+          <div style="padding:24px 0 24px 24px; border-bottom:1px solid var(--rule); border-left:1px solid var(--rule);"><div class="n mono" style="font-size:56px; font-weight:500;">46 s</div><p style="color:var(--ink-2); font-size:26px;">czujka.dev: od zera do działającego stosu</p></div>
           <div style="padding:24px 24px 24px 0; border-bottom:1px solid var(--rule);"><div class="n mono" style="font-size:56px; font-weight:500;">19,9 s</div><p style="color:var(--ink-2); font-size:26px;">od logowania do pierwszego skanu</p></div>
           <div style="padding:24px 0 24px 24px; border-bottom:1px solid var(--rule); border-left:1px solid var(--rule);"><div class="n mono" style="font-size:56px; font-weight:500;">99,9 MiB</div><p style="color:var(--ink-2); font-size:26px;">najwięcej RAM w czasie skanów</p></div>
         </div>
-        <div class="slot" style="height:190px; margin-top:28px;">DO UZUPEŁNIENIA: precyzja i czułość (hosty, usługi, technologie) na 70 hostach laboratorium, z docs/WYNIKI.md</div>
+        <p style="margin-top:24px; font-size:27px; color:var(--ink-2);">Działa publicznie: <span class="mono" style="color:var(--ink);">https://czujka.dev</span>, konto do odczytu dla jury (dane logowania w zgłoszeniu).</p>
+        <div class="slot" style="height:150px; margin-top:20px;">DO UZUPEŁNIENIA: precyzja i czułość (hosty, usługi, technologie) na 70 hostach laboratorium, z docs/WYNIKI.md</div>
       </div>
       <div class="col" style="flex:1;">
         <h2>Po hackathonie</h2>
