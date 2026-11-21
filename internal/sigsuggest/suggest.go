@@ -57,8 +57,12 @@ type Suggestion struct {
 	Candidates    int                       `json:"candidates"`
 	OthersHTTP    int                       `json:"others_http"`
 	OthersTLS     int                       `json:"others_tls"`
-	History       int                       `json:"history"` // observations of the example compared for stability
-	TookMs        int64                     `json:"took_ms"`
+	// LookAlikes counts other services that share at least half of the
+	// candidate features of the example: instances of the same product. They
+	// are what the signature is for, so they do not count against rarity.
+	LookAlikes int   `json:"look_alikes"`
+	History    int   `json:"history"` // observations of the example compared for stability
+	TookMs     int64 `json:"took_ms"`
 }
 
 // Suggester proposes signatures from stored observations.
@@ -79,6 +83,7 @@ type scored struct {
 	f      Feature
 	df     int
 	others int
+	look   int
 	weight float64
 }
 
@@ -138,12 +143,31 @@ func (s *Suggester) Suggest(ctx context.Context, serviceID int64) (Suggestion, e
 	// 3. Document frequency over the newest observation of every other
 	// service, one observation in memory at a time.
 	want := map[string]int{}
+	structural := map[string]bool{}
 	for _, f := range cands {
 		want[f.Key] = 0
+		if isStructural(f) {
+			structural[f.Key] = true
+		}
 	}
 	err := s.st.EachObservation(ctx, store.ObsFilter{LatestOnly: true}, func(o *store.ObservationRow) error {
 		if o.ServiceID == serviceID {
 			return nil
+		}
+		fs, _ := Extract(&o.Result)
+		var shared []string
+		sharedStruct := 0
+		for _, f := range fs {
+			if _, ok := want[f.Key]; ok {
+				shared = append(shared, f.Key)
+				if structural[f.Key] {
+					sharedStruct++
+				}
+			}
+		}
+		if len(structural) >= 2 && sharedStruct >= 2 && 2*sharedStruct >= len(structural) {
+			out.LookAlikes++
+			return ctx.Err()
 		}
 		if o.Result.HTTP != nil && o.Result.HTTP.Status != 0 {
 			out.OthersHTTP++
@@ -151,11 +175,8 @@ func (s *Suggester) Suggest(ctx context.Context, serviceID int64) (Suggestion, e
 		if o.Result.TLS != nil {
 			out.OthersTLS++
 		}
-		fs, _ := Extract(&o.Result)
-		for _, f := range fs {
-			if _, ok := want[f.Key]; ok {
-				want[f.Key]++
-			}
+		for _, k := range shared {
+			want[k]++
 		}
 		return ctx.Err()
 	})
@@ -187,7 +208,7 @@ func (s *Suggester) Suggest(ctx context.Context, serviceID int64) (Suggestion, e
 		if df > 0 {
 			w = f.Strength * 0.6
 		}
-		pool = append(pool, scored{f: f, df: df, others: others, weight: math.Round(w*20) / 20})
+		pool = append(pool, scored{f: f, df: df, others: others, look: out.LookAlikes, weight: math.Round(w*20) / 20})
 	}
 	sort.SliceStable(pool, func(i, j int) bool {
 		if pool[i].df != pool[j].df {
@@ -241,7 +262,7 @@ func (s *Suggester) Suggest(ctx context.Context, serviceID int64) (Suggestion, e
 	out.Slug, out.Name = slug, name
 	var b strings.Builder
 	fmt.Fprintf(&b, "id: %s\nname: %s\ncategory: %s\n", slug, q(name), category(&target.Result))
-	fmt.Fprintf(&b, "description: %s\n", q(fmt.Sprintf("Sygnatura zaproponowana z przykładu %s (%s). Cechy rzadkie w inwentarzu: %d z %d wybranych nie występuje w żadnej innej usłudze.",
+	fmt.Fprintf(&b, "description: %s\n", q(fmt.Sprintf("Sygnatura zaproponowana z przykładu %s (%s). %d z %d cech nie występuje w żadnej usłudze spoza grupy podobnych instancji.",
 		out.Target, nonEmpty(titleOf(&target.Result), "bez tytułu"), unique, len(chosen))))
 	b.WriteString("tags: [sugerowana]\ninterest: 20\n")
 	if cl := classesOf(&target.Result); len(cl) > 0 {
@@ -303,6 +324,8 @@ func (s *Suggester) Suggest(ctx context.Context, serviceID int64) (Suggestion, e
 	switch {
 	case !out.MatchesTarget:
 		out.Message = "Sygnatura nie pasuje do przykładu w retro-huncie (np. cecha leży poza zapisanym fragmentem treści). Nie zapisuj jej bez poprawki."
+	case out.OtherMatches == 0 && out.LookAlikes > 0:
+		out.Message = fmt.Sprintf("Sygnatura „%s” pasuje do przykładu i do żadnej innej z %d zapisanych usług, choć %d usług jest podobnych: sprawdź, czy reguły nie są zbyt wąskie.", name, res.Scanned-1, out.LookAlikes)
 	case out.OtherMatches == 0:
 		out.Message = fmt.Sprintf("Sygnatura „%s” pasuje do przykładu i do żadnej innej z %d zapisanych usług.", name, res.Scanned-1)
 	default:
@@ -313,10 +336,26 @@ func (s *Suggester) Suggest(ctx context.Context, serviceID int64) (Suggestion, e
 	return out, nil
 }
 
+// isStructural says whether a feature describes how the application is
+// built (favicon, custom headers, cookies, assets, markup) rather than a
+// value that many unrelated applications share (a web server name, a title).
+// Only structural features decide whether another service is a look-alike.
+func isStructural(f Feature) bool {
+	switch f.Kind {
+	case KindHeaderValue, KindTitle:
+		return false
+	case KindCookie:
+		return f.Strength >= 0.5
+	}
+	return true
+}
+
 func explain(c scored) string {
 	switch {
 	case c.others == 0:
 		return c.f.Label + ": brak innych usług do porównania, rzadkości nie da się zmierzyć"
+	case c.df == 0 && c.look > 0:
+		return fmt.Sprintf("%s występuje tylko w tej usłudze i w %d podobnych instancjach (0 z %d pozostałych usług)", c.f.Label, c.look, c.others)
 	case c.df == 0:
 		return fmt.Sprintf("%s występuje tylko w tej usłudze (0 z %d innych usług)", c.f.Label, c.others)
 	default:

@@ -88,7 +88,7 @@ func TestSuggestFromStoredInventory(t *testing.T) {
 	}
 	b, _ := json.MarshalIndent(res, "", "  ")
 	t.Logf("suggestion:\n%s", b)
-	if !res.OK || !res.MatchesTarget || res.OtherMatches != 1 || res.Slug != "infokiosk" || res.History != 1 {
+	if !res.OK || !res.MatchesTarget || res.OtherMatches != 1 || res.Slug != "infokiosk" || res.History != 1 || res.LookAlikes != 1 {
 		t.Fatalf("bad suggestion: ok=%v target=%v others=%d slug=%s history=%d msg=%s", res.OK, res.MatchesTarget, res.OtherMatches, res.Slug, res.History, res.Message)
 	}
 	if !strings.Contains(res.YAML, "X-InfoKiosk-Node") || !strings.Contains(res.YAML, "version:") || !res.Validation.OK {
@@ -98,7 +98,7 @@ func TestSuggestFromStoredInventory(t *testing.T) {
 		t.Fatalf("retro-hunt: %+v", res.RetroHunt)
 	}
 	for _, r := range res.Rules {
-		if r.DF > 1 || !strings.Contains(r.Explanation, "innych usług") {
+		if r.DF > 1 || !strings.Contains(r.Explanation, "podobnych instancjach") {
 			t.Fatalf("rule %+v", r)
 		}
 	}
