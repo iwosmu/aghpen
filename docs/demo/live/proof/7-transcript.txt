@@ -1,0 +1,20 @@
+$ docs/demo/live/live.sh 7
+[22:22:22] READY in 89 s. Open http://127.0.0.1:18730, log in as admin@czujka.local (password: live.sh pass).
+
+  Files to import: docs/demo/live/samples/ (on this laptop)
+
+  Next: Import -> results file, findings file; edit a finding; 'Uruchom skan' on 'Quickstart'
+$ import (same calls as the "Import / eksport" page): docs/demo/live/samples/wyniki-nmap.xml, docs/demo/live/samples/znaleziska-dojo-generic.json
+== import results (nmap XML)
+{"run_id":2,"hosts":4,"services":12,"changes":null,"warnings":null}
+== import findings (DefectDojo Generic Findings)
+{"format":"dojo-generic-json","findings":2,"skipped":0,"invalid":[],"created":2,"updated":0,"hosts_created":0,"run_id":null}
+$ edit a scanned finding and an imported finding, then a second scan (profile "Quickstart")
+engine finding 9, imported finding 5
+{"id":9,"status":"accepted","severity":"low","note":"Zaakceptowane: serwer testowy pracowni, do wyłączenia w grudniu."}
+{"id":5,"status":"new","severity":"low","note":"Obniżone: serwer tylko w sieci laboratorium.","assignee":"zespół bezpieczeństwa"}
+engine finding 9, imported finding 27
+{"id":27,"status":"new","severity":"low","note":"Obniżone: serwer tylko w sieci laboratorium.","assignee":"zespół bezpieczeństwa"}
+second scan: run 4 completed
+{"id":9,"title":"Domyślna strona serwera — 172.18.0.1:8787","status":"accepted","severity":"low","note":"Zaakceptowane: serwer testowy pracowni, do wyłączenia w grudniu.","last_seen_run":4}
+{"id":27,"title":"Test ręczny: brak nagłówka Content-Security-Policy na stronie domyślnej","status":"new","severity":"low","note":"Obniżone: serwer tylko w sieci laboratorium.","assignee":"zespół bezpieczeństwa"}
