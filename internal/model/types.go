@@ -170,6 +170,11 @@ type SafetyPolicy struct {
 	// scans must be inside one of them: a target outside is rejected at
 	// entry and dropped again when the run is planned.
 	AllowedNetworks []string `json:"allowed_networks"`
+	// OperatorNetworks is the operator lock (CZUJKA_ALLOWED_NETWORKS), read
+	// only: a hard upper bound on what may be scanned. No user, also no
+	// administrator, can widen it through the API; allowed_networks must lie
+	// inside it. Empty: no lock.
+	OperatorNetworks []string `json:"operator_networks"`
 }
 
 // ---------- Scan configuration ----------

@@ -183,7 +183,15 @@ func (m *Manager) BuildPlan(ctx context.Context, profile model.ScanProfile, run 
 		m.log.Warn("target outside the allowed networks dropped from the plan", "target", d.Value, "reason", d.Reason)
 	}
 	if len(kept) == 0 {
-		return plan, fmt.Errorf("%w: every target of the profile lies outside the allowed networks of the safety policy", ErrInvalid)
+		where := "the allowed networks of the safety policy"
+		if len(plan.Policy.OperatorNetworks) > 0 {
+			where += " or the operator lock (CZUJKA_ALLOWED_NETWORKS: " + strings.Join(plan.Policy.OperatorNetworks, ", ") + ")"
+		}
+		msg := "every target lies outside " + where
+		if len(dropped) > 0 {
+			msg += "; " + dropped[0].Value + ": " + dropped[0].Reason
+		}
+		return plan, fmt.Errorf("%w: %s", ErrInvalid, msg)
 	}
 	plan.Targets = kept
 	if adHoc {

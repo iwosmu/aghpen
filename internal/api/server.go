@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -463,8 +464,14 @@ func (s *Server) secure(r *http.Request) bool {
 
 func (s *Server) clientIP(r *http.Request) string {
 	if s.d.TrustProxy {
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			return strings.TrimSpace(strings.Split(xff, ",")[0])
+		// The rightmost entry is the one the trusted proxy appended: the
+		// address it saw. Entries to its left come from the client and can be
+		// forged, so they never key the login rate limit or the audit log.
+		parts := strings.Split(r.Header.Get("X-Forwarded-For"), ",")
+		for i := len(parts) - 1; i >= 0; i-- {
+			if a, err := netip.ParseAddr(strings.TrimSpace(parts[i])); err == nil {
+				return a.Unmap().String()
+			}
 		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)

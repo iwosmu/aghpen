@@ -130,7 +130,7 @@ func openWith(ctx context.Context, withOldKeys bool, mutate func(*config.Config)
 		log.Warn("a new master key was generated; keep this file safe, without it the encrypted fields are lost", "file", cfg.MasterKeyFile, "key_id", kr.CurrentID())
 	}
 	loc, _ := time.LoadLocation(cfg.Timezone)
-	st, err := store.Open(ctx, cfg.DBURL, store.Options{Keyring: kr, TDE: cfg.TDE, Location: loc})
+	st, err := store.Open(ctx, cfg.DBURL, store.Options{Keyring: kr, TDE: cfg.TDE, Location: loc, OperatorNetworks: cfg.AllowedNetworks})
 	if err != nil {
 		return cfg, nil, log, err
 	}

@@ -38,6 +38,9 @@ type Options struct {
 	TDE      string          // auto | require | off
 	Location *time.Location  // timezone of the hour-of-week histogram
 	MaxConns int32
+	// OperatorNetworks is the operator lock (CZUJKA_ALLOWED_NETWORKS). It is
+	// reported in every safety policy the store returns and never stored.
+	OperatorNetworks []string
 }
 
 // querier is the part of pgx that pool and transaction share.
@@ -57,12 +60,13 @@ type Store struct {
 }
 
 type shared struct {
-	tdeMode string
-	mu      sync.Mutex
-	tde     TDEStatus
-	tdeAt   time.Time
-	scopes  *scopeMatcher
-	scopeAt time.Time
+	operator []string
+	tdeMode  string
+	mu       sync.Mutex
+	tde      TDEStatus
+	tdeAt    time.Time
+	scopes   *scopeMatcher
+	scopeAt  time.Time
 }
 
 // Open connects to PostgreSQL. It does not change the schema; call Migrate.
@@ -93,7 +97,7 @@ func Open(ctx context.Context, url string, opt Options) (*Store, error) {
 	if mode == "" {
 		mode = "auto"
 	}
-	return &Store{db: pool, pool: pool, kr: opt.Keyring, loc: loc, sh: &shared{tdeMode: mode}}, nil
+	return &Store{db: pool, pool: pool, kr: opt.Keyring, loc: loc, sh: &shared{tdeMode: mode, operator: append([]string{}, opt.OperatorNetworks...)}}, nil
 }
 
 // Close releases the connection pool.
