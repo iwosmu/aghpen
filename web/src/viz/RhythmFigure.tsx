@@ -22,14 +22,13 @@ function level(row: number, hour: number): number {
 export function RhythmFigure({ compact = false }: { compact?: boolean }) {
   const alarmDay = weekday(WEEK_ORDER[ALARM.row]);
   return (
-    <figure className="m-0 border border-rule bg-panel shadow-[0_40px_80px_-30px_rgb(0_0_0/0.85),0_2px_0_0_rgb(255_255_255/0.03)_inset]" data-testid="rhythm-figure">
-      <div className="mono flex items-center justify-between gap-3 border-b border-rule px-4 py-2 text-2xs uppercase tracking-[0.14em] text-ink-3">
-        <span>{t('Schemat · tydzień jednego hosta', 'Diagram · one host\'s week')}</span>
-        <span>{t('nie dane', 'not data')}</span>
-      </div>
-      <div className={compact ? 'p-4' : 'p-5 xl:p-6'}>
+    <figure className="login-glass m-0 overflow-hidden !bg-[rgb(8_12_19/0.72)]" data-testid="rhythm-figure">
+      <div className={compact ? 'p-4' : 'p-6 xl:p-7'}>
         <figcaption className="mb-4">
-          <span className={'font-display block leading-none text-ink ' + (compact ? 'text-[28px]' : 'text-[34px] xl:text-[40px]')}>{t('Jak Czujka czyta ciszę', 'How Czujka reads a silence')}</span>
+          <span className="flex items-baseline justify-between gap-3">
+            <span className={'font-display block leading-none text-ink ' + (compact ? 'text-[28px]' : 'text-[34px] xl:text-[40px]')}>{t('Jak Czujka czyta ciszę', 'How Czujka reads a silence')}</span>
+            <span className="mono flex-none text-2xs uppercase tracking-[0.16em] text-ink-3">{t('schemat', 'diagram')}</span>
+          </span>
           <span className="mt-2 block text-xs text-ink-3">{t('Czujka uczy się, w których godzinach host zwykle odpowiada.', 'Czujka learns in which hours a host usually answers.')}</span>
         </figcaption>
         <div
