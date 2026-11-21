@@ -9,6 +9,7 @@ import (
 
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/runner"
+	"github.com/iwosmu/aghpen/internal/targets"
 )
 
 func (s *Server) listScopes(w http.ResponseWriter, r *http.Request) {
@@ -126,6 +127,9 @@ func (s *Server) listTargets(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.fail(w, r, err)
 		return
+	}
+	for i := range page.Items {
+		page.Items[i].MapsTo = targets.MapsTo(page.Items[i].Value)
 	}
 	writeJSON(w, http.StatusOK, page)
 }
@@ -403,6 +407,7 @@ func (s *Server) updateTarget(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	t.MapsTo = targets.MapsTo(t.Value)
 	writeJSON(w, http.StatusOK, t)
 }
 

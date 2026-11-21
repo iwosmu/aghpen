@@ -17,6 +17,7 @@ import (
 	"github.com/iwosmu/aghpen/internal/probe"
 	"github.com/iwosmu/aghpen/internal/rules"
 	"github.com/iwosmu/aghpen/internal/store"
+	"github.com/iwosmu/aghpen/internal/targets"
 )
 
 // maxGroupAll is the largest number of open services for which the grouping
@@ -36,6 +37,11 @@ type Analysis struct {
 	loc  *time.Location
 	log  *slog.Logger
 	Auto AutoExporter // optional
+
+	// SelfPort is the port the docker host publishes Czujka's UI on. On the
+	// docker host (targets.HostGateway) the service on it is Czujka itself:
+	// tagged, no findings.
+	SelfPort int
 
 	// Policy evaluates the exposure rules after every analysis (runs, imports,
 	// manual entries, re-probes); optional.
@@ -257,6 +263,20 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 		}
 		prev = &analyze.Snapshot{RunID: prevRun}
 	}
+	// What earlier runs know about the services of this run: a service seen
+	// open before is "returned", not "new"; the response time has a baseline.
+	var svcIDs []int64
+	for i := range hosts {
+		if hosts[i].Up {
+			for _, id := range hosts[i].ServiceIDs {
+				svcIDs = append(svcIDs, id)
+			}
+		}
+	}
+	histories, err := a.st.ServiceHistories(ctx, runID, svcIDs, analyze.ResponseHistory)
+	if err != nil {
+		return nil, err
+	}
 	obsStatus := make([]store.ObsStatus, 0, len(hosts))
 	for i := range hosts {
 		h := &hosts[i]
@@ -264,6 +284,14 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 		obsStatus = append(obsStatus, store.ObsStatus{HostID: h.HostID, Status: string(as.Status)})
 		hs := analyze.HostSnapshot{HostID: h.HostID, IP: h.IP, Up: h.Up, Services: h.Services, ServiceIDs: h.ServiceIDs, PortsUnknown: h.HasUnknownPorts()}
 		hs.SetAssessment(as, nObs[h.HostID])
+		for key, id := range h.ServiceIDs {
+			if sh, ok := histories[id]; ok && (sh.LastOpenRun != 0 || len(sh.Response) > 0) {
+				if hs.History == nil {
+					hs.History = map[string]analyze.ServiceHistory{}
+				}
+				hs.History[key] = analyze.ServiceHistory{LastOpenRun: sh.LastOpenRun, LastOpenAt: sh.LastOpenAt, RunsAway: sh.RunsAway, Response: sh.Response}
+			}
+		}
 		cur.Hosts = append(cur.Hosts, hs)
 		if p, ok := prevHosts[h.HostID]; ok && prev != nil {
 			prev.Hosts = append(prev.Hosts, analyze.HostSnapshot{HostID: h.HostID, IP: h.IP, Up: p.Up, Status: statusOr(p.Status, p.Up), Services: prevSvcs[h.HostID]})
@@ -312,6 +340,23 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 	for _, sc := range scopes.Items {
 		crit[sc.ID] = sc.Criticality
 	}
+	// The docker host (loopback targets scanned through the host gateway):
+	// name it and tag Czujka's own service, which is not a finding about the network.
+	self := map[int64]bool{}
+	if gw := targets.HostGateway(); gw.IsValid() {
+		for i := range hosts {
+			if hosts[i].IP != gw.String() || !hosts[i].Up {
+				continue
+			}
+			ids, err := a.st.MarkDockerHost(ctx, hosts[i].HostID, a.SelfPort)
+			if err != nil {
+				return nil, err
+			}
+			for _, id := range ids {
+				self[id] = true
+			}
+		}
+	}
 	var svcRows []store.ServiceAnalysis
 	hostRows := make([]store.HostAnalysis, 0, len(hosts))
 	var findings []model.Finding
@@ -350,6 +395,9 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 				fs.ServiceID = &id
 				svcRows = append(svcRows, store.ServiceAnalysis{ID: sid, Interest: score, InterestWhy: why, GroupKey: key,
 					Classes: analyze.EffectiveClasses(&sv, h.Hostnames)})
+			}
+			if hasID && self[sid] {
+				continue // Czujka itself: listed and tagged, no finding
 			}
 			in.Services = append(in.Services, fs)
 		}
