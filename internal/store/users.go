@@ -241,6 +241,12 @@ func (s *Store) DeleteUserSessions(ctx context.Context, userID int64) error {
 	return err
 }
 
+// DeleteOtherSessions deletes the sessions of a user except the one with keepHash.
+func (s *Store) DeleteOtherSessions(ctx context.Context, userID int64, keepHash []byte) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2`, userID, keepHash)
+	return err
+}
+
 // PurgeExpiredSessions deletes sessions that are past their expiry.
 func (s *Store) PurgeExpiredSessions(ctx context.Context) error {
 	_, err := s.db.Exec(ctx, `DELETE FROM sessions WHERE expires_at <= now()`)

@@ -95,7 +95,7 @@ login $BASE 18496 "$PW_A"
 check "the administrator of A logs in to B (users restored)" "$( [ -n "$CSRF" ] && [ "$CSRF" != null ] && echo ok)" "ok"
 SNAP_B=$(snapshot); echo "  B: $SNAP_B"
 check "data of A in B" "$SNAP_B" "$SNAP_A"
-HZ=$(curl -sS $BASE/healthz)
+HZ=$(curl -sS -b "$JAR" $BASE/healthz)
 check "pg_tde encrypts the restored tables" "$(echo "$HZ" | jq -r .tde)" "true"
 DOC=$(CZUJKA_PORT=18496 CZUJKA_MASTER_KEY=$KEY_A dc $B exec -T czujka czujka doctor --json)
 check "doctor in B: database, pg_tde and master key" "$(echo "$DOC" | jq -r '[.checks[] | select(.name == "database" or .name == "pg_tde" or .name == "master_key") | .status] | join(",")')" "ok,ok,ok"

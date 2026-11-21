@@ -228,8 +228,9 @@ status_of() { local id; id=$(svc "$1" | jq -r '.id // empty'); [ -n "$id" ] && a
 
 # ---------- run ----------
 echo "=== Czujka on the organisers' template (lab/jury), $(date '+%Y-%m-%d %H:%M %Z') ==="
-echo "Czujka $(curl -s "$CZ_URL/healthz" | jq -c '{version, engine, tde}'); docker host $(uname -m); target $TARGET"
+echo "Czujka $(curl -s "$CZ_URL/healthz" | jq -c '{status, version}'); docker host $(uname -m); target $TARGET"
 setup
+echo "Czujka with a session: $(curl -s -b "$JAR" "$CZ_URL/healthz" | jq -c '{version, engine, tde}')"
 all_down
 want() { [[ " $ONLY " == *" $1 "* ]]; }
 

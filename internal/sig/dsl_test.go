@@ -317,6 +317,9 @@ func TestCheckPath(t *testing.T) {
 		"/actuator/env", "/a?cmd=ls", "/exec", "/cgi-bin/sh", "/api/token", "/secrets", "/private/key",
 		"/a/reset", "/a/update", "/a/upload", "/save", "/factory", "/index.php~", "/config.yml", "/app.ini",
 		"/debug.log", "/a?" + strings.Repeat("x=1&", 30),
+		// L3 of the security review: word parts of camelCase and compounds.
+		"/api/resetPassword", "/cache/flushAll", "/cache/flushall", "/api/v1/DeleteUser", "/admin/doExecute",
+		"/redis/flushdb", "/user/resetpassword", "/XMLExport",
 	}
 	for _, p := range bad {
 		if reason := CheckPath(p); reason == "" {
