@@ -140,3 +140,19 @@ Backend problems (exact):
 5. Severity: "Panel administracyjny: phpMyAdmin (10.66.10.10:80)" is `info` (interest 75) in Czujka and DefectDojo; for the accuracy owner.
 
 Left in DefectDojo (the README does not call them disposable): products `Czujka UI e2e` (tests #26 API findings, #27 and #28 Nmap Scan, #29 the manual Generic Findings import, which duplicates the API findings in the same product; simple risk acceptance enabled for step 4) and `Czujka UI e2e – hosty niestabilne` (test #25). In Czujka: 3 findings imported from DefectDojo test #28 ("Open Port: …/TCP").
+
+## 12. Live rate basis and estimated packets (engine rate fix, 74b332b)
+
+`RunStats.current_pps_basis` and `RunStats.packets_estimated` are shown in the three places with a live rate. Checked on run #126 (lab /16, profile cap 2000 pps), where the engine reported `current_pps_basis: "pace"` and `packets_estimated: 40`.
+
+| Place | When the basis is `pace` | Screenshot |
+| --- | --- | --- |
+| Top strip | "tempo zadane ≈1 380 / 2 000 pps"; the tooltip says it is the nmap pace (--min-rate/--max-rate) of running stages, not a measurement | `rate-3-strip-pace` |
+| Run page gauge | "≈ 1 840 pps" with a "tempo zadane" tag (same tooltip); with `measured` the tag reads "zmierzone". "Pakiety prób ≈ 102 958" with a tooltip that names the estimated part | `rate-1-run-page-pace` |
+| Dashboard run panel | same gauge, plus "pakiety prób ≈ 126 510" | `rate-2-dashboard-pace` |
+
+The over-cap warning stays (more than 5 % above the run cap); with the basis `pace` its text says "Tempo zadane przekracza limit…", with `measured` "Zmierzone tempo przekracza limit…". The label "Wysłane pakiety" is now "Pakiety prób", because `packets_sent` counts probe packets only.
+
+Contract note: the task named `packets_estimated` a bool; in `internal/model` it is an `int64` (the estimated part of `packets_sent`). The UI shows "≈" when it is above 0.
+
+`DefectDojoSettings.link_url` is not on the integration branch yet (not in `internal/model` or `docs/API.md`). The settings form already has the field "Adres do odnośników (publiczny)", shown only when `GET /settings/defectdojo` returns the key, so it appears without a new UI change when the server supports it. No screenshot yet.
