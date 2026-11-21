@@ -43,9 +43,9 @@ export default function Profiles() {
         <div className="text-xs text-ink-3">{t('okna:', 'windows:')} {describeWindows(p.schedule.windows)}</div>
       </div>
     ) },
-    { id: 'next', header: t('Następny start', 'Next start'), hide: 'md', cell: (p) => p.next_run_at ? <span title={fmtDateTime(p.next_run_at)}><span className="num">{fmtDateTime(p.next_run_at)}</span> <span className="text-xs text-ink-3">{fmtRelative(p.next_run_at)}</span></span> : <span className="text-ink-3">–</span> },
+    { id: 'next', header: t('Następny skan', 'Next scan'), hide: 'md', cell: (p) => p.next_run_at ? <span title={fmtDateTime(p.next_run_at)}><span className="num">{fmtDateTime(p.next_run_at)}</span> <span className="text-xs text-ink-3">{fmtRelative(p.next_run_at)}</span></span> : <span className="text-ink-3">–</span> },
     { id: 'last', header: t('Ostatni', 'Last'), hide: 'lg', cell: (p) => p.last_run_id ? <Link to={'/runs/' + p.last_run_id} className="num link">#{p.last_run_id}</Link> : <span className="text-ink-3">–</span> },
-    { id: 'enabled', header: t('Stan', 'State'), cell: (p) => p.enabled ? <span className="inline-flex items-center gap-1.5"><Glyph name="dot" tone="neutral" />{t('aktywny', 'enabled')}</span> : <span className="inline-flex items-center gap-1.5 text-ink-3"><Glyph name="ring" tone="expected" />{t('wyłączony', 'disabled')}</span> },
+    { id: 'enabled', header: t('Stan', 'Status'), cell: (p) => p.enabled ? <span className="inline-flex items-center gap-1.5"><Glyph name="dot" tone="neutral" />{t('włączony', 'enabled')}</span> : <span className="inline-flex items-center gap-1.5 text-ink-3"><Glyph name="ring" tone="expected" />{t('wyłączony', 'disabled')}</span> },
     ...(canRun ? [{ id: 'act', header: '', align: 'right' as const, cell: (p: ScanProfile) => <Button size="sm" icon="play" disabled={!p.enabled} onClick={() => setStart(p.id)}>{t('Uruchom', 'Start')}</Button> }] : []),
   ];
   return (
@@ -58,7 +58,7 @@ export default function Profiles() {
       />
       <DataTable
         rows={q.data?.items} cols={cols} rowKey={(p) => p.id} rowHref={(p) => '/profiles/' + p.id} loading={q.isPending} error={q.error} retry={() => q.refetch()}
-        empty={<Empty icon="profiles" title={t('Nie ma jeszcze profilu skanu', 'There is no scan profile yet')} hint={t('Profil łączy zakresy z portami, tempem i harmonogramem. Zacznij od jednego profilu dla całej sieci.', 'A profile joins scopes with ports, rate and schedule. Start with one profile for the whole network.')} action={canEdit ? <LinkButton to="/profiles/new" variant="primary" icon="plus">{t('Nowy profil', 'New profile')}</LinkButton> : undefined} />}
+        empty={<Empty icon="profiles" title={t('Brak profili', 'No profiles yet')} hint={t('Profil łączy zakresy z portami, tempem i harmonogramem. Zacznij od jednego profilu dla całej sieci.', 'A profile joins scopes with ports, rate and schedule. Start with one profile for the whole network.')} action={canEdit ? <LinkButton to="/profiles/new" variant="primary" icon="plus">{t('Nowy profil', 'New profile')}</LinkButton> : undefined} />}
         mobile={(p) => (
           <div>
             <div className="text-sm font-medium">{p.name}</div>
