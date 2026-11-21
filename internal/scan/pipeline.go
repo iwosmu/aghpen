@@ -317,6 +317,9 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 			return context.Cause(ctx)
 		}
 	}
+	if err := r.densePass(ctx, g, scanned, rate, gs); err != nil {
+		return err
+	}
 	unknown := map[string]bool{}
 	if t := timedOut(); len(t) > 0 {
 		for _, ip := range t {
@@ -576,4 +579,71 @@ func portScanTimeout(hosts, ports, rate int) time.Duration {
 	}
 	need := time.Duration(float64(hosts) * float64(ports) * 3 / float64(rate) * float64(time.Second))
 	return max(portScanHostTimeout, need)
+}
+
+// A host that already shows denseOpenPorts open ports in the profile's list
+// gets one more port scan over the rest of the TCP range (at most
+// maxDensePerGroup hosts per group). A host that exposes many services
+// usually listens on unusual ports too (application servers, proxies, test
+// instances). Measured on the lab: the 64-port host showed 33 ports from the
+// default list and hid 31 ports ranked 1045 to 7379 in nmap's frequency
+// table or not ranked at all; no other lab host has 10 open ports, so the
+// pass costs one host x 64 500 ports.
+const (
+	denseOpenPorts   = 10
+	maxDensePerGroup = 4
+)
+
+func (r *run) densePass(ctx context.Context, g *group, scanned map[string]*probe.Host, rate int, gs *groupStats) error {
+	if r.ports == nil || ctx.Err() != nil {
+		return nil
+	}
+	rest, err := probe.ParsePorts("1-65535")
+	if err != nil {
+		return nil
+	}
+	rest.Remove(r.ports)
+	if rest.Count() == 0 {
+		return nil
+	}
+	var dense []string
+	for ip, p := range scanned {
+		if p != nil && !p.TimedOut && len(p.Ports) >= denseOpenPorts {
+			dense = append(dense, ip)
+		}
+	}
+	if len(dense) == 0 {
+		return nil
+	}
+	sort.Strings(dense)
+	dense = dense[:min(len(dense), maxDensePerGroup)]
+	t0 := r.e.now()
+	end := r.stats.begin(rate)
+	res, err := r.prober.PortScan(ctx, probe.PortScanRequest{
+		Hosts: dense, Ports: rest, MaxRate: rate, MaxRetries: 1, HostTimeout: portScanTimeout(len(dense), rest.Count(), rate), IPv6: g.v6,
+	})
+	end()
+	r.account(gs, res, t0)
+	if err != nil {
+		if ctx.Err() != nil {
+			return context.Cause(ctx)
+		}
+		r.log.Warn("full-range pass for dense hosts failed", "group", g.id, "error", err.Error())
+		return nil
+	}
+	added := 0
+	for _, h := range res.Hosts {
+		p := scanned[h.IP]
+		if p == nil || len(h.Ports) == 0 {
+			continue
+		}
+		merged := append(append([]probe.Port{}, p.Ports...), h.Ports...)
+		sort.SliceStable(merged, func(i, j int) bool { return merged[i].Port < merged[j].Port })
+		cp := *p
+		cp.Ports = merged
+		scanned[h.IP] = &cp
+		added += len(h.Ports)
+	}
+	r.log.Info("full-range pass for dense hosts", "group", g.id, "hosts", len(dense), "ports", rest.Count(), "new_open", added)
+	return nil
 }

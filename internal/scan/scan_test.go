@@ -830,3 +830,27 @@ func TestPortScanTimeoutGrowsWithTheWork(t *testing.T) {
 		t.Errorf("rate 0: %v", got)
 	}
 }
+
+// A host with many open ports in the profile's list gets one more scan over
+// the rest of the TCP range; a host with a few open ports does not.
+func TestDenseHostGetsAFullRangePass(t *testing.T) {
+	many := []int{}
+	for p := 8000; p < 8010; p++ {
+		many = append(many, p)
+	}
+	many = append(many, 47001)
+	net := &fakeNet{hosts: map[string][]int{"10.0.0.10": many, "10.0.0.11": {22, 47002}}}
+	sink := newSink()
+	plan := basePlan("10.0.0.0/24")
+	plan.Profile.Ports = "1-10000"
+	out := New(Deps{Prober: net, Logger: quiet}).Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	if h := sink.host("10.0.0.10"); h == nil || len(h.Services) != 11 {
+		t.Fatalf("dense host = %+v, want 11 ports with 47001", h)
+	}
+	if h := sink.host("10.0.0.11"); h == nil || len(h.Services) != 1 {
+		t.Fatalf("sparse host = %+v, want only port 22", h)
+	}
+}
