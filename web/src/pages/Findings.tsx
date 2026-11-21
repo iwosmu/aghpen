@@ -1,0 +1,213 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidate, useAction, useItem, usePage } from '../api/hooks';
+import { del, patch, post } from '../api/client';
+import type { DojoExportResult, Finding, FindingStatus, Severity } from '../api/types';
+import { t, plural } from '../i18n';
+import { fmtDateTime, fmtRelative } from '../lib/format';
+import { useUrlState } from '../lib/hooks';
+import { Button, Dialog, Empty, ErrorState, Field, InlineError, KV, PageHeader, Select, SkeletonRows, TagInput, Tags } from '../ui/kit';
+import { Icon } from '../ui/Icon';
+import { DataTable, FilterBar, FilterField, Pager, SearchField, type Col } from '../ui/table';
+import { FINDING_STATUSES, FindingStatusMark, Glyph, InterestScore, SEVERITIES, Sev, findingStatusInfo, severityLabel } from '../ui/marks';
+import { ExportButtons, InlineText, OverrideNote, useDraft } from '../ui/edit';
+import { useSession } from '../session';
+
+const FILTERS = ['q', 'status', 'severity', 'type', 'assignee', 'tag', 'exported', 'host_id', 'min_interest'];
+const statusOpts = () => FINDING_STATUSES.map((s) => ({ value: s, label: findingStatusInfo(s).label }));
+const sevOpts = () => SEVERITIES.map((s) => ({ value: s, label: severityLabel(s) }));
+
+function typeLabel(x: string): string {
+  const m: Record<string, [string, string]> = { signature: ['sygnatura', 'signature'], change: ['zmiana', 'change'], tls: ['certyfikat', 'certificate'], exposure: ['ekspozycja', 'exposure'], manual: ['ręczne', 'manual'] };
+  return m[x] ? t(m[x][0], m[x][1]) : x;
+}
+
+function DetailDialog({ id, onClose }: { id: number; onClose: () => void }) {
+  const { can } = useSession();
+  const canEdit = can('results:update');
+  const q = useItem<Finding>('/findings/' + id);
+  const save = useAction((body: Record<string, unknown>) => patch<Finding>('/findings/' + id, body), { invalidate: ['/findings', '/dashboard'], success: t('Zapisano', 'Saved') });
+  const remove = useAction(() => del('/findings/' + id), { invalidate: ['/findings', '/dashboard'], success: t('Znalezisko usunięte', 'Finding deleted'), onSuccess: onClose });
+  const f = q.data;
+  return (
+    <Dialog open onClose={onClose} width={720} title={f ? <span className="flex items-center gap-2"><Sev level={f.severity} compact />{f.title}</span> : t('Znalezisko', 'Finding')}
+      footer={<>
+        {f && can('results:delete') && f.manual ? <Button variant="danger" icon="trash" busy={remove.isPending} onClick={() => remove.mutate(undefined)}>{t('Usuń', 'Delete')}</Button> : null}
+        <Button onClick={onClose}>{t('Zamknij', 'Close')}</Button>
+      </>}>
+      {q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : !f ? <SkeletonRows rows={6} /> : (
+        <div className="space-y-4">
+          <p className="text-sm text-ink-2">{f.description || t('Brak opisu.', 'No description.')}</p>
+          <OverrideNote o={f.overrides?.title} canEdit={canEdit} onRevert={() => save.mutate({ title: null })} />
+          <div className="grid gap-x-8 sm:grid-cols-2">
+            <dl>
+              <KV k={t('Status', 'Status')}>{canEdit ? <Select label={t('Status', 'Status')} value={f.status} onChange={(v) => save.mutate({ status: v })} options={statusOpts()} /> : <FindingStatusMark status={f.status} />}</KV>
+              <KV k={t('Waga', 'Severity')}>
+                {canEdit ? <Select label={t('Waga', 'Severity')} value={f.severity} onChange={(v) => save.mutate({ severity: v })} options={sevOpts()} /> : <Sev level={f.severity} />}
+                <OverrideNote o={f.overrides?.severity} canEdit={canEdit} onRevert={() => save.mutate({ severity: null })} />
+              </KV>
+              <KV k={t('Przypisane do', 'Assignee')}><InlineText label={t('Przypisane do', 'Assignee')} value={f.assignee} canEdit={canEdit} placeholder={t('nikt', 'nobody')} onSave={(v) => save.mutate({ assignee: v })} /></KV>
+              <KV k={t('Tagi', 'Tags')}>{canEdit ? <TagInput value={f.tags ?? []} onChange={(v) => save.mutate({ tags: v })} placeholder={t('dodaj tag', 'add a tag')} /> : <Tags tags={f.tags} max={10} />}</KV>
+            </dl>
+            <dl>
+              <KV k={t('Adres', 'Address')} mono><Link className="link" to={f.service_id ? '/services/' + f.service_id : '/hosts/' + f.host_id} onClick={onClose}>{f.ip}{f.port ? ':' + f.port : ''}</Link></KV>
+              {f.url ? <KV k="URL" mono><span className="break-all text-xs">{f.url}</span></KV> : null}
+              <KV k={t('Rodzaj', 'Type')}>{typeLabel(f.type)}{f.signature ? <span className="mono ml-2 text-xs text-ink-3">{f.signature}</span> : null}</KV>
+              <KV k={t('Ciekawość', 'Interest')}><InterestScore value={f.interest} /></KV>
+              <KV k={t('Pierwszy raz', 'First seen')}><span className="num">{fmtDateTime(f.first_seen)}</span>{f.first_run_id ? <Link to={'/runs/' + f.first_run_id} onClick={onClose} className="num link ml-2 text-xs">#{f.first_run_id}</Link> : null}</KV>
+              <KV k="DefectDojo">{f.dojo_id ? <a className="link inline-flex items-center gap-1" href={f.dojo_url} target="_blank" rel="noreferrer noopener">#{f.dojo_id}<Icon name="external" size={11} /></a> : <span className="text-ink-3">{t('nie wyeksportowano', 'not exported')}</span>}</KV>
+            </dl>
+          </div>
+          <div>
+            <h3 className="label mb-1">{t('Notatka', 'Note')}</h3>
+            <InlineText label={t('Notatka', 'Note')} multiline value={f.note} canEdit={canEdit} placeholder={t('brak notatki', 'no note')} onSave={(v) => save.mutate({ note: v })} />
+          </div>
+          {(f.evidence ?? []).length ? (
+            <div>
+              <h3 className="label mb-1">{t('Dowody', 'Evidence')}</h3>
+              <ul className="border-t border-rule">
+                {(f.evidence ?? []).map((e, i) => (
+                  <li key={i} className="grid grid-cols-[80px_minmax(0,1fr)] gap-x-3 border-b border-rule py-1 text-xs sm:grid-cols-[80px_180px_minmax(0,1fr)]">
+                    <span className="text-ink-3">{e.matcher}</span><span className="mono hidden text-ink-2 sm:block">{e.where}</span><span className="mono break-all">{e.snippet}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </Dialog>
+  );
+}
+
+function ManualDialog({ onClose }: { onClose: () => void }) {
+  const [f, setF] = useState({ title: '', description: '', severity: 'medium' as Severity, ip: '', port: '', url: '', note: '', tags: [] as string[] });
+  const create = useAction(() => post<Finding>('/findings', { ...f, port: Number(f.port) || 0 }), { invalidate: ['/findings', '/dashboard'], silent: true, success: t('Dodano znalezisko', 'Finding added'), onSuccess: onClose });
+  const ipOk = !f.ip || /^\d{1,3}(\.\d{1,3}){3}$/.test(f.ip);
+  return (
+    <Dialog open onClose={onClose} width={560} title={t('Nowe znalezisko ręczne', 'New manual finding')}
+      footer={<><Button onClick={onClose}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="plus" busy={create.isPending} disabled={!f.title.trim() || !ipOk} onClick={() => create.mutate(undefined)}>{t('Dodaj znalezisko', 'Add the finding')}</Button></>}>
+      <div className="space-y-3">
+        <Field label={t('Tytuł', 'Title')}><input className="field" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} autoFocus /></Field>
+        <Field label={t('Opis', 'Description')}><textarea className="field" rows={3} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label={t('Waga', 'Severity')}><Select value={f.severity} onChange={(v) => setF({ ...f, severity: v as Severity })} options={sevOpts()} /></Field>
+          <Field label={t('Adres IP', 'IP address')} error={ipOk ? undefined : t('nieprawidłowy adres IPv4', 'not a valid IPv4 address')}><input className="field mono" value={f.ip} onChange={(e) => setF({ ...f, ip: e.target.value.trim() })} placeholder="10.30.4.20" /></Field>
+          <Field label={t('Port', 'Port')}><input className="field mono" inputMode="numeric" value={f.port} onChange={(e) => setF({ ...f, port: e.target.value.replace(/\D/g, '') })} placeholder="443" /></Field>
+        </div>
+        <Field label="URL"><input className="field mono" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="https://" /></Field>
+        <Field label={t('Tagi', 'Tags')}><TagInput value={f.tags} onChange={(v) => setF({ ...f, tags: v })} placeholder={t('dodaj tag', 'add a tag')} /></Field>
+        <InlineError error={create.error} />
+      </div>
+    </Dialog>
+  );
+}
+
+export default function Findings() {
+  const u = useUrlState();
+  const qc = useQueryClient();
+  const { can } = useSession();
+  const canEdit = can('results:update');
+  const canExport = can('export:run');
+  const limit = 50;
+  const offset = Number(u.get('offset', '0'));
+  const filters = useMemo(() => {
+    const q: Record<string, string> = {};
+    for (const k of FILTERS) { const v = u.get(k); if (v) q[k] = v; }
+    return q;
+  }, [u]);
+  const q = usePage<Finding>('/findings', { ...filters, sort: u.get('sort', '-interest'), limit, offset });
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
+  const [manual, setManual] = useState(false);
+  const [assignee, setAssignee] = useState('');
+  const [result, setResult] = useState<DojoExportResult | null>(null);
+  const [text, setText] = useDraft(u.get('q'), (v) => u.set({ q: v }));
+  const open = Number(u.get('open', '0'));
+  useEffect(() => { setSelected(new Set()); }, [filters, offset]);
+  const ids = [...selected].map(Number);
+  const bulk = useAction(async (body: Record<string, unknown>) => { await Promise.all(ids.map((id) => patch('/findings/' + id, body))); return ids.length; }, {
+    success: (n) => t('Zmieniono znalezisk: ' + n, 'Findings updated: ' + n), onSuccess: () => { invalidate(qc, '/findings', '/dashboard'); setSelected(new Set()); },
+  });
+  const exportDojo = useAction(() => post<DojoExportResult>('/findings/export/defectdojo', { ids }), { silent: false, onSuccess: (r) => { setResult(r); invalidate(qc, '/findings'); setSelected(new Set()); } });
+  const active = FILTERS.filter((k) => u.get(k)).length;
+  const cols: Col<Finding>[] = [
+    { id: 'sev', header: t('Waga', 'Severity'), sort: 'severity', width: 110, cell: (f) => <Sev level={f.severity} /> },
+    { id: 'title', header: t('Znalezisko', 'Finding'), wrap: true, cell: (f) => (
+      <div className="min-w-[220px] py-1">
+        <div className="text-ink">{f.title}{f.manual ? <span className="ml-1.5 text-2xs text-ink-3">{t('ręczne', 'manual')}</span> : null}</div>
+        <div className="mono text-xs text-ink-3">{f.ip}{f.port ? ':' + f.port : ''}</div>
+      </div>
+    ) },
+    { id: 'status', header: t('Status', 'Status'), sort: 'status', cell: (f) => <FindingStatusMark status={f.status} /> },
+    { id: 'assignee', header: t('Przypisane', 'Assignee'), hide: 'lg', cell: (f) => f.assignee ? <span className="text-ink-2">{f.assignee.split('@')[0]}</span> : <span className="text-ink-3">–</span> },
+    { id: 'tags', header: t('Tagi', 'Tags'), hide: 'xl', cell: (f) => <span className="inline-flex whitespace-nowrap"><Tags tags={f.tags} max={1} /></span> },
+    { id: 'note', header: t('Notatka', 'Note'), hide: 'xl', cell: (f) => <span className="block max-w-[140px] truncate text-xs text-ink-2" title={f.note}>{f.note || '–'}</span> },
+    { id: 'seen', header: t('Od', 'Since'), sort: 'first_seen', hide: 'md', cell: (f) => <span className="num text-ink-2" title={fmtDateTime(f.first_seen)}>{fmtRelative(f.first_seen)}</span> },
+    { id: 'dojo', header: 'DefectDojo', hide: 'lg', cell: (f) => f.dojo_id ? <a className="num link inline-flex items-center gap-1" href={f.dojo_url} target="_blank" rel="noreferrer noopener" onClick={(e) => e.stopPropagation()}>#{f.dojo_id}<Icon name="external" size={11} /></a> : <span className="text-ink-3">–</span> },
+    { id: 'interest', header: t('Ciekawość', 'Interest'), sort: 'interest', align: 'right', cell: (f) => <InterestScore value={f.interest} /> },
+  ];
+  return (
+    <div>
+      <PageHeader
+        title={t('Znaleziska', 'Findings')}
+        sub={t('Rzeczy warte decyzji człowieka: panele administracyjne, środowiska testowe, wygasłe certyfikaty, nowe ekspozycje. Każde ma dowód i status.', 'Things that deserve a human decision: admin panels, staging environments, expired certificates, new exposures. Each has evidence and a status.')}
+        readOnly={!canEdit}
+        actions={<><ExportButtons kind="findings" query={filters} />{can('results:create') ? <Button variant="primary" icon="plus" onClick={() => setManual(true)}>{t('Dodaj ręcznie', 'Add by hand')}</Button> : null}</>}
+      />
+      <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
+        <SearchField value={text} onChange={setText} placeholder={t('tytuł, adres, opis', 'title, address, text')} />
+        <FilterField label={t('Status', 'Status')} width={170}>
+          <Select value={u.get('status')} onChange={(v) => u.set({ status: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'new,triaged', label: t('otwarte (nowe i w analizie)', 'open (new and triaged)') }, ...statusOpts()]} />
+        </FilterField>
+        <FilterField label={t('Waga', 'Severity')} width={120}><Select value={u.get('severity')} onChange={(v) => u.set({ severity: v })} options={[{ value: '', label: t('dowolna', 'any') }, ...sevOpts()]} /></FilterField>
+        <FilterField label={t('Rodzaj', 'Type')} width={130}><Select value={u.get('type')} onChange={(v) => u.set({ type: v })} options={[{ value: '', label: t('dowolny', 'any') }, ...['signature', 'exposure', 'tls', 'change', 'manual'].map((x) => ({ value: x, label: typeLabel(x) }))]} /></FilterField>
+        <FilterField label="DefectDojo" width={150}><Select value={u.get('exported')} onChange={(v) => u.set({ exported: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'false', label: t('niewyeksportowane', 'not exported') }, { value: 'true', label: t('wyeksportowane', 'exported') }]} /></FilterField>
+      </FilterBar>
+      {selected.size > 0 && (canEdit || canExport) ? (
+        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-rule-strong bg-accent-wash px-4 py-1.5 text-sm sm:px-6" role="region" aria-label={t('Akcje zbiorcze', 'Bulk actions')} data-testid="bulk-bar">
+          <span><span className="num font-medium">{selected.size}</span> {plural(selected.size, ['zaznaczone', 'zaznaczone', 'zaznaczonych'], ['selected', 'selected'])}</span>
+          {canEdit ? (
+            <>
+              <span className="w-[190px]"><Select label={t('Ustaw status', 'Set the status')} value="" onChange={(v) => { if (v) bulk.mutate({ status: v as FindingStatus }); }} options={[{ value: '', label: t('Ustaw status…', 'Set the status…') }, ...statusOpts()]} /></span>
+              <span className="flex items-center gap-1.5"><input className="field w-[170px]" value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder={t('przypisz do (e-mail)', 'assign to (e-mail)')} aria-label={t('Przypisz do', 'Assign to')} /><Button size="sm" disabled={!assignee.trim()} busy={bulk.isPending} onClick={() => bulk.mutate({ assignee: assignee.trim() })}>{t('Przypisz', 'Assign')}</Button></span>
+            </>
+          ) : null}
+          {canExport ? <Button size="sm" variant="primary" icon="upload" busy={exportDojo.isPending} onClick={() => exportDojo.mutate(undefined)}>{t('Eksportuj do DefectDojo', 'Export to DefectDojo')}</Button> : null}
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>{t('Odznacz', 'Clear')}</Button>
+        </div>
+      ) : null}
+      <DataTable
+        rows={q.data?.items} cols={cols} rowKey={(f) => f.id} onRowClick={(f) => u.set({ open: f.id }, { keepOffset: true })} loading={q.isPending} error={q.error} retry={() => q.refetch()} dim={q.isPlaceholderData}
+        sort={u.get('sort', '-interest')} onSort={(s) => u.set({ sort: s })}
+        selected={canEdit || canExport ? selected : undefined} onSelect={canEdit || canExport ? setSelected : undefined}
+        rowClass={(f) => (f.status === 'resolved' || f.status === 'false_positive' ? 'text-ink-2' : undefined)}
+        empty={<Empty icon="findings" title={active ? t('Żadne znalezisko nie pasuje do filtrów', 'No finding matches the filters') : t('Nie ma jeszcze znalezisk', 'There is no finding yet')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Znaleziska powstają po skanie z dopasowań sygnatur i wykrytych zmian. Możesz też dodać własne.', 'Findings come from signature matches and detected changes after a scan. You can also add your own.')} />}
+        mobile={(f) => (
+          <div>
+            <div className="flex items-center justify-between gap-2"><Sev level={f.severity} /><FindingStatusMark status={f.status} /></div>
+            <div className="mt-1 text-sm">{f.title}</div>
+            <div className="mono mt-0.5 text-xs text-ink-3">{f.ip}{f.port ? ':' + f.port : ''}</div>
+          </div>
+        )}
+      />
+      {q.data ? <Pager total={q.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}
+      {open ? <DetailDialog id={open} onClose={() => u.set({ open: null }, { keepOffset: true })} /> : null}
+      {manual ? <ManualDialog onClose={() => setManual(false)} /> : null}
+      <Dialog open={result !== null} onClose={() => setResult(null)} title={t('Eksport do DefectDojo', 'Export to DefectDojo')} width={480} footer={<Button variant="primary" onClick={() => setResult(null)}>{t('Gotowe', 'Done')}</Button>}>
+        {result ? (
+          <div className="space-y-3 text-sm" data-testid="dojo-result">
+            <p className="flex items-center gap-2"><Glyph name={result.failed ? 'delta' : 'check'} tone={result.failed ? 'changed' : 'new'} />{result.failed ? t('Eksport zakończony z błędami.', 'The export finished with errors.') : t('Eksport zakończony.', 'The export finished.')}</p>
+            <dl>
+              <KV k={t('Nowe w DefectDojo', 'New in DefectDojo')}><span className="num">{result.exported}</span></KV>
+              <KV k={t('Zaktualizowane', 'Updated')}><span className="num">{result.updated}</span></KV>
+              <KV k={t('Nieudane', 'Failed')}><span className="num">{result.failed}</span></KV>
+              <KV k={t('Test', 'Test')}><a className="link inline-flex items-center gap-1" href={result.test_url} target="_blank" rel="noreferrer noopener">{t('Otwórz test', 'Open test')} #{result.test_id}<Icon name="external" size={11} /></a></KV>
+            </dl>
+            {(result.errors ?? []).length ? <ul className="mono text-xs text-danger">{(result.errors ?? []).map((e, i) => <li key={i}>{e}</li>)}</ul> : null}
+          </div>
+        ) : null}
+      </Dialog>
+    </div>
+  );
+}

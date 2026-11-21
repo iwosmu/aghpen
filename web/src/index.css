@@ -1,0 +1,216 @@
+@import "tailwindcss";
+
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("../node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("../node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-ext-400-normal.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("../node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-500-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("../node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-ext-500-normal.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("../node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("../node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-ext-600-normal.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("../node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("../node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-400-normal.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("../node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("../node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-500-normal.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
+/* ---------- Tokens: the watch book. Blue-black ink, bone paper, hairline rules. ---------- */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e131b;
+  --panel: #131a24;
+  --raised: #1a2330;
+  --sunk: #0a0e15;
+  --rule: #232e3f;
+  --rule-strong: #364459;
+  --ink: #e9e5da;
+  --ink-2: #b9b7ad;
+  --ink-3: #8d93a0;
+  --accent: #6ea3f2;
+  --accent-strong: #8fb8f6;
+  --accent-ink: #0a111c;
+  --accent-wash: #16263f;
+  --rail: #0a0e15;
+  --rail-ink: #e9e5da;
+  --rail-ink-2: #8d93a0;
+  --rail-rule: #1b2433;
+  --rail-active: #16263f;
+  /* state marks: validated with dataviz validate_palette.js --pairs all on --panel */
+  --st-new: #22a89a;
+  --st-gone: #e5556a;
+  --st-changed: #c98500;
+  --st-unstable: #9085e9;
+  --st-expected: #7b8494;
+  --st-new-wash: #10302f;
+  --st-gone-wash: #3a1a24;
+  --st-changed-wash: #33270d;
+  --st-unstable-wash: #262447;
+  --danger: #e5556a;
+  --danger-solid: #c93a4f;
+  --danger-ink: #ffffff;
+  /* sequential ramp (one hue). Dark: more is lighter. */
+  --seq-0: #1b2533;
+  --seq-1: #184f95;
+  --seq-2: #256abf;
+  --seq-3: #3987e5;
+  --seq-4: #6da7ec;
+  --seq-5: #b7d3f6;
+  --shadow: 0 8px 24px -8px rgb(0 0 0 / 0.6);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f1e9;
+  --panel: #fbf9f4;
+  --raised: #ffffff;
+  --sunk: #ece8dd;
+  --rule: #dfdacc;
+  --rule-strong: #bfb9a8;
+  --ink: #161b24;
+  --ink-2: #454b57;
+  --ink-3: #666b76;
+  --accent: #1f55b5;
+  --accent-strong: #17438f;
+  --accent-ink: #ffffff;
+  --accent-wash: #dfe9f9;
+  --rail: #151c28;
+  --rail-ink: #ece8dd;
+  --rail-ink-2: #98a0ae;
+  --rail-rule: #263142;
+  --rail-active: #24344d;
+  --st-new: #0a8f7f;
+  --st-gone: #cf3f3f;
+  --st-changed: #b58a00;
+  --st-unstable: #6250d6;
+  --st-expected: #7a7f89;
+  --st-new-wash: #d9f0ec;
+  --st-gone-wash: #f8e0de;
+  --st-changed-wash: #f5ead0;
+  --st-unstable-wash: #e6e2fa;
+  --danger: #b8303a;
+  --danger-solid: #b8303a;
+  --danger-ink: #ffffff;
+  /* Light: more is darker. */
+  --seq-0: #e7e3d8;
+  --seq-1: #b7d3f6;
+  --seq-2: #86b6ef;
+  --seq-3: #3987e5;
+  --seq-4: #1c5cab;
+  --seq-5: #0d366b;
+  --shadow: 0 8px 24px -10px rgb(22 27 36 / 0.28);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-sunk: var(--sunk);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-wash: var(--accent-wash);
+  --color-rail: var(--rail);
+  --color-rail-ink: var(--rail-ink);
+  --color-rail-ink-2: var(--rail-ink-2);
+  --color-rail-rule: var(--rail-rule);
+  --color-rail-active: var(--rail-active);
+  --color-st-new: var(--st-new);
+  --color-st-gone: var(--st-gone);
+  --color-st-changed: var(--st-changed);
+  --color-st-unstable: var(--st-unstable);
+  --color-st-expected: var(--st-expected);
+  --color-st-new-wash: var(--st-new-wash);
+  --color-st-gone-wash: var(--st-gone-wash);
+  --color-st-changed-wash: var(--st-changed-wash);
+  --color-st-unstable-wash: var(--st-unstable-wash);
+  --color-danger: var(--danger);
+  --color-danger-solid: var(--danger-solid);
+  --color-danger-ink: var(--danger-ink);
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --text-2xs: 11px;
+  --text-2xs--line-height: 14px;
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 18px;
+  --text-base: 15px;
+  --text-base--line-height: 22px;
+  --text-lg: 20px;
+  --text-lg--line-height: 26px;
+  --text-xl: 27px;
+  --text-xl--line-height: 34px;
+  --radius-xs: 1px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  html {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 18px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    scrollbar-color: var(--rule-strong) transparent;
+    scrollbar-width: thin;
+  }
+  body { min-height: 100dvh; margin: 0; }
+  ::selection { background: var(--accent); color: var(--accent-ink); }
+  * { caret-color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  a { color: inherit; text-decoration: none; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  h1, h2, h3 { text-wrap: balance; }
+  input, select, textarea, button { font: inherit; color: inherit; }
+  input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; }
+  table { border-collapse: collapse; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--rule-strong); border: 3px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+}
+
+@layer components {
+  .mono { font-family: var(--font-mono); font-variant-ligatures: none; }
+  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .link { color: var(--accent); text-underline-offset: 3px; }
+  .link:hover { text-decoration: underline; }
+  .label { font-size: 12px; line-height: 16px; color: var(--ink-3); }
+  .field {
+    height: 30px; width: 100%; padding: 0 8px; background: var(--raised); border: 1px solid var(--rule-strong);
+    border-radius: 2px; color: var(--ink); font-size: 13px;
+  }
+  textarea.field { height: auto; padding: 6px 8px; line-height: 18px; }
+  .field::placeholder { color: var(--ink-3); }
+  .field:hover { border-color: var(--ink-3); }
+  .field:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+  .field[aria-invalid="true"] { border-color: var(--danger); }
+  .field:disabled { opacity: 0.55; }
+  .hatch {
+    background-image: repeating-linear-gradient(135deg, var(--st-changed) 0 1.5px, transparent 1.5px 5px);
+  }
+}
+
+@keyframes pulse-ring { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes slide-in { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes rise-in { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.skeleton {
+  background: linear-gradient(90deg, var(--raised) 25%, var(--rule) 50%, var(--raised) 75%);
+  background-size: 200% 100%; animation: shimmer 1.6s linear infinite; border-radius: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
+
+/* grid children may shrink: a long hash or a wide table must never widen its track */
+@layer base {
+  .grid > * { min-width: 0; }
+}

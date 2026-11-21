@@ -1,0 +1,218 @@
+import { useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
+import { useAction, useItem } from '../api/hooks';
+import { post } from '../api/client';
+import type { Chunk, MapBlock, RunMap, SafetyPolicy, ScanProfile, ScanRun } from '../api/types';
+import { t, plural } from '../i18n';
+import { cx, fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtTime } from '../lib/format';
+import { useLiveRun } from '../lib/hooks';
+import { Button, Dialog, ErrorState, PageHeader, Panel, SkeletonRows } from '../ui/kit';
+import { Icon } from '../ui/Icon';
+import { ChunkStatusMark, Glyph, RunStatusMark } from '../ui/marks';
+import { AddressMap } from '../viz/AddressMap';
+import { ProgressBar, RateGauge } from '../viz/charts';
+import { useCan } from '../session';
+
+function Fact({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
+  return (
+    <div className={cx('min-w-0 border-b border-rule py-2 sm:border-b-0 sm:border-l sm:px-4 sm:py-0 sm:[&:nth-child(4n+1)]:border-l-0 sm:[&:nth-child(4n+1)]:pl-0', wide && 'sm:min-w-[220px]')}>
+      <dt className="text-xs text-ink-3">{label}</dt>
+      <dd className="mt-0.5 text-base font-medium text-ink">{children}</dd>
+    </div>
+  );
+}
+
+function specLabel(c: Chunk): string {
+  if (c.spec.length === 1) return c.spec[0];
+  return c.spec[0] + ' +' + (c.spec.length - 1);
+}
+
+export default function RunDetail() {
+  const id = Number(useParams().id);
+  const navigate = useNavigate();
+  const canRun = useCan('scans:run');
+  const { run: runQ, recent, connected } = useLiveRun(id, { withChunks: true });
+  const run = runQ.data;
+  const chunks = useItem<Chunk[]>('/runs/' + id + '/chunks', undefined, { enabled: Boolean(run) });
+  const map = useItem<RunMap>('/runs/' + id + '/map', undefined, { enabled: Boolean(run) });
+  const profile = useItem<ScanProfile>('/profiles/' + run?.profile_id, undefined, { enabled: Boolean(run?.profile_id) });
+  const safety = useItem<SafetyPolicy>('/settings/safety');
+  const [hoverChunk, setHoverChunk] = useState<number | null>(null);
+  const [hoverCidr, setHoverCidr] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const act = useAction((a: 'pause' | 'resume' | 'cancel') => post<ScanRun>('/runs/' + id + '/' + a), { invalidate: ['/runs', '/dashboard'] });
+
+  const chunkOf = useMemo(() => {
+    const m = new Map<string, Chunk>();
+    for (const c of chunks.data ?? []) for (const cidr of c.spec) m.set(cidr, c);
+    return m;
+  }, [chunks.data]);
+  const highlight = useMemo(() => {
+    const c = (chunks.data ?? []).find((x) => x.id === hoverChunk);
+    return c ? new Set(c.spec) : undefined;
+  }, [chunks.data, hoverChunk]);
+  const hoveredChunkId = hoverCidr ? chunkOf.get(hoverCidr)?.id : null;
+
+  if (runQ.error) return <ErrorState error={runQ.error} retry={() => runQ.refetch()} />;
+  if (!run) return <SkeletonRows rows={12} />;
+  const s = run.stats;
+  const pct = s.addresses_total ? s.addresses_done / s.addresses_total : 0;
+  const isLive = run.status === 'running' || run.status === 'analyzing';
+  const policyCap = safety.data?.max_pps ?? 0;
+  const cap = Math.min(profile.data?.rate.max_pps ?? policyCap, policyCap || Infinity) || policyCap;
+  const maxSize = Math.max(1, ...(chunks.data ?? []).map((c) => c.size));
+  const sortedChunks = [...(chunks.data ?? [])].sort((a, b) => a.seq - b.seq);
+
+  return (
+    <div>
+      <PageHeader
+        back={{ to: '/runs', label: t('Przebiegi skanów', 'Scan runs') }}
+        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{t('Przebieg', 'Run')} <span className="num">#{run.id}</span></span><span className="text-base font-normal"><RunStatusMark status={run.status} pauseReason={run.pause_reason} /></span></span>}
+        sub={<>{run.profile_id ? <Link to={'/profiles/' + run.profile_id} className="link">{run.profile_name}</Link> : run.profile_name} · {run.trigger === 'schedule' ? t('z harmonogramu', 'from the schedule') : run.trigger === 'import' ? t('import pliku', 'file import') : t('uruchomiony ręcznie', 'started by hand')} · {fmtDateTime(run.started_at)}
+          {isLive ? <span className="ml-2 inline-flex items-center gap-1 text-xs text-ink-3"><span className={cx('inline-block h-1.5 w-1.5 rounded-full', connected ? 'bg-st-new' : 'bg-st-changed')} />{connected ? t('na żywo', 'live') : t('łączenie…', 'connecting…')}</span> : null}</>}
+        readOnly={!canRun && (isLive || run.status === 'paused')}
+        actions={canRun ? (
+          <>
+            {run.status === 'running' ? <Button icon="pause" busy={act.isPending && act.variables === 'pause'} onClick={() => act.mutate('pause')}>{t('Wstrzymaj', 'Pause')}</Button> : null}
+            {run.status === 'paused' ? <Button variant="primary" icon="play" busy={act.isPending && act.variables === 'resume'} onClick={() => act.mutate('resume')}>{t('Wznów', 'Resume')}</Button> : null}
+            {['running', 'paused', 'queued'].includes(run.status) ? <Button variant="danger" icon="x" onClick={() => setConfirmCancel(true)}>{t('Anuluj skan', 'Cancel the scan')}</Button> : null}
+            {run.status === 'completed' && run.summary?.prev_run_id ? <Button icon="compare" onClick={() => navigate('/changes/compare?from=' + run.summary!.prev_run_id + '&to=' + run.id)}>{t('Porównaj z poprzednim', 'Compare with the previous')}</Button> : null}
+          </>
+        ) : run.status === 'completed' && run.summary?.prev_run_id ? <Button icon="compare" onClick={() => navigate('/changes/compare?from=' + run.summary!.prev_run_id + '&to=' + run.id)}>{t('Porównaj z poprzednim', 'Compare with the previous')}</Button> : null}
+      />
+
+      <div className="space-y-4 p-4 sm:p-6">
+        {run.error ? (
+          <div role="alert" className="flex items-start gap-2 border border-danger/60 bg-st-gone-wash px-3 py-2 text-sm">
+            <Icon name="alert" className="mt-0.5 text-danger" /><span><span className="font-medium">{t('Skan zakończył się błędem.', 'The scan failed.')}</span> <span className="mono text-xs">{run.error}</span></span>
+          </div>
+        ) : null}
+        {run.status === 'paused' && run.pause_reason === 'window_closed' ? (
+          <div className="flex items-start gap-2 border border-rule-strong bg-st-changed-wash px-3 py-2 text-sm">
+            <Glyph name="pause" tone="changed" />
+            <span>
+              {t('Okno czasowe zamknęło się o ', 'The time window closed at ')}<span className="num">{fmtTime(run.window_end)}</span>{t('. Niedokończone podgrupy są odroczone.', '. The unfinished chunks are deferred.')}{' '}
+              {run.resume_at ? <>{t('Skan wznowi się sam w następnym oknie: ', 'The scan resumes by itself in the next window: ')}<span className="num font-medium">{fmtDateTime(run.resume_at)}</span> ({fmtRelative(run.resume_at)}).</> : null}
+            </span>
+          </div>
+        ) : null}
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="border border-rule bg-panel p-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <span><span className="num text-xl font-semibold">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów sprawdzonych', 'of addresses probed')}</span></span>
+              <span className="num text-sm text-ink-2">{fmtInt(s.addresses_done)} / {fmtInt(s.addresses_total)}</span>
+            </div>
+            <div className="mt-2"><ProgressBar value={s.addresses_done} max={s.addresses_total} label={t('Postęp skanu', 'Scan progress')} /></div>
+            <dl className="mt-3 grid grid-cols-2 gap-y-3 sm:grid-cols-4">
+              <Fact label={run.status === 'completed' ? t('Czas trwania', 'Duration') : t('Czas aktywny', 'Active time')}><span className="num">{fmtDuration(s.elapsed_sec)}</span></Fact>
+              <Fact label={t('Pozostało (ETA)', 'Remaining (ETA)')}><span className="num">{isLive || run.status === 'paused' ? (run.status === 'analyzing' ? t('analiza', 'analysing') : fmtDuration(s.eta_sec)) : '–'}</span></Fact>
+              <Fact label={t('Podgrupy', 'Chunks')}><span className="num">{s.chunks_done} / {s.chunks_total}</span></Fact>
+              <Fact label={t('Aktywne hosty', 'Hosts up')}><span className="num">{fmtInt(s.hosts_up)}</span></Fact>
+              <Fact label={t('Otwarte usługi', 'Open services')}><span className="num">{fmtInt(s.services_open)}</span> <span className="text-xs font-normal text-ink-3">({fmtInt(s.http_services)} WWW)</span></Fact>
+              <Fact label={t('Wysłane pakiety', 'Packets sent')}><span className="num">{fmtInt(s.packets_sent)}</span></Fact>
+              <Fact label={t('Żądania HTTP', 'HTTP requests')}><span className="num">{fmtInt(s.http_requests)}</span></Fact>
+              <Fact label={t('Ponowione próby', 'Retried hosts')}><span className="num">{fmtInt(s.retried)}</span></Fact>
+            </dl>
+          </section>
+          <section className="border border-rule bg-panel p-3">
+            <h2 className="mb-2 text-sm font-semibold">{t('Tempo skanowania', 'Scan rate')}</h2>
+            {policyCap ? <RateGauge current={isLive ? s.current_pps : 0} cap={cap} policyCap={policyCap} /> : <div className="skeleton h-12" />}
+            <p className="mt-2 text-xs text-ink-2">{t('Średnio', 'Average')} <span className="num text-ink">{fmtInt(s.avg_pps)}</span> pps. {profile.data && profile.data.rate.max_pps > policyCap ? t('Profil prosi o ' + fmtInt(profile.data.rate.max_pps) + ' pps, polityka bezpieczeństwa obcina do ' + fmtInt(policyCap) + '.', 'The profile asks for ' + fmtInt(profile.data.rate.max_pps) + ' pps, the safety policy cuts it to ' + fmtInt(policyCap) + '.') : null}</p>
+          </section>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <Panel title={t('Mapa przestrzeni adresowej', 'Address-space map')} count={(map.data?.blocks.length ?? 0) + ' × /24'}>
+            {map.error ? <ErrorState error={map.error} retry={() => map.refetch()} /> : !map.data ? <div className="skeleton h-[260px]" /> : (
+              <AddressMap
+                blocks={map.data.blocks} highlight={highlight} onHover={setHoverCidr}
+                onSelect={(b: MapBlock) => navigate('/hosts?cidr=' + encodeURIComponent(b.cidr))}
+                describe={(b) => { const c = chunkOf.get(b.cidr); return c ? t('podgrupa', 'chunk') + ' #' + c.seq : null; }}
+              />
+            )}
+          </Panel>
+
+          <Panel title={t('Podgrupy adresów', 'Address chunks')} count={sortedChunks.length} flush actions={profile.data?.chunking.adaptive ? <span className="text-ink-3">{t('rozmiar adaptacyjny, cel ' + profile.data.chunking.target_seconds + ' s', 'adaptive size, target ' + profile.data.chunking.target_seconds + ' s')}</span> : undefined}>
+            {chunks.error ? <ErrorState error={chunks.error} retry={() => chunks.refetch()} /> : !chunks.data ? <SkeletonRows rows={8} /> : sortedChunks.length === 0 ? (
+              <p className="p-3 text-sm text-ink-2">{run.trigger === 'import' ? t('Import nie dzieli adresów na podgrupy.', 'An import does not split addresses into chunks.') : t('Plan podgrup pojawi się po starcie skanu.', 'The chunk plan appears when the scan starts.')}</p>
+            ) : (
+              <div className="max-h-[520px] overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 z-10 bg-panel">
+                    <tr className="border-b border-rule-strong text-left text-xs text-ink-3">
+                      <th className="h-[30px] w-[36px] pl-3 pr-2 font-medium">#</th>
+                      <th className="px-2 font-medium">{t('Zakres', 'Range')}</th>
+                      <th className="px-2 font-medium">{t('Rozmiar', 'Size')}</th>
+                      <th className="px-2 font-medium">{t('Stan', 'Status')}</th>
+                      <th className="px-2 text-right font-medium">{t('Czas', 'Time')}</th>
+                      <th className="px-2 text-right font-medium">{t('Hosty', 'Hosts')}</th>
+                      <th className="hidden px-2 text-right font-medium sm:table-cell">pps</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedChunks.map((c) => (
+                      <tr
+                        key={c.id} onPointerEnter={() => setHoverChunk(c.id)} onPointerLeave={() => setHoverChunk(null)} tabIndex={0} onFocus={() => setHoverChunk(c.id)} onBlur={() => setHoverChunk(null)}
+                        className={cx('border-b border-rule last:border-b-0 outline-offset-[-2px]', (hoverChunk === c.id || hoveredChunkId === c.id) && 'bg-accent-wash')}
+                      >
+                        <td className="num h-[30px] pl-3 pr-2 text-ink-2">{c.seq}</td>
+                        <td className="mono whitespace-nowrap px-2" title={c.spec.join(', ')}>{specLabel(c)}</td>
+                        <td className="px-2"><span className="flex items-center gap-2"><span className="num w-[38px] text-right">{fmtInt(c.size)}</span><span className="hidden h-[4px] bg-ink-3 sm:block" style={{ width: Math.max(3, (c.size / maxSize) * 28) }} /></span></td>
+                        <td className="whitespace-nowrap px-2"><ChunkStatusMark status={c.status} /></td>
+                        <td className="num whitespace-nowrap px-2 text-right text-ink-2">{c.duration_ms ? fmtDuration(c.duration_ms / 1000) : '–'}</td>
+                        <td className="num px-2 text-right">{c.status === 'done' ? c.hosts_up : '–'}</td>
+                        <td className="num hidden px-2 text-right text-ink-2 sm:table-cell">{c.pps ? fmtInt(c.pps) : '–'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          {isLive || recent.length > 0 ? (
+            <Panel title={t('Ostatnio wykryte hosty', 'Hosts just found')} flush>
+              {recent.length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Czekam na pierwsze odpowiedzi z bieżących podgrup…', 'Waiting for the first answers from the running chunks…')}</p> : (
+                <ul>
+                  {recent.map((h, i) => (
+                    <li key={h.ip + h.at} className="flex h-[30px] items-center gap-3 border-b border-rule px-3 last:border-b-0" style={i === 0 ? { animation: 'rise-in 240ms var(--ease-out-expo)' } : undefined}>
+                      <Glyph name="dot" tone="neutral" size={12} />
+                      <Link to={'/hosts?q=' + h.ip} className="mono link">{h.ip}</Link>
+                      <span className="text-xs text-ink-2">{h.services} {plural(h.services, ['usługa', 'usługi', 'usług'], ['service', 'services'])}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+          ) : null}
+          {run.summary ? (
+            <Panel title={t('Zmiany wykryte przez ten przebieg', 'Changes found by this run')} actions={<Link className="link" to={'/changes?run_id=' + run.id}>{t('Lista zmian', 'Change list')}</Link>}>
+              <dl className="grid grid-cols-2 gap-x-6 sm:grid-cols-3">
+                {([
+                  ['plus', 'new', t('nowe hosty', 'new hosts'), run.summary.hosts_new], ['plus', 'new', t('nowe usługi', 'new services'), run.summary.services_new], ['back', 'new', t('hosty wróciły', 'hosts back'), run.summary.hosts_back],
+                  ['minus', 'gone', t('hosty nieaktywne', 'hosts inactive'), run.summary.hosts_gone], ['minus', 'gone', t('usługi zniknęły', 'services gone'), run.summary.services_gone], ['wave', 'unstable', t('hosty niestabilne', 'hosts unstable'), run.summary.hosts_unstable],
+                  ['delta', 'changed', t('zmienione usługi', 'changed services'), run.summary.services_changed], ['dot', 'accent', t('nowe znaleziska', 'new findings'), run.summary.findings_new],
+                ] as const).map(([g, tone, label, n]) => (
+                  <div key={label} className="flex items-center justify-between gap-2 border-b border-rule py-1.5">
+                    <dt className="flex items-center gap-1.5 text-sm text-ink-2"><Glyph name={g} tone={n ? tone : 'expected'} />{label}</dt>
+                    <dd className="num text-sm font-medium">{n}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Panel>
+          ) : null}
+        </div>
+      </div>
+
+      <Dialog
+        open={confirmCancel} onClose={() => setConfirmCancel(false)} title={t('Anulować skan #' + run.id + '?', 'Cancel run #' + run.id + '?')} width={440}
+        footer={<><Button onClick={() => setConfirmCancel(false)}>{t('Wróć', 'Back')}</Button><Button variant="dangerSolid" busy={act.isPending} onClick={() => act.mutate('cancel', { onSuccess: () => setConfirmCancel(false) })}>{t('Anuluj skan', 'Cancel the scan')}</Button></>}
+      >
+        <p className="text-sm">{t('Wyniki z gotowych podgrup zostają. Pozostałe adresy nie będą sprawdzone, a anulowanego skanu nie da się wznowić.', 'Results of the finished chunks stay. The remaining addresses are not probed, and a cancelled scan cannot be resumed.')}</p>
+      </Dialog>
+    </div>
+  );
+}

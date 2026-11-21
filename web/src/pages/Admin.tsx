@@ -1,0 +1,328 @@
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useAction, useItem, usePage } from '../api/hooks';
+import { del, patch, post, put } from '../api/client';
+import type { AuditEntry, DefectDojoSettings, DojoTestResult, Permission, PermissionInfo, Role, SafetyPolicy, User } from '../api/types';
+import { t, getLang, plural } from '../i18n';
+import { cx, fmtDateTime, fmtInt, fmtRelative } from '../lib/format';
+import { useUrlState } from '../lib/hooks';
+import { Button, Check, Dialog, ErrorState, Field, IconButton, InlineError, PageHeader, Panel, ReadOnlyNote, Select, SkeletonRows, Tabs } from '../ui/kit';
+import { Icon } from '../ui/Icon';
+import { DataTable, FilterBar, FilterField, Pager, SearchField, type Col } from '../ui/table';
+import { Glyph } from '../ui/marks';
+import { useDraft } from '../ui/edit';
+import { roleLabel, useSession } from '../session';
+import { NoAccess } from '../shell/Layout';
+import { Switch } from './Signatures';
+
+// ---------- users ----------
+function UserDialog({ roles, onClose }: { roles: Role[]; onClose: () => void }) {
+  const [f, setF] = useState({ email: '', name: '', role_id: roles.find((r) => r.slug === 'viewer')?.id ?? roles[0]?.id ?? 0, password: '' });
+  const create = useAction(() => post<User>('/users', f), { invalidate: ['/users', '/roles', '/audit'], silent: true, success: t('Użytkownik dodany', 'User added'), onSuccess: onClose });
+  const emailOk = /^\S+@\S+\.\S+$/.test(f.email);
+  return (
+    <Dialog open onClose={onClose} width={480} title={t('Nowy użytkownik', 'New user')}
+      footer={<><Button onClick={onClose}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="plus" busy={create.isPending} disabled={!emailOk || f.password.length < 10} onClick={() => create.mutate(undefined)}>{t('Dodaj użytkownika', 'Add the user')}</Button></>}>
+      <div className="space-y-3">
+        <Field label="E-mail" error={f.email && !emailOk ? t('to nie jest adres e-mail', 'this is not an e-mail address') : undefined}><input className="field" type="email" autoFocus autoComplete="off" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value.trim() })} /></Field>
+        <Field label={t('Imię i nazwisko', 'Full name')}><input className="field" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
+        <Field label={t('Rola', 'Role')}><Select value={String(f.role_id)} onChange={(v) => setF({ ...f, role_id: Number(v) })} options={roles.map((r) => ({ value: String(r.id), label: roleLabel(r.slug, r.name) }))} /></Field>
+        <Field label={t('Hasło początkowe', 'Initial password')} hint={t('co najmniej 10 znaków', 'at least 10 characters')}><input className="field mono" type="password" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></Field>
+        <InlineError error={create.error} />
+      </div>
+    </Dialog>
+  );
+}
+
+function UsersTab() {
+  const { session } = useSession();
+  const users = usePage<User>('/users', { limit: 200 });
+  const roles = useItem<Role[]>('/roles');
+  const [add, setAdd] = useState(false);
+  const [confirm, setConfirm] = useState<User | null>(null);
+  const update = useAction((v: { id: number; body: Record<string, unknown> }) => patch<User>('/users/' + v.id, v.body), { invalidate: ['/users', '/roles', '/audit'], success: t('Zapisano', 'Saved') });
+  const remove = useAction((id: number) => del('/users/' + id), { invalidate: ['/users', '/roles', '/audit'], success: t('Użytkownik usunięty', 'User deleted'), onSuccess: () => setConfirm(null) });
+  const me = session.user.id;
+  const cols: Col<User>[] = [
+    { id: 'name', header: t('Użytkownik', 'User'), wrap: true, cell: (x) => (
+      <div className="min-w-[180px] py-1"><div className={x.disabled ? 'text-ink-3' : 'text-ink'}>{x.name || x.email.split('@')[0]}{x.id === me ? <span className="ml-1.5 text-2xs text-ink-3">{t('to Ty', 'you')}</span> : null}</div><div className="mono text-xs text-ink-3">{x.email}</div></div>
+    ) },
+    { id: 'role', header: t('Rola', 'Role'), width: 220, cell: (x) => x.id === me ? <span>{roleLabel(x.role_slug, x.role_name)}</span> : <Select label={t('Rola użytkownika ', 'Role of ') + x.email} value={String(x.role_id)} onChange={(v) => update.mutate({ id: x.id, body: { role_id: Number(v) } })} options={(roles.data ?? []).map((r) => ({ value: String(r.id), label: roleLabel(r.slug, r.name) }))} /> },
+    { id: 'login', header: t('Ostatnie logowanie', 'Last login'), hide: 'md', cell: (x) => <span className="num text-ink-2" title={fmtDateTime(x.last_login_at)}>{x.last_login_at ? fmtRelative(x.last_login_at) : t('nigdy', 'never')}</span> },
+    { id: 'state', header: t('Konto aktywne', 'Account active'), cell: (x) => <Switch checked={!x.disabled} disabled={x.id === me || update.isPending} onChange={(v) => update.mutate({ id: x.id, body: { disabled: !v } })} label={t('Konto aktywne: ', 'Account active: ') + x.email} /> },
+    { id: 'del', header: '', align: 'right', width: 44, cell: (x) => x.id === me ? null : <IconButton icon="trash" label={t('Usuń użytkownika ', 'Delete user ') + x.email} onClick={() => setConfirm(x)} /> },
+  ];
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 px-4 py-2 sm:px-6">
+        <p className="text-sm text-ink-2">{users.data ? <><span className="num text-ink">{users.data.total}</span> {plural(users.data.total, ['konto', 'konta', 'kont'], ['account', 'accounts'])}</> : null}</p>
+        <Button variant="primary" icon="plus" onClick={() => setAdd(true)}>{t('Nowy użytkownik', 'New user')}</Button>
+      </div>
+      <DataTable rows={users.data?.items} cols={cols} rowKey={(x) => x.id} loading={users.isPending} error={users.error} retry={() => users.refetch()}
+        mobile={(x) => <div><div className="text-sm">{x.name || x.email}</div><div className="text-xs text-ink-3">{x.email} · {roleLabel(x.role_slug, x.role_name)}{x.disabled ? ' · ' + t('wyłączone', 'disabled') : ''}</div></div>} />
+      {add && roles.data ? <UserDialog roles={roles.data} onClose={() => setAdd(false)} /> : null}
+      <Dialog open={confirm !== null} onClose={() => setConfirm(null)} width={420} title={t('Usunąć użytkownika?', 'Delete the user?')}
+        footer={<><Button onClick={() => setConfirm(null)}>{t('Anuluj', 'Cancel')}</Button><Button variant="dangerSolid" busy={remove.isPending} onClick={() => confirm && remove.mutate(confirm.id)}>{t('Usuń konto', 'Delete the account')}</Button></>}>
+        <p className="text-sm"><span className="mono">{confirm?.email}</span>{t(': konto zniknie, a wpisy w dzienniku audytu zostaną. Aby tylko zablokować dostęp, wyłącz konto.', ': the account goes away and its audit entries stay. To only block access, disable the account.')}</p>
+      </Dialog>
+    </div>
+  );
+}
+
+// ---------- roles ----------
+function RolesTab({ canManage }: { canManage: boolean }) {
+  const roles = useItem<Role[]>('/roles');
+  const perms = useItem<PermissionInfo[]>('/permissions');
+  const [draft, setDraft] = useState<Record<number, Permission[]>>({});
+  const [add, setAdd] = useState(false);
+  const [name, setName] = useState('');
+  const [copyFrom, setCopyFrom] = useState('');
+  const save = useAction((r: Role) => patch<Role>('/roles/' + r.id, { permissions: draft[r.id] }), { invalidate: ['/roles', '/audit'], success: t('Rola zapisana', 'Role saved'), onSuccess: (r) => setDraft((d) => { const n = { ...d }; delete n[r.id]; return n; }) });
+  const create = useAction(() => post<Role>('/roles', { name, description: '', permissions: (roles.data ?? []).find((r) => String(r.id) === copyFrom)?.permissions ?? [] }), { invalidate: ['/roles', '/audit'], silent: true, success: t('Rola dodana', 'Role added'), onSuccess: () => { setAdd(false); setName(''); } });
+  const remove = useAction((id: number) => del('/roles/' + id), { invalidate: ['/roles', '/audit'], success: t('Rola usunięta', 'Role deleted') });
+  const groups = useMemo(() => {
+    const m = new Map<string, PermissionInfo[]>();
+    for (const p of perms.data ?? []) { const g = m.get(p.group) ?? []; g.push(p); m.set(p.group, g); }
+    return [...m.entries()];
+  }, [perms.data]);
+  if (roles.error) return <ErrorState error={roles.error} retry={() => roles.refetch()} />;
+  if (!roles.data || !perms.data) return <SkeletonRows rows={10} />;
+  const list = roles.data;
+  const en = getLang() === 'en';
+  return (
+    <div className="p-4 sm:p-6">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-[70ch] text-sm text-ink-2">{t('Role wbudowane są tylko do odczytu. Rolę własną możesz zmieniać: zaznacz uprawnienia w jej kolumnie i zapisz.', 'Built-in roles are read-only. You can change a custom role: tick permissions in its column and save.')}</p>
+        {canManage ? <Button variant="primary" icon="plus" onClick={() => setAdd(true)}>{t('Nowa rola', 'New role')}</Button> : null}
+      </div>
+      <div className="overflow-x-auto border border-rule bg-panel">
+        <table className="w-full text-sm" data-testid="permission-matrix">
+          <thead>
+            <tr className="border-b border-rule-strong">
+              <th className="sticky left-0 z-10 min-w-[230px] bg-panel px-3 py-2 text-left text-xs font-medium text-ink-3">{t('Uprawnienie', 'Permission')}</th>
+              {list.map((r) => (
+                <th key={r.id} className="min-w-[104px] px-2 py-2 text-left align-bottom font-medium">
+                  <div className="text-sm text-ink">{roleLabel(r.slug, r.name)}</div>
+                  <div className="text-2xs font-normal text-ink-3">{r.builtin ? t('wbudowana', 'built-in') : t('własna', 'custom')} · {r.user_count} {t('os.', 'users')}</div>
+                  {!r.builtin && canManage ? (
+                    <div className="mt-1 flex gap-1">
+                      {draft[r.id] ? <Button size="sm" variant="primary" busy={save.isPending} onClick={() => save.mutate(r)}>{t('Zapisz', 'Save')}</Button> : null}
+                      {draft[r.id] ? <Button size="sm" variant="ghost" onClick={() => setDraft((d) => { const n = { ...d }; delete n[r.id]; return n; })}>{t('Cofnij', 'Undo')}</Button> : r.user_count === 0 ? <IconButton icon="trash" label={t('Usuń rolę ', 'Delete role ') + r.name} onClick={() => remove.mutate(r.id)} /> : null}
+                    </div>
+                  ) : null}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map(([group, items]) => (
+              <Fragment key={group}>
+                <tr className="border-b border-rule bg-raised"><th colSpan={list.length + 1} className="sticky left-0 px-3 py-1 text-left text-xs font-semibold text-ink-2">{group}</th></tr>
+                {items.map((p) => (
+                  <tr key={p.permission} className="border-b border-rule last:border-b-0 hover:bg-raised">
+                    <th scope="row" className="sticky left-0 z-10 bg-panel px-3 py-1 text-left font-normal"><div className="text-sm text-ink">{en ? p.label_en : p.label_pl}</div><div className="mono text-2xs text-ink-3">{p.permission}</div></th>
+                    {list.map((r) => {
+                      const cur = draft[r.id] ?? r.permissions;
+                      const on = cur.includes(p.permission);
+                      const label = (en ? p.label_en : p.label_pl) + ', ' + roleLabel(r.slug, r.name);
+                      return (
+                        <td key={r.id} className="px-2 py-1">
+                          {r.builtin || !canManage
+                            ? on ? <span className="inline-flex items-center" title={label}><Glyph name="check" tone="neutral" size={13} /><span className="sr-only">{t('tak', 'yes')}</span></span> : <span className="text-ink-3" title={label}>·<span className="sr-only">{t('nie', 'no')}</span></span>
+                            : <input type="checkbox" className="h-[15px] w-[15px] accent-[var(--accent)]" checked={on} aria-label={label} onChange={(e) => setDraft((d) => ({ ...d, [r.id]: e.target.checked ? [...cur, p.permission] : cur.filter((x) => x !== p.permission) }))} />}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Dialog open={add} onClose={() => setAdd(false)} width={440} title={t('Nowa rola', 'New role')}
+        footer={<><Button onClick={() => setAdd(false)}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" busy={create.isPending} disabled={!name.trim()} onClick={() => create.mutate(undefined)}>{t('Dodaj rolę', 'Add the role')}</Button></>}>
+        <div className="space-y-3">
+          <Field label={t('Nazwa', 'Name')}><input className="field" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
+          <Field label={t('Zacznij od uprawnień roli', 'Start from the permissions of')}><Select value={copyFrom} onChange={setCopyFrom} options={[{ value: '', label: t('bez uprawnień', 'no permission') }, ...list.map((r) => ({ value: String(r.id), label: roleLabel(r.slug, r.name) }))]} /></Field>
+          <InlineError error={create.error} />
+        </div>
+      </Dialog>
+    </div>
+  );
+}
+
+// ---------- audit ----------
+function AuditTab() {
+  const u = useUrlState();
+  const limit = 50;
+  const offset = Number(u.get('offset', '0'));
+  const q = usePage<AuditEntry>('/audit', { q: u.get('q'), action: u.get('action'), entity: u.get('entity'), sort: '-at', limit, offset });
+  const [text, setText] = useDraft(u.get('q'), (v) => u.set({ q: v }));
+  const cols: Col<AuditEntry>[] = [
+    { id: 'at', header: t('Czas', 'Time'), width: 170, cell: (a) => <span className="num text-ink-2">{fmtDateTime(a.at)}</span> },
+    { id: 'user', header: t('Kto', 'Who'), cell: (a) => <span className="mono text-xs">{a.user_email || t('(system)', '(system)')}</span> },
+    { id: 'action', header: t('Akcja', 'Action'), cell: (a) => <span className={cx('mono text-xs', /delete|emergency|failed/.test(a.action) ? 'text-danger' : 'text-ink')}>{a.action}</span> },
+    { id: 'entity', header: t('Obiekt', 'Object'), hide: 'md', cell: (a) => <span className="text-ink-2">{a.entity}{a.entity_id ? <span className="mono ml-1 text-xs">{a.entity_id}</span> : null}</span> },
+    { id: 'detail', header: t('Szczegóły', 'Detail'), hide: 'lg', cell: (a) => <span className="mono block max-w-[360px] truncate text-xs text-ink-3" title={JSON.stringify(a.detail)}>{a.detail && Object.keys(a.detail).length ? JSON.stringify(a.detail) : '–'}</span> },
+    { id: 'ip', header: 'IP', hide: 'xl', cell: (a) => <span className="mono text-xs text-ink-3">{a.ip}</span> },
+  ];
+  return (
+    <div>
+      <FilterBar onClear={() => u.clear(['q', 'action', 'entity'])} active={['q', 'action', 'entity'].filter((k) => u.get(k)).length}>
+        <SearchField value={text} onChange={setText} placeholder={t('akcja, użytkownik, obiekt', 'action, user, object')} />
+        <FilterField label={t('Rodzaj akcji', 'Action group')} width={170}>
+          <Select value={u.get('action')} onChange={(v) => u.set({ action: v })} options={[{ value: '', label: t('wszystkie', 'all') }, ...['auth', 'run', 'target', 'scope', 'profile', 'signature', 'finding', 'change', 'host', 'service', 'user', 'role', 'safety', 'export', 'import', 'defectdojo'].map((x) => ({ value: x, label: x }))]} />
+        </FilterField>
+      </FilterBar>
+      <DataTable rows={q.data?.items} cols={cols} rowKey={(a) => a.id} loading={q.isPending} error={q.error} retry={() => q.refetch()} dim={q.isPlaceholderData}
+        empty={<p className="p-4 text-sm text-ink-2 sm:px-6">{t('Brak wpisów dla tych filtrów.', 'No entry for these filters.')}</p>}
+        mobile={(a) => <div><div className="mono text-xs">{a.action}</div><div className="text-xs text-ink-3">{a.user_email} · {fmtDateTime(a.at)}</div></div>} />
+      {q.data ? <Pager total={q.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}
+    </div>
+  );
+}
+
+// ---------- safety ----------
+function SafetyTab() {
+  const { can } = useSession();
+  const canManage = can('safety:manage');
+  const q = useItem<SafetyPolicy>('/settings/safety');
+  const [f, setF] = useState<SafetyPolicy | null>(null);
+  const [excl, setExcl] = useState('');
+  const [confirmStop, setConfirmStop] = useState(false);
+  useEffect(() => { if (q.data) { setF(q.data); setExcl((q.data.exclusions ?? []).join('\n')); } }, [q.data]);
+  const save = useAction(() => put<SafetyPolicy>('/settings/safety', { ...f, exclusions: excl.split('\n').map((x) => x.trim()).filter(Boolean) }), { invalidate: ['/settings/safety', '/dashboard', '/audit'], silent: true, success: t('Polityka zapisana', 'Policy saved') });
+  const stop = useAction(() => post<SafetyPolicy>('/emergency-stop'), { invalidate: ['/settings/safety', '/dashboard', '/runs', '/audit'], onSuccess: () => setConfirmStop(false) });
+  const release = useAction(() => post<SafetyPolicy>('/emergency-stop/release'), { invalidate: ['/settings/safety', '/dashboard', '/audit'], success: t('Blokada zwolniona', 'The stop is released') });
+  if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
+  if (!f || !q.data) return <SkeletonRows rows={8} />;
+  const num = (k: 'max_pps' | 'max_http_rps' | 'max_per_host_rps' | 'max_paths_per_host', label: string, suffix: string, hint?: string) => (
+    <Field label={label} hint={hint}>
+      <span className="relative block"><input type="number" min={1} className="field num pr-14" disabled={!canManage} value={f[k]} onChange={(e) => setF({ ...f, [k]: Number(e.target.value) })} /><span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-ink-3">{suffix}</span></span>
+    </Field>
+  );
+  const dirty = JSON.stringify({ ...f, exclusions: excl.split('\n').map((x) => x.trim()).filter(Boolean) }) !== JSON.stringify(q.data);
+  return (
+    <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <Panel title={t('Polityka bezpieczeństwa skanowania', 'Scan safety policy')} actions={canManage ? <Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!dirty} onClick={() => save.mutate(undefined)}>{t('Zapisz politykę', 'Save the policy')}</Button> : undefined}>
+        {!canManage ? <div className="mb-3"><ReadOnlyNote text={t('Politykę zmienia rola z uprawnieniem safety:manage. Widzisz obowiązujące wartości.', 'A role with the safety:manage permission changes the policy. You see the values in force.')} /></div> : null}
+        <p className="mb-3 max-w-[72ch] text-sm text-ink-2">{t('Twarde limity dla wszystkich skanów. Profil może być tylko ostrzejszy. Silnik stosuje je także wtedy, gdy profil prosi o więcej.', 'Hard caps for every scan. A profile can only be stricter. The engine applies them even when a profile asks for more.')}</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {num('max_pps', t('Pakiety na sekundę', 'Packets per second'), 'pps')}
+          {num('max_http_rps', t('Żądania HTTP na sekundę', 'HTTP requests per second'), 'rps')}
+          {num('max_per_host_rps', t('Żądania na host', 'Requests per host'), 'rps')}
+          {num('max_paths_per_host', t('Ścieżki na usługę', 'Paths per service'), t('szt.', 'max'))}
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Field label={t('Dozwolone porty', 'Allowed ports')} hint={t('puste = wszystkie', 'empty = all')}><input className="field mono" disabled={!canManage} value={f.allowed_ports} onChange={(e) => setF({ ...f, allowed_ports: e.target.value })} /></Field>
+          <Field label={t('Zabronione porty', 'Denied ports')} hint={t('np. 9100: surowy port drukarek', 'for example 9100: the raw printer port')}><input className="field mono" disabled={!canManage} value={f.denied_ports} onChange={(e) => setF({ ...f, denied_ports: e.target.value })} /></Field>
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Field label={t('Wykluczenia (nigdy nie skanowane)', 'Exclusions (never scanned)')} hint={t('adres albo CIDR, jeden w wierszu', 'an address or a CIDR, one per line')}><textarea className="field mono" rows={5} disabled={!canManage} value={excl} onChange={(e) => setExcl(e.target.value)} /></Field>
+          <div className="space-y-3">
+            <Field label="User-Agent"><input className="field mono" disabled={!canManage} value={f.user_agent} onChange={(e) => setF({ ...f, user_agent: e.target.value })} /></Field>
+            <div>
+              <span className="label mb-1 block">{t('Metody HTTP', 'HTTP methods')}</span>
+              <p className="flex flex-wrap items-center gap-2 text-sm">
+                {(f.allowed_methods ?? []).map((m) => <span key={m} className="mono border border-rule-strong px-1.5 py-0.5 text-xs">{m}</span>)}
+                <span className="inline-flex items-center gap-1 text-xs text-ink-3"><Icon name="lock" size={12} />{t('stałe: Czujka nie wysyła innych metod', 'fixed: Czujka sends no other method')}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-3"><InlineError error={save.error} /></div>
+        <p className="mt-3 text-2xs text-ink-3">{t('Ostatnia zmiana:', 'Last change:')} <span className="num">{fmtDateTime(q.data.updated_at)}</span></p>
+      </Panel>
+
+      <Panel title={t('Stop awaryjny', 'Emergency stop')}>
+        <p className={cx('flex items-center gap-2 text-base font-medium', q.data.emergency_stop ? 'text-danger' : 'text-ink')}>
+          <Icon name={q.data.emergency_stop ? 'stop' : 'shield'} className={q.data.emergency_stop ? '' : 'text-st-new'} />
+          {q.data.emergency_stop ? t('Aktywny: skanowanie zablokowane', 'Active: scanning is blocked') : t('Nieaktywny: skanowanie dozwolone', 'Off: scanning is allowed')}
+        </p>
+        <p className="mt-2 text-sm text-ink-2">{t('Stop natychmiast wstrzymuje wszystkie trwające skany i blokuje nowe, także te z harmonogramu, dopóki ktoś z uprawnieniem safety:manage go nie zwolni.', 'The stop pauses every running scan at once and blocks new ones, scheduled ones too, until someone with the safety:manage permission releases it.')}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {!q.data.emergency_stop && can('safety:stop') ? <Button variant="dangerSolid" icon="stop" onClick={() => setConfirmStop(true)}>{t('Zatrzymaj wszystkie skany', 'Stop all scans')}</Button> : null}
+          {q.data.emergency_stop && canManage ? <Button variant="primary" icon="play" busy={release.isPending} onClick={() => release.mutate(undefined)}>{t('Zwolnij blokadę', 'Release the stop')}</Button> : null}
+          {q.data.emergency_stop && !canManage ? <ReadOnlyNote text={t('Blokadę zwalnia administrator.', 'An administrator releases the stop.')} /> : null}
+        </div>
+      </Panel>
+      <Dialog open={confirmStop} onClose={() => setConfirmStop(false)} width={440} title={t('Zatrzymać wszystkie skany?', 'Stop all scans?')}
+        footer={<><Button onClick={() => setConfirmStop(false)}>{t('Anuluj', 'Cancel')}</Button><Button variant="dangerSolid" icon="stop" busy={stop.isPending} onClick={() => stop.mutate(undefined)}>{t('Zatrzymaj teraz', 'Stop now')}</Button></>}>
+        <p className="text-sm">{t('Trwające skany zostaną wstrzymane w ciągu sekund. Nowe nie ruszą, dopóki blokada nie zostanie zwolniona.', 'Running scans pause within seconds. No new scan starts until the stop is released.')}</p>
+      </Dialog>
+    </div>
+  );
+}
+
+// ---------- DefectDojo ----------
+function DojoTab() {
+  const q = useItem<DefectDojoSettings>('/settings/defectdojo');
+  const [f, setF] = useState<DefectDojoSettings | null>(null);
+  const [key, setKey] = useState('');
+  const [test, setTest] = useState<DojoTestResult | null>(null);
+  useEffect(() => { if (q.data) setF(q.data); }, [q.data]);
+  const save = useAction(() => put<DefectDojoSettings>('/settings/defectdojo', { ...f, ...(key ? { api_key: key } : {}) }), { invalidate: ['/settings/defectdojo', '/audit'], silent: true, success: t('Ustawienia zapisane', 'Settings saved'), onSuccess: () => setKey('') });
+  const run = useAction(() => post<DojoTestResult>('/settings/defectdojo/test', { url: f?.url, verify_tls: f?.verify_tls, ...(key ? { api_key: key } : {}) }), { silent: true, onSuccess: setTest });
+  if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
+  if (!f || !q.data) return <SkeletonRows rows={8} />;
+  const dirty = key !== '' || JSON.stringify(f) !== JSON.stringify(q.data);
+  return (
+    <div className="max-w-[860px] p-4 sm:p-6">
+      <Panel title="DefectDojo" actions={<Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!dirty} onClick={() => save.mutate(undefined)}>{t('Zapisz ustawienia', 'Save the settings')}</Button>}>
+        <p className="mb-3 max-w-[72ch] text-sm text-ink-2">{t('Czujka wysyła wybrane znaleziska do DefectDojo jako jeden test w zaangażowaniu. Ponowny eksport aktualizuje istniejące wpisy zamiast tworzyć duplikaty.', 'Czujka sends chosen findings to DefectDojo as one test in an engagement. A repeated export updates existing entries instead of making duplicates.')}</p>
+        <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label={t('Integracja włączona', 'Integration enabled')} />
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Field label={t('Adres DefectDojo', 'DefectDojo URL')}><input className="field mono" value={f.url} onChange={(e) => { setF({ ...f, url: e.target.value }); setTest(null); }} placeholder="https://defectdojo.example" /></Field>
+          <Field label={t('Klucz API', 'API key')} hint={f.api_key_set ? t('Klucz jest zapisany i zaszyfrowany. Wpisz nowy tylko, aby go zmienić.', 'A key is stored and encrypted. Type a new one only to replace it.') : t('Klucz nie jest jeszcze ustawiony.', 'No key is set yet.')}>
+            <input className="field mono" type="password" autoComplete="off" value={key} onChange={(e) => { setKey(e.target.value); setTest(null); }} placeholder={f.api_key_set ? '••••••••••••••••' : ''} />
+          </Field>
+          <Field label={t('Typ produktu', 'Product type')}><input className="field" value={f.product_type_name} onChange={(e) => setF({ ...f, product_type_name: e.target.value })} /></Field>
+          <Field label={t('Produkt', 'Product')}><input className="field" value={f.product_name} onChange={(e) => setF({ ...f, product_name: e.target.value })} /></Field>
+          <Field label={t('Zaangażowanie', 'Engagement')}><input className="field" value={f.engagement_name} onChange={(e) => setF({ ...f, engagement_name: e.target.value })} /></Field>
+          <Field label={t('Automatyczny eksport od ciekawości', 'Auto-export from interest')}><input type="number" min={0} max={100} className="field num" disabled={!f.auto_export} value={f.min_interest} onChange={(e) => setF({ ...f, min_interest: Number(e.target.value) })} /></Field>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <Check checked={f.verify_tls} onChange={(v) => setF({ ...f, verify_tls: v })} label={t('Sprawdzaj certyfikat TLS serwera', 'Verify the server TLS certificate')} />
+          <Check checked={f.auto_export} onChange={(v) => setF({ ...f, auto_export: v })} label={t('Eksportuj nowe znaleziska po każdym skanie', 'Export new findings after each scan')} />
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-rule pt-3">
+          <Button icon="link" busy={run.isPending} disabled={!f.url} onClick={() => run.mutate(undefined)}>{t('Sprawdź połączenie', 'Test the connection')}</Button>
+          {test ? (
+            <span className="inline-flex items-start gap-2 text-sm" role="status" data-testid="dojo-test">
+              <span className="mt-0.5"><Glyph name={test.ok ? 'check' : 'x'} tone={test.ok ? 'new' : 'gone'} /></span>
+              <span>{test.message}{test.version ? <span className="mono ml-2 text-xs text-ink-3">v{test.version}</span> : null}</span>
+            </span>
+          ) : <span className="text-xs text-ink-3">{t('Test używa wartości z formularza, także niezapisanych.', 'The test uses the values in the form, saved or not.')}</span>}
+        </div>
+        <div className="mt-2"><InlineError error={save.error ?? run.error} /></div>
+      </Panel>
+    </div>
+  );
+}
+
+export default function Admin() {
+  const u = useUrlState();
+  const { can } = useSession();
+  const tabs = [
+    can('users:manage') ? { id: 'users', label: t('Użytkownicy', 'Users') } : null,
+    { id: 'roles', label: t('Role i uprawnienia', 'Roles and permissions') },
+    can('audit:read') ? { id: 'audit', label: t('Dziennik audytu', 'Audit log') } : null,
+    can('scans:read') ? { id: 'safety', label: t('Bezpieczeństwo', 'Safety') } : null,
+    can('integrations:manage') ? { id: 'defectdojo', label: 'DefectDojo' } : null,
+  ].filter((x): x is { id: string; label: string } => x !== null);
+  const tab = tabs.some((x) => x.id === u.get('tab')) ? u.get('tab') : tabs[0]?.id;
+  if (!tab) return <NoAccess />;
+  const readOnly = (tab === 'roles' && !can('roles:manage')) || (tab === 'safety' && !can('safety:manage'));
+  return (
+    <div>
+      <PageHeader title={t('Administracja', 'Administration')} sub={t('Konta, role, dziennik audytu, polityka bezpieczeństwa i integracje.', 'Accounts, roles, the audit log, the safety policy and integrations.')} readOnly={readOnly} />
+      <div className="px-4 pt-2 sm:px-6"><Tabs tabs={tabs} value={tab} onChange={(id) => u.set({ tab: id, q: null, action: null, entity: null })} /></div>
+      {tab === 'users' ? <UsersTab /> : null}
+      {tab === 'roles' ? <RolesTab canManage={can('roles:manage')} /> : null}
+      {tab === 'audit' ? <AuditTab /> : null}
+      {tab === 'safety' ? <SafetyTab /> : null}
+      {tab === 'defectdojo' ? <DojoTab /> : null}
+      <p className="px-4 py-3 text-2xs text-ink-3 sm:px-6">{fmtInt(tabs.length)} {t('sekcji dostępnych dla Twojej roli.', 'sections available to your role.')}</p>
+    </div>
+  );
+}
