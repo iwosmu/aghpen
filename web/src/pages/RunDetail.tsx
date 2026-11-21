@@ -25,7 +25,7 @@ export const SMALL_RUN = 4;
 
 /** The services of one run, as they arrive (polled while the run is live). */
 function RunServices({ run, live }: { run: ScanRun; live: boolean }) {
-  const q = useItem<Page<Service>>('/services', { run_id: run.id, limit: 500 }, { refetchInterval: live ? 3000 : false });
+  const q = useItem<Page<Service>>('/services', { run_id: run.id, limit: 500 }, { refetchInterval: live ? 1500 : false }); // one small run: cheap to poll often
   // While the run is live, rows keep their arrival order: a service of the
   // first pass never moves when a later pass adds more. When the run is over:
   // open services first, then the ones that are gone now; by address and port.

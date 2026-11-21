@@ -176,7 +176,7 @@ function Inventory({ d, pair }: { d: Dash; pair?: { full?: ScanRun; prev?: ScanR
 
 /** The open ports a one-machine run has found so far (polled), instead of the address map. */
 function LivePorts({ runId }: { runId: number }) {
-  const q = useItem<Page<Service>>('/services', { run_id: runId, limit: 500 }, { refetchInterval: 3000 });
+  const q = useItem<Page<Service>>('/services', { run_id: runId, limit: 500 }, { refetchInterval: 1500 });
   const byPort = (a: Service, b: Service) => a.port - b.port;
   const { rows: items } = useArrivalOrder('live-ports-' + runId, q.data?.items ?? [], true, byPort, byPort);
   return (

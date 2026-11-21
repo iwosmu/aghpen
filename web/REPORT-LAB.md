@@ -205,3 +205,28 @@ Also in this round: a service name is never empty (fallback "nierozpoznana"); Cz
 
 **Safety note.** From 17:16 the coordinator forbade range scans of the Mac (nmap `-sV` probes hit local tools). Before that I ran 7 top-1000 scans of host.docker.internal from `czuiz`/`czuiy`. After the notice both stacks have `allowed_ports` set to the template ports plus my own published ports, and every profile on them scans only that list. Run #4 above used that list. The "Ten komputer" quick start copies the seeded default profile, as agreed; that is correct on a jury machine, but on a developer's Mac it scans the Mac's own ports.
 
+## 15. One machine in a dind "jury machine": staged full range, partial result, fixes
+
+Where: a `docker:28-dind` container (`czui-dind`). Czujka (image built from `iwosmu/czujka-accuracy` with this branch merged) and the target containers run inside it. Only Czujka's UI is published, to 127.0.0.1:18640 on the Mac. `localhost` maps to the dind bridge gateway 172.18.0.1, so no scan reaches the Mac. Targets: nginx :8787, Python HTTP with a set delay :9090, redis :6379, httpd :8080; dind's own docker :2375 and Czujka :18080 also answer.
+
+**Fresh install, measured with Playwright (`dind-pl-1..5`, `dind-en-1..5`), the same in PL and EN:**
+
+| Step | Time after login | Clicks |
+| --- | --- | --- |
+| Wizard, quick start | 0.8 s | 0 |
+| "Ten komputer (localhost)": "localhost = host Dockera 172.18.0.1" | 1.5 s | 1 |
+| "Uruchom skan": run page | 2.2 s | 2 |
+| Passes line and partial note ("najczęstsze porty: gotowe · pełny zakres 1-65535: 1%") | 4.5 s | 2 |
+| First services on screen (4 rows) | 12.6 s | 2 |
+| Run done, 6 services, full range 1-65535 done | 119 s | 2 |
+
+Where the 10 s to the first row go (API polled every 0.4 s): the top-ports pass ends 2.3 s after the start; `/services?run_id` gives the first rows at 8.5 s, after the HTTP fingerprinting of that pass. The UI polled every 3 s; it now polls a one-host live run every 1.5 s. Rows keep their arrival order while the run is live (0 order changes in both runs; one remount had moved a row before the per-run order cache).
+
+**Partial result.** While the full-range pass runs, the run page and the dashboard say "Skan trwa: sprawdzono najczęstsze porty, pełny zakres 1-65535 w toku (N%). Wynik nie jest jeszcze ostateczny; zmiany i zniknięte usługi pokażą się po końcu skanu." The live table shows the state of this run ("otwarta"), not the inventory state. Changes exist only after the run ends. The dashboard box of a one-host run counts open services instead of "0% adresów" and hides "pozostało 0 s".
+
+**Gone, slower, returned, recovered (runs #2 and #3 on the first stack):** run #2 (nginx stopped, 900 ms delay) gave `service_gone` :8787 and `response_slower` :9090 "1 ms → 901 ms". Run #3 gave `service_returned` :8787 "away for 5 min 13 s (1 scan)" and `response_recovered` :9090 "901 ms → 1 ms" (it showed "1 ms → 1 ms" before this fix). Dashboard "Najnowsze zmiany" uses the returned glyph. The response-time chart scales to the API's slow threshold (2× and +300 ms: 301 ms here), so 1 ms → 3 ms stays flat. Only points with `slow=true` are highlighted. Compare of two consecutive runs uses the run's change log, so nginx shows as "returned", not "new".
+
+**English.** The new strings show in EN (`dind-*-en`). The API writes change summaries in Polish; for `service_returned`, `response_slower` and `response_recovered` the EN view builds its own sentence. Other kinds keep the API's Polish text. Mobile, live run: `dind-m1-run-live-en`.
+
+**Profile editor and estimate** (`dind-14-estimate-pl/en`). The text comes from ScanEstimate: `full_range_max_hosts` 16, `full_range_max_addresses` 256, `full_range_ports` 64 484, `est_full_range_sec_per_host` 85.3. "Drugi etap trwa około 1 min 25 s dla 1 hosta i około 22 min 45 s dla 16 hostów, przy tempie 1 000 pps." The ports field says when the full range applies; an explicit list is scanned as written.
+
