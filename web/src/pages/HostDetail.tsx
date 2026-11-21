@@ -10,6 +10,8 @@ import { ChangeMark, ClassChips, Crit, HostStatusMark, InterestScore, ServiceSta
 import { InlineText, OverrideNote } from '../ui/edit';
 import { WeekHeatmap } from '../viz/WeekHeatmap';
 import { useCan } from '../session';
+import { ReprobePanel } from './Reprobe';
+import { HostLifePanel } from './TimeMachine';
 
 function ModelOutput({ h, a }: { h: Host; a: AvailabilityProfile }) {
   const left = Math.max(0, a.down_after_misses - h.consecutive_misses);
@@ -150,6 +152,8 @@ export default function HostDetail() {
               </div>
             )}
           </Panel>
+          <ReprobePanel hostId={h.id} />
+          <HostLifePanel hostId={h.id} />
 
           <Panel title={t('Historia zmian', 'Change timeline')} count={changes.data?.total} flush>
             {changes.error ? <ErrorState error={changes.error} retry={() => changes.refetch()} /> : !changes.data ? <SkeletonRows rows={4} /> : changes.data.items.length === 0 ? (

@@ -10,6 +10,8 @@ import { Icon } from '../ui/Icon';
 import { ClassChips, Confidence, Glyph, InterestBreakdown, InterestScore, SERVICE_CLASSES, ServiceStateMark, categoryLabel, classLabel } from '../ui/marks';
 import { InlineText, OverrideNote } from '../ui/edit';
 import { useCan } from '../session';
+import { SuggestButton } from './Suggest';
+import { ServiceHistoryPanel } from './TimeMachine';
 
 function Flag({ on, label, bad }: { on: boolean; label: string; bad?: boolean }) {
   return (
@@ -187,6 +189,7 @@ function ClassEditor({ s, onSave, onClose }: { s: Service; onSave: (c: string[])
 export default function ServiceDetail() {
   const id = Number(useParams().id);
   const canEdit = useCan('results:update');
+  const canSuggest = useCan('signatures:read');
   const q = useItem<Service>('/services/' + id);
   const obs = usePage<ServiceObservation>('/services/' + id + '/observations', { limit: 30 });
   const save = useAction((body: Record<string, unknown>) => patch<Service>('/services/' + id, body), { invalidate: ['/services', '/service-groups', '/hosts/'], success: t('Zapisano', 'Saved') });
@@ -203,7 +206,7 @@ export default function ServiceDetail() {
         title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono">{s.ip}:{s.port}</span><span className="text-base font-normal"><ServiceStateMark state={s.state} /></span></span>}
         sub={<><Link to={'/hosts/' + s.host_id} className="link">{t('host', 'host')} <span className="mono">{s.hostname || s.ip}</span></Link> · {s.name}{s.tls ? ' · TLS' : ''}{s.url ? <> · <a className="link mono inline-flex items-center gap-1" href={s.url} target="_blank" rel="noreferrer noopener">{s.url}<Icon name="external" size={11} /></a></> : null}</>}
         readOnly={!canEdit}
-        actions={<span className="flex items-center gap-2 text-sm text-ink-2">{t('Ciekawość', 'Interest')} <InterestScore value={s.interest} /></span>}
+        actions={<span className="flex items-center gap-3 text-sm text-ink-2">{canSuggest ? <SuggestButton serviceId={s.id} /> : null}<span className="flex items-center gap-2">{t('Ciekawość', 'Interest')} <InterestScore value={s.interest} /></span></span>}
       />
       <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
         <div className="min-w-0 space-y-4">
@@ -238,6 +241,7 @@ export default function ServiceDetail() {
           {r?.http ? <Panel title="HTTP"><HttpPanel h={r.http} tls={s.tls} /></Panel> : s.name === 'http' ? <Panel title="HTTP"><p className="text-sm text-ink-2">{t('Kolektor HTTP nie zebrał danych z tej usługi w ostatnim skanie.', 'The HTTP collector got no data from this service in the last scan.')}</p></Panel> : null}
           {r?.tls ? <Panel title={t('Certyfikat TLS', 'TLS certificate')}><TlsPanel c={r.tls} /></Panel> : null}
 
+          <ServiceHistoryPanel serviceId={s.id} />
           <Panel title={t('Historia obserwacji', 'Observation history')} count={obs.data?.total} flush>
             {obs.error ? <ErrorState error={obs.error} retry={() => obs.refetch()} /> : !obs.data ? <SkeletonRows rows={4} /> : (
               <div className="overflow-x-auto">
