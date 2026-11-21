@@ -834,7 +834,10 @@ func (r *run) densePass(ctx context.Context, g *group, scanned map[string]*probe
 // ports: 68 s before, mostly -sV (43 s) and then the HTTP stage (24 s).
 const (
 	quickMaxPairs       = 32               // open TCP ports in a group, all hosts together
-	quickServiceTimeout = 60 * time.Second // bound for one port's version detection (Gitea: 42 s)
+	// bound for one port's version detection: the general path's bound, so
+	// the result does not depend on the path (Gitea needs 42 s, Prometheus
+	// 66 s: nmap matches it only with its late FourOhFourRequest probe)
+	quickServiceTimeout = serviceHostTimeout
 	quickMaxProcs       = 8                // nmap processes at one time on the quick path
 )
 
