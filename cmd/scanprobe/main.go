@@ -356,9 +356,9 @@ func main() {
 		per := wall.Seconds() / float64(out.Stats.AddressesDone)
 		sum.Extrapolation = map[string]string{
 			"basis":  fmt.Sprintf("%d addresses in %.1fs (%.4fs per address) at %d pps, same share of live hosts", out.Stats.AddressesDone, wall.Seconds(), per, sum.LimitPPS),
-			"10000":  (time.Duration(per*10000*float64(time.Second))).Round(time.Second).String(),
-			"65536":  (time.Duration(per*65536*float64(time.Second))).Round(time.Second).String(),
-			"100000": (time.Duration(per*100000*float64(time.Second))).Round(time.Second).String(),
+			"10000":  (time.Duration(per * 10000 * float64(time.Second))).Round(time.Second).String(),
+			"65536":  (time.Duration(per * 65536 * float64(time.Second))).Round(time.Second).String(),
+			"100000": (time.Duration(per * 100000 * float64(time.Second))).Round(time.Second).String(),
 		}
 	}
 	_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"summary": sum})

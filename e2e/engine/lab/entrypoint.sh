@@ -24,6 +24,15 @@ s.serve_forever()"
     iptables -A INPUT -p icmp -j DROP 2>/dev/null || iptables-legacy -A INPUT -p icmp -j DROP
     exec python3 -m http.server "$PORT" --directory /srv/www
     ;;
+  router)
+    # Forwards between the scanner network and the lab and hides the scanner
+    # behind its own lab address.
+    iptables -t nat -A POSTROUTING -s 10.78.0.0/24 -d 10.77.0.0/22 -j MASQUERADE 2>/dev/null \
+      || iptables-legacy -t nat -A POSTROUTING -s 10.78.0.0/24 -d 10.77.0.0/22 -j MASQUERADE
+    iptables -t nat -A POSTROUTING -s 10.78.0.0/24 -d 10.79.0.0/20 -j MASQUERADE 2>/dev/null \
+      || iptables-legacy -t nat -A POSTROUTING -s 10.78.0.0/24 -d 10.79.0.0/20 -j MASQUERADE
+    exec sleep infinity
+    ;;
   *)
     exec sleep infinity
     ;;

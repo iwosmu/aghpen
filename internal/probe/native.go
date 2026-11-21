@@ -113,7 +113,7 @@ func (n *Native) Discover(ctx context.Context, req DiscoverRequest) (*Result, er
 	if len(ports) == 0 {
 		ports = DefaultSynPorts
 	}
-	lim := NewLimiter(float64(req.MaxRate), max(1, req.MaxRate/10))
+	lim := nativeLimiter(req.MaxRate)
 	passes := 1 + req.MaxRetries
 	var sent atomic.Int64
 	var mu sync.Mutex
@@ -195,6 +195,12 @@ func ConnectProbe(ctx context.Context, ip string, ports []int, timeout time.Dura
 	return h, sent
 }
 
+// nativeLimiter paces connects a little under the cap: a completed
+// handshake also sends an ACK and a FIN, which the bucket does not count.
+func nativeLimiter(rate int) *Limiter {
+	return NewLimiter(float64(rate)*0.97, 1)
+}
+
 type hostPort struct {
 	host int
 	port int
@@ -205,7 +211,7 @@ func (n *Native) PortScan(ctx context.Context, req PortScanRequest) (*Result, er
 		return nil, errors.New("port scan: empty port set")
 	}
 	ports := req.Ports.List()
-	lim := NewLimiter(float64(req.MaxRate), max(1, req.MaxRate/10))
+	lim := nativeLimiter(req.MaxRate)
 	res := &Result{Hosts: make([]Host, len(req.Hosts)), Scanned: len(req.Hosts)}
 	for i, ip := range req.Hosts {
 		res.Hosts[i] = Host{IP: ip, Up: true}
@@ -252,7 +258,7 @@ func (n *Native) PortScan(ctx context.Context, req PortScanRequest) (*Result, er
 }
 
 func (n *Native) ServiceScan(ctx context.Context, req ServiceRequest) (*Result, error) {
-	lim := NewLimiter(float64(req.MaxRate), max(1, req.MaxRate/10))
+	lim := nativeLimiter(req.MaxRate)
 	res := &Result{Hosts: make([]Host, len(req.Hosts)), Scanned: len(req.Hosts)}
 	for i, h := range req.Hosts {
 		res.Hosts[i] = Host{IP: h.IP, Up: true}

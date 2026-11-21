@@ -107,7 +107,12 @@ func (n *Nmap) commonArgs(maxRate, maxRetries int, hostTimeout time.Duration, v6
 	if maxRetries < 0 {
 		maxRetries = 0
 	}
-	args := []string{"-n", "-T4", "-v", "--max-rate", strconv.Itoa(maxRate), "--max-retries", strconv.Itoa(maxRetries)}
+	// --max-rate alone caps the average since the start of the process: after
+	// a slow phase nmap sends bursts far above it to catch up (measured: 1000
+	// pps for seconds against a 500 pps limit). --min-rate with the same
+	// value pins the pace, so the cap also holds second by second.
+	rate := strconv.Itoa(maxRate)
+	args := []string{"-n", "-T4", "-v", "--min-rate", rate, "--max-rate", rate, "--max-retries", strconv.Itoa(maxRetries)}
 	if hostTimeout > 0 {
 		args = append(args, "--host-timeout", strconv.Itoa(int(hostTimeout.Seconds()+0.5))+"s")
 	}
