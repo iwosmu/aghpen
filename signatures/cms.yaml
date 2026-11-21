@@ -25,6 +25,7 @@
 
 - id: wordpress-login
   name: WordPress – strona logowania
+  name_en: WordPress – login page
   category: cms
   technology: WordPress
   description: Dostępny publicznie formularz logowania wp-login.php.
@@ -60,6 +61,7 @@
 
 - id: joomla-installer
   name: Joomla – niedokończona instalacja
+  name_en: Joomla – unfinished installation
   category: cms
   technology: Joomla
   description: Instalator Joomla jest dostępny publicznie. Kto pierwszy go ukończy, przejmuje witrynę.
@@ -91,6 +93,7 @@
 
 - id: drupal-installer
   name: Drupal – niedokończona instalacja
+  name_en: Drupal – unfinished installation
   category: cms
   technology: Drupal
   description: Instalator Drupala (core/install.php) jest dostępny publicznie.
@@ -153,6 +156,7 @@
 
 - id: mediawiki-not-configured
   name: MediaWiki – brak konfiguracji
+  name_en: MediaWiki – not configured
   category: cms
   technology: MediaWiki
   description: MediaWiki bez pliku LocalSettings.php. Instalator jest dostępny publicznie.

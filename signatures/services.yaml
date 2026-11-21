@@ -31,6 +31,7 @@
 
 - id: ssh-protocol-1
   name: SSH w wersji protokołu 1
+  name_en: SSH protocol version 1
   category: other
   technology: false
   description: Serwer SSH przyjmuje przestarzały protokół SSH-1 (baner SSH-1.x). Protokół ma znane słabości kryptograficzne.
@@ -55,6 +56,7 @@
 
 - id: rdp
   name: Pulpit zdalny (RDP)
+  name_en: Remote desktop (RDP)
   category: other
   description: Usługa pulpitu zdalnego Microsoft RDP.
   tags: [rdp, microsoft]
@@ -352,6 +354,7 @@
 
 - id: rtsp
   name: RTSP (strumień wideo)
+  name_en: RTSP (video stream)
   category: iot
   technology: false
   description: Usługa strumieniowania RTSP, typowa dla kamer i rejestratorów.
@@ -364,6 +367,7 @@
 
 - id: ics-protocol
   name: Protokół przemysłowy (Modbus, S7, BACnet, DNP3, EtherNet/IP)
+  name_en: "Industrial protocol (Modbus, S7, BACnet, DNP3, EtherNet/IP)"
   category: iot
   technology: false
   description: Usługa protokołu automatyki przemysłowej albo budynkowej dostępna w sieci. Te protokoły nie mają uwierzytelniania.

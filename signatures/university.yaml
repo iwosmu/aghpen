@@ -295,6 +295,7 @@
 
 - id: jupyter-open
   name: Jupyter bez logowania
+  name_en: Jupyter without login
   category: devops
   technology: Jupyter Notebook / JupyterLab
   description: Serwer Jupyter wpuszcza bez hasła i tokenu. Każdy może uruchomić kod na tym serwerze.

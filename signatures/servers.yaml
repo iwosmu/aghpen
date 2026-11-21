@@ -15,6 +15,7 @@
 
 - id: nginx-default-page
   name: nginx – strona domyślna
+  name_en: nginx – default page
   category: web-server
   technology: nginx
   description: Serwer pokazuje stronę powitalną nginx. Usługa jest zainstalowana, ale nie skonfigurowana.
@@ -41,6 +42,7 @@
 
 - id: apache-default-page
   name: Apache – strona domyślna
+  name_en: Apache – default page
   category: web-server
   technology: Apache HTTP Server
   description: Serwer pokazuje stronę domyślną Apache („It works!”, strona Debiana, Ubuntu albo CentOS).
@@ -74,6 +76,7 @@
 
 - id: iis-default-page
   name: IIS – strona domyślna
+  name_en: IIS – default page
   category: web-server
   technology: Microsoft IIS
   description: Serwer pokazuje stronę powitalną IIS.
@@ -106,6 +109,7 @@
 
 - id: caddy-default-page
   name: Caddy – strona domyślna
+  name_en: Caddy – default page
   category: web-server
   technology: Caddy
   description: Serwer pokazuje stronę powitalną Caddy.
@@ -176,6 +180,7 @@
 
 - id: tomcat-default-page
   name: Tomcat – strona domyślna
+  name_en: Tomcat – default page
   category: app-server
   technology: Apache Tomcat
   description: Tomcat pokazuje stronę powitalną z odnośnikami do aplikacji Manager i Host Manager.
@@ -422,6 +427,7 @@
 
 - id: haproxy-stats
   name: HAProxy – strona statystyk
+  name_en: HAProxy – statistics page
   category: proxy
   technology: HAProxy
   description: Strona statystyk HAProxy jest dostępna. Pokazuje adresy serwerów zaplecza.
@@ -530,6 +536,7 @@
 
 - id: openssl-in-server-header
   name: OpenSSL (wersja w nagłówku Server)
+  name_en: OpenSSL (version in the Server header)
   category: library
   technology: OpenSSL
   description: Nagłówek Server ujawnia wersję biblioteki OpenSSL.

@@ -3,222 +3,382 @@ rule admin-panel-outside-mgmt
   pl.description: Panel administracyjny jest osiągalny z sieci skanowanej. Panele powinny być dostępne tylko z sieci zarządzania (hosty z etykietą mgmt są pominięte).
   pl.remediation: Ogranicz dostęp do panelu (ACL, VPN, sieć zarządzania) albo oznacz host etykietą mgmt, jeśli należy do sieci zarządzania.
   pl.condition: klasa admin-panel
+  en.name: Admin panel outside the management network
+  en.description: An admin panel is reachable from the scanned network. Admin panels should be reachable only from the management network (hosts tagged mgmt are skipped).
+  en.remediation: Restrict access to the panel (ACL, VPN, management network), or tag the host mgmt if it belongs to the management network.
+  en.condition: class admin-panel
 rule cleartext-remote-access
   pl.name: Telnet albo FTP dostępny w sieci
   pl.description: Usługa przesyła dane logowania otwartym tekstem (telnet, FTP).
   pl.remediation: Wyłącz telnet i FTP; użyj SSH i SFTP.
   pl.condition: usługa telnet/ftp lub port 21,23
+  en.name: Telnet or FTP reachable on the network
+  en.description: The service sends credentials in clear text (telnet, FTP).
+  en.remediation: Turn off telnet and FTP; use SSH and SFTP.
+  en.condition: service telnet/ftp or port 21,23
 rule database-port-exposed
   pl.name: Port bazy danych otwarty na sieć skanowaną
   pl.description: Serwer bazy danych (lub magazyn klucz–wartość) przyjmuje połączenia z sieci, z której skanuje Czujka.
   pl.remediation: Zamknij port w zaporze albo zwiąż usługę z adresem lokalnym; dostęp tylko z serwerów aplikacji.
   pl.condition: usługa mysql/postgresql/ms-sql-s/oracle-tns/mongodb/redis/memcached/elasticsearch/couchdb/cassandra/influxdb lub port 1433,1521,3306,5432,5984,6379,9042,9200,11211,27017
+  en.name: Database port open to the scanned network
+  en.description: A database server (or a key–value store) accepts connections from the network Czujka scans from.
+  en.remediation: Close the port in the firewall or bind the service to a local address; allow access only from the application servers.
+  en.condition: service mysql/postgresql/ms-sql-s/oracle-tns/mongodb/redis/memcached/elasticsearch/couchdb/cassandra/influxdb or port 1433,1521,3306,5432,5984,6379,9042,9200,11211,27017
 rule default-server-page
   pl.name: Domyślna strona serwera
   pl.description: Serwer WWW pokazuje stronę domyślną po instalacji. To zwykle porzucona albo nieskonfigurowana usługa.
   pl.remediation: Wyłącz nieużywany serwer albo skonfiguruj właściwą witrynę.
   pl.condition: klasa default-page
+  en.name: Default server page
+  en.description: The web server shows its post-install default page. This is usually an abandoned or unconfigured service.
+  en.remediation: Turn off the unused server or configure the proper site.
+  en.condition: class default-page
 rule directory-listing
   pl.name: Listowanie katalogów
   pl.description: Serwer WWW pokazuje listę plików katalogu.
   pl.remediation: Wyłącz autoindeks (Options -Indexes, autoindex off).
   pl.condition: klasa directory-listing
+  en.name: Directory listing
+  en.description: The web server shows the file list of a directory.
+  en.remediation: Turn off autoindex (Options -Indexes, autoindex off).
+  en.condition: class directory-listing
 rule login-over-plain-http
   pl.name: Formularz logowania przez zwykły HTTP
   pl.description: Strona logowania działa bez TLS i nie przekierowuje na HTTPS. Hasła idą przez sieć otwartym tekstem.
   pl.remediation: Włącz HTTPS i przekierowanie z HTTP na HTTPS.
   pl.condition: klasa login i schemat http i przekierowanie na HTTPS: false
+  en.name: Login form over plain HTTP
+  en.description: The login page runs without TLS and does not redirect to HTTPS. Passwords cross the network in clear text.
+  en.remediation: Enable HTTPS and redirect HTTP to HTTPS.
+  en.condition: class login and scheme http and redirects to HTTPS: false
 rule new-service-not-approved
   pl.name: Nowa usługa bez akceptacji
   pl.description: Usługa pojawiła się w ciągu ostatnich 7 dni i nikt nie oznaczył jej etykietą approved. Włącz tę regułę po pierwszym pełnym skanie, aby każda nowa ekspozycja wymagała akceptacji.
   pl.remediation: Sprawdź usługę i dodaj etykietę approved (do usługi albo hosta), jeśli jest zamierzona.
   pl.condition: nowe od 7 dni i nie (etykieta approved)
+  en.name: New service not approved
+  en.description: The service appeared in the last 7 days and nobody tagged it approved. Turn this rule on after the first full scan, so that every new exposure needs approval.
+  en.remediation: Check the service and add the tag approved (to the service or the host) if it is intended.
+  en.condition: new within 7 days and not (tag approved)
 rule outdated-cms-major
   pl.name: Przestarzała główna wersja CMS
   pl.description: Wykryto system CMS w głównej wersji, która nie dostaje już poprawek bezpieczeństwa.
   pl.remediation: Zaktualizuj CMS do wspieranej wersji głównej.
   pl.condition: technologia wordpress < 6 / joomla < 4 / drupal < 10 / typo3 < 12 / moodle < 4 / mediawiki < 1.39
+  en.name: Outdated CMS major version
+  en.description: A CMS runs a major version that no longer gets security fixes.
+  en.remediation: Upgrade the CMS to a supported major version.
+  en.condition: technology wordpress < 6 / joomla < 4 / drupal < 10 / typo3 < 12 / moodle < 4 / mediawiki < 1.39
 rule remote-desktop-exposed
   pl.name: Pulpit zdalny (RDP, VNC) dostępny w sieci
   pl.description: Usługa pulpitu zdalnego jest osiągalna z sieci skanowanej.
   pl.remediation: Udostępniaj pulpit zdalny tylko przez VPN albo bramę RDP.
   pl.condition: usługa ms-wbt-server/rdp/vnc/vnc-http lub port 3389,5900,5901
+  en.name: Remote desktop (RDP, VNC) reachable on the network
+  en.description: A remote desktop service is reachable from the scanned network.
+  en.remediation: Offer remote desktop only through a VPN or an RDP gateway.
+  en.condition: service ms-wbt-server/rdp/vnc/vnc-http or port 3389,5900,5901
 rule staging-or-debug-exposed
   pl.name: Środowisko testowe albo narzędzie deweloperskie dostępne w sieci
   pl.description: Środowisko staging/test/dev albo narzędzie deweloperskie (CI, konsola debugowania) jest osiągalne z sieci skanowanej.
   pl.remediation: Ogranicz dostęp do środowisk testowych albo oznacz je etykietą approved po akceptacji ryzyka.
   pl.condition: klasa staging/dev-tool
+  en.name: Test environment or developer tool reachable on the network
+  en.description: A staging/test/dev environment or a developer tool (CI, debug console) is reachable from the scanned network.
+  en.remediation: Restrict access to test environments, or tag them approved once the risk is accepted.
+  en.condition: class staging/dev-tool
 rule tls-certificate-expired
   pl.name: Wygasły certyfikat TLS
   pl.description: Usługa przedstawia certyfikat, którego termin ważności minął.
   pl.remediation: Odnów certyfikat (np. ACME) i wdroż go na usłudze.
   pl.condition: TLS {present: true, expired: true}
+  en.name: Expired TLS certificate
+  en.description: The service presents a certificate that has expired.
+  en.remediation: Renew the certificate (for example with ACME) and deploy it on the service.
+  en.condition: TLS {present: true, expired: true}
 rule tls-certificate-expiring-14d
   pl.name: Certyfikat TLS wygasa w ciągu 14 dni
   pl.description: Certyfikat jest jeszcze ważny, ale wygaśnie w ciągu 14 dni.
   pl.remediation: Zaplanuj odnowienie certyfikatu.
   pl.condition: TLS {present: true, expired: false, ważny krócej niż 14 dni}
+  en.name: TLS certificate expires within 14 days
+  en.description: The certificate is still valid, but expires within 14 days.
+  en.remediation: Plan the certificate renewal.
+  en.condition: TLS {present: true, expired: false, valid for less than 14 days}
 rule tls-self-signed
   pl.name: Certyfikat samopodpisany
   pl.description: Usługa używa certyfikatu samopodpisanego. Użytkownicy uczą się ignorować ostrzeżenia przeglądarki.
   pl.remediation: Użyj certyfikatu z zaufanego CA (np. ACME).
   pl.condition: TLS {present: true, self_signed: true}
+  en.name: Self-signed certificate
+  en.description: The service uses a self-signed certificate. Users learn to ignore browser warnings.
+  en.remediation: Use a certificate from a trusted CA (for example ACME).
+  en.condition: TLS {present: true, self_signed: true}
 rule unauthenticated-control-api
   pl.name: API sterujące bez uwierzytelniania
   pl.description: API do sterowania usługą odpowiada bez logowania (np. API Toxiproxy, Traefik z api.insecure, API Dockera na porcie 2375). Kto je osiągnie, zmienia konfigurację usługi albo uruchamia kontenery.
   pl.remediation: Zwiąż API z adresem lokalnym albo włącz uwierzytelnianie (Traefik bez api.insecure, Docker przez gniazdo lub TLS na 2376).
   pl.condition: klasa unauth-control-api lub port 2375 i usługa docker
+  en.name: Control API without authentication
+  en.description: An API that controls the service answers without login (for example the Toxiproxy API, Traefik with api.insecure, the Docker API on port 2375). Whoever reaches it can change the service configuration or start containers.
+  en.remediation: Bind the API to a local address or enable authentication (Traefik without api.insecure, Docker through its socket or TLS on 2376).
+  en.condition: class unauth-control-api or port 2375 and service docker
 rule unfinished-install-page
   pl.name: Niedokończona instalacja aplikacji
   pl.description: Aplikacja pokazuje kreator instalacji (np. instalator Gitea, wp-admin/install.php WordPressa). Każdy, kto pierwszy go dokończy, ustawi konto administratora i przejmie aplikację.
   pl.remediation: Dokończ instalację od razu albo wyłącz usługę; do czasu instalacji nie wystawiaj jej do sieci.
   pl.condition: klasa install-page
+  en.name: Unfinished application installation
+  en.description: The application shows its installation wizard (for example the Gitea installer, WordPress wp-admin/install.php). Whoever completes it first sets the admin account and takes over the application.
+  en.remediation: Complete the installation now or turn the service off; do not expose it to the network until it is installed.
+  en.condition: class install-page
 rule web-without-https-redirect
   pl.name: Serwis WWW bez przekierowania na HTTPS
   pl.description: Usługa WWW odpowiada po zwykłym HTTP i nie przekierowuje na HTTPS.
   pl.remediation: Dodaj przekierowanie 301 na HTTPS.
   pl.condition: schemat http i przekierowanie na HTTPS: false i kod HTTP 2xx
+  en.name: Web site without HTTPS redirect
+  en.description: The web service answers over plain HTTP and does not redirect to HTTPS.
+  en.remediation: Add a 301 redirect to HTTPS.
+  en.condition: scheme http and redirects to HTTPS: false and HTTP status 2xx
 finding policy-violation|admin-panel-outside-mgmt|10.0.0.5/tcp-8080
   pl.title: Panel administracyjny poza siecią zarządzania — 10.0.0.5:8080
   pl.desc: "Panel administracyjny jest osiągalny z sieci skanowanej. Panele powinny być dostępne tylko z sieci zarządzania (hosty z etykietą mgmt są pominięte).\n\nNaruszona reguła ekspozycji „admin-panel-outside-mgmt”. Warunek: klasa admin-panel.\nZalecenie: Ogranicz dostęp do panelu (ACL, VPN, sieć zarządzania) albo oznacz host etykietą mgmt, jeśli należy do sieci zarządzania."
+  en.title: Admin panel outside the management network — 10.0.0.5:8080
+  en.desc: "An admin panel is reachable from the scanned network. Admin panels should be reachable only from the management network (hosts tagged mgmt are skipped).\n\nExposure rule “admin-panel-outside-mgmt” violated. Condition: class admin-panel.\nRemediation: Restrict access to the panel (ACL, VPN, management network), or tag the host mgmt if it belongs to the management network."
 finding policy-violation|admin-panel-outside-mgmt|10.0.0.5
   pl.title: Panel administracyjny poza siecią zarządzania — 10.0.0.5
   pl.desc: "Panel administracyjny jest osiągalny z sieci skanowanej. Panele powinny być dostępne tylko z sieci zarządzania (hosty z etykietą mgmt są pominięte).\n\nNaruszona reguła ekspozycji „admin-panel-outside-mgmt”. Warunek: klasa admin-panel.\nZalecenie: Ogranicz dostęp do panelu (ACL, VPN, sieć zarządzania) albo oznacz host etykietą mgmt, jeśli należy do sieci zarządzania."
+  en.title: Admin panel outside the management network — 10.0.0.5
+  en.desc: "An admin panel is reachable from the scanned network. Admin panels should be reachable only from the management network (hosts tagged mgmt are skipped).\n\nExposure rule “admin-panel-outside-mgmt” violated. Condition: class admin-panel.\nRemediation: Restrict access to the panel (ACL, VPN, management network), or tag the host mgmt if it belongs to the management network."
 finding policy-violation|admin-panel-outside-mgmt|scope
   pl.title: Panel administracyjny poza siecią zarządzania — brak w zakresie
   pl.desc: "Panel administracyjny jest osiągalny z sieci skanowanej. Panele powinny być dostępne tylko z sieci zarządzania (hosty z etykietą mgmt są pominięte).\n\nNaruszona reguła ekspozycji „admin-panel-outside-mgmt”. Warunek: klasa admin-panel.\nZalecenie: Ogranicz dostęp do panelu (ACL, VPN, sieć zarządzania) albo oznacz host etykietą mgmt, jeśli należy do sieci zarządzania."
+  en.title: Admin panel outside the management network — missing in scope
+  en.desc: "An admin panel is reachable from the scanned network. Admin panels should be reachable only from the management network (hosts tagged mgmt are skipped).\n\nExposure rule “admin-panel-outside-mgmt” violated. Condition: class admin-panel.\nRemediation: Restrict access to the panel (ACL, VPN, management network), or tag the host mgmt if it belongs to the management network."
 finding policy-violation|cleartext-remote-access|10.0.0.5/tcp-8080
   pl.title: Telnet albo FTP dostępny w sieci — 10.0.0.5:8080
   pl.desc: "Usługa przesyła dane logowania otwartym tekstem (telnet, FTP).\n\nNaruszona reguła ekspozycji „cleartext-remote-access”. Warunek: usługa telnet/ftp lub port 21,23.\nZalecenie: Wyłącz telnet i FTP; użyj SSH i SFTP."
+  en.title: Telnet or FTP reachable on the network — 10.0.0.5:8080
+  en.desc: "The service sends credentials in clear text (telnet, FTP).\n\nExposure rule “cleartext-remote-access” violated. Condition: service telnet/ftp or port 21,23.\nRemediation: Turn off telnet and FTP; use SSH and SFTP."
 finding policy-violation|cleartext-remote-access|10.0.0.5
   pl.title: Telnet albo FTP dostępny w sieci — 10.0.0.5
   pl.desc: "Usługa przesyła dane logowania otwartym tekstem (telnet, FTP).\n\nNaruszona reguła ekspozycji „cleartext-remote-access”. Warunek: usługa telnet/ftp lub port 21,23.\nZalecenie: Wyłącz telnet i FTP; użyj SSH i SFTP."
+  en.title: Telnet or FTP reachable on the network — 10.0.0.5
+  en.desc: "The service sends credentials in clear text (telnet, FTP).\n\nExposure rule “cleartext-remote-access” violated. Condition: service telnet/ftp or port 21,23.\nRemediation: Turn off telnet and FTP; use SSH and SFTP."
 finding policy-violation|cleartext-remote-access|scope
   pl.title: Telnet albo FTP dostępny w sieci — brak w zakresie
   pl.desc: "Usługa przesyła dane logowania otwartym tekstem (telnet, FTP).\n\nNaruszona reguła ekspozycji „cleartext-remote-access”. Warunek: usługa telnet/ftp lub port 21,23.\nZalecenie: Wyłącz telnet i FTP; użyj SSH i SFTP."
+  en.title: Telnet or FTP reachable on the network — missing in scope
+  en.desc: "The service sends credentials in clear text (telnet, FTP).\n\nExposure rule “cleartext-remote-access” violated. Condition: service telnet/ftp or port 21,23.\nRemediation: Turn off telnet and FTP; use SSH and SFTP."
 finding policy-violation|database-port-exposed|10.0.0.5/tcp-8080
   pl.title: Port bazy danych otwarty na sieć skanowaną — 10.0.0.5:8080
   pl.desc: "Serwer bazy danych (lub magazyn klucz–wartość) przyjmuje połączenia z sieci, z której skanuje Czujka.\n\nNaruszona reguła ekspozycji „database-port-exposed”. Warunek: usługa mysql/postgresql/ms-sql-s/oracle-tns/mongodb/redis/memcached/elasticsearch/couchdb/cassandra/influxdb lub port 1433,1521,3306,5432,5984,6379,9042,9200,11211,27017.\nZalecenie: Zamknij port w zaporze albo zwiąż usługę z adresem lokalnym; dostęp tylko z serwerów aplikacji."
+  en.title: Database port open to the scanned network — 10.0.0.5:8080
+  en.desc: "A database server (or a key–value store) accepts connections from the network Czujka scans from.\n\nExposure rule “database-port-exposed” violated. Condition: service mysql/postgresql/ms-sql-s/oracle-tns/mongodb/redis/memcached/elasticsearch/couchdb/cassandra/influxdb or port 1433,1521,3306,5432,5984,6379,9042,9200,11211,27017.\nRemediation: Close the port in the firewall or bind the service to a local address; allow access only from the application servers."
 finding policy-violation|database-port-exposed|10.0.0.5
   pl.title: Port bazy danych otwarty na sieć skanowaną — 10.0.0.5
   pl.desc: "Serwer bazy danych (lub magazyn klucz–wartość) przyjmuje połączenia z sieci, z której skanuje Czujka.\n\nNaruszona reguła ekspozycji „database-port-exposed”. Warunek: usługa mysql/postgresql/ms-sql-s/oracle-tns/mongodb/redis/memcached/elasticsearch/couchdb/cassandra/influxdb lub port 1433,1521,3306,5432,5984,6379,9042,9200,11211,27017.\nZalecenie: Zamknij port w zaporze albo zwiąż usługę z adresem lokalnym; dostęp tylko z serwerów aplikacji."
+  en.title: Database port open to the scanned network — 10.0.0.5
+  en.desc: "A database server (or a key–value store) accepts connections from the network Czujka scans from.\n\nExposure rule “database-port-exposed” violated. Condition: service mysql/postgresql/ms-sql-s/oracle-tns/mongodb/redis/memcached/elasticsearch/couchdb/cassandra/influxdb or port 1433,1521,3306,5432,5984,6379,9042,9200,11211,27017.\nRemediation: Close the port in the firewall or bind the service to a local address; allow access only from the application servers."
 finding policy-violation|database-port-exposed|scope
   pl.title: Port bazy danych otwarty na sieć skanowaną — brak w zakresie
   pl.desc: "Serwer bazy danych (lub magazyn klucz–wartość) przyjmuje połączenia z sieci, z której skanuje Czujka.\n\nNaruszona reguła ekspozycji „database-port-exposed”. Warunek: usługa mysql/postgresql/ms-sql-s/oracle-tns/mongodb/redis/memcached/elasticsearch/couchdb/cassandra/influxdb lub port 1433,1521,3306,5432,5984,6379,9042,9200,11211,27017.\nZalecenie: Zamknij port w zaporze albo zwiąż usługę z adresem lokalnym; dostęp tylko z serwerów aplikacji."
+  en.title: Database port open to the scanned network — missing in scope
+  en.desc: "A database server (or a key–value store) accepts connections from the network Czujka scans from.\n\nExposure rule “database-port-exposed” violated. Condition: service mysql/postgresql/ms-sql-s/oracle-tns/mongodb/redis/memcached/elasticsearch/couchdb/cassandra/influxdb or port 1433,1521,3306,5432,5984,6379,9042,9200,11211,27017.\nRemediation: Close the port in the firewall or bind the service to a local address; allow access only from the application servers."
 finding policy-violation|default-server-page|10.0.0.5/tcp-8080
   pl.title: Domyślna strona serwera — 10.0.0.5:8080
   pl.desc: "Serwer WWW pokazuje stronę domyślną po instalacji. To zwykle porzucona albo nieskonfigurowana usługa.\n\nNaruszona reguła ekspozycji „default-server-page”. Warunek: klasa default-page.\nZalecenie: Wyłącz nieużywany serwer albo skonfiguruj właściwą witrynę."
+  en.title: Default server page — 10.0.0.5:8080
+  en.desc: "The web server shows its post-install default page. This is usually an abandoned or unconfigured service.\n\nExposure rule “default-server-page” violated. Condition: class default-page.\nRemediation: Turn off the unused server or configure the proper site."
 finding policy-violation|default-server-page|10.0.0.5
   pl.title: Domyślna strona serwera — 10.0.0.5
   pl.desc: "Serwer WWW pokazuje stronę domyślną po instalacji. To zwykle porzucona albo nieskonfigurowana usługa.\n\nNaruszona reguła ekspozycji „default-server-page”. Warunek: klasa default-page.\nZalecenie: Wyłącz nieużywany serwer albo skonfiguruj właściwą witrynę."
+  en.title: Default server page — 10.0.0.5
+  en.desc: "The web server shows its post-install default page. This is usually an abandoned or unconfigured service.\n\nExposure rule “default-server-page” violated. Condition: class default-page.\nRemediation: Turn off the unused server or configure the proper site."
 finding policy-violation|default-server-page|scope
   pl.title: Domyślna strona serwera — brak w zakresie
   pl.desc: "Serwer WWW pokazuje stronę domyślną po instalacji. To zwykle porzucona albo nieskonfigurowana usługa.\n\nNaruszona reguła ekspozycji „default-server-page”. Warunek: klasa default-page.\nZalecenie: Wyłącz nieużywany serwer albo skonfiguruj właściwą witrynę."
+  en.title: Default server page — missing in scope
+  en.desc: "The web server shows its post-install default page. This is usually an abandoned or unconfigured service.\n\nExposure rule “default-server-page” violated. Condition: class default-page.\nRemediation: Turn off the unused server or configure the proper site."
 finding policy-violation|directory-listing|10.0.0.5/tcp-8080
   pl.title: Listowanie katalogów — 10.0.0.5:8080
   pl.desc: "Serwer WWW pokazuje listę plików katalogu.\n\nNaruszona reguła ekspozycji „directory-listing”. Warunek: klasa directory-listing.\nZalecenie: Wyłącz autoindeks (Options -Indexes, autoindex off)."
+  en.title: Directory listing — 10.0.0.5:8080
+  en.desc: "The web server shows the file list of a directory.\n\nExposure rule “directory-listing” violated. Condition: class directory-listing.\nRemediation: Turn off autoindex (Options -Indexes, autoindex off)."
 finding policy-violation|directory-listing|10.0.0.5
   pl.title: Listowanie katalogów — 10.0.0.5
   pl.desc: "Serwer WWW pokazuje listę plików katalogu.\n\nNaruszona reguła ekspozycji „directory-listing”. Warunek: klasa directory-listing.\nZalecenie: Wyłącz autoindeks (Options -Indexes, autoindex off)."
+  en.title: Directory listing — 10.0.0.5
+  en.desc: "The web server shows the file list of a directory.\n\nExposure rule “directory-listing” violated. Condition: class directory-listing.\nRemediation: Turn off autoindex (Options -Indexes, autoindex off)."
 finding policy-violation|directory-listing|scope
   pl.title: Listowanie katalogów — brak w zakresie
   pl.desc: "Serwer WWW pokazuje listę plików katalogu.\n\nNaruszona reguła ekspozycji „directory-listing”. Warunek: klasa directory-listing.\nZalecenie: Wyłącz autoindeks (Options -Indexes, autoindex off)."
+  en.title: Directory listing — missing in scope
+  en.desc: "The web server shows the file list of a directory.\n\nExposure rule “directory-listing” violated. Condition: class directory-listing.\nRemediation: Turn off autoindex (Options -Indexes, autoindex off)."
 finding policy-violation|login-over-plain-http|10.0.0.5/tcp-8080
   pl.title: Formularz logowania przez zwykły HTTP — 10.0.0.5:8080
   pl.desc: "Strona logowania działa bez TLS i nie przekierowuje na HTTPS. Hasła idą przez sieć otwartym tekstem.\n\nNaruszona reguła ekspozycji „login-over-plain-http”. Warunek: klasa login i schemat http i przekierowanie na HTTPS: false.\nZalecenie: Włącz HTTPS i przekierowanie z HTTP na HTTPS."
+  en.title: Login form over plain HTTP — 10.0.0.5:8080
+  en.desc: "The login page runs without TLS and does not redirect to HTTPS. Passwords cross the network in clear text.\n\nExposure rule “login-over-plain-http” violated. Condition: class login and scheme http and redirects to HTTPS: false.\nRemediation: Enable HTTPS and redirect HTTP to HTTPS."
 finding policy-violation|login-over-plain-http|10.0.0.5
   pl.title: Formularz logowania przez zwykły HTTP — 10.0.0.5
   pl.desc: "Strona logowania działa bez TLS i nie przekierowuje na HTTPS. Hasła idą przez sieć otwartym tekstem.\n\nNaruszona reguła ekspozycji „login-over-plain-http”. Warunek: klasa login i schemat http i przekierowanie na HTTPS: false.\nZalecenie: Włącz HTTPS i przekierowanie z HTTP na HTTPS."
+  en.title: Login form over plain HTTP — 10.0.0.5
+  en.desc: "The login page runs without TLS and does not redirect to HTTPS. Passwords cross the network in clear text.\n\nExposure rule “login-over-plain-http” violated. Condition: class login and scheme http and redirects to HTTPS: false.\nRemediation: Enable HTTPS and redirect HTTP to HTTPS."
 finding policy-violation|login-over-plain-http|scope
   pl.title: Formularz logowania przez zwykły HTTP — brak w zakresie
   pl.desc: "Strona logowania działa bez TLS i nie przekierowuje na HTTPS. Hasła idą przez sieć otwartym tekstem.\n\nNaruszona reguła ekspozycji „login-over-plain-http”. Warunek: klasa login i schemat http i przekierowanie na HTTPS: false.\nZalecenie: Włącz HTTPS i przekierowanie z HTTP na HTTPS."
+  en.title: Login form over plain HTTP — missing in scope
+  en.desc: "The login page runs without TLS and does not redirect to HTTPS. Passwords cross the network in clear text.\n\nExposure rule “login-over-plain-http” violated. Condition: class login and scheme http and redirects to HTTPS: false.\nRemediation: Enable HTTPS and redirect HTTP to HTTPS."
 finding policy-violation|new-service-not-approved|10.0.0.5/tcp-8080
   pl.title: Nowa usługa bez akceptacji — 10.0.0.5:8080
   pl.desc: "Usługa pojawiła się w ciągu ostatnich 7 dni i nikt nie oznaczył jej etykietą approved. Włącz tę regułę po pierwszym pełnym skanie, aby każda nowa ekspozycja wymagała akceptacji.\n\nNaruszona reguła ekspozycji „new-service-not-approved”. Warunek: nowe od 7 dni i nie (etykieta approved).\nZalecenie: Sprawdź usługę i dodaj etykietę approved (do usługi albo hosta), jeśli jest zamierzona."
+  en.title: New service not approved — 10.0.0.5:8080
+  en.desc: "The service appeared in the last 7 days and nobody tagged it approved. Turn this rule on after the first full scan, so that every new exposure needs approval.\n\nExposure rule “new-service-not-approved” violated. Condition: new within 7 days and not (tag approved).\nRemediation: Check the service and add the tag approved (to the service or the host) if it is intended."
 finding policy-violation|new-service-not-approved|10.0.0.5
   pl.title: Nowa usługa bez akceptacji — 10.0.0.5
   pl.desc: "Usługa pojawiła się w ciągu ostatnich 7 dni i nikt nie oznaczył jej etykietą approved. Włącz tę regułę po pierwszym pełnym skanie, aby każda nowa ekspozycja wymagała akceptacji.\n\nNaruszona reguła ekspozycji „new-service-not-approved”. Warunek: nowe od 7 dni i nie (etykieta approved).\nZalecenie: Sprawdź usługę i dodaj etykietę approved (do usługi albo hosta), jeśli jest zamierzona."
+  en.title: New service not approved — 10.0.0.5
+  en.desc: "The service appeared in the last 7 days and nobody tagged it approved. Turn this rule on after the first full scan, so that every new exposure needs approval.\n\nExposure rule “new-service-not-approved” violated. Condition: new within 7 days and not (tag approved).\nRemediation: Check the service and add the tag approved (to the service or the host) if it is intended."
 finding policy-violation|new-service-not-approved|scope
   pl.title: Nowa usługa bez akceptacji — brak w zakresie
   pl.desc: "Usługa pojawiła się w ciągu ostatnich 7 dni i nikt nie oznaczył jej etykietą approved. Włącz tę regułę po pierwszym pełnym skanie, aby każda nowa ekspozycja wymagała akceptacji.\n\nNaruszona reguła ekspozycji „new-service-not-approved”. Warunek: nowe od 7 dni i nie (etykieta approved).\nZalecenie: Sprawdź usługę i dodaj etykietę approved (do usługi albo hosta), jeśli jest zamierzona."
+  en.title: New service not approved — missing in scope
+  en.desc: "The service appeared in the last 7 days and nobody tagged it approved. Turn this rule on after the first full scan, so that every new exposure needs approval.\n\nExposure rule “new-service-not-approved” violated. Condition: new within 7 days and not (tag approved).\nRemediation: Check the service and add the tag approved (to the service or the host) if it is intended."
 finding policy-violation|outdated-cms-major|10.0.0.5/tcp-8080
   pl.title: Przestarzała główna wersja CMS — 10.0.0.5:8080
   pl.desc: "Wykryto system CMS w głównej wersji, która nie dostaje już poprawek bezpieczeństwa.\n\nNaruszona reguła ekspozycji „outdated-cms-major”. Warunek: technologia wordpress < 6 / joomla < 4 / drupal < 10 / typo3 < 12 / moodle < 4 / mediawiki < 1.39.\nZalecenie: Zaktualizuj CMS do wspieranej wersji głównej."
+  en.title: Outdated CMS major version — 10.0.0.5:8080
+  en.desc: "A CMS runs a major version that no longer gets security fixes.\n\nExposure rule “outdated-cms-major” violated. Condition: technology wordpress < 6 / joomla < 4 / drupal < 10 / typo3 < 12 / moodle < 4 / mediawiki < 1.39.\nRemediation: Upgrade the CMS to a supported major version."
 finding policy-violation|outdated-cms-major|10.0.0.5
   pl.title: Przestarzała główna wersja CMS — 10.0.0.5
   pl.desc: "Wykryto system CMS w głównej wersji, która nie dostaje już poprawek bezpieczeństwa.\n\nNaruszona reguła ekspozycji „outdated-cms-major”. Warunek: technologia wordpress < 6 / joomla < 4 / drupal < 10 / typo3 < 12 / moodle < 4 / mediawiki < 1.39.\nZalecenie: Zaktualizuj CMS do wspieranej wersji głównej."
+  en.title: Outdated CMS major version — 10.0.0.5
+  en.desc: "A CMS runs a major version that no longer gets security fixes.\n\nExposure rule “outdated-cms-major” violated. Condition: technology wordpress < 6 / joomla < 4 / drupal < 10 / typo3 < 12 / moodle < 4 / mediawiki < 1.39.\nRemediation: Upgrade the CMS to a supported major version."
 finding policy-violation|outdated-cms-major|scope
   pl.title: Przestarzała główna wersja CMS — brak w zakresie
   pl.desc: "Wykryto system CMS w głównej wersji, która nie dostaje już poprawek bezpieczeństwa.\n\nNaruszona reguła ekspozycji „outdated-cms-major”. Warunek: technologia wordpress < 6 / joomla < 4 / drupal < 10 / typo3 < 12 / moodle < 4 / mediawiki < 1.39.\nZalecenie: Zaktualizuj CMS do wspieranej wersji głównej."
+  en.title: Outdated CMS major version — missing in scope
+  en.desc: "A CMS runs a major version that no longer gets security fixes.\n\nExposure rule “outdated-cms-major” violated. Condition: technology wordpress < 6 / joomla < 4 / drupal < 10 / typo3 < 12 / moodle < 4 / mediawiki < 1.39.\nRemediation: Upgrade the CMS to a supported major version."
 finding policy-violation|remote-desktop-exposed|10.0.0.5/tcp-8080
   pl.title: Pulpit zdalny (RDP, VNC) dostępny w sieci — 10.0.0.5:8080
   pl.desc: "Usługa pulpitu zdalnego jest osiągalna z sieci skanowanej.\n\nNaruszona reguła ekspozycji „remote-desktop-exposed”. Warunek: usługa ms-wbt-server/rdp/vnc/vnc-http lub port 3389,5900,5901.\nZalecenie: Udostępniaj pulpit zdalny tylko przez VPN albo bramę RDP."
+  en.title: Remote desktop (RDP, VNC) reachable on the network — 10.0.0.5:8080
+  en.desc: "A remote desktop service is reachable from the scanned network.\n\nExposure rule “remote-desktop-exposed” violated. Condition: service ms-wbt-server/rdp/vnc/vnc-http or port 3389,5900,5901.\nRemediation: Offer remote desktop only through a VPN or an RDP gateway."
 finding policy-violation|remote-desktop-exposed|10.0.0.5
   pl.title: Pulpit zdalny (RDP, VNC) dostępny w sieci — 10.0.0.5
   pl.desc: "Usługa pulpitu zdalnego jest osiągalna z sieci skanowanej.\n\nNaruszona reguła ekspozycji „remote-desktop-exposed”. Warunek: usługa ms-wbt-server/rdp/vnc/vnc-http lub port 3389,5900,5901.\nZalecenie: Udostępniaj pulpit zdalny tylko przez VPN albo bramę RDP."
+  en.title: Remote desktop (RDP, VNC) reachable on the network — 10.0.0.5
+  en.desc: "A remote desktop service is reachable from the scanned network.\n\nExposure rule “remote-desktop-exposed” violated. Condition: service ms-wbt-server/rdp/vnc/vnc-http or port 3389,5900,5901.\nRemediation: Offer remote desktop only through a VPN or an RDP gateway."
 finding policy-violation|remote-desktop-exposed|scope
   pl.title: Pulpit zdalny (RDP, VNC) dostępny w sieci — brak w zakresie
   pl.desc: "Usługa pulpitu zdalnego jest osiągalna z sieci skanowanej.\n\nNaruszona reguła ekspozycji „remote-desktop-exposed”. Warunek: usługa ms-wbt-server/rdp/vnc/vnc-http lub port 3389,5900,5901.\nZalecenie: Udostępniaj pulpit zdalny tylko przez VPN albo bramę RDP."
+  en.title: Remote desktop (RDP, VNC) reachable on the network — missing in scope
+  en.desc: "A remote desktop service is reachable from the scanned network.\n\nExposure rule “remote-desktop-exposed” violated. Condition: service ms-wbt-server/rdp/vnc/vnc-http or port 3389,5900,5901.\nRemediation: Offer remote desktop only through a VPN or an RDP gateway."
 finding policy-violation|staging-or-debug-exposed|10.0.0.5/tcp-8080
   pl.title: Środowisko testowe albo narzędzie deweloperskie dostępne w sieci — 10.0.0.5:8080
   pl.desc: "Środowisko staging/test/dev albo narzędzie deweloperskie (CI, konsola debugowania) jest osiągalne z sieci skanowanej.\n\nNaruszona reguła ekspozycji „staging-or-debug-exposed”. Warunek: klasa staging/dev-tool.\nZalecenie: Ogranicz dostęp do środowisk testowych albo oznacz je etykietą approved po akceptacji ryzyka."
+  en.title: Test environment or developer tool reachable on the network — 10.0.0.5:8080
+  en.desc: "A staging/test/dev environment or a developer tool (CI, debug console) is reachable from the scanned network.\n\nExposure rule “staging-or-debug-exposed” violated. Condition: class staging/dev-tool.\nRemediation: Restrict access to test environments, or tag them approved once the risk is accepted."
 finding policy-violation|staging-or-debug-exposed|10.0.0.5
   pl.title: Środowisko testowe albo narzędzie deweloperskie dostępne w sieci — 10.0.0.5
   pl.desc: "Środowisko staging/test/dev albo narzędzie deweloperskie (CI, konsola debugowania) jest osiągalne z sieci skanowanej.\n\nNaruszona reguła ekspozycji „staging-or-debug-exposed”. Warunek: klasa staging/dev-tool.\nZalecenie: Ogranicz dostęp do środowisk testowych albo oznacz je etykietą approved po akceptacji ryzyka."
+  en.title: Test environment or developer tool reachable on the network — 10.0.0.5
+  en.desc: "A staging/test/dev environment or a developer tool (CI, debug console) is reachable from the scanned network.\n\nExposure rule “staging-or-debug-exposed” violated. Condition: class staging/dev-tool.\nRemediation: Restrict access to test environments, or tag them approved once the risk is accepted."
 finding policy-violation|staging-or-debug-exposed|scope
   pl.title: Środowisko testowe albo narzędzie deweloperskie dostępne w sieci — brak w zakresie
   pl.desc: "Środowisko staging/test/dev albo narzędzie deweloperskie (CI, konsola debugowania) jest osiągalne z sieci skanowanej.\n\nNaruszona reguła ekspozycji „staging-or-debug-exposed”. Warunek: klasa staging/dev-tool.\nZalecenie: Ogranicz dostęp do środowisk testowych albo oznacz je etykietą approved po akceptacji ryzyka."
+  en.title: Test environment or developer tool reachable on the network — missing in scope
+  en.desc: "A staging/test/dev environment or a developer tool (CI, debug console) is reachable from the scanned network.\n\nExposure rule “staging-or-debug-exposed” violated. Condition: class staging/dev-tool.\nRemediation: Restrict access to test environments, or tag them approved once the risk is accepted."
 finding policy-violation|tls-certificate-expired|10.0.0.5/tcp-8080
   pl.title: Wygasły certyfikat TLS — 10.0.0.5:8080
   pl.desc: "Usługa przedstawia certyfikat, którego termin ważności minął.\n\nNaruszona reguła ekspozycji „tls-certificate-expired”. Warunek: TLS {present: true, expired: true}.\nZalecenie: Odnów certyfikat (np. ACME) i wdroż go na usłudze."
+  en.title: Expired TLS certificate — 10.0.0.5:8080
+  en.desc: "The service presents a certificate that has expired.\n\nExposure rule “tls-certificate-expired” violated. Condition: TLS {present: true, expired: true}.\nRemediation: Renew the certificate (for example with ACME) and deploy it on the service."
 finding policy-violation|tls-certificate-expired|10.0.0.5
   pl.title: Wygasły certyfikat TLS — 10.0.0.5
   pl.desc: "Usługa przedstawia certyfikat, którego termin ważności minął.\n\nNaruszona reguła ekspozycji „tls-certificate-expired”. Warunek: TLS {present: true, expired: true}.\nZalecenie: Odnów certyfikat (np. ACME) i wdroż go na usłudze."
+  en.title: Expired TLS certificate — 10.0.0.5
+  en.desc: "The service presents a certificate that has expired.\n\nExposure rule “tls-certificate-expired” violated. Condition: TLS {present: true, expired: true}.\nRemediation: Renew the certificate (for example with ACME) and deploy it on the service."
 finding policy-violation|tls-certificate-expired|scope
   pl.title: Wygasły certyfikat TLS — brak w zakresie
   pl.desc: "Usługa przedstawia certyfikat, którego termin ważności minął.\n\nNaruszona reguła ekspozycji „tls-certificate-expired”. Warunek: TLS {present: true, expired: true}.\nZalecenie: Odnów certyfikat (np. ACME) i wdroż go na usłudze."
+  en.title: Expired TLS certificate — missing in scope
+  en.desc: "The service presents a certificate that has expired.\n\nExposure rule “tls-certificate-expired” violated. Condition: TLS {present: true, expired: true}.\nRemediation: Renew the certificate (for example with ACME) and deploy it on the service."
 finding policy-violation|tls-certificate-expiring-14d|10.0.0.5/tcp-8080
   pl.title: Certyfikat TLS wygasa w ciągu 14 dni — 10.0.0.5:8080
   pl.desc: "Certyfikat jest jeszcze ważny, ale wygaśnie w ciągu 14 dni.\n\nNaruszona reguła ekspozycji „tls-certificate-expiring-14d”. Warunek: TLS {present: true, expired: false, ważny krócej niż 14 dni}.\nZalecenie: Zaplanuj odnowienie certyfikatu."
+  en.title: TLS certificate expires within 14 days — 10.0.0.5:8080
+  en.desc: "The certificate is still valid, but expires within 14 days.\n\nExposure rule “tls-certificate-expiring-14d” violated. Condition: TLS {present: true, expired: false, valid for less than 14 days}.\nRemediation: Plan the certificate renewal."
 finding policy-violation|tls-certificate-expiring-14d|10.0.0.5
   pl.title: Certyfikat TLS wygasa w ciągu 14 dni — 10.0.0.5
   pl.desc: "Certyfikat jest jeszcze ważny, ale wygaśnie w ciągu 14 dni.\n\nNaruszona reguła ekspozycji „tls-certificate-expiring-14d”. Warunek: TLS {present: true, expired: false, ważny krócej niż 14 dni}.\nZalecenie: Zaplanuj odnowienie certyfikatu."
+  en.title: TLS certificate expires within 14 days — 10.0.0.5
+  en.desc: "The certificate is still valid, but expires within 14 days.\n\nExposure rule “tls-certificate-expiring-14d” violated. Condition: TLS {present: true, expired: false, valid for less than 14 days}.\nRemediation: Plan the certificate renewal."
 finding policy-violation|tls-certificate-expiring-14d|scope
   pl.title: Certyfikat TLS wygasa w ciągu 14 dni — brak w zakresie
   pl.desc: "Certyfikat jest jeszcze ważny, ale wygaśnie w ciągu 14 dni.\n\nNaruszona reguła ekspozycji „tls-certificate-expiring-14d”. Warunek: TLS {present: true, expired: false, ważny krócej niż 14 dni}.\nZalecenie: Zaplanuj odnowienie certyfikatu."
+  en.title: TLS certificate expires within 14 days — missing in scope
+  en.desc: "The certificate is still valid, but expires within 14 days.\n\nExposure rule “tls-certificate-expiring-14d” violated. Condition: TLS {present: true, expired: false, valid for less than 14 days}.\nRemediation: Plan the certificate renewal."
 finding policy-violation|tls-self-signed|10.0.0.5/tcp-8080
   pl.title: Certyfikat samopodpisany — 10.0.0.5:8080
   pl.desc: "Usługa używa certyfikatu samopodpisanego. Użytkownicy uczą się ignorować ostrzeżenia przeglądarki.\n\nNaruszona reguła ekspozycji „tls-self-signed”. Warunek: TLS {present: true, self_signed: true}.\nZalecenie: Użyj certyfikatu z zaufanego CA (np. ACME)."
+  en.title: Self-signed certificate — 10.0.0.5:8080
+  en.desc: "The service uses a self-signed certificate. Users learn to ignore browser warnings.\n\nExposure rule “tls-self-signed” violated. Condition: TLS {present: true, self_signed: true}.\nRemediation: Use a certificate from a trusted CA (for example ACME)."
 finding policy-violation|tls-self-signed|10.0.0.5
   pl.title: Certyfikat samopodpisany — 10.0.0.5
   pl.desc: "Usługa używa certyfikatu samopodpisanego. Użytkownicy uczą się ignorować ostrzeżenia przeglądarki.\n\nNaruszona reguła ekspozycji „tls-self-signed”. Warunek: TLS {present: true, self_signed: true}.\nZalecenie: Użyj certyfikatu z zaufanego CA (np. ACME)."
+  en.title: Self-signed certificate — 10.0.0.5
+  en.desc: "The service uses a self-signed certificate. Users learn to ignore browser warnings.\n\nExposure rule “tls-self-signed” violated. Condition: TLS {present: true, self_signed: true}.\nRemediation: Use a certificate from a trusted CA (for example ACME)."
 finding policy-violation|tls-self-signed|scope
   pl.title: Certyfikat samopodpisany — brak w zakresie
   pl.desc: "Usługa używa certyfikatu samopodpisanego. Użytkownicy uczą się ignorować ostrzeżenia przeglądarki.\n\nNaruszona reguła ekspozycji „tls-self-signed”. Warunek: TLS {present: true, self_signed: true}.\nZalecenie: Użyj certyfikatu z zaufanego CA (np. ACME)."
+  en.title: Self-signed certificate — missing in scope
+  en.desc: "The service uses a self-signed certificate. Users learn to ignore browser warnings.\n\nExposure rule “tls-self-signed” violated. Condition: TLS {present: true, self_signed: true}.\nRemediation: Use a certificate from a trusted CA (for example ACME)."
 finding policy-violation|unauthenticated-control-api|10.0.0.5/tcp-8080
   pl.title: API sterujące bez uwierzytelniania — 10.0.0.5:8080
   pl.desc: "API do sterowania usługą odpowiada bez logowania (np. API Toxiproxy, Traefik z api.insecure, API Dockera na porcie 2375). Kto je osiągnie, zmienia konfigurację usługi albo uruchamia kontenery.\n\nNaruszona reguła ekspozycji „unauthenticated-control-api”. Warunek: klasa unauth-control-api lub port 2375 i usługa docker.\nZalecenie: Zwiąż API z adresem lokalnym albo włącz uwierzytelnianie (Traefik bez api.insecure, Docker przez gniazdo lub TLS na 2376)."
+  en.title: Control API without authentication — 10.0.0.5:8080
+  en.desc: "An API that controls the service answers without login (for example the Toxiproxy API, Traefik with api.insecure, the Docker API on port 2375). Whoever reaches it can change the service configuration or start containers.\n\nExposure rule “unauthenticated-control-api” violated. Condition: class unauth-control-api or port 2375 and service docker.\nRemediation: Bind the API to a local address or enable authentication (Traefik without api.insecure, Docker through its socket or TLS on 2376)."
 finding policy-violation|unauthenticated-control-api|10.0.0.5
   pl.title: API sterujące bez uwierzytelniania — 10.0.0.5
   pl.desc: "API do sterowania usługą odpowiada bez logowania (np. API Toxiproxy, Traefik z api.insecure, API Dockera na porcie 2375). Kto je osiągnie, zmienia konfigurację usługi albo uruchamia kontenery.\n\nNaruszona reguła ekspozycji „unauthenticated-control-api”. Warunek: klasa unauth-control-api lub port 2375 i usługa docker.\nZalecenie: Zwiąż API z adresem lokalnym albo włącz uwierzytelnianie (Traefik bez api.insecure, Docker przez gniazdo lub TLS na 2376)."
+  en.title: Control API without authentication — 10.0.0.5
+  en.desc: "An API that controls the service answers without login (for example the Toxiproxy API, Traefik with api.insecure, the Docker API on port 2375). Whoever reaches it can change the service configuration or start containers.\n\nExposure rule “unauthenticated-control-api” violated. Condition: class unauth-control-api or port 2375 and service docker.\nRemediation: Bind the API to a local address or enable authentication (Traefik without api.insecure, Docker through its socket or TLS on 2376)."
 finding policy-violation|unauthenticated-control-api|scope
   pl.title: API sterujące bez uwierzytelniania — brak w zakresie
   pl.desc: "API do sterowania usługą odpowiada bez logowania (np. API Toxiproxy, Traefik z api.insecure, API Dockera na porcie 2375). Kto je osiągnie, zmienia konfigurację usługi albo uruchamia kontenery.\n\nNaruszona reguła ekspozycji „unauthenticated-control-api”. Warunek: klasa unauth-control-api lub port 2375 i usługa docker.\nZalecenie: Zwiąż API z adresem lokalnym albo włącz uwierzytelnianie (Traefik bez api.insecure, Docker przez gniazdo lub TLS na 2376)."
+  en.title: Control API without authentication — missing in scope
+  en.desc: "An API that controls the service answers without login (for example the Toxiproxy API, Traefik with api.insecure, the Docker API on port 2375). Whoever reaches it can change the service configuration or start containers.\n\nExposure rule “unauthenticated-control-api” violated. Condition: class unauth-control-api or port 2375 and service docker.\nRemediation: Bind the API to a local address or enable authentication (Traefik without api.insecure, Docker through its socket or TLS on 2376)."
 finding policy-violation|unfinished-install-page|10.0.0.5/tcp-8080
   pl.title: Niedokończona instalacja aplikacji — 10.0.0.5:8080
   pl.desc: "Aplikacja pokazuje kreator instalacji (np. instalator Gitea, wp-admin/install.php WordPressa). Każdy, kto pierwszy go dokończy, ustawi konto administratora i przejmie aplikację.\n\nNaruszona reguła ekspozycji „unfinished-install-page”. Warunek: klasa install-page.\nZalecenie: Dokończ instalację od razu albo wyłącz usługę; do czasu instalacji nie wystawiaj jej do sieci."
+  en.title: Unfinished application installation — 10.0.0.5:8080
+  en.desc: "The application shows its installation wizard (for example the Gitea installer, WordPress wp-admin/install.php). Whoever completes it first sets the admin account and takes over the application.\n\nExposure rule “unfinished-install-page” violated. Condition: class install-page.\nRemediation: Complete the installation now or turn the service off; do not expose it to the network until it is installed."
 finding policy-violation|unfinished-install-page|10.0.0.5
   pl.title: Niedokończona instalacja aplikacji — 10.0.0.5
   pl.desc: "Aplikacja pokazuje kreator instalacji (np. instalator Gitea, wp-admin/install.php WordPressa). Każdy, kto pierwszy go dokończy, ustawi konto administratora i przejmie aplikację.\n\nNaruszona reguła ekspozycji „unfinished-install-page”. Warunek: klasa install-page.\nZalecenie: Dokończ instalację od razu albo wyłącz usługę; do czasu instalacji nie wystawiaj jej do sieci."
+  en.title: Unfinished application installation — 10.0.0.5
+  en.desc: "The application shows its installation wizard (for example the Gitea installer, WordPress wp-admin/install.php). Whoever completes it first sets the admin account and takes over the application.\n\nExposure rule “unfinished-install-page” violated. Condition: class install-page.\nRemediation: Complete the installation now or turn the service off; do not expose it to the network until it is installed."
 finding policy-violation|unfinished-install-page|scope
   pl.title: Niedokończona instalacja aplikacji — brak w zakresie
   pl.desc: "Aplikacja pokazuje kreator instalacji (np. instalator Gitea, wp-admin/install.php WordPressa). Każdy, kto pierwszy go dokończy, ustawi konto administratora i przejmie aplikację.\n\nNaruszona reguła ekspozycji „unfinished-install-page”. Warunek: klasa install-page.\nZalecenie: Dokończ instalację od razu albo wyłącz usługę; do czasu instalacji nie wystawiaj jej do sieci."
+  en.title: Unfinished application installation — missing in scope
+  en.desc: "The application shows its installation wizard (for example the Gitea installer, WordPress wp-admin/install.php). Whoever completes it first sets the admin account and takes over the application.\n\nExposure rule “unfinished-install-page” violated. Condition: class install-page.\nRemediation: Complete the installation now or turn the service off; do not expose it to the network until it is installed."
 finding policy-violation|web-without-https-redirect|10.0.0.5/tcp-8080
   pl.title: Serwis WWW bez przekierowania na HTTPS — 10.0.0.5:8080
   pl.desc: "Usługa WWW odpowiada po zwykłym HTTP i nie przekierowuje na HTTPS.\n\nNaruszona reguła ekspozycji „web-without-https-redirect”. Warunek: schemat http i przekierowanie na HTTPS: false i kod HTTP 2xx.\nZalecenie: Dodaj przekierowanie 301 na HTTPS."
+  en.title: Web site without HTTPS redirect — 10.0.0.5:8080
+  en.desc: "The web service answers over plain HTTP and does not redirect to HTTPS.\n\nExposure rule “web-without-https-redirect” violated. Condition: scheme http and redirects to HTTPS: false and HTTP status 2xx.\nRemediation: Add a 301 redirect to HTTPS."
 finding policy-violation|web-without-https-redirect|10.0.0.5
   pl.title: Serwis WWW bez przekierowania na HTTPS — 10.0.0.5
   pl.desc: "Usługa WWW odpowiada po zwykłym HTTP i nie przekierowuje na HTTPS.\n\nNaruszona reguła ekspozycji „web-without-https-redirect”. Warunek: schemat http i przekierowanie na HTTPS: false i kod HTTP 2xx.\nZalecenie: Dodaj przekierowanie 301 na HTTPS."
+  en.title: Web site without HTTPS redirect — 10.0.0.5
+  en.desc: "The web service answers over plain HTTP and does not redirect to HTTPS.\n\nExposure rule “web-without-https-redirect” violated. Condition: scheme http and redirects to HTTPS: false and HTTP status 2xx.\nRemediation: Add a 301 redirect to HTTPS."
 finding policy-violation|web-without-https-redirect|scope
   pl.title: Serwis WWW bez przekierowania na HTTPS — brak w zakresie
   pl.desc: "Usługa WWW odpowiada po zwykłym HTTP i nie przekierowuje na HTTPS.\n\nNaruszona reguła ekspozycji „web-without-https-redirect”. Warunek: schemat http i przekierowanie na HTTPS: false i kod HTTP 2xx.\nZalecenie: Dodaj przekierowanie 301 na HTTPS."
+  en.title: Web site without HTTPS redirect — missing in scope
+  en.desc: "The web service answers over plain HTTP and does not redirect to HTTPS.\n\nExposure rule “web-without-https-redirect” violated. Condition: scheme http and redirects to HTTPS: false and HTTP status 2xx.\nRemediation: Add a 301 redirect to HTTPS."

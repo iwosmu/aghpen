@@ -2,6 +2,7 @@
 
 - id: header-version-powered-by
   name: Wersja oprogramowania w X-Powered-By
+  name_en: Software version in X-Powered-By
   category: header
   description: Nagłówek X-Powered-By podaje dokładną wersję oprogramowania. Ułatwia dobór znanych podatności.
   interest: 20
@@ -11,6 +12,7 @@
 
 - id: header-version-server
   name: Wersja oprogramowania w Server
+  name_en: Software version in Server
   category: header
   description: Nagłówek Server podaje dokładną wersję serwera.
   interest: 15
@@ -30,6 +32,7 @@
 
 - id: header-debug
   name: Nagłówek debugowania
+  name_en: Debug header
   category: header
   description: Odpowiedź zawiera nagłówek debugowania (X-Debug-Token, X-Debug-Info). Aplikacja działa w trybie deweloperskim.
   interest: 60
@@ -42,6 +45,7 @@
 
 - id: header-backend-leak
   name: Nagłówek ujawnia serwer zaplecza
+  name_en: Header reveals the backend server
   category: header
   description: Nagłówek odpowiedzi podaje nazwę serwera zaplecza albo węzła (X-Backend-Server, X-Served-By, X-Upstream).
   interest: 35
@@ -51,6 +55,7 @@
 
 - id: header-internal-ip
   name: Prywatny adres IP w nagłówku
+  name_en: Private IP address in a header
   category: header
   description: Nagłówek odpowiedzi zawiera adres z sieci prywatnej (RFC 1918). Ujawnia adresację sieci wewnętrznej.
   interest: 40
@@ -60,6 +65,7 @@
 
 - id: header-cors-wildcard-credentials
   name: CORS – dowolne źródło z poświadczeniami
+  name_en: CORS – any origin with credentials
   category: header
   description: Serwer zezwala na żądania z dowolnego źródła (Access-Control-Allow-Origin „*”) i jednocześnie na przesyłanie poświadczeń. To błąd konfiguracji CORS.
   interest: 55
@@ -71,6 +77,7 @@
 
 - id: header-cors-wildcard
   name: CORS – dowolne źródło
+  name_en: CORS – any origin
   category: header
   description: Serwer zezwala na odczyt odpowiedzi z dowolnego źródła (Access-Control-Allow-Origin „*”).
   interest: 10
@@ -80,6 +87,7 @@
 
 - id: header-cors-null-origin
   name: CORS – źródło null
+  name_en: CORS – null origin
   category: header
   description: Serwer zezwala na źródło „null”, które można uzyskać z ramki w piaskownicy.
   interest: 40
@@ -89,6 +97,7 @@
 
 - id: header-login-no-csp
   name: Strona logowania bez Content-Security-Policy
+  name_en: Login page without Content-Security-Policy
   category: header
   description: Strona z polem hasła nie wysyła nagłówka Content-Security-Policy.
   interest: 15
@@ -100,6 +109,7 @@
 
 - id: header-login-no-frame-protection
   name: Strona logowania bez ochrony przed osadzeniem
+  name_en: Login page without framing protection
   category: header
   description: Strona z polem hasła nie ma X-Frame-Options ani dyrektywy frame-ancestors (ryzyko clickjackingu).
   interest: 25
@@ -112,6 +122,7 @@
 
 - id: header-login-no-hsts
   name: Strona logowania HTTPS bez HSTS
+  name_en: HTTPS login page without HSTS
   category: header
   description: Strona logowania po HTTPS nie wysyła Strict-Transport-Security.
   interest: 20
@@ -124,6 +135,7 @@
 
 - id: header-login-over-http
   name: Formularz logowania po nieszyfrowanym HTTP
+  name_en: Login form over plain HTTP
   category: header
   description: Strona z polem hasła jest podawana po HTTP. Hasło idzie przez sieć otwartym tekstem.
   interest: 55
@@ -136,6 +148,7 @@
 
 - id: header-basic-auth-http
   name: Uwierzytelnianie Basic po nieszyfrowanym HTTP
+  name_en: Basic authentication over plain HTTP
   category: header
   description: Usługa żąda uwierzytelniania Basic po HTTP. Hasło idzie przez sieć w kodowaniu base64.
   interest: 55
@@ -168,6 +181,7 @@
 
 - id: header-via-proxy
   name: Nagłówek Via
+  name_en: Via header
   category: header
   description: Nagłówek Via podaje pośredniczące serwery proxy i ich oprogramowanie.
   interest: 10
@@ -177,6 +191,7 @@
 
 - id: header-x-generator
   name: Nagłówek X-Generator
+  name_en: X-Generator header
   category: header
   description: Nagłówek X-Generator podaje system, który wygenerował stronę.
   interest: 10
@@ -186,6 +201,7 @@
 
 - id: header-hsts-missing
   name: HTTPS bez HSTS
+  name_en: HTTPS without HSTS
   category: header
   description: Usługa HTTPS nie wysyła Strict-Transport-Security.
   interest: 5
@@ -198,6 +214,7 @@
 
 - id: header-deprecated-tls-redirect
   name: Przekierowanie z HTTPS na HTTP
+  name_en: Redirect from HTTPS to HTTP
   category: header
   description: Usługa HTTPS przekierowuje na adres nieszyfrowany.
   interest: 35
@@ -209,6 +226,7 @@
 
 - id: header-build-info
   name: Nagłówek z wersją kompilacji (X-Build-Commit, X-Git-Commit, X-Revision)
+  name_en: "Build version header (X-Build-Commit, X-Git-Commit, X-Revision)"
   category: header
   description: Nagłówek odpowiedzi podaje commit albo numer kompilacji aplikacji. Ułatwia ustalenie dokładnej wersji kodu.
   interest: 20
@@ -218,6 +236,7 @@
 
 - id: header-robots-noindex
   name: X-Robots-Tag noindex (strona ukryta przed wyszukiwarkami)
+  name_en: X-Robots-Tag noindex (page hidden from search engines)
   category: header
   description: Nagłówek X-Robots-Tag zakazuje indeksowania. Tak oznacza się często środowiska testowe i strony wewnętrzne wystawione do sieci.
   interest: 10

@@ -157,6 +157,11 @@ func TestFindingTextGolden(t *testing.T) {
 	for _, f := range goldenFindings() {
 		seen[f.Type] = true
 		fmt.Fprintf(&b, "%s\n  pl.title: %s\n  pl.desc:  %s\n  pl.evidence: %s\n", f.Type, f.Title, f.Description, evidenceLine(f.Evidence))
+		if pl := RenderFinding(f, "pl"); pl.Title != f.Title || pl.Description != f.Description || evidenceLine(pl.Evidence) != evidenceLine(f.Evidence) {
+			t.Errorf("Polish rendering changed the stored finding: %+v", pl)
+		}
+		en := RenderFinding(f, "en")
+		fmt.Fprintf(&b, "  en.title: %s\n  en.desc:  %s\n  en.evidence: %s\n", en.Title, en.Description, evidenceLine(en.Evidence))
 	}
 	for typ := range FindingBaseInterest {
 		if !seen[typ] {
@@ -171,7 +176,10 @@ func TestReasonTextGolden(t *testing.T) {
 	seen := map[string]bool{}
 	for _, r := range goldenReasons() {
 		seen[r.Code] = true
-		fmt.Fprintf(&b, "%s %+d\n  pl: %s\n", r.Code, r.Points, r.Text)
+		fmt.Fprintf(&b, "%s %+d\n  pl: %s\n  en: %s\n", r.Code, r.Points, r.Text, RenderReason(r, "en"))
+		if RenderReason(r, "pl") != r.Text {
+			t.Errorf("Polish rendering changed the stored reason %q", r.Text)
+		}
 	}
 	for _, w := range InterestWeights {
 		if !seen[w.Code] {

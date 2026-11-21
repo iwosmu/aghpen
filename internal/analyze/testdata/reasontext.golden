@@ -1,70 +1,105 @@
 signature +38
   pl: Sygnatura: Adminer
+  en: Signature: Adminer
 admin-panel +30
   pl: Panel administracyjny dostępny z sieci
+  en: Admin panel reachable from the network
 database +25
   pl: Baza danych dostępna z sieci: http
+  en: Database open to the network: http
 rare-tech +10
   pl: Rzadka technologia w tej sieci: 1 z 87 usług
+  en: Rare technology in this network: 1 of 87 services
 scope-criticality +10
   pl: Krytyczny zakres (5/5)
+  en: Critical scope (5/5)
 login-plain-http +25
   pl: Logowanie bez szyfrowania (HTTP)
+  en: Login over plain HTTP
 missing-security-headers +5
   pl: Strona logowania bez nagłówków bezpieczeństwa: brak Content-Security-Policy / X-Frame-Options
+  en: Login page without security headers: missing Content-Security-Policy / X-Frame-Options
 scope-criticality +5
   pl: Krytyczny zakres: 4/5
+  en: Critical scope (4/5)
 staging +20
   pl: Środowisko testowe
+  en: Test environment
 debug-page +25
   pl: Strona diagnostyczna lub tryb debug
+  en: Debug page or debug mode
 iot +20
   pl: Urządzenie IoT
+  en: IoT device
 dev-tool +20
   pl: Narzędzie deweloperskie
+  en: Developer tool
 database +25
   pl: Baza danych dostępna z sieci: MariaDB 11.4.13
+  en: Database open to the network: MariaDB 11.4.13
 database +25
   pl: Baza danych dostępna z sieci: redis
+  en: Database open to the network: redis
 remote-access-plaintext +25
   pl: Zdalny dostęp bez szyfrowania: telnet
+  en: Remote access without encryption: telnet
 remote-desktop +20
   pl: Zdalny pulpit: ms-wbt-server
+  en: Remote desktop: ms-wbt-server
 remote-access +5
   pl: Usługa zdalnego dostępu
+  en: Remote access service
 expired-cert +15
   pl: Przeterminowany certyfikat TLS: ważny do 2026-11-20
+  en: Expired TLS certificate: valid until 2026-11-20
 cert-expiring +5
   pl: Certyfikat TLS wkrótce wygaśnie: za 5 dni
+  en: TLS certificate expires soon: in 5 days
 cert-expiring +5
   pl: Certyfikat TLS wkrótce wygaśnie: za 1 dzień
+  en: TLS certificate expires soon: in 1 day
 self-signed-cert +10
   pl: Samopodpisany certyfikat TLS
+  en: Self-signed TLS certificate
 hostname-mismatch +5
   pl: Certyfikat TLS nie pasuje do nazwy hosta
+  en: TLS certificate does not match the host name
 login +10
   pl: Strona logowania
+  en: Login page
 missing-security-headers +5
   pl: Strona logowania bez nagłówków bezpieczeństwa: brak Content-Security-Policy / X-Frame-Options, Strict-Transport-Security
+  en: Login page without security headers: missing Content-Security-Policy / X-Frame-Options, Strict-Transport-Security
 signature +18
   pl: Sygnatura: Wersja oprogramowania w X-Powered-By
+  en: Signature: Software version in X-Powered-By
 sensitive-header +2
   pl: Nagłówek ujawnia szczegóły oprogramowania: X-Powered-By, Server
+  en: Header reveals software details: X-Powered-By, Server
 interesting-cookie +5
   pl: Ciasteczko sesyjne bez flag bezpieczeństwa: JSESSIONID, auth_token
+  en: Session cookie without security flags: JSESSIONID, auth_token
 signature +5
   pl: Sygnatura: Ciasteczko sesji Laravel
+  en: Signature: Ciasteczko sesji Laravel
 directory-listing +15
   pl: Listing katalogu
+  en: Directory listing
 default-page +5
   pl: Strona domyślna serwera
+  en: Default server page
 new-exposure +15
   pl: Nowa ekspozycja
+  en: New exposure
 new-exposure +15
   pl: Nowa ekspozycja
+  en: New exposure
 signature +40
   pl: Sygnatura: Symfony – profiler i pasek debugowania
+  en: Signature: Symfony – profiler and debug toolbar
 debug-page +25
   pl: Strona diagnostyczna lub tryb debug
+  en: Debug page or debug mode
 outdated +10
   pl: Przestarzała wersja oprogramowania: Stopka ACME 3.1
+  en: Outdated software version: Stopka ACME 3.1

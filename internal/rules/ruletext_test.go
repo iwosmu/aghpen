@@ -8,8 +8,34 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iwosmu/aghpen/internal/analyze"
 	"github.com/iwosmu/aghpen/internal/model"
 )
+
+// The Polish side of the English rule catalog is the text of the built-in
+// rules: a rule changed in YAML must change in the catalog too.
+func TestRuleCatalogMatchesBuiltin(t *testing.T) {
+	rs, err := Builtin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rs) != len(analyze.BuiltinRuleTexts) {
+		t.Errorf("%d built-in rules, %d in the catalog", len(rs), len(analyze.BuiltinRuleTexts))
+	}
+	for _, r := range rs {
+		c, ok := analyze.BuiltinRuleTexts[r.ID]
+		if !ok {
+			t.Errorf("rule %s has no English text", r.ID)
+			continue
+		}
+		if c.Name != r.Name || c.Description != r.Description || c.Remediation != r.Remediation {
+			t.Errorf("rule %s: catalog Polish text differs from the YAML", r.ID)
+		}
+		if c.NameEN == "" || c.DescriptionEN == "" || c.RemediationEN == "" {
+			t.Errorf("rule %s: empty English text", r.ID)
+		}
+	}
+}
 
 var updateGolden = flag.Bool("update", false, "rewrite the golden files in testdata")
 
@@ -79,9 +105,13 @@ func TestRuleTextGolden(t *testing.T) {
 	var b strings.Builder
 	for _, r := range rs {
 		fmt.Fprintf(&b, "rule %s\n  pl.name: %s\n  pl.description: %s\n  pl.remediation: %s\n  pl.condition: %s\n", r.ID, r.Name, r.Description, r.Remediation, r.Describe())
+		n, d, rem := analyze.RuleTextIn(r.ID, r.Name, r.Description, r.Remediation, "en")
+		fmt.Fprintf(&b, "  en.name: %s\n  en.description: %s\n  en.remediation: %s\n  en.condition: %s\n", n, d, rem, analyze.RuleConditionIn(r.Describe(), "en"))
 	}
 	for _, f := range goldenRuleFindings(t) {
 		fmt.Fprintf(&b, "finding %s\n  pl.title: %s\n  pl.desc: %q\n", f.Key, f.Title, f.Description)
+		en := analyze.RenderFinding(f, "en")
+		fmt.Fprintf(&b, "  en.title: %s\n  en.desc: %q\n", en.Title, en.Description)
 	}
 	checkGolden(t, "ruletext.golden", b.String())
 }

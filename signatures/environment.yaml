@@ -2,6 +2,7 @@
 
 - id: staging-hostname
   name: Nazwa hosta środowiska testowego
+  name_en: Test environment host name
   category: environment
   description: Nazwa hosta zawiera znacznik środowiska testowego albo deweloperskiego (dev, test, staging, uat, qa, preprod, sandbox, demo, beta).
   interest: 45
@@ -13,6 +14,7 @@
 
 - id: staging-certificate
   name: Certyfikat środowiska testowego
+  name_en: Test environment certificate
   category: environment
   description: Nazwa w certyfikacie TLS zawiera znacznik środowiska testowego albo deweloperskiego.
   interest: 45
@@ -25,6 +27,7 @@
 
 - id: staging-title
   name: Tytuł strony środowiska testowego
+  name_en: Test environment page title
   category: environment
   description: Tytuł strony mówi, że to środowisko testowe, deweloperskie albo demonstracyjne.
   interest: 45
@@ -35,6 +38,7 @@
 
 - id: environment-header
   name: Nagłówek środowiska
+  name_en: Environment header
   category: environment
   description: Nagłówek odpowiedzi podaje środowisko inne niż produkcyjne (X-Environment, X-Env, X-App-Env).
   interest: 50
@@ -45,6 +49,7 @@
 
 - id: django-debug
   name: Django – tryb DEBUG
+  name_en: Django – DEBUG mode
   category: environment
   technology: Django
   description: Django działa z DEBUG = True. Strony błędów pokazują konfigurację, ścieżki i fragmenty kodu.
@@ -59,6 +64,7 @@
 
 - id: django-default-page
   name: Django – strona startowa
+  name_en: Django – start page
   category: environment
   technology: Django
   description: Świeży projekt Django bez własnych widoków, z włączonym DEBUG.
@@ -71,6 +77,7 @@
 
 - id: laravel-debug
   name: Laravel – strona błędu debug (Ignition / Whoops)
+  name_en: Laravel – debug error page (Ignition / Whoops)
   category: environment
   technology: Laravel
   description: Laravel działa z APP_DEBUG=true. Strona błędu pokazuje ślad stosu, zmienne środowiska i zapytania.
@@ -85,6 +92,7 @@
 
 - id: symfony-profiler
   name: Symfony – profiler i pasek debugowania
+  name_en: Symfony – profiler and debug toolbar
   category: environment
   technology: Symfony
   description: Symfony działa w środowisku dev. Profiler pokazuje żądania, konfigurację i zapytania.
@@ -131,6 +139,7 @@
 
 - id: spring-actuator-sensitive
   name: Spring Boot Actuator – wrażliwe punkty końcowe
+  name_en: Spring Boot Actuator – sensitive endpoints
   category: environment
   technology: Spring Boot
   description: Indeks Actuatora wymienia wrażliwe punkty końcowe (env, heapdump, loggers, mappings, configprops). Czujka ich nie pobiera.
@@ -157,6 +166,7 @@
 
 - id: rails-debug
   name: Rails – strona błędu w trybie development
+  name_en: Rails – development mode error page
   category: environment
   technology: Ruby on Rails
   description: Rails działa w trybie development. Strona błędu pokazuje ślad stosu i trasy.
@@ -170,6 +180,7 @@
 
 - id: aspnet-yellow-screen
   name: ASP.NET – szczegółowa strona błędu
+  name_en: ASP.NET – detailed error page
   category: environment
   technology: ASP.NET
   description: ASP.NET pokazuje szczegółową stronę błędu (customErrors wyłączone) ze śladem stosu i wersją platformy.
@@ -186,6 +197,7 @@
 
 - id: stack-trace
   name: Ślad stosu w odpowiedzi
+  name_en: Stack trace in the response
   category: environment
   description: Odpowiedź zawiera ślad stosu albo komunikat błędu interpretera. Ujawnia ścieżki plików i budowę aplikacji.
   tags: [debug]
@@ -202,6 +214,7 @@
 
 - id: tomcat-stack-trace
   name: Tomcat – strona błędu z wersją
+  name_en: Tomcat – error page with version
   category: environment
   technology: Apache Tomcat
   description: Domyślna strona błędu Tomcata ujawnia wersję serwera.
@@ -235,6 +248,7 @@
 
 - id: directory-listing
   name: Lista plików katalogu
+  name_en: Directory file list
   category: environment
   description: Serwer pokazuje listę plików katalogu głównego zamiast strony.
   interest: 60
@@ -246,6 +260,7 @@
 
 - id: dev-server
   name: Serwer deweloperski frontendu
+  name_en: Frontend development server
   category: environment
   technology: false
   description: Strona jest serwowana przez serwer deweloperski (Vite, webpack-dev-server, Create React App) z kodem źródłowym i mapami.
@@ -260,6 +275,7 @@
 
 - id: framework-default-page
   name: Strona startowa frameworka
+  name_en: Framework start page
   category: environment
   technology: false
   description: Aplikacja pokazuje stronę startową frameworka (Laravel, Symfony, Create React App, Vue, Rails). Wdrożenie nie zostało dokończone.
@@ -272,6 +288,7 @@
 
 - id: placeholder-page
   name: Strona zastępcza
+  name_en: Placeholder page
   category: environment
   technology: false
   description: Strona „w budowie” albo strona zastępcza hostingu.
@@ -283,6 +300,7 @@
 
 - id: source-map-header
   name: Nagłówek mapy źródeł
+  name_en: Source map header
   category: environment
   description: Odpowiedź wskazuje mapę źródeł (SourceMap). Mapy źródeł odsłaniają oryginalny kod aplikacji.
   tags: [debug]
