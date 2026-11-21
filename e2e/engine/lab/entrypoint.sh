@@ -27,6 +27,9 @@ s.serve_forever()"
   udp)
     # UDP services for the optional UDP scan: DNS on 53 and NTP on 123.
     ntpd -l 2>/dev/null || true
+    # an SNMP agent with an empty configuration: it answers the SNMPv3 engine
+    # discovery and gives no data to anyone
+    snmpd -C -c /dev/null udp:161 2>/dev/null || true
     exec dnsmasq -k --no-resolv --no-hosts --address=/lab.test/10.76.0.70
     ;;
   router)

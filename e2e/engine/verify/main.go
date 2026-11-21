@@ -196,10 +196,10 @@ func CheckApps(out Output) (fails []string) {
 			svc[key{h.IP, s.Port}] = s
 		}
 	}
-	// the optional UDP scan: DNS and NTP answer on 10.76.0.70, nothing else is reported
+	// the optional UDP scan: DNS, NTP and SNMP answer on 10.76.0.70, nothing else is reported
 	if len(udp) > 0 {
-		if udp[key{"10.76.0.70", 53}] != "domain" || udp[key{"10.76.0.70", 123}] != "ntp" || len(udp) != 2 {
-			fails = append(fails, fmt.Sprintf("UDP services = %v, want only 10.76.0.70 53/domain and 123/ntp", udp))
+		if udp[key{"10.76.0.70", 53}] != "domain" || udp[key{"10.76.0.70", 123}] != "ntp" || udp[key{"10.76.0.70", 161}] != "snmp" || len(udp) != 3 {
+			fails = append(fails, fmt.Sprintf("UDP services = %v, want only 10.76.0.70 53/domain, 123/ntp and 161/snmp", udp))
 		}
 	}
 	for _, w := range Apps {
