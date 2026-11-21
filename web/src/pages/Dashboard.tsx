@@ -53,7 +53,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   if (!run && partial) {
     return (
       <div>
-        <p className="font-display text-[40px] leading-[1.02] sm:text-[52px]" data-testid="handover">{t('Nie ma jeszcze pełnego skanu profilu do porównania.', 'No full profile scan to compare yet.')}</p>
+        <p className="font-display text-[30px] leading-[1.1] sm:text-[40px]" data-testid="handover">{t('Nie ma jeszcze pełnego skanu profilu do porównania.', 'No full profile scan to compare yet.')}</p>
         <p className="mt-2 text-sm text-ink-2" data-testid="handover-partial">{t('Ostatnio', 'Last')}: {partialRunPhrase(partial)} (<Link to={'/runs/' + partial.id} className="num link">#{partial.id}</Link>, {fmtRelative(partial.finished_at)}).</p>
       </div>
     );
@@ -61,7 +61,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   if (!run) {
     return (
       <div>
-        <p className="font-display text-[40px] leading-[1.02] sm:text-[52px]">{t('Nie ma jeszcze zakończonego skanu.', 'No scan has completed yet.')}</p>
+        <p className="font-display text-[30px] leading-[1.1] sm:text-[40px]">{t('Nie ma jeszcze zakończonego skanu.', 'No scan has completed yet.')}</p>
         <p className="mt-2 text-base text-ink-2">{t('Dodaj cele, przygotuj profil i uruchom skan.', 'Add targets, prepare a profile and start a scan.')}</p>
         <Link to="/targets" className="link mt-3 inline-block text-sm">{t('Dodaj cele', 'Add targets')}</Link>
       </div>
@@ -90,7 +90,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
       : (() => { const n = added + gone + changed + missing + s!.hosts_unstable + returned + slower + recovered + confirmedGone; return t(fmtInt(n) + ' ' + plural(n, ['zmiana', 'zmiany', 'zmian'], ['', '']) + ' od poprzedniego skanu.', fmtInt(n) + ' ' + (n === 1 ? 'change' : 'changes') + ' since the previous scan.'); })();
   return (
     <div>
-      <p className="font-display max-w-[30ch] text-[40px] leading-[1.02] tracking-[-0.01em] text-ink sm:text-[52px] xl:text-[60px]" data-testid="handover">{headline}</p>
+      <p className="font-display text-[30px] leading-[1.1] text-ink sm:text-[40px] xl:text-[48px]" data-testid="handover">{headline}</p>
       <p className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-ink-2" data-testid="handover-attention">
         {h.admin_panels > 0 ? (
           <Link to="/services?class=admin-panel" className="inline-flex items-center gap-2 text-ink hover:text-ink">
@@ -134,7 +134,7 @@ function Stat({ label, value, delta, deltaTitle, to, mono = true }: { label: str
   const inner = (
     <>
       <dd className="flex items-baseline gap-2">
-        <span className={cx('text-ink', mono ? 'font-display text-[44px] leading-none sm:text-[56px]' : 'text-base font-medium')}>{value}</span>
+        <span className={cx('text-ink', mono ? 'font-display text-[36px] leading-none sm:text-[44px]' : 'text-base font-medium')}>{value}</span>
         {delta !== undefined && delta !== null ? (
           <span className="num text-xs text-ink-3" title={deltaTitle ?? t('zmiana względem poprzedniego skanu', 'change against the previous scan')}>{delta === 0 ? '±0' : fmtSigned(delta)}</span>
         ) : null}
