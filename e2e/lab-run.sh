@@ -39,6 +39,7 @@ export LR_IP CZUJKA_PORT=$PORT CZUJKA_VERSION=${CZUJKA_VERSION:-acc} CZUJKA_ADMI
 export CZUJKA_SCHED_INTERVAL=10s CZUJKA_SCAN_NETWORK=czujka-lab CZUJKA_TZ=Europe/Warsaw
 DC="docker compose -p $PROJECT -f deploy/docker-compose.yml -f deploy/docker-compose.scan-network.yml -f e2e/lab-run.compose.yml"
 CZ=$PROJECT-czujka-1
+IGNORE=$(seq -s, -f "10.66.0.%g" 1 49)
 
 log() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$OUT/run.log"; }
 api() { # method path [json]; prints the body; returns 1 on an HTTP error
@@ -83,12 +84,15 @@ CSRF=$(echo "$LOGIN" | jq -r .csrf_token)
 [ -n "$CSRF" ] && [ "$CSRF" != null ] || { echo "login failed: $LOGIN"; exit 1; }
 
 # ---- policy, scope, signature, profile ----
-POL=$(api GET /settings/safety | jq -c --arg ip "$LR_IP" '.exclusions = ([$ip, "10.66.0.1"] + .exclusions | unique)')
+# 10.66.0.1-10.66.0.49: the gateway and the addresses the lab keeps for scanners (lab/README.md, section 4).
+# Other workers' scanners stand there; they are not lab hosts.
+POL=$(api GET /settings/safety | jq -c '.exclusions = (["10.66.0.1-10.66.0.49"] + .exclusions | unique)')
 api PUT /settings/safety "$POL" | jq -c '{max_pps, max_http_rps, max_per_host_rps, exclusions}' | tee -a "$OUT/run.log"
 SCOPE=$(api GET "/scopes?limit=100" | jq -r '[.items[] | select(.name == "Laboratorium (lab-run)")][0].id // empty')
 if [ -z "$SCOPE" ]; then
   SCOPE=$(api POST /scopes '{"name":"Laboratorium (lab-run)","description":"sieć czujka-lab 10.66.0.0/16 i nazwy z lab/ground-truth/targets-domains.txt","criticality":3}' | jq -r .id)
-  TEXT=$(cat lab/ground-truth/targets-cidr.txt lab/ground-truth/targets-domains.txt)
+  # LR_SCOPE replaces the targets (for example "10.66.0.0/20" for a short rate check)
+  if [ -n "${LR_SCOPE:-}" ]; then TEXT=$LR_SCOPE; else TEXT=$(cat lab/ground-truth/targets-cidr.txt lab/ground-truth/targets-domains.txt); fi
   api POST /scopes/$SCOPE/targets "$(jq -nc --arg t "$TEXT" '{text: $t}')" | jq -c '{saved: (.valid | length), address_count, excluded, invalid: (.invalid | length)}' | tee -a "$OUT/run.log"
 fi
 if ! api GET "/signatures?q=lab-infokiosk" | jq -e '.items | length > 0' >/dev/null; then
@@ -113,30 +117,49 @@ PREV=""
 for st in $STATES; do
   log "=== state $st ==="
   lab/scenario.sh "$st" 2>&1 | tail -1 | tee -a "$OUT/run.log"
+  # every packet the scanner sends on the lab interface, for one-second bins (e2e/ppsbins)
+  LABIF=$(docker exec "$CZ" sh -c "ip -o -4 addr | awk '/ 10\\.66\\./ {print \$2}'")
+  docker rm -f "$PROJECT-tcpdump" >/dev/null 2>&1
+  docker image inspect czfull-tcpdump:latest >/dev/null 2>&1 ||
+    printf 'FROM alpine:3.22\nRUN apk add --no-cache tcpdump\n' | docker build -q -t czfull-tcpdump:latest - >/dev/null
+  docker run -d --name "$PROJECT-tcpdump" --network "container:$CZ" --cap-add NET_RAW --cap-add NET_ADMIN \
+    czfull-tcpdump:latest tcpdump -i "$LABIF" -n -tt -l "src host $LR_IP or arp" >/dev/null
   P0=$(txp)
   T0=$(date +%s)
   RUN=$(api POST /runs "{\"profile_id\":$PROFILE}" | jq -r .id)
   log "run $RUN started"
+  PEAK=0; LP=$P0; LT=$(date +%s)
   while :; do
     R=$(api GET /runs/$RUN)
     case "$(echo "$R" | jq -r .status)" in completed|failed|cancelled) break ;; esac
     sleep 3
+    # peak packet rate on the lab interface, over windows of about 3 s
+    NP=$(txp); NT=$(date +%s)
+    if [ "$NT" -gt "$LT" ]; then RATE=$(( (NP - LP) / (NT - LT) )); [ "$RATE" -gt "$PEAK" ] && PEAK=$RATE; fi
+    LP=$NP; LT=$NT
   done
   WALL=$(( $(date +%s) - T0 ))
   P1=$(txp)
+  sleep 1; docker logs "$PROJECT-tcpdump" 2>/dev/null > "$OUT/tcpdump-$st.txt"; docker rm -f "$PROJECT-tcpdump" >/dev/null 2>&1
+  CAPPPS=$(echo "$PJSON" | jq '.rate.max_pps')
+  go run ./e2e/ppsbins -src "$LR_IP" -cap "$CAPPPS" "$OUT/tcpdump-$st.txt" > "$OUT/pps-$st.txt"
+  go run ./e2e/ppsbins -src "$LR_IP" -cap "$CAPPPS" -json "$OUT/tcpdump-$st.txt" > "$OUT/pps-$st.json"
+  gzip -f "$OUT/tcpdump-$st.txt"
+  sed -n 2,3p "$OUT/pps-$st.txt" | tee -a "$OUT/run.log"
   echo "$R" | jq . > "$OUT/run-$st.json"
-  log "run $RUN $(echo "$R" | jq -r .status) in $WALL s; tx packets on the lab interface: $((P1 - P0)); $(echo "$R" | jq -c '{hosts_up: .stats.hosts_up, services: .stats.services_open, packets: .stats.packets_sent, avg_pps: (.stats.avg_pps|floor), peak_pps: .stats.peak_pps, http_requests: .stats.http_requests, elapsed: .stats.elapsed_sec}')"
-  echo "$st run=$RUN wall=$WALL tx=$((P1 - P0))" >> "$OUT/runs.txt"
+  log "run $RUN $(echo "$R" | jq -r .status) in $WALL s; tx packets on the lab interface: $((P1 - P0)), peak $PEAK pps; $(echo "$R" | jq -c '{hosts_up: .stats.hosts_up, services: .stats.services_open, packets: .stats.packets_sent, avg_pps: (.stats.avg_pps|floor), peak_pps: .stats.peak_pps, http_requests: .stats.http_requests, elapsed: .stats.elapsed_sec}')"
+  echo "$st run=$RUN wall=$WALL tx=$((P1 - P0)) peak=$PEAK" >> "$OUT/runs.txt"
   curl -sS -b "$JAR" -o "$OUT/export-$st.json" "$API/export/runs/$RUN.json"
   api GET "/changes?run_id=$RUN&limit=1000" > "$OUT/changes-$st.json"
-  go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$st.json" -ignore "$LR_IP" -max-list 0 > "$OUT/score-$st.txt"
-  go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$st.json" -ignore "$LR_IP" -json > "$OUT/score-$st.json"
+  go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$st.json" -ignore "$IGNORE" -max-list 0 > "$OUT/score-$st.txt"
+  go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$st.json" -ignore "$IGNORE" -json > "$OUT/score-$st.json"
+  go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$st.json" -ignore "$IGNORE" -strict -json > "$OUT/score-strict-$st.json"
   sed -n '1,12p' "$OUT/score-$st.txt" | tee -a "$OUT/run.log"
   if [ -n "$PREV" ] && [ -f "lab/ground-truth/changes-$PREV-$st.json" ]; then
     go run ./e2e/score -changes lab/ground-truth/changes-$PREV-$st.json -truth-from lab/ground-truth/$PREV.json -truth lab/ground-truth/$st.json \
-      -from "$OUT/export-$PREV.json" -to "$OUT/export-$st.json" -ignore "$LR_IP" -max-list 0 > "$OUT/changes-score-$PREV-$st.txt"
+      -from "$OUT/export-$PREV.json" -to "$OUT/export-$st.json" -ignore "$IGNORE" -max-list 0 > "$OUT/changes-score-$PREV-$st.txt"
     go run ./e2e/score -changes lab/ground-truth/changes-$PREV-$st.json -truth-from lab/ground-truth/$PREV.json -truth lab/ground-truth/$st.json \
-      -from "$OUT/export-$PREV.json" -to "$OUT/export-$st.json" -product-changes "$OUT/changes-$st.json" -ignore "$LR_IP" -max-list 0 > "$OUT/product-changes-score-$PREV-$st.txt"
+      -from "$OUT/export-$PREV.json" -to "$OUT/export-$st.json" -product-changes "$OUT/changes-$st.json" -ignore "$IGNORE" -max-list 0 > "$OUT/product-changes-score-$PREV-$st.txt"
     log "changes $PREV -> $st (export diff):     $(sed -n 4p "$OUT/changes-score-$PREV-$st.txt")"
     log "changes $PREV -> $st (product changes): $(sed -n 4p "$OUT/product-changes-score-$PREV-$st.txt")"
   fi

@@ -13,6 +13,7 @@ const ppsWindow = 5 * time.Second
 type stageRec struct {
 	start, end time.Time
 	packets    int64
+	exact      bool
 }
 
 // statsKeeper holds the run counters. Packets are counted when a probe
@@ -76,14 +77,17 @@ func (k *statsKeeper) begin(rate int) (end func()) {
 }
 
 // addStage records the packets of one finished probe stage.
-func (k *statsKeeper) addStage(packets int64, start, end time.Time) {
+func (k *statsKeeper) addStage(packets int64, exact bool, start, end time.Time) {
 	if packets <= 0 {
 		return
 	}
 	k.mu.Lock()
 	k.s.PacketsSent += packets
+	if !exact {
+		k.s.PacketsEstimated += packets
+	}
 	k.sessionPk += packets
-	k.stages = append(k.stages, stageRec{start, end, packets})
+	k.stages = append(k.stages, stageRec{start, end, packets, exact})
 	k.mu.Unlock()
 }
 
@@ -99,6 +103,7 @@ func (k *statsKeeper) snapshot() model.RunStats {
 	// current speed: packets of recent stages that fall into the window
 	from := now.Add(-ppsWindow)
 	var recent float64
+	basis := "measured"
 	keep := k.stages[:0]
 	for _, st := range k.stages {
 		if st.end.Before(from) {
@@ -115,6 +120,9 @@ func (k *statsKeeper) snapshot() model.RunStats {
 		}
 		if ov := st.end.Sub(lo); ov > 0 {
 			recent += float64(st.packets) * float64(ov) / float64(d)
+			if !st.exact {
+				basis = "pace"
+			}
 		}
 	}
 	k.stages = keep
@@ -125,6 +133,7 @@ func (k *statsKeeper) snapshot() model.RunStats {
 		}
 		if d := now.Sub(lo); d > 0 {
 			recent += float64(f.rate) * d.Seconds()
+			basis = "pace"
 		}
 	}
 	win := ppsWindow
@@ -133,6 +142,7 @@ func (k *statsKeeper) snapshot() model.RunStats {
 	}
 	if win > 0 {
 		s.CurrentPPS = round1(recent / win.Seconds())
+		s.CurrentPPSBasis = basis
 	}
 	if s.CurrentPPS > k.peakPPS {
 		k.peakPPS = s.CurrentPPS

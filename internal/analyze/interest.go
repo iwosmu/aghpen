@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"sort"
 	"strings"
@@ -84,7 +85,8 @@ type Weight struct {
 }
 
 // InterestWeights is the one table of the interest score (§4.5). The score
-// of a service is the sum of the rows that apply, capped at 100. Signature
+// of a service is the sum of the rows that apply, compressed above
+// InterestKnee (CompressInterest). Signature
 // matches add round(match.Interest * match.Confidence), capped at
 // MaxSignaturePoints each. Scope criticality 4 adds 5 points, 5 adds 10.
 var InterestWeights = []Weight{
@@ -299,10 +301,28 @@ func Interest(in InterestInput) (int, []model.InterestReason) {
 			score += r.Points
 		}
 	}
-	if score > 100 {
-		score = 100
+	return CompressInterest(score), kept
+}
+
+// InterestKnee and InterestSpan shape the top of the score. Up to the knee
+// the score is the plain sum of the reasons. Above it the sum is compressed
+// towards 100: score = knee + (100-knee) * (1 - exp(-(sum-knee)/span)).
+// A plain cut at 100 made the top of the list equal (measured on the lab:
+// the five most interesting services all had 100, a blog login page next
+// to phpMyAdmin); with the curve a sum of 100 gives 84, 140 gives 92 and 200
+// gives 97, so a larger sum still ranks higher.
+const (
+	InterestKnee = 70
+	InterestSpan = 50
+)
+
+// CompressInterest maps the sum of the reason points to the 0..99 score.
+func CompressInterest(sum int) int {
+	if sum <= InterestKnee {
+		return max(sum, 0)
 	}
-	return score, kept
+	v := InterestKnee + (100-InterestKnee)*(1-math.Exp(-float64(sum-InterestKnee)/InterestSpan))
+	return min(99, int(v+0.5))
 }
 
 // reasonWeakSignature marks a header or cookie signature match while the

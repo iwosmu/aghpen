@@ -576,7 +576,14 @@ func mergeTechnologies(st *set, svc *model.ServiceResult, matches []model.SigMat
 		if conf <= 0 || conf > 1 {
 			conf = 0.7
 		}
-		t := get(product, nmapCategory(svc.Name))
+		t := get(nmapProductName(product, func(name string) bool {
+			key := strings.ToLower(name)
+			if canon, ok := st.canon[key]; ok {
+				key = strings.ToLower(canon)
+			}
+			_, ok := acc[key]
+			return ok
+		}), nmapCategory(svc.Name))
 		t.add(conf, "nmap", cleanVersion(firstField(svc.Version)))
 		if t.cpe == "" {
 			for _, c := range svc.CPE {
@@ -630,6 +637,29 @@ func mergeTechnologies(st *set, svc *model.ServiceResult, matches []model.SigMat
 		return out[i].Name < out[j].Name
 	})
 	return out
+}
+
+// nmapServerWords are words nmap appends to a product name ("Grafana http",
+// "Jenkins httpd", "Gitea web server") that are not part of the product.
+var nmapServerWords = []string{" http server", " httpd", " http", " web server", " web interface", " web ui", " web admin", " server"}
+
+// nmapProductName returns the name under which an nmap product joins the
+// technologies of a service. When the product is "<name> http" (or another
+// server word) and a signature already named <name>, the nmap evidence
+// joins that technology instead of creating a second one.
+func nmapProductName(product string, known func(string) bool) string {
+	if known(product) {
+		return product
+	}
+	lower := strings.ToLower(product)
+	for _, w := range nmapServerWords {
+		if strings.HasSuffix(lower, w) {
+			if base := strings.TrimSpace(product[:len(product)-len(w)]); base != "" && known(base) {
+				return base
+			}
+		}
+	}
+	return product
 }
 
 func firstField(s string) string {

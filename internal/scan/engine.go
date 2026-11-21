@@ -181,8 +181,8 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 	r := &run{
 		e: e, log: log, plan: plan, sink: sink, sinkCtx: context.WithoutCancel(ctx),
 		prober: e.Prober(), ports: ports, disc: disc, lim: lim,
-		mode: discoveryMode(plan.Profile.Discovery.Mode), local: localNets(),
-		budget:    NewBudget(lim.PPS),
+		mode: discoveryMode(plan.Profile.Discovery.Mode), local: localNetsFn(),
+		budget:    NewBudget(lim.ProbePPS()),
 		httpLim:   probe.NewLimiter(lim.HTTPRPS, 1), // no burst: the cap holds in every second
 		hostSem:   make(chan struct{}, lim.ParallelHosts),
 		hostnames: exp.Hostnames,
@@ -358,7 +358,7 @@ func (r *run) claim() (*group, int) {
 	// equal share of the packet budget; the last lone group may use all of it
 	rate := r.budget.Share(r.lim.ParallelChunks)
 	if len(rest) == 0 && r.running == 0 {
-		rate = r.lim.PPS
+		rate = r.lim.ProbePPS()
 	}
 	if we := r.plan.WindowEnd; we != nil {
 		left := we.Sub(r.e.now())
@@ -549,6 +549,44 @@ func (r *run) finish(parent, work context.Context) model.RunOutcome {
 	return out
 }
 
+// DefaultLiveRate is the share of live addresses the estimate assumes for a
+// scope the inventory does not know (the high end of the range);
+// LowLiveRate is the low end.
+const (
+	DefaultLiveRate = 0.05
+	LowLiveRate     = 0.01
+)
+
+// scopeOnLink reports whether every IPv4 target of the plan lies in a
+// directly connected network, so discovery would be ARP-only.
+func (e *Engine) scopeOnLink(plan model.ScanPlan) bool {
+	local := localNetsFn()
+	if len(local) == 0 {
+		return false
+	}
+	vals := make([]string, len(plan.Targets))
+	for i, t := range plan.Targets {
+		vals[i] = t.Value
+	}
+	st := targets.Build(vals)
+	if len(st.V6) > 0 || len(st.Domains) > 0 || st.V4.Count() == 0 {
+		return false
+	}
+	for _, rg := range st.V4.Ranges() {
+		in := false
+		for _, n := range local {
+			if rg.Lo >= n.Lo && rg.Hi <= n.Hi {
+				in = true
+				break
+			}
+		}
+		if !in {
+			return false
+		}
+	}
+	return true
+}
+
 // Estimate computes the traffic budget of a plan. It sends nothing: domains
 // are not resolved and count as one address each.
 func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
@@ -585,58 +623,64 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 	}
 
 	// Expected share of live addresses: from the inventory when it knows
-	// hosts in this scope, else a cautious default.
-	est.ExpectedLiveRate = 0.05
+	// hosts in this scope. A new scope has no such number: the estimate is
+	// then a range, from LowLiveRate (est_packets_low) to the cautious
+	// default (est_packets). Measured on the lab /16: 67 of 65 487 addresses
+	// live (0.1 %), which the second run's estimate learns from the inventory.
+	est.ExpectedLiveRate = DefaultLiveRate
 	if len(plan.Hints) > 0 {
 		est.ExpectedLiveRate = math.Min(1, float64(len(plan.Hints))/float64(est.Addresses))
 	}
-	live := float64(est.Addresses) * est.ExpectedLiveRate
-	dead := float64(est.Addresses) - live
 
 	nPorts := 100.0
 	if ports, err := probe.EffectivePorts(plan.Profile.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil {
 		nPorts = float64(ports.Count())
 	}
 	disc := probe.NormalizeDiscovery(plan.Profile.Discovery)
-	probes := discoveryProbes(disc, e.Prober().Privileged())
-	var packets float64
-	if disc.SkipDiscovery {
-		packets = float64(est.Addresses) * nPorts * 2 // every address gets a port scan, silent ports are retried
-		live = float64(est.Addresses) * est.ExpectedLiveRate
-	} else {
-		// Share of /24 blocks that get the second pass in balanced mode: the
-		// blocks the inventory knows hosts in, or a guess for a new scope.
-		liveBlocks := liveBlockGuess
-		if len(plan.Hints) > 0 {
-			seen := map[string]bool{}
-			for _, h := range plan.Hints {
-				if p, err := targets.ParseValue(h.IP); err == nil && !p.V6.IsValid() {
-					seen[fmt.Sprint(p.Range.Lo>>8)] = true
-				}
+	privileged := e.Prober().Privileged()
+	probes := discoveryProbes(disc, privileged)
+	// ARP-only discovery (see discover): one frame per address and two
+	// retries for the silent ones, plus the confirmation sweep of live blocks.
+	arpOnly := privileged && !disc.SkipDiscovery && e.scopeOnLink(plan)
+	// Share of /24 blocks that get the second pass: the blocks the inventory
+	// knows hosts in, or a guess for a new scope.
+	liveBlocks := liveBlockGuess
+	if len(plan.Hints) > 0 {
+		seen := map[string]bool{}
+		for _, h := range plan.Hints {
+			if p, err := targets.ParseValue(h.IP); err == nil && !p.V6.IsValid() {
+				seen[fmt.Sprint(p.Range.Lo>>8)] = true
 			}
-			liveBlocks = math.Min(1, float64(len(seen))*256/float64(est.Addresses))
 		}
-		packets = dead*deadCost(disc, e.Prober().Privileged(), est.DiscoveryMode, liveBlocks) + live*probes
-		packets += live * nPorts * 1.05
+		liveBlocks = math.Min(1, float64(len(seen))*256/float64(est.Addresses))
 	}
-	if plan.Profile.ServiceDetection {
-		packets += live * 3 * 14 // about 3 open ports per host, about 14 packets per version probe
-	}
-	if plan.Profile.UDP.Enabled {
-		if udp, err := probe.UDPPorts(plan.Profile.UDP.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil {
-			packets += live * float64(len(udp)) * 2 // one retry for silent ports
+	calc := func(rate float64) (packets, sec float64) {
+		live := float64(est.Addresses) * rate
+		dead := float64(est.Addresses) - live
+		switch {
+		case disc.SkipDiscovery:
+			packets = float64(est.Addresses) * nPorts * 2 // every address gets a port scan, silent ports are retried
+		case arpOnly:
+			packets = dead*3*(1+liveBlocks) + live
+			packets += live * nPorts * 1.05
+		default:
+			packets = dead*deadCost(disc, privileged, est.DiscoveryMode, liveBlocks) + live*probes
+			packets += live * nPorts * 1.05
 		}
-	}
-	if plan.Profile.Retry.UnstableRetries > 0 {
-		packets += float64(len(plan.Hints)) * 0.1 * probes * float64(plan.Profile.Retry.UnstableRetries)
-	}
-	est.EstPackets = int64(packets)
-
-	var sec float64
-	if plan.MeasuredPPS > 0 {
-		est.BasedOnHistory = true
-		sec = packets / plan.MeasuredPPS
-	} else {
+		if plan.Profile.ServiceDetection {
+			packets += live * 3 * 14 // about 3 open ports per host, about 14 packets per version probe
+		}
+		if plan.Profile.UDP.Enabled {
+			if udp, err := probe.UDPPorts(plan.Profile.UDP.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil {
+				packets += live * float64(len(udp)) * 2 // one retry for silent ports
+			}
+		}
+		if plan.Profile.Retry.UnstableRetries > 0 {
+			packets += float64(len(plan.Hints)) * 0.1 * probes * float64(plan.Profile.Retry.UnstableRetries)
+		}
+		if plan.MeasuredPPS > 0 {
+			return packets, packets / plan.MeasuredPPS
+		}
 		// nmap seldom holds the cap exactly; process start and the service
 		// stage add fixed time per group
 		groups := math.Ceil(float64(est.Addresses) / float64(chunking.MaxSize))
@@ -644,6 +688,15 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 		if plan.Profile.ServiceDetection {
 			sec += live * 3 * 1.5 / float64(lim.ParallelHosts)
 		}
+		return packets, sec
+	}
+	packets, sec := calc(est.ExpectedLiveRate)
+	est.BasedOnHistory = plan.MeasuredPPS > 0
+	est.EstPackets = int64(packets)
+	est.EstPacketsLow, est.EstDurationLowSec = est.EstPackets, int64(math.Ceil(sec))
+	if len(plan.Hints) == 0 && LowLiveRate < est.ExpectedLiveRate {
+		lowP, lowS := calc(LowLiveRate)
+		est.EstPacketsLow, est.EstDurationLowSec = int64(lowP), int64(math.Ceil(lowS))
 	}
 	est.EstDurationSec = int64(math.Ceil(sec))
 	if plan.WindowEnd != nil {

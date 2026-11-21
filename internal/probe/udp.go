@@ -83,39 +83,68 @@ var snmpEngineDiscovery = []byte{
 
 // snmpProbe sends the engine discovery to addr (ip:port) up to two times
 // and reports whether an SNMP message came back. sent is the packet count.
-func snmpProbe(ctx context.Context, addr string, timeout time.Duration, lim *Limiter) (open bool, sent int64) {
+func snmpProbe(ctx context.Context, addr string, timeout time.Duration, lim *Limiter) (open bool, product string, sent int64) {
 	d := net.Dialer{Timeout: timeout}
 	conn, err := d.DialContext(ctx, "udp", addr)
 	if err != nil {
-		return false, 0
+		return false, "", 0
 	}
 	defer conn.Close()
 	buf := make([]byte, 1500)
 	for try := 0; try < 2; try++ {
 		if lim.Wait(ctx) != nil {
-			return false, sent
+			return false, "", sent
 		}
 		_ = conn.SetDeadline(time.Now().Add(timeout))
 		if _, err := conn.Write(snmpEngineDiscovery); err != nil {
-			return false, sent // ICMP port unreachable from an earlier try: closed
+			return false, "", sent // ICMP port unreachable from an earlier try: closed
 		}
 		sent++
 		n, err := conn.Read(buf)
 		if err == nil && n > 2 && buf[0] == 0x30 { // an ASN.1 sequence: an SNMP message
-			return true, sent
+			return true, snmpVendor(buf[:n]), sent
 		}
 		var ne net.Error
 		if err != nil && !(errors.As(err, &ne) && ne.Timeout()) {
-			return false, sent // refused: the port is closed
+			return false, "", sent // refused: the port is closed
 		}
 	}
-	return false, sent
+	return false, "", sent
+}
+
+// snmpEnterprises maps the IANA enterprise number in an SNMP engine ID
+// (RFC 3411, SnmpEngineID: the first four bytes are 0x80000000 | enterprise)
+// to the agent's product. Only agents whose engine ID names the software.
+var snmpEnterprises = map[uint32]string{
+	8072: "net-snmp", 2021: "net-snmp", 9: "Cisco SNMP agent", 311: "Microsoft SNMP agent",
+	2636: "Juniper SNMP agent", 14988: "MikroTik SNMP agent", 41112: "Ubiquiti SNMP agent",
+	6876: "VMware SNMP agent", 11: "HP SNMP agent", 6574: "Synology SNMP agent",
+}
+
+// snmpVendor reads the authoritative engine ID from an SNMPv3 Report (the
+// answer to engine discovery) and returns the product its enterprise number
+// names, or "". The engine ID is the first OCTET STRING of 5 to 32 bytes
+// whose first byte has the high bit set.
+func snmpVendor(msg []byte) string {
+	for i := 0; i+2 < len(msg); i++ {
+		if msg[i] != 0x04 {
+			continue
+		}
+		l := int(msg[i+1])
+		if l < 5 || l > 32 || i+2+l > len(msg) || msg[i+2]&0x80 == 0 {
+			continue
+		}
+		id := msg[i+2 : i+2+l]
+		ent := (uint32(id[0])&0x7f)<<24 | uint32(id[1])<<16 | uint32(id[2])<<8 | uint32(id[3])
+		return snmpEnterprises[ent]
+	}
+	return ""
 }
 
 // snmpScan probes port 161 of every host, a few hosts at a time, under the rate limit.
-func snmpScan(ctx context.Context, hosts []string, maxRate int, timeout time.Duration) (open map[string]bool, sent int64) {
+func snmpScan(ctx context.Context, hosts []string, maxRate int, timeout time.Duration) (open map[string]string, sent int64) {
 	lim := NewLimiter(float64(max(1, maxRate)), 1)
-	open = map[string]bool{}
+	open = map[string]string{}
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 32)
@@ -128,11 +157,11 @@ func snmpScan(ctx context.Context, hosts []string, maxRate int, timeout time.Dur
 		go func() {
 			defer wg.Done()
 			defer func() { <-sem }()
-			ok, n := snmpProbe(ctx, net.JoinHostPort(ip, strconv.Itoa(snmpPort)), timeout, lim)
+			ok, product, n := snmpProbe(ctx, net.JoinHostPort(ip, strconv.Itoa(snmpPort)), timeout, lim)
 			mu.Lock()
 			sent += n
 			if ok {
-				open[ip] = true
+				open[ip] = product
 			}
 			mu.Unlock()
 		}()
@@ -183,8 +212,8 @@ func (n *Nmap) UDPScan(ctx context.Context, req UDPScanRequest) (*Result, error)
 		for i, h := range res.Hosts {
 			byIP[h.IP] = i
 		}
-		for ip := range open {
-			port := Port{Port: snmpPort, Proto: "udp", State: "open", Reason: "udp-response", Name: "snmp", Method: "probed", Confidence: 0.8}
+		for ip, product := range open {
+			port := Port{Port: snmpPort, Proto: "udp", State: "open", Reason: "udp-response", Name: "snmp", Product: product, Method: "probed", Confidence: 0.8}
 			if i, ok := byIP[ip]; ok {
 				res.Hosts[i].Ports = append(res.Hosts[i].Ports, port)
 			} else {

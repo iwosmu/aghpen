@@ -33,13 +33,13 @@ func TestInterest(t *testing.T) {
 	}{
 		{"plain page", InterestInput{Service: httpSvc(80, "Hello", 200)}, 0, ""},
 		{"login over plain http without security headers", InterestInput{Service: login}, 30, "login-plain-http,missing-security-headers"},
-		{"admin panel, dev tool, expired self-signed cert, new", InterestInput{Service: admin, NewExposure: true, Now: now}, 90,
+		{"admin panel, dev tool, expired self-signed cert, new", InterestInput{Service: admin, NewExposure: true, Now: now}, 80, // sum 90, compressed above 70
 			"admin-panel,dev-tool,expired-cert,new-exposure,self-signed-cert"},
-		{"capped at 100", InterestInput{Service: func() model.ServiceResult {
+		{"a large sum stays under 100", InterestInput{Service: func() model.ServiceResult {
 			s := admin
 			s.Classes = []string{model.ClassAdminPanel, model.ClassStaging, model.ClassIoT, model.ClassDirListing}
 			return s
-		}(), NewExposure: true, Now: now, ScopeCriticality: 5}, 100, ""},
+		}(), NewExposure: true, Now: now, ScopeCriticality: 5}, 95, ""}, // sum 165
 		{"database", InterestInput{Service: model.ServiceResult{Port: 6379, Name: "redis", Product: "Redis key-value store", Version: "7.4.1", State: "open"}}, 25, "database"},
 		{"telnet", InterestInput{Service: model.ServiceResult{Port: 23, Name: "telnet", State: "open"}}, 25, "remote-access-plaintext"},
 		{"ssh is only worth 5", InterestInput{Service: model.ServiceResult{Port: 22, Name: "ssh", State: "open"}}, 5, "remote-access"},
@@ -138,5 +138,23 @@ func TestEffectiveClassesFallbacks(t *testing.T) {
 				t.Errorf("classes = %q, want %q", got, c.want)
 			}
 		})
+	}
+}
+
+func TestCompressInterestKeepsTheTopOrdered(t *testing.T) {
+	prev := -1
+	for sum := 0; sum <= 300; sum += 5 {
+		got := CompressInterest(sum)
+		if got < prev || got > 99 {
+			t.Fatalf("sum %d -> %d after %d", sum, got, prev)
+		}
+		if sum <= InterestKnee && got != sum {
+			t.Errorf("sum %d -> %d, want the sum below the knee", sum, got)
+		}
+		prev = got
+	}
+	// the lab case: phpMyAdmin over HTTP against a blog login page over HTTP
+	if a, b := CompressInterest(150), CompressInterest(105); a <= b {
+		t.Errorf("150 -> %d, 105 -> %d: the larger sum must rank higher", a, b)
 	}
 }

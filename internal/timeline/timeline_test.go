@@ -199,3 +199,26 @@ func TestValidCIDR(t *testing.T) {
 		t.Error("garbage accepted")
 	}
 }
+
+// A discovery-only run between two full runs: no version flip in the lane,
+// no "-" stretch in the field history.
+func TestUnmeasuredFieldsKeepTheirValue(t *testing.T) {
+	host := []hostObs{{RunID: 1, At: day(0), Up: true}, {RunID: 2, At: day(1), Up: true}, {RunID: 3, At: day(2), Up: true}}
+	obs := []svcObs{
+		{RunID: 1, At: day(0), Product: "nginx", Version: "1.26.2"},
+		{RunID: 2, At: day(1)}, // no version detection in this run
+		{RunID: 3, At: day(2), Product: "nginx", Version: "1.26.2"},
+	}
+	if _, marks := serviceLane(host, obs); len(marks) != 0 {
+		t.Errorf("version marks = %+v", marks)
+	}
+	fo := []fieldObs{
+		{RunID: 1, At: day(0), Values: map[string]string{"name": "http", "version": "nginx 1.26.2", "title": "Panel"}},
+		{RunID: 2, At: day(1), Values: map[string]string{"name": "http"}},
+		{RunID: 3, At: day(2), Values: map[string]string{"name": "http", "version": "nginx 1.26.2", "title": "Panel"}},
+	}
+	changed, unchanged := fieldHistories(fo)
+	if len(changed) != 0 || unchanged["version"] != "nginx 1.26.2" || unchanged["title"] != "Panel" {
+		t.Errorf("changed %+v, unchanged %v", changed, unchanged)
+	}
+}
