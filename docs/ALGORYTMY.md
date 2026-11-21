@@ -190,6 +190,27 @@ Wszystkie stałe są w `stability.go` i `diff.go`, każda z komentarzem. Zmiana 
 - Zmiana czasu (lato/zima) przesuwa godzinę lokalną skanu o jeden kubełek. Sąsiednie godziny z wagą 0,5 łagodzą ten efekt.
 - Model ocenia host, nie pojedynczy port. Usługi hosta, który milczy, mają stan „nieznany".
 
+### 2.9 Ponowne sondowanie sterowane modelem
+
+Pakiet `internal/reprobe` dopytuje hosty, o których model wie za mało. Szczegóły tras są w `docs/API-time.md`.
+
+- **Potwierdzenie.** Host dostał `host_missing` (status `unstable`, wcześniej odpowiadał). Czujka sprawdza go ponownie 10, 30 i 90 minut po pierwszym braku odpowiedzi (`backoff_minutes`). Seria starsza niż ostatni krok plus 12 godzin nie jest już potwierdzana.
+- **Prawdopodobnie aktywny.** Host niestabilny jest sprawdzany 5 minut po początku najbliższej godziny, w której model daje częstość odpowiedzi co najmniej `likely_up_rate` (domyślnie 0,6). Warunek: co najmniej 8 obserwacji i prawdziwa odpowiedź w tym samym typie dnia (dzień roboczy albo weekend, godzina ±1).
+- **Bezpieczeństwo.** Sondy działają tylko w oknach skanowania profilu (`sched.NextAllowed`) i pod polityką bezpieczeństwa: wykluczenia, limity pakietów i HTTP, wyłącznik awaryjny. Budżet to 200 adresów na godzinę (`budget_per_hour`), liczony razem dla wszystkich sond z ostatniej godziny. Nadmiar przechodzi na następną godzinę. Sonda sprawdza najwyżej 32 znane porty hosta.
+- Wykonawca startuje co minutę. Zbiera należne sondy w jeden przebieg na profil (`trigger = reprobe`) i nie startuje nowego, dopóki poprzedni trwa.
+- Operator wyłącza mechanizm w `PUT /settings/reprobe` (`enabled: false`).
+
+### 2.10 Zegar laboratoryjny
+
+Kubełki modelu mają domyślnie szerokość 1 h i okres 1 tygodnia (168 kubełków). Do pokazu w laboratorium zegar można skrócić zmiennymi środowiskowymi procesu `czujka`:
+
+| Zmienna | Domyślnie | Przykład w laboratorium |
+| --- | --- | --- |
+| `CZUJKA_AVAIL_BUCKET` | `1h` | `3m` |
+| `CZUJKA_AVAIL_PERIOD` | `168h` | `30m` |
+
+Reguły: szerokość co najmniej 1 s, okres jest całkowitą wielokrotnością szerokości, najwyżej 168 kubełków. Przy innym zegarze model liczy kubełek jako `(czas Unix mod okres) / szerokość`, kurczy częstość kubełka prosto do częstości globalnej (bez poziomu dnia tygodnia) i opisuje rytm jako „zegar laboratoryjny”. To ustawienie służy tylko do pokazu. W produkcji zostaw wartości domyślne.
+
 ## 3. Wykrywanie zmian
 
 `Diff(prev, cur)` porównuje dwa obrazy sieci i zwraca listę zmian oraz podsumowanie. Gdy nie ma poprzedniego przebiegu, nie ma zmian: pierwszy skan to punkt odniesienia.
