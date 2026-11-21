@@ -823,6 +823,14 @@ const (
 	quickMaxProcs       = 8                // nmap processes at one time on the quick path
 )
 
+// amqpHello reads an AMQP broker's product and version (a variable for tests).
+var amqpHello = probe.AMQPHello
+
+const (
+	amqpTimeout = 3 * time.Second
+	amqpPackets = 10 // handshake, header, Connection.Start, close
+)
+
 // quickStoreEvery is the pace of partial results of a host being described
 // (a variable for tests).
 var quickStoreEvery = 2 * time.Second
@@ -979,6 +987,31 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 				if ctx.Err() == nil && len(part.Services) > 0 {
 					store(part)
 				}
+			}
+		}()
+	}
+
+	// AMQP: the broker names its product and version right after the
+	// client's protocol header; nmap reaches its AMQP probe only after 22 s.
+	for _, p := range h.Ports {
+		if (p.Proto != "" && p.Proto != "tcp") || p.State != "open" || !(strings.EqualFold(p.Name, "amqp") || p.Port == 5672 || p.Port == 5673) {
+			continue
+		}
+		port := p.Port
+		svwg.Add(1)
+		go func() {
+			defer svwg.Done()
+			t0 := r.e.now()
+			product, version, err := amqpHello(ctx, h.IP, port, amqpTimeout)
+			r.account(gs, &probe.Result{Packets: amqpPackets, PacketsExact: false}, t0)
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			detected[port], changed = probe.Port{Port: port, Proto: "tcp", State: "open", Name: "amqp", Product: product, Version: version, Confidence: 1}, true
+			mu.Unlock()
+			if c := cancels[port]; c != nil {
+				c() // nmap's answer would be the same, 20 s later
 			}
 		}()
 	}

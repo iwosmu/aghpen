@@ -1197,3 +1197,42 @@ func TestQuickPathRetriesHTTPAfterVersionDetection(t *testing.T) {
 		t.Fatalf("host = %+v, tries = %d", h, fp.tries)
 	}
 }
+
+// slowAMQP is a network whose version detection on 5672 takes long, like
+// nmap on RabbitMQ (22 s).
+type slowAMQP struct{ *fakeNet }
+
+func (s slowAMQP) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*probe.Result, error) {
+	if req.Hosts[0].Ports[0] == 5672 {
+		select {
+		case <-ctx.Done():
+			return nil, context.Cause(ctx)
+		case <-time.After(20 * time.Second):
+		}
+	}
+	return s.fakeNet.ServiceScan(ctx, req)
+}
+
+func TestQuickPathReadsTheAMQPVersion(t *testing.T) {
+	defer func(f func(context.Context, string, int, time.Duration) (string, string, error)) { amqpHello = f }(amqpHello)
+	amqpHello = func(_ context.Context, ip string, port int, _ time.Duration) (string, string, error) {
+		return "RabbitMQ", "4.3.8", nil
+	}
+	netw := slowAMQP{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 5672}}}}
+	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.Ports = "22,5672"
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	start := time.Now()
+	sink := newSink()
+	if out := e.Run(context.Background(), plan, sink); out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	if d := time.Since(start); d > 10*time.Second {
+		t.Errorf("run took %v: the AMQP answer must stop nmap's -sV", d)
+	}
+	h := sink.host("10.7.0.5")
+	if h == nil || h.Services[1].Name != "amqp" || h.Services[1].Product != "RabbitMQ" || h.Services[1].Version != "4.3.8" {
+		t.Fatalf("host = %+v", h)
+	}
+}
