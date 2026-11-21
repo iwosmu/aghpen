@@ -93,6 +93,9 @@ export default function Hosts() {
   const grid = cols.map((c) => c.width).join(' ');
   const sort = u.get('sort', '-interest');
   const active = FILTERS.filter((k) => u.get(k)).length;
+  // an empty list: are there hosts at all, hidden by a filter?
+  const anyHost = usePage<Host>('/hosts', { limit: 1 }, !inf.isPending && rows.length === 0);
+  const hidden = anyHost.data?.total ?? 0;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -124,7 +127,9 @@ export default function Hosts() {
 
       <div ref={wrapRef} className="flex min-h-0 flex-1 flex-col">
         {inf.error ? <ErrorState error={inf.error} retry={() => inf.refetch()} /> : inf.isPending ? <SkeletonRows rows={14} /> : rows.length === 0 ? (
-          <Empty icon="hosts" title={active ? t('Żaden host nie pasuje do filtrów', 'No hosts match the filters') : t('Brak hostów', 'No hosts yet')}            action={active ? undefined : <NextSteps />} />
+          active ? <Empty icon="hosts" title={t('Żaden host nie pasuje do filtrów', 'No hosts match the filters')} action={<Button icon="x" onClick={() => u.clear(FILTERS)}>{t('Wyczyść filtry', 'Clear filters')}</Button>} />
+            : hidden > 0 ? <Empty icon="hosts" title={t('Filtr „bez nieaktywnych” ukrywa wszystkie hosty', 'The "hide down" filter hides every host')} action={<Button onClick={() => u.set({ status: 'all' })} data-testid="hosts-show-all">{t('Pokaż wszystkie', 'Show all')} ({fmtInt(hidden)})</Button>} />
+            : <Empty icon="hosts" title={t('Brak hostów', 'No hosts yet')} action={<NextSteps />} />
         ) : (
           <>
             {!narrow ? (
