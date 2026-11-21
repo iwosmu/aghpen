@@ -29,7 +29,7 @@ echo "=== 2. install.sh from the bundle ==="
 T0=$(date +%s)
 inner 'mkdir -p /opt && tar -xzf /bundle.tgz -C /opt && cd /opt/czujka-bundle-* && CZUJKA_WRITE_SYSCTL=n sh install.sh' 2>&1 | grep -v -E "^ *(Container|Network|Volume) " | sed 's/^/  | /'
 echo "  install took $(( $(date +%s) - T0 )) s (load + start)"
-check "images loaded" "$(inner 'docker images --format "{{.Repository}}" | sort -u | tr "\n" " "')" "czujka czujka-db "
+check "images loaded" "$(inner 'docker images --format "{{.Repository}}" | sort -u | tr "\n" " "')" "alpine czujka czujka-db "
 
 echo "=== 3. The stack works ==="
 HZ=$(inner 'wget -qO- http://127.0.0.1:8080/healthz')

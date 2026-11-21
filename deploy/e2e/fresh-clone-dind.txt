@@ -1,10 +1,10 @@
 # Czujka: from a fresh clone to the first "Ten komputer" scan, on a clean machine
-# Machine: docker:28-dind (privileged) on Docker Desktop, arm64, 0 images at the start.
-# Source: git bundle of branch iwosmu/czujka-core at d250e29, cloned inside dind.
-# Docker Hub had hit its anonymous pull limit for this network ("toomanyrequests"),
-# so this dind ran with --registry-mirror=https://mirror.gcr.io (Google's public Docker Hub mirror).
-# Recorded 2026-11-21 by deploy/e2e scripts run from the Mac; the UI part was driven
-# with playwright-cli through 127.0.0.1:18180 -> dind:18080 -> socat -> 127.0.0.1:8080.
+# Machine: docker:28-dind (privileged) on Docker Desktop, arm64, no Czujka images at the start.
+# Source: git bundle of the merged branch at 607c91e (includes pull_policy: build), cloned inside dind.
+# The dind ran with --registry-mirror=https://mirror.gcr.io (Google's public Docker Hub mirror),
+# because Docker Hub refused anonymous pulls from this network earlier the same day ("toomanyrequests").
+# Recorded 2026-11-21. The UI part was driven with playwright-cli through
+# 127.0.0.1:18180 -> dind:18080 -> socat -> 127.0.0.1:8080.
 
 ## A. git clone; docker compose up -d (images built on the machine)
 
@@ -34,43 +34,74 @@ czujka-1  |     password: <24 random characters, shown once>
 czujka-1  |   Change it after the first login.
 # secrets-1  | secrets: generated a new database password
 # grep -c 'czujka-internal-network-only\|POSTGRES_PASSWORD:' deploy/docker-compose.yml: 0 fixed password lines
-# TIMES clone=1 s; docker compose up -d returned after 114 s; API healthy 115 s after the command; total 116 s
+# TIMES clone=2 s; docker compose up -d returned after 50 s; API healthy 51 s after the command; total 53 s
 
 ## B. Browser: open, log in, "Ten komputer", "Uruchom skan"
-# (times are wall clock of the automated browser; a person needs a few seconds more for typing)
+# (wall clock of the automated browser; a person needs a few seconds more for typing)
 
-18:03:02 open http://127.0.0.1:18180 (the dind UI on 127.0.0.1:8080, forwarded)
-18:03:04 log in with the password from the log
-18:03:08 click "Ten komputer (localhost)"
-18:03:10 preview: localhost = host Dockera 172.18.0.1
-18:03:11 click "Uruchom skan" -> Page URL: http://127.0.0.1:18180/runs/1
-18:03:52 run finished 41 s after the click
-run 1: completed, 2026-11-21T18:03:10.680768Z -> 2026-11-21T18:03:51.780688Z
+18:20:53 open http://127.0.0.1:18180 (the dind UI on 127.0.0.1:8080, forwarded)
+18:20:57 log in with the password from the log
+18:21:00 click "Ten komputer (localhost)"
+18:21:02 preview: localhost = host Dockera 172.18.0.1
+18:21:03 click "Uruchom skan" -> Page URL: http://127.0.0.1:18180/runs/1
+18:21:44 run finished 41 s after the click
+run 1: completed, 2026-11-21T18:21:02.813826Z -> 2026-11-21T18:21:43.972765Z
+  profile Domyślny (bezpieczne rozpoznanie): ports=top-1000,1521,2379,2380,5984,6379,7474,8086,9042,9200,9300,11211,27017,28017,188
+  profile Ten komputer: Domyślny (bezpieczne rozpoznanie): ports=top-1000,1521,2379,2380,5984,6379,7474,8086,9042,9200,9300,11211,27017,28017,188
   172.18.0.1:2376 open docker  title= response_ms=null
-  172.18.0.1:8787 open http nginx title=Welcome to nginx! response_ms=1
-  172.18.0.1:18080 open http Golang net/http server title=Czujka response_ms=2
+  172.18.0.1:8787 open http nginx title=Welcome to nginx! response_ms=0
+  172.18.0.1:18080 open http Golang net/http server title=Czujka response_ms=0
   host 172.18.0.1 Host dockera (ten komputer) hostnames=localhost
 
-## C. Offline bundle (make bundle, 354 MiB) on another clean docker:28-dind, no registry used
+## C. Offline bundle: make bundle (354 MiB), then deploy/e2e/bundle-proof.sh
+# A clean docker:28-dind with --network none: nothing can be pulled.
 
-# images before: 0
-$ tar -xzf czujka-bundle-d250e29.tar.gz && cd czujka-bundle-d250e29
-$ sh install.sh
-# exit 0
-install: loading the images
-Loaded image: czujka:d250e29
-Loaded image: czujka-db:17
-Loaded image: alpine:3.22
-  password:      <random, written to .env>
- Container czujka-db-1  Healthy
- Container czujka-db-1  Healthy
- Container czujka-czujka-1  Healthy
-install: Czujka listens on http://127.0.0.1:8080 (administrator: admin@czujka.local)
-# healthz: {"db":"ok","engine":true,"field_encryption":{"algorithm":"AES-256-GCM envelope","key_id":"042cd5acd62c"},"host_gateway":
-# TIMES extract=3 s; install.sh (docker load, .env, start, wait healthy, doctor) 23 s; total 26 s
+=== 1. A clean docker daemon without network ===
+  PASS  the inner daemon has no images: 0
+  PASS  the inner daemon has no network route out: 0
+Docker Compose version v2.40.3
+=== 2. install.sh from the bundle ===
+  | install: loading the images
+  | Loaded image: czujka-db:17
+  | Loaded image: alpine:3.22
+  | Loaded image: czujka:607c91e
+  | init: wrote /opt/czujka-bundle-607c91e/.env (mode 600)
+  |   administrator: admin@czujka.local
+  |   password:      <random, written to .env>
+  |   master key:    in CZUJKA_MASTER_KEY. Keep a copy outside this machine: without it
+  |                  the encrypted fields and every backup archive are lost.
+  | Next: make up   (or: docker compose -f docker-compose.yml up -d --wait in the bundle)
+  | czujka doctor 607c91e, 2026-11-21 18:19:11
+  | 
+  | [OK   ] Baza danych: PostgreSQL 17.12 - Percona Server for PostgreSQL 17.12.1
+  | [OK   ] Szyfrowanie bazy (pg_tde): zaszyfrowane tabele: 23 z 23, WAL: szyfrowany
+  | [OK   ] Klucz główny: klucz ee90e935e7f7 z CZUJKA_MASTER_KEY, kluczy poprzednich: 0; klucz pasuje do danych w bazie
+  | [OK   ] nmap: /usr/bin/nmap, wersja 7.97
+  | [OK   ] Gniazda surowe (SYN, ICMP, ARP): dostępne: skan SYN, wykrywanie ICMP i ARP
+  | [OK   ] DNS: rozwiązano 1 z 1 nazw (localhost)
+  | [OK   ] Wolne miejsce na dysku: /var/lib/czujka: wolne 771.6 GiB
+  | [OK   ] Narzędzia kopii zapasowej (pg_dump, pg_restore): pg_dump i pg_restore są dostępne
+  | [UWAGA] Trasa do sieci skanowanych: żaden włączony profil nie ma zakresu z włączonymi celami
+  |         Co zrobić: Dodaj zakres z celami (Zakresy → Dodaj cele) i przypisz go do włączonego profilu skanowania.
+  | [POMIN] Tablica sąsiadów jądra (ARP): nie można odczytać limitu (/proc/sys/net/ipv4/neigh/default/gc_thresh3; w kontenerze jądro go ukrywa); żaden włączony zakres nie leży w sieci lokalnej skanera
+  | 
+  | Wynik: instalacja jest gotowa do pracy.
+  | install: Czujka listens on http://127.0.0.1:8080 (administrator: admin@czujka.local)
+  install took 29 s (load + start)
+  PASS  images loaded: alpine czujka czujka-db 
+=== 3. The stack works ===
+  healthz: {"db":"ok","engine":true,"field_encryption":{"algorithm":"AES-256-GCM envelope","key_id":"ee90e935e7f7"},"host_gateway":"172.17.0.1","probe":{"mode":"nmap-raw","prober":"nmap","raw_sockets":true},"status":"ok"
+  PASS  healthz status: ok
+  PASS  pg_tde encrypts every table: true
+  PASS  scan engine wired with nmap: true nmap-raw
+  PASS  the administrator from init.sh logs in: admin
+  PASS  the UI is served: 1
+  PASS  .env written once with mode 600: 600
 
-## Earlier clean run, same flow, Docker Hub directly (commit f964d6e, before the rate limit)
-# images before: 0
-# TIMES clone=1 s; docker compose up -d returned after 78 s; API healthy 79 s after the command; total 80 s
-# Run "Ten komputer": completed in 35 s (the sample service on 8787 was not found then:
-# 8787 was outside the default port set; fixed in d250e29, see A/B above).
+PASS: 9  FAIL: 0
+BUNDLE OK
+
+## Earlier runs the same day
+# f964d6e, Docker Hub directly: clone 1 s, API healthy 79 s after docker compose up -d (total 80 s).
+# d250e29, through the mirror: clone 1 s, API healthy 115 s after the command (total 116 s); scan 41 s.
+# d250e29 bundle on a clean dind: extract 3 s + install.sh 23 s = 26 s.
