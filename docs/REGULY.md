@@ -4,7 +4,7 @@ Rozpoznanie mówi, **co istnieje**. Reguła mówi, **czego nie może być** (alb
 
 Reguła działa tylko na zapisanym inwentarzu. Sprawdzenie reguły nie wysyła żadnego pakietu.
 
-Kod: `internal/rules`. Trasy API: [API-policy.md](API-policy.md).
+Kod: `internal/rules`. Trasy API: [API.md](API.md#exposure-rules-and-signature-from-an-example).
 
 ## 1. Przykład
 

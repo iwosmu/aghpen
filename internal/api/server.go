@@ -175,6 +175,9 @@ func (s *Server) routes() http.Handler {
 		for _, m := range s.d.Mounts {
 			r.Mount(m.Pattern, m.Router(can))
 		}
+		for _, reg := range s.d.Routes {
+			reg(r, can)
+		}
 	})
 	r.Get("/healthz", s.healthz) // for container health checks
 	r.NotFound(s.serveUI)

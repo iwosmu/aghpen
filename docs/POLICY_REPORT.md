@@ -1,6 +1,6 @@
 # Policy worker: report
 
-Branch `iwosmu/czujka-policy`. Date 2026-11-21. Worker report (English); the analyst documentation is [REGULY.md](REGULY.md) (Polish), the routes are in [API-policy.md](API-policy.md).
+Branch `iwosmu/czujka-policy`. Date 2026-11-21. Worker report (English); the analyst documentation is [REGULY.md](REGULY.md) (Polish), the routes are in [API.md](API.md#exposure-rules-and-signature-from-an-example).
 
 ## 1. What was built
 
@@ -234,7 +234,7 @@ Required one-line change in `internal/wire/analysis.go` (`AnalyzeRun`, stale-fin
 if f.Manual || derived[f.Key] || f.LastRunID >= runID || f.Type == rules.FindingType {
 ```
 
-UI (`web/`): a "Reguły" page (list, YAML editor calling `/rules/validate` and `/rules/dry-run` on edit, enable switch, violations per rule) and a "Zaproponuj sygnaturę" button on the service page that posts `/signatures/suggest` and opens the YAML in the signature editor. Wire format in API-policy.md.
+UI (`web/`): a "Reguły" page (list, YAML editor calling `/rules/validate` and `/rules/dry-run` on edit, enable switch, violations per rule) and a "Zaproponuj sygnaturę" button on the service page that posts `/signatures/suggest` and opens the YAML in the signature editor. Wire format in API.md.
 
 ## 5. Known gaps and next steps
 

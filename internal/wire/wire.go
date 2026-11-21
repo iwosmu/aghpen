@@ -6,13 +6,16 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/iwosmu/aghpen/internal/api"
 	"github.com/iwosmu/aghpen/internal/config"
 	"github.com/iwosmu/aghpen/internal/enginewire"
 	"github.com/iwosmu/aghpen/internal/model"
+	"github.com/iwosmu/aghpen/internal/rules"
 	"github.com/iwosmu/aghpen/internal/runner"
 	"github.com/iwosmu/aghpen/internal/scan"
 	"github.com/iwosmu/aghpen/internal/sched"
+	"github.com/iwosmu/aghpen/internal/sigsuggest"
 	"github.com/iwosmu/aghpen/internal/sigwire"
 	"github.com/iwosmu/aghpen/internal/store"
 	"github.com/iwosmu/aghpen/web"
@@ -27,6 +30,7 @@ type Wiring struct {
 	Window      runner.WindowFunc         // internal/sched: end of the current scan window, start of the next
 	PauseCause  func(reason string) error // scan.PauseCause: pause reasons reach the engine as cancel causes
 	API         api.Deps                  // seams of the REST API
+	Rules       *rules.Service            // exposure rules (policy-violation findings)
 
 	cfg config.Config
 	st  *store.Store
@@ -61,6 +65,9 @@ func Build(cfg config.Config, st *store.Store, log *slog.Logger) *Wiring {
 	an := NewAnalysis(st, loc, log)
 	dojo := Dojo{st: st, log: log}
 	an.Auto = dojo
+	pol := rules.New(st, log)
+	an.Policy = pol
+	sugg := sigsuggest.New(st, log)
 	ic := Interchange{st: st}
 	w := &Wiring{
 		Engine:      eng,
@@ -70,6 +77,7 @@ func Build(cfg config.Config, st *store.Store, log *slog.Logger) *Wiring {
 		Window:      enginewire.Window,
 		PauseCause:  enginewire.PauseCause,
 		cfg:         cfg, st: st, log: log,
+		Rules: pol,
 	}
 	w.API = api.Deps{
 		Analyzer:     an,
@@ -83,6 +91,12 @@ func Build(cfg config.Config, st *store.Store, log *slog.Logger) *Wiring {
 		Reporter:     Reporter{st: st, loc: loc},
 		Passive:      Passive{st: st, log: log},
 		EngineInfo:   func() map[string]any { return EngineInfo(eng) },
+		Routes: []func(r chi.Router, can api.Guard){
+			func(r chi.Router, can api.Guard) {
+				r.Mount("/rules", pol.Router(rules.Middleware(can)))
+				r.With(can(model.PermSignaturesRead)).Post("/signatures/suggest", sugg.Handler)
+			},
+		},
 		Hooks: api.Hooks{
 			SignaturesChanged: sw.Changed,
 			ProfileChanged:    enginewire.ProfileChanged(st, log),
@@ -100,6 +114,9 @@ func Build(cfg config.Config, st *store.Store, log *slog.Logger) *Wiring {
 func (w *Wiring) Start(ctx context.Context, mgr *runner.Manager) error {
 	if err := w.Signatures.Start(ctx); err != nil {
 		return fmt.Errorf("signatures: %w", err)
+	}
+	if err := w.Rules.Start(ctx); err != nil {
+		return fmt.Errorf("rules: %w", err)
 	}
 	info := EngineInfo(w.Scan) // runs "nmap --version" once and logs the mode
 	w.log.Info("scan engine wired", "prober", info["prober"], "mode", info["mode"])

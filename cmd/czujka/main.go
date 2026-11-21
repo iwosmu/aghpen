@@ -214,7 +214,16 @@ func serve() error {
 		log.Warn("recovered runs that a restart interrupted", "runs", recovered)
 	}
 
+	loc, _ := time.LoadLocation(cfg.Timezone)
+	if loc == nil {
+		loc = time.UTC
+	}
+	tmRoutes, err := timeMachine(ctx, st, mgr, loc, log)
+	if err != nil {
+		return err
+	}
 	deps := w.API
+	deps.Routes = append(deps.Routes, tmRoutes)
 	deps.Store, deps.Auth, deps.Runner, deps.Bus, deps.Logger, deps.Version = st, authSvc, mgr, bus, log, version
 	deps.CookieSecure, deps.TrustProxy, deps.WebDir = cfg.CookieSecure, cfg.TrustProxy, cfg.WebDir
 	srv := &http.Server{

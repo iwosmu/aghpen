@@ -56,7 +56,7 @@ func New(st *store.Store, logger *slog.Logger) *Timeline {
 }
 
 // Start creates the indexes the timeline queries need, when they are missing.
-// See docs/API-time.md for the EXPLAIN that justifies each one.
+// See docs/API.md (Time machine, Re-probing) for the EXPLAIN that justifies each one.
 func (t *Timeline) Start(ctx context.Context) error {
 	for _, q := range indexes {
 		if _, err := t.st.Pool().Exec(ctx, q); err != nil {
