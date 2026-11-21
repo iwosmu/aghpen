@@ -1,0 +1,57 @@
+# Czujka as a systemd service (bare metal). See README.md next to this file.
+#   install -m 0755 czujka /usr/local/bin/czujka
+#   install -d -m 0750 /etc/czujka && install -m 0640 czujka.env /etc/czujka/czujka.env
+#   useradd --system --home /var/lib/czujka --shell /usr/sbin/nologin czujka
+#   install -m 0644 czujka.service /etc/systemd/system/ && systemctl daemon-reload
+#   systemctl enable --now czujka
+[Unit]
+Description=Czujka - attack surface intelligence (safe detection scanner)
+Documentation=file:///usr/share/doc/czujka/README.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=czujka
+Group=czujka
+EnvironmentFile=/etc/czujka/czujka.env
+ExecStartPre=/usr/local/bin/czujka migrate
+ExecStart=/usr/local/bin/czujka serve
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+
+# The data directory: master key file (if not in the environment) and backups.
+StateDirectory=czujka
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/czujka
+
+# Raw sockets for SYN, ICMP and ARP probes, without root. nmap inherits the
+# ambient capabilities (NMAP_PRIVILEGED=1 in czujka.env).
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+NoNewPrivileges=true
+
+# Hardening.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+# AF_PACKET: ARP discovery on the local segment; AF_NETLINK: interface and route lookup.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK AF_PACKET
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

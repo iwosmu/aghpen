@@ -178,7 +178,7 @@ Domyślnie interfejs słucha tylko na `127.0.0.1` i bez TLS. Dla dostępu z siec
 
 Skan adresów w tej samej podsieci co interfejs skanera tworzy wpis ARP dla każdego sondowanego adresu, także cichego. Limit tablicy sąsiadów (`net.ipv4.neigh.default.gc_thresh1/2/3`, domyślnie 128/512/1024) jest wspólny dla całego hosta, także dla kontenerów. Po przepełnieniu jądro loguje `neighbour: arp_cache: neighbor table overflow!` i usuwa wpisy samego hosta. Wtedy host przestaje m.in. rozwiązywać nazwy DNS, a skan gubi hosty.
 
-`czujka doctor` (kontrola `neighbour_table`) porównuje `gc_thresh3` z liczbą adresów w sieci lokalnej skanera w największym włączonym zakresie i drukuje gotowe wartości. Dla zakresu /16 skanowanego bezpośrednio, na hoście (nie w kontenerze):
+`czujka doctor` (kontrola `neighbour_table`) porównuje `gc_thresh3` z liczbą adresów w sieci lokalnej skanera w największym włączonym zakresie i drukuje gotowe wartości. Uwaga: jądro pokazuje `gc_thresh3` tylko w przestrzeni sieciowej hosta. W kontenerze Czujki (bez `network_mode: host`) pliku nie ma; wtedy kontrola ma stan `UWAGA`, podaje potrzebną wartość i polecenie sprawdzenia na hoście (`sysctl net.ipv4.neigh.default.gc_thresh3`). Sprawdzone na jądrze Docker Desktop: w zwykłym kontenerze katalog `/proc/sys/net/ipv4/neigh/default` nie istnieje, z `--network host` jest (1024). Dla zakresu /16 skanowanego bezpośrednio, na hoście (nie w kontenerze):
 
 ```sh
 cat <<'EOF' | sudo tee /etc/sysctl.d/90-czujka-neigh.conf

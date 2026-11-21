@@ -13,6 +13,8 @@
 package main
 
 import (
+	// The zone database inside the binary: a bare host or a minimal image
+	// without tzdata still knows Europe/Warsaw (CZUJKA_TZ, schedule windows).
 	"context"
 	"errors"
 	"flag"
@@ -27,6 +29,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/iwosmu/aghpen/internal/api"
 	"github.com/iwosmu/aghpen/internal/auth"

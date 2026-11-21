@@ -93,6 +93,7 @@ Base path `/api/v1`. JSON bodies use the types of `internal/model/types.go` (the
 | POST `/emergency-stop/release` | safety:manage | → `SafetyPolicy` (clears the flag; paused runs stay paused until someone calls `/runs/{id}/resume`) |
 | GET `/settings/defectdojo` · PUT · POST `/settings/defectdojo/test` | integrations:manage | `DefectDojoSettings` → `{ok, message, version}`. `scope_mappings: [{scope_id, product_type_name, product_name, engagement_name}]` (each scope at most once; the scope must exist). `status_sync`: after every analysed run, close resolved findings in DefectDojo, reopen observed ones and apply the status pull (result in the audit log, action `finding.sync.defectdojo`) |
 | GET `/healthz` | public | → `{status, version, db, tde, tde_detail, field_encryption, engine, probe: {prober, mode, raw_sockets}}`; `probe.mode` is `nmap-raw` (SYN scan, ICMP/ARP discovery), `nmap-connect` (no raw sockets: `-sT`) or `native` (Go TCP connect, no nmap) |
+| GET `/doctor` | safety:manage | → `{ok, version, checks: [{name, title, status: ok|warn|fail, detail, fix}]}`: the installation check of `czujka doctor` (database, pg_tde, master key, nmap version, raw sockets, DNS, free disk, pg_dump/pg_restore, routes to the scan networks of enabled scopes; no packet is sent). `fix` is a Polish instruction |
 
 ## Notes
 
