@@ -61,6 +61,8 @@ export function changeKindInfo(kind: ChangeKind | string): { tone: Tone; glyph: 
     case 'service_gone': return { tone: 'gone', glyph: 'minus', label: t('usługa zniknęła', 'service gone'), group: 'gone' };
     case 'tech_gone': return { tone: 'gone', glyph: 'minus', label: t('technologia zniknęła', 'technology gone'), group: 'gone' };
     case 'host_unstable': return { tone: 'unstable', glyph: 'wave', label: t('host niestabilny', 'host unstable'), group: 'unstable' };
+    // Silent in this run, answered in the previous one; not reported inactive yet. Its services are unknown, not gone.
+    case 'host_missing': return { tone: 'expected', glyph: 'half', label: t('brak odpowiedzi', 'host missing'), group: 'unstable' };
     case 'service_changed': return { tone: 'changed', glyph: 'delta', label: t('usługa zmieniona', 'service changed'), group: 'changed' };
     case 'tech_version': return { tone: 'changed', glyph: 'delta', label: t('zmiana wersji', 'version changed'), group: 'changed' };
     case 'title_changed': return { tone: 'changed', glyph: 'delta', label: t('zmiana tytułu', 'title changed'), group: 'changed' };
@@ -76,7 +78,7 @@ export function changeKindInfo(kind: ChangeKind | string): { tone: Tone; glyph: 
 }
 
 export const CHANGE_KINDS: ChangeKind[] = [
-  'host_new', 'host_gone', 'host_back', 'host_unstable', 'service_new', 'service_gone', 'service_changed', 'tech_new',
+  'host_new', 'host_gone', 'host_missing', 'host_back', 'host_unstable', 'service_new', 'service_gone', 'service_changed', 'tech_new',
   'tech_gone', 'tech_version', 'title_changed', 'status_changed', 'cert_changed', 'headers_changed', 'cookies_changed',
   'content_changed', 'redirect_changed', 'class_changed',
 ];

@@ -184,9 +184,17 @@ export default function SignatureEditor() {
             {!hunt ? <p className="text-sm text-ink-2">{t('Sprawdź regułę na danych z poprzednich skanów, zanim ją zapiszesz. Test czyta bazę i nie dotyka sieci.', 'Check the rule against data of earlier scans before you save it. The test reads the database and does not touch the network.')}</p> : (
               <div className={cx(!huntFresh && 'opacity-60')} data-testid="retrohunt">
                 <p className="text-sm">
-                  {t('Dopasowano ', 'Matched ')}<span className="num text-base font-semibold">{fmtInt((hunt.result.hits ?? []).length)}</span> {plural((hunt.result.hits ?? []).length, ['zapisaną usługę', 'zapisane usługi', 'zapisanych usług'], ['stored service', 'stored services'])}{t(', wysłano ', ', ')}<span className="num text-base font-semibold">{hunt.result.packets_sent}</span> {t('pakietów.', 'packets sent.')}
+                  {t('Dopasowano ', 'Matched ')}<span className="num text-base font-semibold">{fmtInt(hunt.result.total_hits ?? (hunt.result.hits ?? []).length)}</span> {plural(hunt.result.total_hits ?? (hunt.result.hits ?? []).length, ['zapisaną usługę', 'zapisane usługi', 'zapisanych usług'], ['stored service', 'stored services'])}{t(', wysłano ', ', ')}<span className="num text-base font-semibold">{hunt.result.packets_sent}</span> {t('pakietów.', 'packets sent.')}
                 </p>
                 <p className="text-xs text-ink-3">{t('Przejrzano ' + fmtInt(hunt.result.scanned) + ' obserwacji w ' + hunt.result.took_ms + ' ms.', 'Checked ' + fmtInt(hunt.result.scanned) + ' observations in ' + hunt.result.took_ms + ' ms.')}{!huntFresh ? ' ' + t('Treść zmieniła się od tego testu.', 'The text has changed since this test.') : ''}</p>
+                {hunt.result.truncated ? <p className="mt-1 text-xs text-ink-2" data-testid="retro-truncated">{t('Lista pokazuje pierwsze ' + fmtInt((hunt.result.hits ?? []).length) + ' z ' + fmtInt(hunt.result.total_hits ?? 0) + ' trafień.', 'The list shows the first ' + fmtInt((hunt.result.hits ?? []).length) + ' of ' + fmtInt(hunt.result.total_hits ?? 0) + ' hits.')}</p> : null}
+                {(hunt.result.missing_paths ?? []).length ? (
+                  <div className="mt-2 border border-rule-strong bg-st-changed-wash px-2.5 py-2 text-xs" data-testid="retro-missing">
+                    <p className="flex items-start gap-1.5 text-ink"><Glyph name="delta" tone="changed" size={12} /><span>{t('Reguły ścieżek nie mogły trafić w ' + fmtInt(hunt.result.incomplete ?? 0) + ' obserwacjach: tych ścieżek skaner wtedy nie pobrał. Wynik jest dolną granicą; następny skan je pobierze.', 'Path rules could not match in ' + fmtInt(hunt.result.incomplete ?? 0) + ' observations: the scanner did not fetch these paths then. The result is a lower bound; the next scan fetches them.')}</span></p>
+                    <p className="mono mt-1 text-ink-2">{(hunt.result.missing_paths ?? []).join('  ')}</p>
+                  </div>
+                ) : null}
+                {(hunt.result.notes ?? []).length ? <ul className="mt-2 list-disc space-y-0.5 pl-4 text-xs text-ink-2">{(hunt.result.notes ?? []).map((n) => <li key={n}>{n}</li>)}</ul> : null}
                 {(hunt.result.hits ?? []).length ? (
                   <ul className="mt-2 max-h-[300px] overflow-auto border-t border-rule">
                     {(hunt.result.hits ?? []).map((h) => (

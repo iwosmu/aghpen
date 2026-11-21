@@ -25,6 +25,7 @@ const Profiles = lazy(() => import('./pages/Profiles'));
 const ProfileEdit = lazy(() => import('./pages/ProfileEdit'));
 const Transfer = lazy(() => import('./pages/Transfer'));
 const Admin = lazy(() => import('./pages/Admin'));
+const Setup = lazy(() => import('./pages/Setup'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -74,6 +75,7 @@ export default function App() {
               <Route path="profiles/:id" element={<ProfileEdit />} />
               <Route path="transfer" element={<Transfer />} />
               <Route path="admin" element={<Admin />} />
+              <Route path="setup" element={<Setup />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

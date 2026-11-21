@@ -126,12 +126,12 @@ export const safety: SafetyPolicy = {
 
 // ---------- Profiles ----------
 const baseProfile = (): Omit<ScanProfile, 'id' | 'name' | 'description' | 'scope_ids' | 'ports' | 'schedule' | 'next_run_at' | 'last_run_id'> => ({
-  discovery: { icmp_echo: true, icmp_timestamp: false, tcp_syn_ports: [22, 80, 443, 3389], tcp_ack_ports: [80], arp: false, skip_discovery: false },
-  service_detection: true, version_intensity: 5,
+  discovery: { icmp_echo: true, icmp_timestamp: false, tcp_syn_ports: [22, 80, 443, 3389], tcp_ack_ports: [80], arp: false, skip_discovery: false, mode: 'balanced' },
+  service_detection: true, version_intensity: 5, udp: { enabled: false, ports: '' },
   http: { enabled: true, max_redirects: 5, signature_paths: true, max_body_bytes: 262144, timeout_ms: 8000, favicon: true },
   rate: { max_pps: 800, max_parallel_chunks: 2, max_parallel_hosts: 24, http_rps: 20, per_host_concurrency: 2, per_host_delay_ms: 250 },
   chunking: { adaptive: true, initial_size: 256, min_size: 64, max_size: 2048, target_seconds: 90 },
-  retry: { unstable_retries: 2, backoff_ms: 1500 }, enabled: true, created_at: iso(NOW - 190 * D), updated_at: iso(NOW - 6 * D),
+  retry: { unstable_retries: 2, backoff_ms: 1500, down_after_misses: 0 }, enabled: true, created_at: iso(NOW - 190 * D), updated_at: iso(NOW - 6 * D),
 });
 function nextAt(hour: number): string {
   const d = new Date(NOW);

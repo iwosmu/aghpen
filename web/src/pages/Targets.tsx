@@ -7,6 +7,7 @@ import { t, plural } from '../i18n';
 import { cx, fmtInt } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
 import { Button, Dialog, Empty, ErrorState, Field, IconButton, InlineError, PageHeader, Panel, Select, SkeletonRows, Spinner, Tabs, Tags } from '../ui/kit';
+import { PassivePanel } from './Passive';
 import { DataTable, Pager, type Col } from '../ui/table';
 import { Crit, Glyph } from '../ui/marks';
 import { useDebounced } from '../ui/edit';
@@ -202,6 +203,7 @@ export default function Targets() {
                 </div>
               </div>
               {canCreate ? <AddTargets scope={scope} /> : null}
+              {canCreate ? <PassivePanel scope={scope} /> : null}
               <Panel title={t('Cele w zakresie', 'Targets in the scope')} count={targets.data?.total} flush>
                 <DataTable inPanel rows={targets.data?.items} cols={cols} rowKey={(x) => x.id} loading={targets.isPending} error={targets.error} retry={() => targets.refetch()} dim={targets.isPlaceholderData}
                   empty={<p className="p-3 text-sm text-ink-2">{t('Ten zakres nie ma jeszcze celów.', 'This scope has no target yet.')}{canCreate ? ' ' + t('Dodaj je w formularzu powyżej.', 'Add them in the form above.') : ''}</p>}

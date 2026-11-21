@@ -10,7 +10,7 @@ import { invalidate, useAction, useItem, usePage } from '../api/hooks';
 import { post } from '../api/client';
 import { openStream } from '../api/events';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
-import type { Permission, SafetyPolicy, ScanRun } from '../api/types';
+import type { Health, Permission, SafetyPolicy, ScanRun } from '../api/types';
 import { Glyph } from '../ui/marks';
 
 interface NavItem { to: string; label: string; icon: string; perms: Permission[]; end?: boolean }
@@ -149,7 +149,10 @@ function useGlobalEvents(enabled: boolean) {
 function ActiveRunStrip() {
   const { can } = useSession();
   const q = usePage<ScanRun>('/runs', { status: 'running', limit: 1 }, can('scans:read'));
-  const run = q.data?.items[0];
+  const listed = q.data?.items[0];
+  // The list is refreshed only on run events; the live detail query (kept fresh by the run page and polling) has the current rate.
+  const detail = useItem<ScanRun>('/runs/' + (listed?.id ?? 0), undefined, { enabled: Boolean(listed), refetchInterval: 4000 });
+  const run = listed ? (detail.data?.status === 'running' ? detail.data : listed) : undefined;
   if (!run) return null;
   const pct = run.stats.addresses_total ? run.stats.addresses_done / run.stats.addresses_total : 0;
   return (
@@ -222,8 +225,21 @@ function StopBanner({ policy }: { policy: SafetyPolicy | undefined }) {
   );
 }
 
+/** How the scanner reaches the network, in words an administrator checks before a scan. */
+export function probeModeLabel(mode: string | undefined): { short: string; long: string } {
+  switch (mode) {
+    case 'nmap-raw': return { short: 'nmap SYN', long: t('nmap z surowymi gniazdami: skan SYN, wykrywanie ICMP/ARP', 'nmap with raw sockets: SYN scan, ICMP/ARP discovery') };
+    case 'nmap-connect': return { short: 'nmap connect', long: t('nmap bez surowych gniazd: pełne połączenie TCP (-sT), bez UDP', 'nmap without raw sockets: full TCP connect (-sT), no UDP') };
+    case 'native': return { short: t('wbudowany TCP', 'built-in TCP'), long: t('wbudowany skaner Go (połączenie TCP), bez nmap', 'built-in Go scanner (TCP connect), no nmap') };
+    default: return { short: mode || '–', long: mode || '' };
+  }
+}
+
 function SafetyChip({ policy }: { policy: SafetyPolicy | undefined }) {
+  const health = useItem<Health>('/healthz', undefined, { staleTime: 60_000 });
   if (!policy) return null;
+  const probe = health.data?.probe;
+  const pm = probeModeLabel(probe?.mode);
   return (
     <Link
       to="/admin?tab=safety" className="hidden items-center gap-1.5 text-xs text-ink-2 hover:text-ink lg:inline-flex"
@@ -233,6 +249,7 @@ function SafetyChip({ policy }: { policy: SafetyPolicy | undefined }) {
       <span>{t('limit', 'cap')} <span className="num text-ink">{fmtInt(policy.max_pps)}</span> pps</span>
       <span className="text-ink-3">·</span>
       <span className="mono text-ink">{(policy.allowed_methods ?? []).join('/') || 'GET/HEAD'}</span>
+      {probe ? <><span className="text-ink-3">·</span><span className="text-ink-2" title={pm.long} data-testid="probe-mode">{pm.short}</span></> : health.data && health.data.engine === false ? <><span className="text-ink-3">·</span><span className="text-st-changed">{t('skaner niepodłączony', 'scanner not wired')}</span></> : null}
     </Link>
   );
 }

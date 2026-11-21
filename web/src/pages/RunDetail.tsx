@@ -22,6 +22,15 @@ function Fact({ label, children, wide }: { label: string; children: React.ReactN
   );
 }
 
+function ReportButtons({ onOpen }: { onOpen: (print: boolean) => void }) {
+  return (
+    <>
+      <Button icon="external" onClick={() => onOpen(false)} data-testid="run-report">{t('Raport', 'Report')}</Button>
+      <Button icon="print" onClick={() => onOpen(true)}>{t('Drukuj', 'Print')}</Button>
+    </>
+  );
+}
+
 function specLabel(c: Chunk): string {
   if (c.spec.length === 1) return c.spec[0];
   return c.spec[0] + ' +' + (c.spec.length - 1);
@@ -47,9 +56,17 @@ export default function RunDetail() {
     for (const c of chunks.data ?? []) for (const cidr of c.spec) m.set(cidr, c);
     return m;
   }, [chunks.data]);
+  // Hovering a chunk lights up its whole work group: the chunks one scanner process took together.
+  const hoverGroup = useMemo(() => {
+    const c = (chunks.data ?? []).find((x) => x.id === hoverChunk) ?? (hoverCidr ? chunkOf.get(hoverCidr) : undefined);
+    return c && c.group ? c.group : null;
+  }, [chunks.data, hoverChunk, hoverCidr, chunkOf]);
   const highlight = useMemo(() => {
-    const c = (chunks.data ?? []).find((x) => x.id === hoverChunk);
-    return c ? new Set(c.spec) : undefined;
+    const all = chunks.data ?? [];
+    const c = all.find((x) => x.id === hoverChunk);
+    if (!c) return undefined;
+    const members = c.group ? all.filter((x) => x.group === c.group) : [c];
+    return new Set(members.flatMap((x) => x.spec));
   }, [chunks.data, hoverChunk]);
   const hoveredChunkId = hoverCidr ? chunkOf.get(hoverCidr)?.id : null;
 
@@ -62,6 +79,14 @@ export default function RunDetail() {
   const cap = Math.min(profile.data?.rate.max_pps ?? policyCap, policyCap || Infinity) || policyCap;
   const maxSize = Math.max(1, ...(chunks.data ?? []).map((c) => c.size));
   const sortedChunks = [...(chunks.data ?? [])].sort((a, b) => a.seq - b.seq);
+  const groupSizes = new Map<number, number>();
+  for (const c of sortedChunks) if (c.group) groupSizes.set(c.group, (groupSizes.get(c.group) ?? 0) + 1);
+  const multiGroups = [...groupSizes.values()].filter((n) => n > 1).length;
+  const openReport = (print: boolean) => {
+    const w = window.open('/api/v1/runs/' + run.id + '/report.html', '_blank');
+    if (print && w) w.addEventListener('load', () => w.print(), { once: true });
+  };
+  const reportReady = ['completed', 'cancelled', 'failed', 'paused'].includes(run.status);
 
   return (
     <div>
@@ -74,17 +99,35 @@ export default function RunDetail() {
         actions={canRun ? (
           <>
             {run.status === 'running' ? <Button icon="pause" busy={act.isPending && act.variables === 'pause'} onClick={() => act.mutate('pause')}>{t('Wstrzymaj', 'Pause')}</Button> : null}
-            {run.status === 'paused' ? <Button variant="primary" icon="play" busy={act.isPending && act.variables === 'resume'} onClick={() => act.mutate('resume')}>{t('Wznów', 'Resume')}</Button> : null}
+            {run.status === 'paused' ? <Button variant="primary" icon="play" busy={act.isPending && act.variables === 'resume'} disabled={safety.data?.emergency_stop} title={safety.data?.emergency_stop ? t('Najpierw zwolnij stop awaryjny', 'Release the emergency stop first') : undefined} onClick={() => act.mutate('resume')}>{t('Wznów', 'Resume')}</Button> : null}
             {['running', 'paused', 'queued'].includes(run.status) ? <Button variant="danger" icon="x" onClick={() => setConfirmCancel(true)}>{t('Anuluj skan', 'Cancel the scan')}</Button> : null}
             {run.status === 'completed' && run.summary?.prev_run_id ? <Button icon="compare" onClick={() => navigate('/changes/compare?from=' + run.summary!.prev_run_id + '&to=' + run.id)}>{t('Porównaj z poprzednim', 'Compare with the previous')}</Button> : null}
+            {reportReady ? <ReportButtons onOpen={openReport} /> : null}
           </>
-        ) : run.status === 'completed' && run.summary?.prev_run_id ? <Button icon="compare" onClick={() => navigate('/changes/compare?from=' + run.summary!.prev_run_id + '&to=' + run.id)}>{t('Porównaj z poprzednim', 'Compare with the previous')}</Button> : null}
+        ) : (
+          <>
+            {run.status === 'completed' && run.summary?.prev_run_id ? <Button icon="compare" onClick={() => navigate('/changes/compare?from=' + run.summary!.prev_run_id + '&to=' + run.id)}>{t('Porównaj z poprzednim', 'Compare with the previous')}</Button> : null}
+            {reportReady ? <ReportButtons onOpen={openReport} /> : null}
+          </>
+        )}
       />
 
       <div className="space-y-4 p-4 sm:p-6">
         {run.error ? (
           <div role="alert" className="flex items-start gap-2 border border-danger/60 bg-st-gone-wash px-3 py-2 text-sm">
             <Icon name="alert" className="mt-0.5 text-danger" /><span><span className="font-medium">{t('Skan zakończył się błędem.', 'The scan failed.')}</span> <span className="mono text-xs">{run.error}</span></span>
+          </div>
+        ) : null}
+        {run.status === 'paused' && run.pause_reason === 'emergency_stop' ? (
+          <div role="status" className="flex items-start gap-2 border border-danger/60 bg-st-gone-wash px-3 py-2 text-sm" data-testid="paused-emergency">
+            <Icon name="stop" className="mt-0.5 text-danger" />
+            <span>{t('Skan zatrzymał stop awaryjny. Żaden pakiet nie jest wysyłany. Po zwolnieniu blokady skan zostaje wstrzymany: wznów go ręcznie, gdy będzie bezpiecznie.', 'The emergency stop halted this scan. No packet is sent. After the stop is released the scan stays paused: resume it by hand when it is safe.')}</span>
+          </div>
+        ) : null}
+        {run.status === 'paused' && run.pause_reason === 'manual' ? (
+          <div role="status" className="flex items-start gap-2 border border-rule-strong bg-raised px-3 py-2 text-sm">
+            <Glyph name="pause" tone="neutral" />
+            <span>{t('Skan wstrzymany ręcznie. Gotowe podgrupy są zapisane; wznowienie zaczyna od pierwszej niedokończonej.', 'The scan is paused by hand. Finished chunks are saved; resuming starts at the first unfinished one.')}</span>
           </div>
         ) : null}
         {run.status === 'paused' && run.pause_reason === 'window_closed' ? (
@@ -133,7 +176,7 @@ export default function RunDetail() {
             )}
           </Panel>
 
-          <Panel title={t('Podgrupy adresów', 'Address chunks')} count={sortedChunks.length} flush actions={profile.data?.chunking.adaptive ? <span className="text-ink-3">{t('rozmiar adaptacyjny, cel ' + profile.data.chunking.target_seconds + ' s', 'adaptive size, target ' + profile.data.chunking.target_seconds + ' s')}</span> : undefined}>
+          <Panel title={t('Podgrupy adresów', 'Address chunks')} count={sortedChunks.length} flush actions={<span className="text-ink-3">{groupSizes.size ? groupSizes.size + ' ' + plural(groupSizes.size, ['grupa robocza', 'grupy robocze', 'grup roboczych'], ['work group', 'work groups']) + (multiGroups ? ' · ' + t(multiGroups + ' łączonych', multiGroups + ' merged') : '') : null}{groupSizes.size && profile.data?.chunking.adaptive ? ' · ' : ''}{profile.data?.chunking.adaptive ? t('rozmiar adaptacyjny, cel ' + profile.data.chunking.target_seconds + ' s', 'adaptive size, target ' + profile.data.chunking.target_seconds + ' s') : ''}</span>}>
             {chunks.error ? <ErrorState error={chunks.error} retry={() => chunks.refetch()} /> : !chunks.data ? <SkeletonRows rows={8} /> : sortedChunks.length === 0 ? (
               <p className="p-3 text-sm text-ink-2">{run.trigger === 'import' ? t('Import nie dzieli adresów na podgrupy.', 'An import does not split addresses into chunks.') : t('Plan podgrup pojawi się po starcie skanu.', 'The chunk plan appears when the scan starts.')}</p>
             ) : (
@@ -143,6 +186,7 @@ export default function RunDetail() {
                     <tr className="border-b border-rule-strong text-left text-xs text-ink-3">
                       <th className="h-[30px] w-[36px] pl-3 pr-2 font-medium">#</th>
                       <th className="px-2 font-medium">{t('Zakres', 'Range')}</th>
+                      <th className="px-2 font-medium" title={t('Grupa robocza: podgrupy, które jeden proces skanera wziął razem', 'Work group: the chunks that one scanner process took together')}>{t('Grupa', 'Group')}</th>
                       <th className="px-2 font-medium">{t('Rozmiar', 'Size')}</th>
                       <th className="px-2 font-medium">{t('Stan', 'Status')}</th>
                       <th className="px-2 text-right font-medium">{t('Czas', 'Time')}</th>
@@ -154,10 +198,11 @@ export default function RunDetail() {
                     {sortedChunks.map((c) => (
                       <tr
                         key={c.id} onPointerEnter={() => setHoverChunk(c.id)} onPointerLeave={() => setHoverChunk(null)} tabIndex={0} onFocus={() => setHoverChunk(c.id)} onBlur={() => setHoverChunk(null)}
-                        className={cx('border-b border-rule last:border-b-0 outline-offset-[-2px]', (hoverChunk === c.id || hoveredChunkId === c.id) && 'bg-accent-wash')}
+                        className={cx('border-b border-rule last:border-b-0 outline-offset-[-2px]', (hoverChunk === c.id || hoveredChunkId === c.id) ? 'bg-accent-wash' : hoverGroup && c.group === hoverGroup ? 'bg-accent-wash/50' : '')}
                       >
                         <td className="num h-[30px] pl-3 pr-2 text-ink-2">{c.seq}</td>
                         <td className="mono whitespace-nowrap px-2" title={c.spec.join(', ')}>{specLabel(c)}</td>
+                        <td className="num whitespace-nowrap px-2 text-ink-2">{c.group ? <span className="inline-flex items-center gap-1">{(groupSizes.get(c.group) ?? 0) > 1 ? <span className="inline-block h-[14px] w-[3px] bg-accent" aria-hidden="true" /> : null}G{c.group}{(groupSizes.get(c.group) ?? 0) > 1 ? <span className="text-2xs text-ink-3">×{groupSizes.get(c.group)}</span> : null}</span> : '–'}</td>
                         <td className="px-2"><span className="flex items-center gap-2"><span className="num w-[38px] text-right">{fmtInt(c.size)}</span><span className="hidden h-[4px] bg-ink-3 sm:block" style={{ width: Math.max(3, (c.size / maxSize) * 28) }} /></span></td>
                         <td className="whitespace-nowrap px-2"><ChunkStatusMark status={c.status} /></td>
                         <td className="num whitespace-nowrap px-2 text-right text-ink-2">{c.duration_ms ? fmtDuration(c.duration_ms / 1000) : '–'}</td>
@@ -195,6 +240,7 @@ export default function RunDetail() {
                   ['plus', 'new', t('nowe hosty', 'new hosts'), run.summary.hosts_new], ['plus', 'new', t('nowe usługi', 'new services'), run.summary.services_new], ['back', 'new', t('hosty wróciły', 'hosts back'), run.summary.hosts_back],
                   ['minus', 'gone', t('hosty nieaktywne', 'hosts inactive'), run.summary.hosts_gone], ['minus', 'gone', t('usługi zniknęły', 'services gone'), run.summary.services_gone], ['wave', 'unstable', t('hosty niestabilne', 'hosts unstable'), run.summary.hosts_unstable],
                   ['delta', 'changed', t('zmienione usługi', 'changed services'), run.summary.services_changed], ['dot', 'accent', t('nowe znaleziska', 'new findings'), run.summary.findings_new],
+                  ['ring', 'changed', t('hosty bez odpowiedzi', 'hosts missing'), run.summary.hosts_missing ?? 0], ['ring', 'expected', t('usługi nieosiągalne', 'services unreachable'), run.summary.services_unreachable ?? 0],
                 ] as const).map(([g, tone, label, n]) => (
                   <div key={label} className="flex items-center justify-between gap-2 border-b border-rule py-1.5">
                     <dt className="flex items-center gap-1.5 text-sm text-ink-2"><Glyph name={g} tone={n ? tone : 'expected'} />{label}</dt>
