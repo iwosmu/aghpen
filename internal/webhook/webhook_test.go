@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -106,6 +107,31 @@ func TestPostSignsAndReportsErrors(t *testing.T) {
 	}
 	if res := (Client{}).Post(context.Background(), "ftp://x/", "", EventRun, body); res.Error == "" {
 		t.Error("ftp URL accepted")
+	}
+}
+
+// L2 of the security review: a delivery follows no redirect and does not
+// echo the response body (an internal endpoint could leak through it).
+func TestPostFollowsNoRedirectAndEchoesNoBody(t *testing.T) {
+	var reached int32
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { atomic.AddInt32(&reached, 1) }))
+	defer other.Close()
+	redirect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, other.URL, http.StatusTemporaryRedirect)
+	}))
+	defer redirect.Close()
+	res := Client{}.Post(context.Background(), redirect.URL, "", "test", []byte("{}"))
+	if atomic.LoadInt32(&reached) != 0 || res.Status != http.StatusTemporaryRedirect || res.Error == "" {
+		t.Fatalf("redirect: reached=%d %+v", reached, res)
+	}
+	leaky := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("internal secret: db=10.0.0.5 password=hunter2"))
+	}))
+	defer leaky.Close()
+	res = Client{}.Post(context.Background(), leaky.URL, "", "test", []byte("{}"))
+	if res.Status != 500 || res.Error == "" || strings.Contains(res.Error, "hunter2") {
+		t.Fatalf("the response body was echoed: %+v", res)
 	}
 }
 

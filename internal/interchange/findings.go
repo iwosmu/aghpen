@@ -387,8 +387,12 @@ func WriteDojoGenericCSV(w io.Writer, findings []model.Finding) error {
 		if g.CWE != 0 {
 			cwe = strconv.Itoa(g.CWE)
 		}
-		if err := cw.Write([]string{date, g.Title, cwe, u, g.Severity, g.Description, g.Mitigation, g.Impact, g.References,
-			b(g.Active), b(g.Verified), b(g.FalseP), b(g.IsMitigated), "False"}); err != nil {
+		row := []string{date, g.Title, cwe, u, g.Severity, g.Description, g.Mitigation, g.Impact, g.References,
+			b(g.Active), b(g.Verified), b(g.FalseP), b(g.IsMitigated), "False"}
+		for i := range row {
+			row[i] = guard(row[i]) // CSV injection: a title can come from a scanned page
+		}
+		if err := cw.Write(row); err != nil {
 			return err
 		}
 	}
@@ -977,7 +981,7 @@ func (im *findingImporter) genericCSV(r io.Reader) error {
 		}
 		get := func(name string) string {
 			if i, ok := col[name]; ok && i < len(rec) {
-				return strings.TrimSpace(rec[i])
+				return unCSVSafe(strings.TrimSpace(rec[i])) // undo the formula guard of WriteDojoGenericCSV
 			}
 			return ""
 		}

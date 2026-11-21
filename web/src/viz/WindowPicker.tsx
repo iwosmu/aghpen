@@ -150,7 +150,7 @@ export function WindowPicker({ value, onChange, disabled }: { value: Window[]; o
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-ink-2">
           {hours === 0
-            ? t('Brak okien: skan może ruszyć o każdej porze.', 'No window: a scan can start at any time.')
+            ? t('Brak okien. Skan może ruszyć o każdej porze.', 'No windows. A scan can start at any time.')
             : <><span className="num text-ink">{hours}</span> {t('godz. w tygodniu', 'hours a week')} · {describeWindows(value)}</>}
         </p>
         {!disabled ? (

@@ -13,10 +13,10 @@ const STORY: { kind: string; one: [string, string]; few: [string, string]; many:
   { kind: 'service_returned', one: ['usługa wróciła', ''], few: ['usługi wróciły', ''], many: ['usług wróciło', ''], en: ['service is back', 'services are back'] },
   { kind: 'service_new', one: ['nowa usługa', ''], few: ['nowe usługi', ''], many: ['nowych usług', ''], en: ['new service', 'new services'] },
   { kind: 'response_slower', one: ['usługa odpowiada wolniej', ''], few: ['usługi odpowiadają wolniej', ''], many: ['usług odpowiada wolniej', ''], en: ['service responds slower', 'services respond slower'] },
-  { kind: 'response_recovered', one: ['usługa znów odpowiada szybko', ''], few: ['usługi znów odpowiadają szybko', ''], many: ['usług znów odpowiada szybko', ''], en: ['service is fast again', 'services are fast again'] },
+  { kind: 'response_recovered', one: ['usługa znów szybka', ''], few: ['usługi znów szybkie', ''], many: ['usług znów szybkich', ''], en: ['service fast again', 'services fast again'] },
   { kind: 'host_new', one: ['nowy host', ''], few: ['nowe hosty', ''], many: ['nowych hostów', ''], en: ['new host', 'new hosts'] },
   { kind: 'host_back', one: ['host wrócił', ''], few: ['hosty wróciły', ''], many: ['hostów wróciło', ''], en: ['host is back', 'hosts are back'] },
-  { kind: 'host_gone', one: ['host nieaktywny', ''], few: ['hosty nieaktywne', ''], many: ['hostów nieaktywnych', ''], en: ['host inactive', 'hosts inactive'] },
+  { kind: 'host_gone', one: ['host nieaktywny', ''], few: ['hosty nieaktywne', ''], many: ['hostów nieaktywnych', ''], en: ['host down', 'hosts down'] },
 ];
 
 function itemLabel(c: Change, svc: Map<string, Service>, showIp: boolean): string {

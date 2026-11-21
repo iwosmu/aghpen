@@ -98,7 +98,7 @@ function CellTip({ block, extra }: { block: MapBlock; extra?: ReactNode }) {
   return (
     <div>
       <div className="mono text-sm text-ink">{block.cidr}</div>
-      <div className="text-ink-2">{st.label}{block.status === 'done' ? ' · ' + block.hosts_up + ' ' + plural(block.hosts_up, ['aktywny host', 'aktywne hosty', 'aktywnych hostów'], ['live host', 'live hosts']) : ''}</div>
+      <div className="text-ink-2">{st.label}{block.status === 'done' ? ' · ' + block.hosts_up + ' ' + plural(block.hosts_up, ['aktywny host', 'aktywne hosty', 'aktywnych hostów'], ['host up', 'hosts up']) : ''}</div>
       {extra ? <div className="text-ink-3">{extra}</div> : null}
     </div>
   );
@@ -141,7 +141,7 @@ export function AddressMap(p: Props) {
   }, [p.blocks]);
 
   if (p.blocks.length === 0) {
-    return <p className="text-sm text-ink-3">{t('Brak bloków adresowych w tym przebiegu.', 'This run has no address blocks.')}</p>;
+    return <p className="text-sm text-ink-3">{t('Brak bloków adresowych.', 'No address blocks.')}</p>;
   }
   return (
     <div ref={ref} className="min-w-0">
@@ -162,11 +162,11 @@ export function AddressMap(p: Props) {
             {activeBlock ? (
               <>
                 <span className="mono text-ink">{activeBlock.cidr}</span>{p.snapshot ? null : <> · {chunkStatusInfo(activeBlock.status).label}</>}
-                {activeBlock.status === 'done' ? <> · <span className="num">{activeBlock.hosts_up}</span> {plural(activeBlock.hosts_up, ['aktywny host', 'aktywne hosty', 'aktywnych hostów'], ['live host', 'live hosts'])}</> : null}
+                {activeBlock.status === 'done' ? <> · <span className="num">{activeBlock.hosts_up}</span> {plural(activeBlock.hosts_up, ['aktywny host', 'aktywne hosty', 'aktywnych hostów'], ['host up', 'hosts up'])}</> : null}
                 {p.describe ? <> · {p.describe(activeBlock)}</> : null}
               </>
             ) : (
-              <span className="text-ink-3">{t('Jedna komórka to blok /24 (256 adresów). Kolejność: krzywa Hilberta, sąsiednie sieci leżą obok siebie.', 'One cell is a /24 block (256 addresses). Order: Hilbert curve, neighbouring networks sit side by side.')}</span>
+              <span className="text-ink-3">{t('Jedna komórka to blok /24 (256 adresów).', 'One cell is a /24 block (256 addresses).')}</span>
             )}
           </p>
           <MapLegend counts={counts} densityOnly={p.snapshot} />
@@ -199,7 +199,7 @@ export function MapLegend({ counts, densityOnly }: { counts: { pending: number; 
       </>}
       {counts.failed > 0 && !densityOnly ? <Swatch label={t('błąd', 'failed')} n={counts.failed}><rect x="0.500" y="0.500" width="11" height="11" fill="var(--st-gone-wash)" stroke="var(--danger)" /></Swatch> : null}
       <span className="inline-flex items-center gap-1.5">
-        <span>{densityOnly ? t('aktywne hosty w bloku:', 'live hosts in the block:') : t('gotowy, aktywne hosty w bloku:', 'done, live hosts in the block:')}</span>
+        <span>{densityOnly ? t('aktywne hosty w bloku:', 'hosts up in the block:') : t('gotowy, aktywne hosty w bloku:', 'done, hosts up in the block:')}</span>
         <span className="inline-flex items-center gap-px">
           {DENSITY_STEPS.map((s, i) => (
             <span key={i} className="inline-flex flex-col items-center gap-0.5">

@@ -16,7 +16,7 @@ Rytm hosta i ponowne sprawdzenia
 
 5
 00:01:16,506 --> 00:01:34,118
-Wehikuł czasu
+Oś czasu
 
 6
 00:01:34,118 --> 00:01:54,005

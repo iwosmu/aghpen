@@ -49,7 +49,7 @@ export function RequireSession({ children }: { children: ReactNode }) {
     if (me.error && me.error.status !== 401) {
       return (
         <div className="flex min-h-dvh flex-col items-center justify-center gap-2 px-6 text-center">
-          <p className="text-base font-semibold">{t('Brak połączenia z serwerem Czujki', 'Cannot reach the Czujka server')}</p>
+          <p className="text-base font-semibold">{t('Brak połączenia z serwerem', 'Cannot reach the server')}</p>
           <p className="text-sm text-ink-2"><span className="mono text-xs text-ink-3">{me.error.code}</span> {me.error.message}</p>
           <button className="link text-sm" onClick={() => me.refetch()}>{t('Spróbuj ponownie', 'Try again')}</button>
         </div>
@@ -69,7 +69,7 @@ export function roleLabel(slug: string, name: string): string {
     case 'admin': return t('Administrator', 'Administrator');
     case 'editor': return t('Edytor', 'Editor');
     case 'analyst': return t('Analityk', 'Analyst');
-    case 'viewer': return t('Odczyt', 'Viewer');
+    case 'viewer': return t('Obserwator', 'Viewer');
     default: return name || slug;
   }
 }
