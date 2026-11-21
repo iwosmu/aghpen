@@ -19,6 +19,7 @@ import { RunStory } from '../ui/RunStory';
 import { PartialNote, RunPasses } from '../ui/RunPasses';
 import { useArrivalOrder } from '../ui/arrivalOrder';
 import { ResponseCell, SelfTag } from '../ui/serviceBits';
+import { NotScanned, notScannedHint, scannedFirst } from '../ui/NotScanned';
 
 /** A run over this many addresses or fewer is a "one machine" run: the page shows its services instead of the address map. */
 export const SMALL_RUN = 4;
@@ -30,11 +31,13 @@ function RunServices({ run, live }: { run: ScanRun; live: boolean }) {
   // first pass never moves when a later pass adds more. When the run is over:
   // open services first, then the ones that are gone now; by address and port.
   const byAddr = (a: Service, b: Service) => a.ip.localeCompare(b.ip, undefined, { numeric: true }) || a.port - b.port;
-  const { rows: items, fresh } = useArrivalOrder('run-services-' + run.id, q.data?.items ?? [], live, byAddr, (a, b) => Number(a.state !== 'open') - Number(b.state !== 'open') || byAddr(a, b));
+  const { rows: ordered, fresh } = useArrivalOrder('run-services-' + run.id, q.data?.items ?? [], live, byAddr, (a, b) => Number(a.state !== 'open') - Number(b.state !== 'open') || byAddr(a, b));
+  const items = scannedFirst(ordered);
+  const carried = items.filter((s) => s.carried).length;
   const hosts = [...new Set(items.map((s) => s.host_id))];
   const anyTime = items.some((s) => s.response_ms !== undefined);
   return (
-    <Panel title={t('Usługi znalezione w tym przebiegu', 'Services found in this run')} count={q.data?.total} flush
+    <Panel title={t('Usługi znalezione w tym przebiegu', 'Services found in this run')} count={q.data ? q.data.total - carried : undefined} flush
       actions={hosts.length === 1 ? <Link to={'/hosts/' + hosts[0]} className="link">{t('Host', 'Host')} <span className="mono">{items[0].ip}</span></Link> : undefined}>
       {q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : !q.data ? <SkeletonRows rows={5} /> : items.length === 0 ? (
         <p className="p-3 text-sm text-ink-2" data-testid="run-services-empty">{live ? t('Czekam na pierwsze otwarte porty…', 'Waiting for the first open ports…') : t('Ten przebieg nie znalazł otwartej usługi.', 'This run found no open service.')}</p>
@@ -52,18 +55,19 @@ function RunServices({ run, live }: { run: ScanRun; live: boolean }) {
             </tr></thead>
             <tbody>
               {items.map((s) => (
-                <tr key={s.id} className="border-b border-rule last:border-b-0" style={fresh.has(s.id) ? { animation: 'rise-in 240ms var(--ease-out-expo)' } : undefined}>
+                <tr key={s.id} className={cx('border-b border-rule last:border-b-0', s.carried && 'text-ink-3 [&_.link]:text-ink-2')} data-carried={s.carried ? 'true' : undefined} title={s.carried ? notScannedHint() : undefined} style={fresh.has(s.id) && !s.carried ? { animation: 'rise-in 240ms var(--ease-out-expo)' } : undefined}>
                   {hosts.length > 1 ? <td className="mono h-[30px] whitespace-nowrap px-3">{s.ip}</td> : null}
                   <td className="h-[30px] whitespace-nowrap px-3"><Link to={'/services/' + s.id} className="mono link">{s.port}/{s.proto}</Link></td>
-                  <td className="whitespace-nowrap px-3"><ServiceStateMark state={live ? 'open' : s.state} /></td>
+                  <td className="whitespace-nowrap px-3">{s.carried ? <NotScanned /> : <ServiceStateMark state={live ? 'open' : s.state} />}</td>
                   <td className="whitespace-nowrap px-3">{serviceName(s)}{isSelf(s) ? <SelfTag /> : null}</td>
-                  <td className="whitespace-nowrap px-3 text-ink-2">{[s.product, s.version].filter(Boolean).join(' ') || '–'}</td>
+                  <td className={cx('whitespace-nowrap px-3', !s.carried && 'text-ink-2')}>{[s.product, s.version].filter(Boolean).join(' ') || '–'}</td>
                   <td className="hidden max-w-[320px] truncate px-3 text-ink-2 md:table-cell">{s.title || '–'}</td>
-                  {anyTime ? <td className="whitespace-nowrap px-3 text-right"><ResponseCell s={s} /></td> : null}
+                  {anyTime ? <td className="whitespace-nowrap px-3 text-right">{s.carried ? '–' : <ResponseCell s={s} />}</td> : null}
                 </tr>
               ))}
             </tbody>
           </table>
+          {carried > 0 ? <p className="border-t border-rule px-3 py-2 text-xs text-ink-3" data-testid="run-services-carried">{t('Nie skanowane w tym przebiegu', 'Not scanned in this run')}: {carried} {t('(na końcu listy). Ten skan nie sprawdzał tych portów, więc stan pochodzi z ostatniej obserwacji.', '(at the end of the list). This scan did not check these ports, so the state comes from the last observation.')}</p> : null}
         </div>
       )}
     </Panel>

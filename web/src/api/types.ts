@@ -246,6 +246,8 @@ export interface Service {
   latest?: ServiceObservation | null;
   /** latest HTTP response time (ms); null: not HTTP or no answer. Optional: older servers do not send it. */
   response_ms?: number | null; response_slow?: boolean;
+  /** only with ?run_id: the run did not scan this port; the row copies the last observation. Optional: older servers do not send it. */
+  carried?: boolean;
 }
 export interface ServiceObservation { id: number; service_id: number; run_id: number; at: string; result: ServiceResult }
 export interface ServiceGroup {
@@ -373,6 +375,8 @@ export interface AtHost { id: number; ip: string; hostnames: string[]; label: st
 export interface AtService {
   id: number; host_id: number; ip: string; port: number; proto: string; state: string; name: string; product: string; version: string;
   title: string; http_status: number; tls: boolean; technologies: string[]; classes: string[]; observed_at: string; run_id: number; state_now: string; changed_since: boolean;
+  /** the run did not scan this port; the state is kept from the last observation. Optional: older servers do not send it. */
+  carried?: boolean;
 }
 export interface AtFinding { id: number; key: string; type: string; title: string; severity: string; interest: number; host_id: number; ip: string; port: number; first_seen: string; last_seen: string; first_run_id: number; last_run_id: number; status_now: string }
 export interface DiffToNow {

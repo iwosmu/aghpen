@@ -12,6 +12,7 @@ import { DataTable, FilterBar, FilterField, Pager, type Col } from '../ui/table'
 import { FindingStatusMark, HostStatusMark, ServiceStateMark, Sev } from '../ui/marks';
 import { AddressMap } from '../viz/AddressMap';
 import { triggerLabel } from './Runs';
+import { NotScanned } from '../ui/NotScanned';
 
 function useDebounced<T>(v: T, ms: number): T {
   const [d, setD] = useState(v);
@@ -164,7 +165,7 @@ function SnapshotLists({ runId }: { runId: number }) {
   ];
   const sCols: Col<AtService>[] = [
     { id: 'ep', header: t('Usługa', 'Service'), cell: (s) => <Link to={'/services/' + s.id} className="mono link">{s.ip}:{s.port}/{s.proto}</Link> },
-    { id: 'st', header: t('Wtedy', 'Then'), cell: (s) => <ServiceStateMark state={s.state} /> },
+    { id: 'st', header: t('Wtedy', 'Then'), cell: (s) => s.carried ? <span className="inline-flex flex-col leading-tight"><ServiceStateMark state={s.state} /><NotScanned /></span> : <ServiceStateMark state={s.state} /> },
     { id: 'now', header: t('Dziś', 'Today'), cell: (s) => <ServiceStateMark state={s.state_now} /> },
     { id: 'prod', header: t('Produkt wtedy', 'Product then'), cell: (s) => <span className="text-sm">{[s.product, s.version].filter(Boolean).join(' ') || s.name || '–'}{s.changed_since ? <span className="ml-1.5 text-2xs text-st-changed">{t('zmienione od tamtej pory', 'changed since')}</span> : null}</span> },
     { id: 'title', header: t('Tytuł', 'Title'), hide: 'lg', cell: (s) => <span className="block max-w-[260px] truncate text-xs text-ink-2">{s.title || '–'}</span> },
@@ -189,7 +190,7 @@ function SnapshotLists({ runId }: { runId: number }) {
         {tab === 'findings' ? <FilterField label={t('Waga', 'Severity')} width={140}><Select value={sev} onChange={(v) => u.set({ fsev: v })} options={[{ value: '', label: t('dowolna', 'any') }, { value: 'high', label: t('wysoka', 'high') }, { value: 'medium', label: t('średnia', 'medium') }, { value: 'low', label: t('niska', 'low') }, { value: 'info', label: 'info' }]} /></FilterField> : null}
       </FilterBar>
       {tab === 'hosts' ? <DataTable rows={hosts.data?.items} cols={hCols} rowKey={(h) => h.id} loading={hosts.isPending} error={hosts.error} retry={() => hosts.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak hostów dla tych filtrów w tamtej chwili.', 'No host for these filters at that time.')}</p>} mobile={(h) => <div className="flex justify-between"><span className="mono">{h.ip}</span><HostStatusMark status={h.status} /></div>} /> : null}
-      {tab === 'services' ? <DataTable rows={services.data?.items} cols={sCols} rowKey={(s) => s.id} loading={services.isPending} error={services.error} retry={() => services.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak usług dla tych filtrów w tamtej chwili.', 'No service for these filters at that time.')}</p>} mobile={(s) => <div className="flex justify-between"><span className="mono">{s.ip}:{s.port}</span><ServiceStateMark state={s.state} /></div>} /> : null}
+      {tab === 'services' ? <DataTable rows={services.data?.items} cols={sCols} rowKey={(s) => s.id} rowClass={(s) => (s.carried ? 'text-ink-3 [&_.link]:text-ink-2' : undefined)} loading={services.isPending} error={services.error} retry={() => services.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak usług dla tych filtrów w tamtej chwili.', 'No service for these filters at that time.')}</p>} mobile={(s) => <div className={cx('flex justify-between gap-2', s.carried && 'text-ink-3')}><span className="mono">{s.ip}:{s.port}</span>{s.carried ? <NotScanned /> : <ServiceStateMark state={s.state} />}</div>} /> : null}
       {tab === 'findings' ? <DataTable rows={findings.data?.items} cols={fCols} rowKey={(f) => f.id} loading={findings.isPending} error={findings.error} retry={() => findings.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Żadne znalezisko nie było wtedy otwarte.', 'No finding was open at that time.')}</p>} mobile={(f) => <div><Sev level={f.severity} compact /> {f.title}</div>} /> : null}
       {cur.data ? <Pager total={cur.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null }, { keepOffset: true })} /> : null}
     </Panel>
