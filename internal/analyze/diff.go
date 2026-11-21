@@ -342,6 +342,9 @@ func (d *differ) host(prev, cur *HostSnapshot) {
 	}
 	sort.SliceStable(order, func(i, j int) bool { return order[i].Port < order[j].Port })
 	for _, s := range order {
+		if s.Carried {
+			continue // not scanned in this run: the store kept its state, nothing changed
+		}
 		if p, ok := prevSvc[svcKey(s)]; ok {
 			d.service(cur, p, s)
 			if hist, ok := cur.History[svcKey(s)]; ok {

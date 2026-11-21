@@ -306,10 +306,15 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 			prev.Hosts = append(prev.Hosts, analyze.HostSnapshot{HostID: h.HostID, IP: h.IP, Up: p.Up, Status: statusOr(p.Status, p.Up), Services: prevSvcs[h.HostID], ServiceIDs: prevIDs[h.HostID]})
 		}
 	}
-	// Scope of the ports: an explicit port list of the profile limits "gone".
-	// An imported file is a full view of the hosts it lists.
+	// Scope of the ports. A profile scan follows the store: the ingest marked
+	// gone exactly the unlisted services on ports the run covered on each host
+	// (HostResult.Coverage: the profile's list, plus the dense or full-range
+	// pass when it finished), and carried the others into this run unchanged.
+	// Partial data (re-probes) does not mark at ingest: the profile's port
+	// list (for a re-probe, the probed ports) limits "gone". An imported file
+	// is a full view of the hosts it lists.
 	var opts analyze.DiffOptions
-	if hasProf {
+	if hasProf && partialData(run.Trigger) {
 		opts.PortInScope = a.portScope(ctx, prof)
 	}
 	changes, dsum := analyze.Diff(prev, cur, opts)

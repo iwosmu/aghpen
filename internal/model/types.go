@@ -482,6 +482,41 @@ type HostResult struct {
 	// (the engine's quick path). The final result of the same run replaces
 	// it. The store keeps the service's change hash and its known fields.
 	Interim bool `json:"interim,omitempty"`
+	// Coverage: the ports the scan covered on this host (the profile's list,
+	// plus the dense or full-range pass when it finished for the host). A
+	// service of the host outside it keeps its state and is not reported
+	// gone. Nil: unknown (imports, older engines): every unlisted service of
+	// an answering host counts as gone. Engine to store only, not serialized.
+	Coverage *PortCoverage `json:"-"`
+}
+
+// PortRange is an inclusive range of ports.
+type PortRange struct {
+	Lo int `json:"lo"`
+	Hi int `json:"hi"`
+}
+
+// PortCoverage is the set of ports one run scanned on one host.
+type PortCoverage struct {
+	TCP []PortRange `json:"tcp"`
+	UDP []PortRange `json:"udp"`
+}
+
+// Has reports whether the port was scanned. A nil coverage covers every port.
+func (c *PortCoverage) Has(proto string, port int) bool {
+	if c == nil {
+		return true
+	}
+	rs := c.TCP
+	if proto == "udp" {
+		rs = c.UDP
+	}
+	for _, r := range rs {
+		if port >= r.Lo && port <= r.Hi {
+			return true
+		}
+	}
+	return false
 }
 
 // VendorForMAC returns the vendor to show for a MAC address. A locally
@@ -543,6 +578,9 @@ type ScriptResult struct {
 }
 
 type ServiceResult struct {
+	// Carried: not scanned in this run (outside the run's coverage of the
+	// host); the store copied the last observation and kept the state.
+	Carried      bool             `json:"carried,omitempty"`
 	Port         int              `json:"port"`
 	Proto        string           `json:"proto"` // tcp | udp
 	State        string           `json:"state"` // open | closed | filtered
