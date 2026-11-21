@@ -42,10 +42,10 @@
 04-java	8983	tcp	appserver	solr:9.11.0	http	Solr	9.11.0	Jetty	admin-panel		class:database	http/solr/
 04-java	13000	tcp	appserver	metabase/metabase:v0.65.6.3	http	^Metabase$	0.65.6.3		install-page		class:admin-panel	http/api/health
 05-vuln	3000	tcp	vuln	bkimminich/juice-shop:v20.4.0	http	Juice Shop	20.4.0		staging			http/
-05-vuln	8080	tcp	vuln	webgoat/webgoat:v2026.5	http	^WebGoat$	2026.5		staging			http/WebGoat/login
-05-vuln	9090	tcp	vuln	webgoat/webgoat:v2026.5	http	^WebWolf$			staging			http/WebWolf/login
-05-vuln	36080	tcp	vuln	raesene/bwapp:latest	http	^bWAPP			staging			http/
-05-vuln	8000	tcp	vuln	php:8.3.37-cli-alpine	http	^PHP$	8.3.37		dev-tool	phpinfo		http/
+05-vuln	8080	tcp	vuln	webgoat/webgoat:v2026.5	http	^WebGoat$			staging		class:login,class:error-page	http/WebGoat/login
+05-vuln	9090	tcp	vuln	webgoat/webgoat:v2026.5	http	^WebWolf$			staging		class:error-page	http/WebWolf/login
+05-vuln	36080	tcp	vuln	raesene/bwapp:latest	http	^bWAPP			staging		class:install-page	http/
+05-vuln	8000	tcp	vuln	php:8.3.37-cli-alpine	http	^PHP$	8.3.37		staging	phpinfo		http/
 05-vuln	48000	tcp	vuln	python:3.14.10-alpine	http	Python|SimpleHTTP	3.14.10		directory-listing			http/
 06-db	3306	tcp	database	mysql:8.4.13	mysql	^MySQL$	8.4.13		database			tcp
 06-db	37017	tcp	database	mongo:8.0.38	mongodb	^MongoDB$	8.0.38		database			tcp

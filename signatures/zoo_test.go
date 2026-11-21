@@ -180,3 +180,42 @@ func TestZooJava(t *testing.T) {
 	noMatch(t, eng, mb, "symfony-profiler")
 	noClass(t, eng, mb, model.ClassStaging)
 }
+
+func TestZooTrainers(t *testing.T) {
+	eng, err := sig.NewBuiltinEngine()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := "http://localhost"
+
+	// bkimminich/juice-shop:v20.4.0; the version from /rest/admin/application-version ("20.4.0-SNAPSHOT").
+	js := httpSvc(3000, "", "", zooPage(t, 200, "juice-shop-20.4-index.html", "OWASP Juice Shop", b+":3000/"))
+	js.HTTP.Headers = map[string][]string{"X-Recruiting": {"/#/jobs"}}
+	js.HTTP.Paths = []model.PathProbe{{Path: "/rest/admin/application-version", Status: 200, Excerpt: zooFixture(t, "juice-shop-20.4-application-version.json")}}
+	check(t, eng, js, want{"juice-shop", "OWASP Juice Shop", "20.4.0", model.ClassStaging})
+
+	// webgoat/webgoat:v2026.5: the root is embedded Tomcat's 404; the login page lives under /WebGoat (8080) and
+	// WebWolf under /WebWolf (9090). The root page must rank the path among the 8 the scanner fetches.
+	root := zooFixture(t, "webgoat-root-tomcat-404.html")
+	wg := httpSvc(8080, "Apache Tomcat", "", &model.HTTPFingerprint{Scheme: "http", Status: 404, Title: "HTTP Status 404 – Not Found", BodyExcerpt: root, URL: b + ":8080/", FinalURL: b + ":8080/"})
+	if p := eng.PathsFor(wg, 8); !slices.Contains(p, "/WebGoat/login") {
+		t.Errorf("/WebGoat/login not among the first 8 paths: %v", p)
+	}
+	noMatch(t, eng, wg, "webgoat")
+	wg.HTTP.Paths = []model.PathProbe{{Path: "/WebGoat/login", Status: 200, Title: "Login Page", Excerpt: zooFixture(t, "webgoat-2026.5-login.html")}}
+	check(t, eng, wg, want{"webgoat", "OWASP WebGoat", "", model.ClassStaging})
+	ww := httpSvc(9090, "Apache Tomcat", "", &model.HTTPFingerprint{Scheme: "http", Status: 404, Title: "HTTP Status 404 – Not Found", BodyExcerpt: root, URL: b + ":9090/", FinalURL: b + ":9090/"})
+	ww.HTTP.Paths = []model.PathProbe{{Path: "/WebWolf/login", Status: 200, Title: "WebWolf", Excerpt: zooFixture(t, "webwolf-2026.5-login.html")}}
+	check(t, eng, ww, want{"webwolf", "OWASP WebWolf", "", model.ClassStaging})
+	// A plain Tomcat 404 is neither.
+	tc := httpSvc(8080, "Apache Tomcat", "", &model.HTTPFingerprint{Scheme: "http", Status: 404, BodyExcerpt: root, URL: b + ":8080/", FinalURL: b + ":8080/"})
+	tc.HTTP.Paths = []model.PathProbe{{Path: "/WebGoat/login", Status: 404, Excerpt: root}, {Path: "/WebWolf/login", Status: 404, Excerpt: root}}
+	noMatch(t, eng, tc, "webgoat")
+	noMatch(t, eng, tc, "webwolf")
+
+	// raesene/bwapp: before /install.php ran, login.php says the database is missing.
+	bw := httpSvc(36080, "Apache httpd", "2.4.7", zooPage(t, 200, "bwapp-login-no-db.txt", "", b+":36080/login.php"))
+	bw.HTTP.Paths = []model.PathProbe{{Path: "/install.php", Status: 200, Title: "bWAPP - Installation", Excerpt: zooFixture(t, "bwapp-install.html")}}
+	check(t, eng, bw, want{"bwapp-installer", "bWAPP", "", model.ClassInstallPage})
+	check(t, eng, bw, want{"bwapp", "bWAPP", "", model.ClassStaging})
+}
