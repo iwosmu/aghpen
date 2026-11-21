@@ -68,9 +68,9 @@ export function ResponseTimeChart({ serviceId }: { serviceId: number }) {
       </div>
       <div className="mt-1 flex justify-between text-2xs text-ink-3">
         <span className="num">#{pts[0].run_id}</span>
-        <span>{t('słupek = skan; wyróżniony = wolniej niż zwykle; × = brak odpowiedzi HTTP', 'bar = run; highlighted = slower than usual; × = no HTTP answer')}</span>
         <span className="num">#{last.run_id}</span>
       </div>
+      <p className="mt-1 text-2xs text-ink-3">{t('słupek = skan; wyróżniony = wolniej niż zwykle; × = brak odpowiedzi HTTP', 'bar = run; highlighted = slower than usual; × = no HTTP answer')}</p>
     </Panel>
   );
 }

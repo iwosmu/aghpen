@@ -25,7 +25,8 @@ export const SMALL_RUN = 4;
 /** The services of one run, as they arrive (polled while the run is live). */
 function RunServices({ run, live }: { run: ScanRun; live: boolean }) {
   const q = useItem<Page<Service>>('/services', { run_id: run.id, limit: 500 }, { refetchInterval: live ? 3000 : false });
-  const items = [...(q.data?.items ?? [])].sort((a, b) => a.ip.localeCompare(b.ip, undefined, { numeric: true }) || a.port - b.port);
+  // Open services first, then the ones that are gone now; by address and port.
+  const items = [...(q.data?.items ?? [])].sort((a, b) => Number(a.state !== 'open') - Number(b.state !== 'open') || a.ip.localeCompare(b.ip, undefined, { numeric: true }) || a.port - b.port);
   const hosts = [...new Set(items.map((s) => s.host_id))];
   const anyTime = items.some((s) => s.response_ms !== undefined);
   return (
@@ -39,7 +40,7 @@ function RunServices({ run, live }: { run: ScanRun; live: boolean }) {
             <thead><tr className="border-b border-rule-strong text-left text-xs text-ink-3">
               {hosts.length > 1 ? <th className="h-[30px] px-3 font-medium">IP</th> : null}
               <th className="h-[30px] px-3 font-medium">{t('Port', 'Port')}</th>
-              <th className="px-3 font-medium">{t('Stan', 'State')}</th>
+              <th className="px-3 font-medium" title={t('Stan usługi dziś, po najnowszym skanie', 'The state of the service today, after the latest scan')}>{t('Stan dziś', 'State now')}</th>
               <th className="px-3 font-medium">{t('Usługa', 'Service')}</th>
               <th className="px-3 font-medium">{t('Produkt', 'Product')}</th>
               <th className="hidden px-3 font-medium md:table-cell">{t('Tytuł strony', 'Page title')}</th>
@@ -227,7 +228,11 @@ export default function RunDetail() {
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <section className="border border-rule bg-panel p-3">
             <div className="flex items-baseline justify-between gap-3">
-              <span><span className="num text-xl font-semibold">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów sprawdzonych', 'of addresses probed')}</span></span>
+              {small && isLive ? (
+                <span><span className="num text-xl font-semibold">{fmtInt(s.services_open)}</span> <span className="text-sm text-ink-2">{plural(s.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['open service', 'open services'])} {t('do tej pory', 'so far')}</span></span>
+              ) : (
+                <span><span className="num text-xl font-semibold">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów sprawdzonych', 'of addresses probed')}</span></span>
+              )}
               <span className="num text-sm text-ink-2">{fmtInt(s.addresses_done)} / {fmtInt(s.addresses_total)}</span>
             </div>
             <div className="mt-2"><ProgressBar value={s.addresses_done} max={s.addresses_total} active={isLive ? runningAddrs : 0} label={t('Postęp skanu', 'Scan progress')} /></div>
@@ -240,7 +245,7 @@ export default function RunDetail() {
             ) : null}
             <dl className="mt-3 grid grid-cols-2 gap-y-3 sm:grid-cols-4">
               <Fact label={run.status === 'completed' ? t('Czas trwania', 'Duration') : t('Czas aktywny', 'Active time')}><span className="num">{fmtDuration(s.elapsed_sec)}</span></Fact>
-              <Fact label={t('Pozostało (ETA)', 'Remaining (ETA)')}><span className="num">{isLive || run.status === 'paused' ? (run.status === 'analyzing' ? t('analiza', 'analysing') : fmtDuration(s.eta_sec)) : '–'}</span></Fact>
+              <Fact label={t('Pozostało (ETA)', 'Remaining (ETA)')}><span className="num">{isLive || run.status === 'paused' ? (run.status === 'analyzing' ? t('analiza', 'analysing') : s.eta_sec > 0 ? fmtDuration(s.eta_sec) : '–') : '–'}</span></Fact>
               <Fact label={t('Podgrupy', 'Chunks')}><span className="num">{s.chunks_done} / {s.chunks_total}</span></Fact>
               <Fact label={t('Aktywne hosty', 'Hosts up')}><span className="num">{fmtInt(s.hosts_up)}</span></Fact>
               <Fact label={t('Otwarte usługi', 'Open services')}><span className="num">{fmtInt(s.services_open)}</span> <span className="text-xs font-normal text-ink-3">({fmtInt(s.http_services)} WWW)</span></Fact>

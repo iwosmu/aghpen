@@ -214,6 +214,7 @@ export default function ServiceDetail() {
       <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
         <div className="min-w-0 space-y-4">
           <ServiceStory s={s} />
+          {r?.http || s.name === 'http' || s.name === 'https' ? <ResponseTimeChart serviceId={s.id} /> : null}
           <Panel title={t('Identyfikacja', 'Identification')} actions={<span className="flex items-center gap-2 text-ink-2">{t('pewność', 'confidence')} <Confidence value={s.confidence} width={48} /></span>}>
             <dl>
               <KV k={t('Usługa', 'Service')}>
@@ -243,7 +244,6 @@ export default function ServiceDetail() {
           </Panel>
 
           {r?.http ? <Panel title="HTTP"><HttpPanel h={r.http} tls={s.tls} /></Panel> : s.name === 'http' ? <Panel title="HTTP"><p className="text-sm text-ink-2">{t('Kolektor HTTP nie zebrał danych z tej usługi w ostatnim skanie.', 'The HTTP collector got no data from this service in the last scan.')}</p></Panel> : null}
-          {r?.http || s.name === 'http' ? <ResponseTimeChart serviceId={s.id} /> : null}
           {r?.tls ? <Panel title={t('Certyfikat TLS', 'TLS certificate')}><TlsPanel c={r.tls} /></Panel> : null}
 
           <ServiceHistoryPanel serviceId={s.id} />
