@@ -1,0 +1,141 @@
+# Czujka: startowy pakiet reguł ekspozycji dla sieci uczelnianej.
+# Reguły z enabled: false są wyłączone domyślnie: włącz je, gdy pasują do Twojej sieci.
+
+- id: admin-panel-outside-mgmt
+  name: Panel administracyjny poza siecią zarządzania
+  severity: high
+  description: Panel administracyjny jest osiągalny z sieci skanowanej. Panele powinny być dostępne tylko z sieci zarządzania (hosty z etykietą mgmt są pominięte).
+  remediation: Ogranicz dostęp do panelu (ACL, VPN, sieć zarządzania) albo oznacz host etykietą mgmt, jeśli należy do sieci zarządzania.
+  where:
+    not_tags: [mgmt]
+  match:
+    class: admin-panel
+
+- id: login-over-plain-http
+  name: Formularz logowania przez zwykły HTTP
+  severity: high
+  description: Strona logowania działa bez TLS i nie przekierowuje na HTTPS. Hasła idą przez sieć otwartym tekstem.
+  remediation: Włącz HTTPS i przekierowanie z HTTP na HTTPS.
+  match:
+    all:
+      - class: login
+      - scheme: http
+      - redirects_to_https: false
+
+- id: tls-certificate-expired
+  name: Wygasły certyfikat TLS
+  severity: high
+  description: Usługa przedstawia certyfikat, którego termin ważności minął.
+  remediation: Odnów certyfikat (np. ACME) i wdroż go na usłudze.
+  match:
+    tls: {expired: true}
+
+- id: tls-certificate-expiring-14d
+  name: Certyfikat TLS wygasa w ciągu 14 dni
+  severity: medium
+  description: Certyfikat jest jeszcze ważny, ale wygaśnie w ciągu 14 dni.
+  remediation: Zaplanuj odnowienie certyfikatu.
+  match:
+    tls: {expired: false, days_left_below: 14}
+
+- id: database-port-exposed
+  name: Port bazy danych otwarty na sieć skanowaną
+  severity: high
+  description: Serwer bazy danych (lub magazyn klucz–wartość) przyjmuje połączenia z sieci, z której skanuje Czujka.
+  remediation: Zamknij port w zaporze albo zwiąż usługę z adresem lokalnym; dostęp tylko z serwerów aplikacji.
+  match:
+    any:
+      - service: [mysql, postgresql, ms-sql-s, oracle-tns, mongodb, redis, memcached, elasticsearch, couchdb, cassandra, influxdb]
+      - port: [1433, 1521, 3306, 5432, 5984, 6379, 9042, 9200, 11211, 27017]
+
+- id: cleartext-remote-access
+  name: Telnet albo FTP dostępny w sieci
+  severity: high
+  description: Usługa przesyła dane logowania otwartym tekstem (telnet, FTP).
+  remediation: Wyłącz telnet i FTP; użyj SSH i SFTP.
+  match:
+    any:
+      - service: [telnet, ftp]
+      - port: [21, 23]
+
+- id: remote-desktop-exposed
+  name: Pulpit zdalny (RDP, VNC) dostępny w sieci
+  severity: medium
+  description: Usługa pulpitu zdalnego jest osiągalna z sieci skanowanej.
+  remediation: Udostępniaj pulpit zdalny tylko przez VPN albo bramę RDP.
+  match:
+    any:
+      - service: [ms-wbt-server, rdp, vnc, vnc-http]
+      - port: [3389, 5900, 5901]
+
+- id: staging-or-debug-exposed
+  name: Środowisko testowe albo narzędzie deweloperskie dostępne w sieci
+  severity: medium
+  description: Środowisko staging/test/dev albo narzędzie deweloperskie (CI, konsola debugowania) jest osiągalne z sieci skanowanej.
+  remediation: Ogranicz dostęp do środowisk testowych albo oznacz je etykietą approved po akceptacji ryzyka.
+  where:
+    not_tags: [approved]
+  match:
+    class: [staging, dev-tool]
+
+- id: default-server-page
+  name: Domyślna strona serwera
+  severity: low
+  description: Serwer WWW pokazuje stronę domyślną po instalacji. To zwykle porzucona albo nieskonfigurowana usługa.
+  remediation: Wyłącz nieużywany serwer albo skonfiguruj właściwą witrynę.
+  match:
+    class: default-page
+
+- id: directory-listing
+  name: Listowanie katalogów
+  severity: medium
+  description: Serwer WWW pokazuje listę plików katalogu.
+  remediation: Wyłącz autoindeks (Options -Indexes, autoindex off).
+  match:
+    class: directory-listing
+
+- id: new-service-not-approved
+  name: Nowa usługa bez akceptacji
+  severity: medium
+  enabled: false
+  description: Usługa pojawiła się w ciągu ostatnich 7 dni i nikt nie oznaczył jej etykietą approved. Włącz tę regułę po pierwszym pełnym skanie, aby każda nowa ekspozycja wymagała akceptacji.
+  remediation: Sprawdź usługę i dodaj etykietę approved (do usługi albo hosta), jeśli jest zamierzona.
+  match:
+    all:
+      - new_within_days: 7
+      - not: {tags: [approved]}
+
+- id: outdated-cms-major
+  name: Przestarzała główna wersja CMS
+  severity: medium
+  description: Wykryto system CMS w głównej wersji, która nie dostaje już poprawek bezpieczeństwa.
+  remediation: Zaktualizuj CMS do wspieranej wersji głównej.
+  match:
+    tech:
+      - WordPress < 6
+      - Joomla < 4
+      - Drupal < 10
+      - TYPO3 < 12
+      - Moodle < 4
+      - MediaWiki < 1.39
+
+- id: tls-self-signed
+  name: Certyfikat samopodpisany
+  severity: low
+  enabled: false
+  description: Usługa używa certyfikatu samopodpisanego. Użytkownicy uczą się ignorować ostrzeżenia przeglądarki.
+  remediation: Użyj certyfikatu z zaufanego CA (np. ACME).
+  match:
+    tls: {self_signed: true}
+
+- id: web-without-https-redirect
+  name: Serwis WWW bez przekierowania na HTTPS
+  severity: low
+  enabled: false
+  description: Usługa WWW odpowiada po zwykłym HTTP i nie przekierowuje na HTTPS.
+  remediation: Dodaj przekierowanie 301 na HTTPS.
+  match:
+    all:
+      - scheme: http
+      - redirects_to_https: false
+      - http_status: [2xx]
