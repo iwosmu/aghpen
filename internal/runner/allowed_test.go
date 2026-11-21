@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/netip"
+	"strings"
 	"testing"
 
 	"github.com/iwosmu/aghpen/internal/model"
@@ -60,6 +61,46 @@ func TestAllowedNetworks(t *testing.T) {
 		model.SafetyPolicy{AllowedNetworks: []string{"10.0.0.0/8"}}, lookup)
 	if err != nil || len(kept) != 1 || len(dropped) != 1 || dropped[0].Value != "8.8.8.8" {
 		t.Fatalf("filter: %v %v %v", kept, dropped, err)
+	}
+}
+
+func TestOperatorLockIsAnUpperBound(t *testing.T) {
+	lookup := func(_ context.Context, host string) ([]netip.Addr, error) {
+		if host == "zewn.example.org" {
+			return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
+		}
+		return []netip.Addr{netip.MustParseAddr("10.9.0.5")}, nil
+	}
+	targets := []model.Target{
+		{Kind: model.TargetIP, Value: "10.9.0.1"},
+		{Kind: model.TargetIP, Value: "8.8.4.4"},
+		{Kind: model.TargetCIDR, Value: "0.0.0.0/0"},
+		{Kind: model.TargetDomain, Value: "zewn.example.org"},
+		{Kind: model.TargetDomain, Value: "wewn.example.org"},
+		{Kind: model.TargetIP, Value: "10.20.0.1"}, // inside the lock, outside allowed_networks
+	}
+	// The administrator allowed everything; the operator lock still bounds it.
+	pol := model.SafetyPolicy{OperatorNetworks: []string{"10.0.0.0/8"}, AllowedNetworks: []string{"0.0.0.0/0"}}
+	kept, dropped, err := FilterAllowed(context.Background(), targets, pol, lookup)
+	if err != nil || len(kept) != 3 || len(dropped) != 3 {
+		t.Fatalf("lock with a wide policy: kept %v dropped %v %v", kept, dropped, err)
+	}
+	for _, d := range dropped {
+		if !strings.Contains(d.Reason, "CZUJKA_ALLOWED_NETWORKS") {
+			t.Errorf("%s: the reason must name the operator lock: %s", d.Value, d.Reason)
+		}
+	}
+	// Both lists apply: inside the lock but outside allowed_networks is dropped too.
+	pol.AllowedNetworks = []string{"10.9.0.0/16"}
+	kept, _, _ = FilterAllowed(context.Background(), targets, pol, lookup)
+	if len(kept) != 2 || kept[0].Value != "10.9.0.1" || kept[1].Value != "wewn.example.org" {
+		t.Fatalf("lock and policy: %v", kept)
+	}
+	in, _ := netip.ParsePrefix("10.9.0.0/16")
+	out, _ := netip.ParsePrefix("0.0.0.0/0")
+	lock, _ := ParseAllowed([]string{"10.0.0.0/8"})
+	if !PrefixInside(in, lock) || PrefixInside(out, lock) {
+		t.Error("PrefixInside")
 	}
 }
 

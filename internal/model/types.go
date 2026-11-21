@@ -170,6 +170,11 @@ type SafetyPolicy struct {
 	// scans must be inside one of them: a target outside is rejected at
 	// entry and dropped again when the run is planned.
 	AllowedNetworks []string `json:"allowed_networks"`
+	// OperatorNetworks is the operator lock (CZUJKA_ALLOWED_NETWORKS), read
+	// only: a hard upper bound on what may be scanned. No user, also no
+	// administrator, can widen it through the API; allowed_networks must lie
+	// inside it. Empty: no lock.
+	OperatorNetworks []string `json:"operator_networks"`
 }
 
 // ---------- Scan configuration ----------
@@ -295,6 +300,19 @@ type ScanEstimate struct {
 	BasedOnHistory   bool    `json:"based_on_history"` // true when earlier runs gave a measured speed
 	ExpectedLiveRate float64 `json:"expected_live_rate"`
 	DiscoveryMode    string  `json:"discovery_mode"` // fast | balanced | thorough: the mode the numbers assume
+
+	// Windows: in_window is true when a window of the profile is open now (or
+	// it has none). Outside the windows window_sec is the length of the next
+	// window, next_window_at its start, and fits_window is computed against it.
+	InWindow     bool       `json:"in_window"`
+	NextWindowAt *time.Time `json:"next_window_at,omitempty"`
+
+	// The last completed run of the same profile, measured (nil/0 when there is none).
+	PrevRunID       *int64     `json:"prev_run_id,omitempty"`
+	PrevFinishedAt  *time.Time `json:"prev_finished_at,omitempty"`
+	PrevDurationSec int64      `json:"prev_duration_sec"`
+	PrevHostsUp     int        `json:"prev_hosts_up"`
+	PrevAddresses   int64      `json:"prev_addresses"`
 }
 
 // ---------- Scan runs ----------

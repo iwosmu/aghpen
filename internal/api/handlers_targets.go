@@ -153,8 +153,9 @@ func (s *Server) preview(r *http.Request, valid []model.Target, invalid []model.
 	if err != nil {
 		return p, err
 	}
-	if len(policy.AllowedNetworks) > 0 {
-		// A target outside the allowed networks of the policy is refused at entry.
+	if len(policy.AllowedNetworks) > 0 || len(policy.OperatorNetworks) > 0 {
+		// A target outside the allowed networks of the policy, or outside the
+		// operator lock, is refused at entry.
 		kept, dropped, err := runner.FilterAllowed(r.Context(), p.Valid, policy, s.lookup)
 		if err != nil {
 			return p, err

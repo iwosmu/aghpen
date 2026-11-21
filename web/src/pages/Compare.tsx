@@ -32,8 +32,8 @@ function Column({ title, glyph, tone, items, showExpected }: { title: string; gl
       </h2>
       {list.length === 0 ? <p className="p-3 text-sm text-ink-3">{expected.length ? t('Tylko zmiany oczekiwane.', 'Expected changes only.') : t('Brak.', 'None.')}</p> : (
         <ul className="max-h-[560px] overflow-auto">
-          {list.map((c) => (
-            <li key={c.id} className="border-b border-rule px-3 py-2 last:border-b-0">
+          {list.map((c, i) => (
+            <li key={c.id || 'x' + i + '-' + c.ip + ':' + (c.port ?? '')} className="border-b border-rule px-3 py-2 last:border-b-0">
               <div className="flex items-start justify-between gap-2">
                 <Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link text-sm">{c.ip}{c.port ? ':' + c.port : ''}</Link>
                 {c.expected ? <span className="inline-flex flex-none items-center gap-1 text-xs text-ink-3"><Glyph name="dashring" tone="expected" size={11} />{t('oczekiwana', 'expected')}</span> : <span className="flex-none"><Sev level={c.severity} /></span>}

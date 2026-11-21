@@ -64,7 +64,8 @@ Kilka instalacji na jednej maszynie: dodaj `-p <nazwa>` i inny port, na przykła
 | `CZUJKA_BIND` | `127.0.0.1` | adres hosta, na którym słucha interfejs |
 | `CZUJKA_PORT` | `8080` | port na hoście |
 | `CZUJKA_COOKIE_SECURE` | `auto` | flaga `Secure` ciasteczka sesji: `auto` (przy TLS), `true`, `false` |
-| `CZUJKA_TRUST_PROXY` | `false` | `true` za serwerem pośredniczącym: adres klienta z `X-Forwarded-For`, TLS z `X-Forwarded-Proto` |
+| `CZUJKA_TRUST_PROXY` | `false` | `true` za serwerem pośredniczącym: adres klienta to ostatni wpis `X-Forwarded-For` (dopisany przez serwer pośredniczący), TLS z `X-Forwarded-Proto` |
+| `CZUJKA_ALLOWED_NETWORKS` | puste | blokada operatora: sieci CIDR po przecinku. Czujka nie skanuje nic poza nimi. Żaden użytkownik, także administrator, nie poszerzy jej w interfejsie ani w API |
 | `CZUJKA_TZ` | `Europe/Warsaw` | strefa czasowa histogramu dostępności hostów (godzina tygodnia) |
 | `CZUJKA_VERSION` | `dev` | etykieta obrazu i wersja w `/healthz` |
 
@@ -144,7 +145,13 @@ Domyślnie interfejs słucha tylko na `127.0.0.1` i bez TLS. Dla dostępu z siec
 2. Ustaw `CZUJKA_TRUST_PROXY=true` i `CZUJKA_COOKIE_SECURE=true`.
 3. Nie ustawiaj `CZUJKA_BIND=0.0.0.0` bez TLS: hasła i ciasteczko sesji szłyby jawnie.
 
-Konfiguracja z serwerem pośredniczącym nie była uruchomiona w tym sprawdzeniu.
+### 5.1 Instancja publiczna: zabezpieczenia
+
+- **Blokada operatora.** Ustaw `CZUJKA_ALLOWED_NETWORKS` na sieci, które wolno skanować, np. `10.91.0.0/16,127.0.0.1`. To twarda granica wdrożenia. Cel poza nią jest odrzucany przy wpisie do zakresu, w skanie doraźnym, w ponownym sondowaniu i przy planowaniu przebiegu. Nazwa domenowa przechodzi tylko wtedy, gdy każdy jej adres leży w blokadzie. Administrator może zawęzić `allowed_networks` w polityce bezpieczeństwa, ale nie może jej poszerzyć poza blokadę (odpowiedź 422). Polityka w `GET /settings/safety` pokazuje blokadę w polu `operator_networks`. Skradziona sesja administratora nie skieruje więc skanera w internet.
+- **Ograniczenie logowania.** Z jednego adresu klienta: 20 prób na minutę (`CZUJKA_LOGIN_RATE_PER_MIN`), potem 429. Na jedno konto: 5 nieudanych prób (`CZUJKA_LOGIN_MAX_FAILURES`) blokuje konto na 15 minut (`CZUJKA_LOGIN_LOCKOUT`), z każdego adresu. Za serwerem pośredniczącym adres klienta to ostatni wpis `X-Forwarded-For`, więc podrobiony nagłówek od klienta nie omija limitu. Uwaga: blokada konta działa też przeciw atakującemu, który zna adres e-mail. Na instancji publicznej nie używaj domyślnego `admin@czujka.local`.
+- **Nagłówki bezpieczeństwa** na każdej odpowiedzi: `Content-Security-Policy` bez skryptów inline i z `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `Strict-Transport-Security` przy TLS.
+
+Sprawdzenie na prawdziwym stosie: `./e2e/lock/run.sh` (19 kontroli: blokada operatora, nagłówki, limit logowania za serwerem pośredniczącym, blokada konta, adres klienta w dzienniku audytu). Skrypt niczego nie skanuje.
 
 ## 6. Kopia zapasowa i odtwarzanie
 
