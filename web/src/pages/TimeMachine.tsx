@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { useItem } from '../api/hooks';
-import type { AtFinding, AtHost, AtService, FieldHistory, HostLife, LifeInterval, Page, RunMap, ServiceHistory, Snapshot, Timeline, RunPoint } from '../api/types';
+import { useItem, usePage } from '../api/hooks';
+import type { AtFinding, AtHost, AtService, FieldHistory, HostLife, LifeInterval, Page, RunMap, ScanRun, ServiceHistory, Snapshot, Timeline, RunPoint } from '../api/types';
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtInt } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
@@ -78,7 +78,7 @@ function Scrubber({ runs, index, onIndex }: { runs: RunPoint[]; index: number; o
 function Count({ label, value, now, tone }: { label: string; value: number; now?: number; tone?: string }) {
   const d = now === undefined ? 0 : now - value;
   return (
-    <div className="min-w-0 border-l border-rule pl-3 first:border-l-0 first:pl-0">
+    <div className="min-w-0 border-l border-rule pl-3 [&:nth-child(3n+1)]:border-l-0 [&:nth-child(3n+1)]:pl-0">
       <dt className="text-xs text-ink-3">{label}</dt>
       <dd className={cx('num text-xl', tone)}>{fmtInt(value)}{d ? <span className="ml-1.5 text-xs text-ink-3" title={t('różnica do dziś', 'difference to today')}>{d > 0 ? '+' : ''}{fmtInt(d)} {t('dziś', 'today')}</span> : null}</dd>
     </div>
@@ -89,27 +89,42 @@ const ip24 = (ip: string) => ip.split('.').slice(0, 3).join('.') + '.0/24';
 
 function SnapshotMap({ runId, frameRunId }: { runId: number; frameRunId?: number }) {
   const hosts = useItem<Page<AtHost>>('/timeline/at/hosts', { run_id: runId, limit: 1000 }, { staleTime: 60_000 });
+  const services = useItem<Page<AtService>>('/timeline/at/services', { run_id: runId, limit: 1000 }, { staleTime: 60_000 });
   const frame = useItem<RunMap>('/runs/' + frameRunId + '/map', undefined, { enabled: Boolean(frameRunId), staleTime: 300_000 });
   const { blocks, gone, per } = useMemo(() => {
-    const per = new Map<string, { up: number; goneNow: number }>();
+    const per = new Map<string, { up: number; goneNow: number; svcGone: number }>();
     for (const h of hosts.data?.items ?? []) {
       const k = ip24(h.ip);
-      const v = per.get(k) ?? { up: 0, goneNow: 0 };
+      const v = per.get(k) ?? { up: 0, goneNow: 0, svcGone: 0 };
       if (h.up || h.status === 'up') { v.up++; if (h.status_now !== 'up') v.goneNow++; }
+      per.set(k, v);
+    }
+    for (const s of services.data?.items ?? []) {
+      if (s.state !== 'open' || s.state_now === 'open') continue;
+      const k = ip24(s.ip);
+      const v = per.get(k) ?? { up: 0, goneNow: 0, svcGone: 0 };
+      v.svcGone++;
       per.set(k, v);
     }
     const cidrs = new Set<string>([...(frame.data?.blocks ?? []).map((b) => b.cidr), ...per.keys()]);
     const blocks = [...cidrs].map((cidr) => ({ cidr, size: 256, status: 'done' as const, hosts_up: per.get(cidr)?.up ?? 0 }));
-    const gone = new Set([...per.entries()].filter(([, v]) => v.goneNow > 0).map(([k]) => k));
+    const gone = new Set([...per.entries()].filter(([, v]) => v.goneNow > 0 || v.svcGone > 0).map(([k]) => k));
     return { blocks, gone, per };
-  }, [hosts.data, frame.data]);
+  }, [hosts.data, services.data, frame.data]);
   if (hosts.error) return <ErrorState error={hosts.error} retry={() => hosts.refetch()} />;
   if (!hosts.data) return <SkeletonRows rows={6} />;
   return (
     <div data-testid="tm-map">
-      <AddressMap blocks={blocks} highlight={gone} maxCell={30}
-        describe={(b) => { const v = per.get(b.cidr); return v && v.goneNow ? <span className="text-st-gone">{v.goneNow} {plural(v.goneNow, ['host z tamtej chwili dziś nie odpowiada', 'hosty z tamtej chwili dziś nie odpowiadają', 'hostów z tamtej chwili dziś nie odpowiada'], ['host from then is silent today', 'hosts from then are silent today'])}</span> : null; }} />
-      <p className="mt-2 text-xs text-ink-3">{t('Kolor: liczba hostów aktywnych w tamtym przebiegu. Obwódka: blok, w którym host z tamtej chwili dziś nie odpowiada.', 'Colour: hosts up in that run. Outline: a block where a host from then is silent today.')}</p>
+      <AddressMap blocks={blocks} highlight={gone} maxCell={24} snapshot
+        describe={(b) => {
+          const v = per.get(b.cidr);
+          if (!v || (!v.goneNow && !v.svcGone)) return null;
+          return <span className="text-st-gone">{[
+            v.goneNow ? v.goneNow + ' ' + plural(v.goneNow, ['host z tamtej chwili dziś nie odpowiada', 'hosty z tamtej chwili dziś nie odpowiadają', 'hostów z tamtej chwili dziś nie odpowiada'], ['host from then is silent today', 'hosts from then are silent today']) : '',
+            v.svcGone ? v.svcGone + ' ' + plural(v.svcGone, ['usługa z tamtej chwili dziś nie odpowiada', 'usługi z tamtej chwili dziś nie odpowiadają', 'usług z tamtej chwili dziś nie odpowiada'], ['service from then is not open today', 'services from then are not open today']) : '',
+          ].filter(Boolean).join(' · ')}</span>;
+        }} />
+      <p className="mt-2 text-xs text-ink-3">{t('Kolor: liczba hostów aktywnych w tamtym przebiegu. Obwódka: blok, w którym host albo usługa z tamtej chwili dziś nie odpowiada.', 'Colour: hosts up in that run. Outline: a block where a host or a service from then is silent today.')}</p>
     </div>
   );
 }
@@ -179,7 +194,10 @@ export default function TimeMachine() {
   useEffect(() => { if (runId && runId !== wanted) u.set({ run: runId }, { keepOffset: false }); }, [runId]); // eslint-disable-line react-hooks/exhaustive-deps
   const snap = useItem<Snapshot>('/timeline/at', { run_id: runId, limit: 1 }, { enabled: runId > 0, staleTime: 60_000 });
   const latest = runs[runs.length - 1];
-  const frameRun = [...runs].reverse().find((r) => !isLight(r) && r.trigger !== 'import');
+  // The map frame is the widest finished run (the whole scope), so the time machine shows the full address space.
+  const recent = usePage<ScanRun>('/runs', { status: 'completed', limit: 100, sort: '-id' });
+  const frameRun = (recent.data?.items ?? []).filter((r) => r.trigger !== 'reprobe' && r.trigger !== 'manual-entry' && r.trigger !== 'import')
+    .reduce<ScanRun | undefined>((best, r) => (!best || r.stats.addresses_total > best.stats.addresses_total ? r : best), undefined);
   // Arrow keys step one run anywhere on the page, unless the focus is in a form field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -226,7 +244,7 @@ export default function TimeMachine() {
               </div>
             )}
           </Panel>
-          <Panel title={t('Mapa przestrzeni adresowej wtedy', 'Address-space map then')}>{runId ? <SnapshotMap runId={runId} frameRunId={frameRun?.run_id} /> : null}</Panel>
+          <Panel title={t('Mapa przestrzeni adresowej wtedy', 'Address-space map then')}>{runId ? <SnapshotMap runId={runId} frameRunId={frameRun?.id} /> : null}</Panel>
         </div>
         {runId ? <SnapshotLists runId={runId} /> : null}
       </div>

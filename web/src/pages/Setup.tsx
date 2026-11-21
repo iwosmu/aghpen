@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router';
+import { Navigate, useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidate, useItem } from '../api/hooks';
 import { patch, post, put, setCsrfToken } from '../api/client';
@@ -12,7 +12,7 @@ import { Glyph } from '../ui/marks';
 import { Icon } from '../ui/Icon';
 import { useDebounced } from '../ui/edit';
 import { useSession } from '../session';
-import { PreviewReport } from './Targets';
+import { OperatorLockNote, PreviewReport } from './Targets';
 import { EstimateBox } from './ProfileEdit';
 
 export const SETUP_DONE_KEY = 'czujka.setup.done';
@@ -55,7 +55,9 @@ function Step({ n, title, done, active, children, summary }: { n: number; title:
 }
 
 export default function Setup() {
-  const { session } = useSession();
+  const { session, can } = useSession();
+  // The wizard creates scopes, profiles and runs: a role without those rights (for example the jury's viewer) goes to the dashboard.
+  const allowed = can('targets:create') && can('scans:configure') && can('scans:run');
   const navigate = useNavigate();
   const qc = useQueryClient();
   const policyQ = useItem<SafetyPolicy>('/settings/safety');
@@ -157,6 +159,7 @@ export default function Setup() {
   const p = preview.data;
   const netOk = netName.trim().length > 0 && Boolean(p && p.valid.length > 0 && p.address_count > 0) && debounced === ranges;
 
+  if (!allowed) return <Navigate to="/" replace />;
   return (
     <div className="mx-auto max-w-[880px]" data-testid="setup">
       <div className="flex flex-wrap items-end justify-between gap-3 px-4 pb-4 pt-6 sm:px-6">
@@ -184,8 +187,9 @@ export default function Setup() {
           <div className="grid gap-3">
             <Field label={t('Nazwa sieci', 'Network name')} hint={t('np. Kampus główny, Akademiki, DMZ', 'for example Main campus, Dormitories, DMZ')}><input className="field" value={netName} onChange={(e) => setNetName(e.target.value)} data-testid="setup-net-name" /></Field>
             <Field label={t('Zakresy: jeden w wierszu (IP, CIDR, zakres od-do, domena)', 'Ranges: one per line (IP, CIDR, from-to range, domain)')}>
-              <textarea className="field mono min-h-[110px] py-2" value={ranges} onChange={(e) => setRanges(e.target.value)} placeholder={'10.0.0.0/16\n192.168.10.1-192.168.10.50\nportal.example.edu'} data-testid="setup-ranges" />
+              <textarea className="field mono min-h-[110px] py-2" value={ranges} onChange={(e) => setRanges(e.target.value)} placeholder={(policyQ.data?.operator_networks?.[0] ?? '10.0.0.0/16') + '\n192.168.10.1-192.168.10.50\nportal.example.edu'} data-testid="setup-ranges" />
             </Field>
+            <OperatorLockNote networks={policyQ.data?.operator_networks} />
             {p && ranges.trim() ? <PreviewReport p={p} pending={preview.isFetching || debounced !== ranges} /> : <p className="text-xs text-ink-3">{t('Podgląd pojawi się w trakcie pisania: liczba adresów, błędne wiersze, adresy wykluczone polityką. Nic nie jest jeszcze zapisane.', 'The preview appears as you type: the address count, invalid lines, addresses excluded by the policy. Nothing is saved yet.')}</p>}
           </div>
           <div className="mt-4"><Button variant="primary" icon="check" busy={busy} disabled={!netOk} onClick={saveNetwork}>{t('Zapisz sieć i dalej', 'Save the network and continue')}</Button></div>

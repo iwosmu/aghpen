@@ -52,7 +52,7 @@ export function ReprobePanel({ hostId, limit = 8 }: { hostId?: number; limit?: n
   return (
     <Panel title={title} actions={!hostId && canConfigure ? <button type="button" className="link text-xs" onClick={() => setEdit((v) => !v)}>{edit ? t('Zamknij ustawienia', 'Close the settings') : t('Ustawienia', 'Settings')}</button> : undefined}>
       <div data-testid="reprobe-plan">
-        {p.blocked ? <p className="mb-2 flex items-start gap-2 text-sm text-danger"><Icon name="stop" size={14} className="mt-0.5" />{p.blocked}</p> : null}
+        {p.blocked && p.enabled ? <p className="mb-2 flex items-start gap-2 text-sm text-danger"><Icon name="stop" size={14} className="mt-0.5" />{p.blocked}</p> : null}
         {!p.enabled ? <p className="text-sm text-ink-2">{t('Ponowne sprawdzenia są wyłączone. Po włączeniu Czujka sprawdzi pojedyncze hosty, które przestały odpowiadać, zamiast czekać na następny pełny skan.', 'Re-probing is off. When it is on, Czujka checks single hosts that went silent instead of waiting for the next full scan.')}</p> : !hostId ? (
           <p className="mb-2 text-xs text-ink-3"><span className="num text-ink">{fmtInt(p.due_now)}</span> {t('do sprawdzenia teraz', 'due now')} · <span className="num text-ink">{fmtInt(p.used_last_hour)}</span> / <span className="num">{fmtInt(p.budget_per_hour)}</span> {t('adresów w ostatniej godzinie', 'addresses in the last hour')}</p>
         ) : null}

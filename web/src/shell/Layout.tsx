@@ -10,7 +10,8 @@ import { invalidate, useAction, useItem, usePage } from '../api/hooks';
 import { post } from '../api/client';
 import { openStream } from '../api/events';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
-import type { Health, Permission, SafetyPolicy, ScanRun } from '../api/types';
+import type { Health, Permission, SafetyPolicy, ScanProfile, ScanRun } from '../api/types';
+import { overCap } from '../lib/headline';
 import { Glyph } from '../ui/marks';
 
 interface NavItem { to: string; label: string; icon: string; perms: Permission[]; end?: boolean }
@@ -155,14 +156,20 @@ function ActiveRunStrip() {
   // The list is refreshed only on run events; the live detail query (kept fresh by the run page and polling) has the current rate.
   const detail = useItem<ScanRun>('/runs/' + (listed?.id ?? 0), undefined, { enabled: Boolean(listed), refetchInterval: 4000 });
   const run = listed ? (detail.data?.status === 'running' ? detail.data : listed) : undefined;
+  const profile = useItem<ScanProfile>('/profiles/' + (run?.profile_id ?? 0), undefined, { enabled: Boolean(run?.profile_id) });
+  const safety = useItem<SafetyPolicy>('/settings/safety', undefined, { enabled: Boolean(run) });
   if (!run) return null;
   const pct = run.stats.addresses_total ? run.stats.addresses_done / run.stats.addresses_total : 0;
+  // The run cap is the stricter of the profile cap and the policy cap, as on the run page and the dashboard.
+  const policyCap = safety.data?.max_pps ?? 0;
+  const cap = Math.min(profile.data?.rate.max_pps ?? policyCap, policyCap || Infinity) || policyCap;
+  const over = overCap(run.stats.current_pps, cap);
   return (
     <Link to={'/runs/' + run.id} className="hidden min-w-0 items-center gap-2 text-xs text-ink-2 hover:text-ink md:inline-flex">
       <Glyph name="run" tone="accent" pulse size={12} />
       <span className="truncate">{t('Skan', 'Run')} <span className="num">#{run.id}</span> · {run.profile_name}</span>
       <span className="num text-ink">{fmtPct(pct)}</span>
-      <span className="num text-ink-3">{fmtInt(run.stats.current_pps)} pps</span>
+      <span className={cx('num inline-flex items-center gap-1', over ? 'font-medium text-danger' : 'text-ink-3')} title={over ? t('Tempo powyżej limitu skanu ' + fmtInt(cap) + ' pps', 'Rate above the run cap of ' + fmtInt(cap) + ' pps') : undefined} data-testid={over ? 'strip-over-cap' : undefined}>{over ? <Icon name="alert" size={11} /> : null}{fmtInt(run.stats.current_pps)}{cap ? <span className="text-ink-3"> / {fmtInt(cap)}</span> : null} pps</span>
     </Link>
   );
 }
@@ -242,12 +249,16 @@ function SafetyChip({ policy }: { policy: SafetyPolicy | undefined }) {
   if (!policy) return null;
   const probe = health.data?.probe;
   const pm = probeModeLabel(probe?.mode);
+  const op = policy.operator_networks ?? [];
+  const title = t('Polityka bezpieczeństwa skanowania', 'Scan safety policy')
+    + (op.length ? '. ' + t('Blokada operatora wdrożenia: skanowanie tylko w ' + op.join(', ') + '. Żaden użytkownik, także administrator, nie może jej poszerzyć.', 'Deployment operator lock: scanning only inside ' + op.join(', ') + '. No user, an administrator included, can widen it.') : '');
   return (
     <Link
       to="/admin?tab=safety" className="hidden items-center gap-1.5 text-xs text-ink-2 hover:text-ink lg:inline-flex"
-      title={t('Polityka bezpieczeństwa skanowania', 'Scan safety policy')}
+      title={title} data-testid="safety-chip"
     >
       <Icon name="shield" size={14} className="text-st-new" />
+      {op.length ? <><span className="inline-flex items-center gap-1" data-testid="safety-chip-lock"><Icon name="lock" size={12} className="text-ink-3" /><span className="mono text-ink">{op.length === 1 ? op[0] : op.length + ' ' + t('sieci', 'networks')}</span></span><span className="text-ink-3">·</span></> : null}
       <span>{t('limit', 'cap')} <span className="num text-ink">{fmtInt(policy.max_pps)}</span> pps</span>
       <span className="text-ink-3">·</span>
       <span className="mono text-ink">{(policy.allowed_methods ?? []).join('/') || 'GET/HEAD'}</span>
@@ -258,6 +269,7 @@ function SafetyChip({ policy }: { policy: SafetyPolicy | undefined }) {
 
 export function Layout() {
   const { session, can } = useSession();
+  usePresentMode();
   const [menu, setMenu] = useState(false);
   const [theme, toggleTheme] = useTheme();
   const loc = useLocation();
@@ -323,4 +335,24 @@ export function NoAccess({ children }: { children?: ReactNode }) {
       <Link to="/" className="link text-sm">{t('Wróć na pulpit', 'Back to the dashboard')}</Link>
     </div>
   );
+}
+
+/** Presentation mode for recording: ?present=1 (or Shift+P) enlarges the whole UI one step; the safety strip stays. Nothing else changes. */
+export function usePresentMode() {
+  const loc = useLocation();
+  useEffect(() => {
+    const q = new URLSearchParams(loc.search).get('present');
+    if (q === '1') sessionStorage.setItem('czujka.present', '1');
+    if (q === '0') sessionStorage.removeItem('czujka.present');
+    const apply = () => { if (sessionStorage.getItem('czujka.present')) document.documentElement.dataset.present = ''; else delete document.documentElement.dataset.present; };
+    apply();
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.shiftKey && (e.key === 'P' || e.key === 'p')) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if ((e.target as HTMLElement).closest('input, textarea, select, [contenteditable]')) return;
+      if (sessionStorage.getItem('czujka.present')) sessionStorage.removeItem('czujka.present'); else sessionStorage.setItem('czujka.present', '1');
+      apply();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [loc.search]);
 }
