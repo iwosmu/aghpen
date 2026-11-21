@@ -68,6 +68,22 @@ ALLOVER=$(go run ./e2e/ppsbins -src "${LR_IP:-10.66.0.30}" -cap "$ALLLIM" -json 
 ALLMAX=$(jq .all_max_per_s "$OUT/pps-t0.json"); ALLP99=$(jq .all_p99_per_s "$OUT/pps-t0.json"); SECS=$(jq .seconds "$OUT/pps-t0.json")
 row "all packets: seconds over $ALLLIM" "$ALLOVER of $SECS (max $ALLMAX)" "<= $AS" "$([ "$ALLOVER" -le "$AS" ] && echo 1 || echo 0)"
 row "all packets: p99 per second" "$ALLP99" "<= $CAP" "$([ "$ALLP99" -le "$CAP" ] && echo 1 || echo 0)"
+for K in t0 t0-2; do
+  [ -f "$OUT/passtimes-$K.txt" ] || continue
+  read -r PG PD PH PW PN < "$OUT/passtimes-$K.txt"
+  printf '%-44s %-22s %-22s %s\n' "wall time $K: general pass / deep pass" "$PG s / $PD s" "deep: $PH hosts" "info ($PW waiting, $PN new)"
+done
+# the kernel cap must be active and drop nothing in a normal run (both runs)
+if [ -s "$OUT/kcap-t0.json" ] && [ "$(cat "$OUT/kcap-t0.json")" != null ]; then
+  KC=""; KOK=1
+  for K in t0 t0-2; do
+    [ -f "$OUT/kcap-$K.json" ] || continue
+    A=$(jq -r '.active' "$OUT/kcap-$K.json"); D=$(jq -r '.dropped // 0' "$OUT/kcap-$K.json")
+    KC="$KC$K $A/$D "
+    { [ "$A" = true ] && [ "$D" = 0 ]; } || KOK=0
+  done
+  row "kernel cap: active/dropped per run" "$KC" "true/0" "$KOK"
+fi
 F0=$(echo "$NB0" | jq .table_fulls); F1=$(echo "$NB1" | jq .table_fulls)
 row "neighbour table: entries after, overflows" "$(echo "$NB1" | jq .entries) / +$((F1 - F0))" "+0 overflows" "$([ "$F1" = "$F0" ] && echo 1 || echo 0)"
 printf 'run %s s, %s hosts up, %s open services, %s packets; output %s\n' "$(jq .stats.elapsed_sec "$OUT/run-t0.json")" "$(jq .stats.hosts_up "$OUT/run-t0.json")" \
