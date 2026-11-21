@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate, useLocation } from 'react-router';
 import { ApiError, get, setCsrfToken, setUnauthorizedHandler } from './api/client';
@@ -33,11 +33,13 @@ export function RequireSession({ children }: { children: ReactNode }) {
   const me = useMe();
   const qc = useQueryClient();
   const loc = useLocation();
+  // True after the server answered 401 to a request of a session that worked before.
+  const expired = useRef(false);
   useEffect(() => {
     if (me.data) setCsrfToken(me.data.csrf_token);
   }, [me.data]);
   useEffect(() => {
-    setUnauthorizedHandler(() => { qc.setQueryData(['/me'], undefined); qc.invalidateQueries({ queryKey: ['/me'] }); });
+    setUnauthorizedHandler(() => { expired.current = true; qc.setQueryData(['/me'], undefined); qc.invalidateQueries({ queryKey: ['/me'] }); });
     return () => setUnauthorizedHandler(null);
   }, [qc]);
   if (me.isPending) {
@@ -53,7 +55,7 @@ export function RequireSession({ children }: { children: ReactNode }) {
         </div>
       );
     }
-    return <Navigate to="/login" replace state={{ from: loc.pathname + loc.search }} />;
+    return <Navigate to="/login" replace state={{ from: loc.pathname + loc.search, expired: expired.current }} />;
   }
   const session = me.data;
   setCsrfToken(session.csrf_token);

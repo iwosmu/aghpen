@@ -6,24 +6,35 @@ Interfejs analityka dla Czujki. React 19, TypeScript, Vite, React Router, TanSta
 
 ```sh
 npm install
-npm run dev            # wymaga działającego backendu pod /api/v1 (ten sam origin albo proxy Vite)
+npm run dev            # wymaga działającego backendu pod /api/v1 (proxy Vite, domyślnie http://127.0.0.1:8080)
+CZUJKA_DEV_API=http://127.0.0.1:18300 npm run dev:api   # to samo, z adresem backendu podanym wprost
 npm run dev:fixtures   # tryb deweloperski bez backendu, dane z warstwy fixtures
 npm run typecheck
 npm run lint
 npm test
-npm run build          # wynik w web/dist
+npm run build          # tsc, vite build i kontrola paczki; wynik w web/dist
 ```
 
 Binarka Go osadza `web/dist` przy budowaniu z tagiem `embedui` (`embed.go`). Bez tagu używany jest `noembed.go`, więc `go build ./...` działa także bez zbudowanego interfejsu.
 
 ## Warstwa fixtures
 
-- Włączana tylko przez `VITE_FIXTURES=1` w trybie deweloperskim (`import.meta.env.DEV`). Nie trafia do paczki produkcyjnej.
+- Włączana tylko przez `VITE_FIXTURES=1` w serwerze deweloperskim. Stała `__CZUJKA_FIXTURES__` jest ustawiana przy kompilacji i w każdym buildzie ma wartość `false`, więc kod warstwy nie trafia do paczki.
+- `npm run build` z `VITE_FIXTURES=1` kończy się błędem. Po buildzie `scripts/check-bundle.mjs` przeszukuje `dist` i przerywa build, gdy znajdzie ślad warstwy fixtures.
 - Podmienia transport klienta API i źródło zdarzeń SSE. Odpowiada na wszystkie ścieżki z `docs/API.md` i symuluje postęp trwającego skanu.
 - Dane opisują fikcyjną sieć uczelni (ok. 400 hostów, 700 usług). Stan wraca do początku po przeładowaniu strony.
 - Konta: `admin@cbi.example`, `editor@cbi.example`, `analyst@cbi.example`, `viewer@cbi.example`, hasło `czujka`.
 
-Wszystkie zrzuty w `screenshots/` pochodzą z tego trybu. Interfejs nie był jeszcze uruchamiany z prawdziwym backendem.
+Zrzuty bezpośrednio w `screenshots/` pochodzą z tego trybu. Zrzuty w `screenshots/real/` pochodzą z prawdziwego serwera i prawdziwych danych (import nmap, skan `127.0.0.1`, DefectDojo).
+
+## Praca z prawdziwym backendem
+
+- Serwer podaje zbudowany interfejs z katalogu wskazanego przez `CZUJKA_WEB_DIR` (na przykład `web/dist`) albo z paczki osadzonej tagiem `embedui`.
+- Polityka CSP serwera nie pozwala na skrypty inline. Motyw i język przed pierwszym renderem ustawia plik `public/boot.js`.
+- Klient zamienia `null` na pustą listę dla znanych pól tablicowych (`src/api/normalize.ts`), bo Go zapisuje pusty slice jako `null`.
+- Odpowiedź `501 not_wired` daje spokojny stan „Funkcja niedostępna w tej instalacji”. Pozostałe kody błędów mają własne komunikaty (`explainError` w `src/ui/kit.tsx`).
+- Po wygaśnięciu sesji interfejs wraca na stronę logowania z informacją i po zalogowaniu otwiera tę samą stronę. Nieaktualny token CSRF jest odświeżany raz i żądanie jest powtarzane.
+- Wynik przejścia wszystkich przepływów i lista niezgodności backendu: `REPORT-REAL-BACKEND.md`.
 
 ## Struktura
 

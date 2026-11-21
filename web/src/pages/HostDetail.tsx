@@ -23,8 +23,10 @@ function ModelOutput({ h, a }: { h: Host; a: AvailabilityProfile }) {
           <dd className="text-sm text-ink-2">{t('prawdopodobieństwo, że host nadal istnieje', 'probability that the host still exists')} <span className="mono text-xs text-ink-3">p_alive</span></dd>
         </div>
         <div className="grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-3 border-b border-rule py-1.5">
-          <dt className="num text-lg font-semibold">{a.down_after_misses}</dt>
-          <dd className="text-sm text-ink-2">{plural(a.down_after_misses, ['brak odpowiedzi z rzędu', 'braki odpowiedzi z rzędu', 'braków odpowiedzi z rzędu'], ['miss in a row', 'misses in a row'])} {t('i host zostaje uznany za nieaktywny', 'and the host is declared inactive')}</dd>
+          <dt className="num text-lg font-semibold">{a.down_after_misses > 0 ? a.down_after_misses : '–'}</dt>
+          <dd className="text-sm text-ink-2">{a.down_after_misses > 0
+            ? <>{plural(a.down_after_misses, ['brak odpowiedzi z rzędu', 'braki odpowiedzi z rzędu', 'braków odpowiedzi z rzędu'], ['miss in a row', 'misses in a row'])} {t('i host zostaje uznany za nieaktywny', 'and the host is declared inactive')}</>
+            : t('próg braków odpowiedzi: serwer go nie podał dla tego hosta', 'miss threshold: the server did not give one for this host')}</dd>
         </div>
         <div className="grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-3 border-b border-rule py-1.5">
           <dt className="num text-lg font-semibold">{h.consecutive_misses}</dt>

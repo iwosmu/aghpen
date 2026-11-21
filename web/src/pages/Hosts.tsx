@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
+import { NextSteps } from '../ui/NextSteps';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { get } from '../api/client';
@@ -113,7 +114,7 @@ export default function Hosts() {
         {inf.error ? <ErrorState error={inf.error} retry={() => inf.refetch()} /> : inf.isPending ? <SkeletonRows rows={14} /> : rows.length === 0 ? (
           <Empty icon="hosts" title={active ? t('Żaden host nie pasuje do filtrów', 'No host matches the filters') : t('Inwentarz jest pusty', 'The inventory is empty')}
             hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Hosty pojawią się po pierwszym skanie albo po imporcie wyników.', 'Hosts appear after the first scan or after an import of results.')}
-            action={active ? undefined : <Link className="link text-sm" to="/runs">{t('Przejdź do skanów', 'Go to scans')}</Link>} />
+            action={active ? undefined : <NextSteps />} />
         ) : (
           <>
             {!narrow ? (

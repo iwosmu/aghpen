@@ -1,5 +1,7 @@
 // Server-sent events. Production uses EventSource; the dev fixture layer swaps the factory.
 
+import { parseJSON } from './normalize';
+
 export interface EventStream { close(): void }
 export type EventHandlers = Record<string, (data: any) => void>;
 export type StreamFactory = (path: string, handlers: EventHandlers, onState?: (open: boolean) => void) => EventStream;
@@ -9,7 +11,7 @@ let factory: StreamFactory = (path, handlers, onState) => {
   for (const [name, fn] of Object.entries(handlers)) {
     es.addEventListener(name, (ev) => {
       let data: unknown = null;
-      try { data = JSON.parse((ev as MessageEvent).data); } catch { /* event without JSON data */ }
+      try { data = parseJSON((ev as MessageEvent).data); } catch { /* event without JSON data */ }
       fn(data);
     });
   }

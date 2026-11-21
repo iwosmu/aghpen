@@ -16,7 +16,8 @@ export default function Login() {
   const navigate = useNavigate();
   const loc = useLocation();
   const lang = getLang();
-  const fixtures = import.meta.env.DEV && import.meta.env.VITE_FIXTURES === '1';
+  const fixtures = __CZUJKA_FIXTURES__;
+  const expired = Boolean((loc.state as { expired?: boolean } | null)?.expired);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -30,9 +31,9 @@ export default function Login() {
       const from = (loc.state as { from?: string } | null)?.from;
       navigate(from && from !== '/login' ? from : '/', { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 401
-        ? new Error(t('Nieprawidłowy adres e-mail lub hasło.', 'Wrong e-mail address or password.'))
-        : err);
+      if (err instanceof ApiError && err.status === 401) setError(new Error(t('Nieprawidłowy adres e-mail lub hasło.', 'Wrong e-mail address or password.')));
+      else if (err instanceof ApiError && err.status === 429) setError(new Error(t('Zbyt wiele nieudanych prób. Logowanie jest chwilowo zablokowane, spróbuj ponownie za kilka minut.', 'Too many failed attempts. Sign-in is locked for a while, try again in a few minutes.')));
+      else setError(err);
     } finally {
       setBusy(false);
     }
@@ -74,6 +75,12 @@ export default function Login() {
           </div>
           <h1 className="text-lg font-semibold">{t('Logowanie', 'Sign in')}</h1>
           <p className="mt-1 text-sm text-ink-2">{t('Konsola analityka bezpieczeństwa.', 'Security analyst console.')}</p>
+          {expired && !error ? (
+            <p role="status" data-testid="session-expired" className="mt-4 flex items-start gap-2 border border-rule bg-sunk px-3 py-2 text-xs text-ink-2">
+              <Icon name="clock" size={14} className="mt-px flex-none text-ink-3" />
+              {t('Sesja wygasła. Zaloguj się ponownie, a wrócisz do tej samej strony.', 'The session has expired. Sign in again and you return to the same page.')}
+            </p>
+          ) : null}
           <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
             <Field label={t('Adres e-mail', 'E-mail address')}>
               <input className="field" type="email" name="email" autoComplete="username" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -81,7 +88,7 @@ export default function Login() {
             <Field label={t('Hasło', 'Password')}>
               <input className="field" type="password" name="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </Field>
-            <InlineError error={error} />
+            <div data-testid="login-error"><InlineError error={error} /></div>
             <button type="submit" disabled={busy || !email || !password} className="flex h-[34px] w-full items-center justify-center gap-2 rounded-sm bg-accent text-sm font-medium text-accent-ink hover:bg-accent-strong disabled:opacity-50">
               {busy ? t('Logowanie…', 'Signing in…') : t('Zaloguj się', 'Sign in')}
               <Icon name="arrowRight" />

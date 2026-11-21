@@ -153,6 +153,7 @@ export function DataTable<T>(p: TableProps<T>) {
 }
 
 export function Pager({ total, limit, offset, onOffset }: { total: number; limit: number; offset: number; onOffset: (o: number) => void }) {
+  if (total === 0) return null;
   if (total <= limit && offset === 0) {
     return <div className="border-t border-rule px-4 py-2 text-xs text-ink-3 sm:px-6">{fmtInt(total)} {t('wierszy', 'rows')}</div>;
   }

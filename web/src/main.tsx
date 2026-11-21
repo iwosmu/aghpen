@@ -4,9 +4,10 @@ import './index.css';
 import App from './App';
 
 async function boot() {
-  // Dev-only fixture layer. The condition is a build-time constant, so the
-  // production bundle contains neither this branch nor the fixtures chunk.
-  if (import.meta.env.DEV && import.meta.env.VITE_FIXTURES === '1') {
+  // Dev-only fixture layer. __CZUJKA_FIXTURES__ is a compile-time constant that
+  // is false in every build (vite.config.ts), so the production bundle contains
+  // neither this branch nor the fixtures chunk.
+  if (__CZUJKA_FIXTURES__) {
     const fx = await import('./fixtures');
     fx.install();
   }

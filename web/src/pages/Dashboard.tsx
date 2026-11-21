@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import { useItem } from '../api/hooks';
-import type { Change, Dashboard as Dash, RunMap, ScanRun } from '../api/types';
+import { useItem, usePage } from '../api/hooks';
+import type { Change, Dashboard as Dash, RunMap, ScanProfile, ScanRun, Scope } from '../api/types';
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtSigned } from '../lib/format';
 import { useLiveRun, useNow } from '../lib/hooks';
@@ -206,15 +206,126 @@ function RecentChanges({ changes }: { changes: Change[] }) {
   );
 }
 
+function SafetyPanel({ st }: { st: Dash['safety'] }) {
+  const { can } = useSession();
+  return (
+    <Panel title={t('Bezpieczeństwo skanowania', 'Scan safety')} actions={<Link to="/admin?tab=safety" className="link">{can('safety:manage') ? t('Polityka', 'Policy') : t('Podgląd polityki', 'View the policy')}</Link>}>
+      <p className={cx('mb-2 flex items-center gap-2 text-sm font-medium', st.emergency_stop ? 'text-danger' : 'text-ink')}>
+        <Icon name={st.emergency_stop ? 'stop' : 'shield'} className={st.emergency_stop ? '' : 'text-st-new'} />
+        {st.emergency_stop ? t('Stop awaryjny aktywny', 'Emergency stop is active') : t('Skaner działa w trybie bezpiecznej detekcji', 'The scanner runs in safe-detection mode')}
+      </p>
+      <dl>
+        <Stat label={t('Limit pakietów', 'Packet cap')} value={<>{fmtInt(st.max_pps)} <span className="font-sans text-xs font-normal text-ink-3">pps</span></>} />
+        <Stat label={t('Limit żądań HTTP', 'HTTP request cap')} value={<>{st.max_http_rps} <span className="font-sans text-xs font-normal text-ink-3">{t('na s, ', 'per s, ')}{st.max_per_host_rps} {t('na host', 'per host')}</span></>} />
+        <Stat label={t('Metody HTTP', 'HTTP methods')} value={(st.allowed_methods ?? []).join(', ')} />
+        <Stat label={t('Wykluczenia', 'Exclusions')} value={(st.exclusions ?? []).length} />
+        <Stat label={t('Stop awaryjny', 'Emergency stop')} value={<HostlessState on={st.emergency_stop} />} mono={false} />
+      </dl>
+    </Panel>
+  );
+}
+
+interface Step { done: boolean; title: string; text: string; state?: string; to?: string; cta?: string; blocked?: string }
+
+/** A fresh installation: no scan and no imported result yet. Says what to do next, in order. */
+function FirstRun({ d }: { d: Dash }) {
+  const { can } = useSession();
+  const scopes = usePage<Scope>('/scopes', { limit: 1 }, can('targets:read'));
+  const profiles = usePage<ScanProfile>('/profiles', { limit: 50 }, can('scans:read'));
+  const health = useItem<{ engine?: boolean }>('/healthz', undefined, { staleTime: 60_000 });
+  const addresses = d.headline.addresses_in_scope;
+  const hasTargets = addresses > 0;
+  const list = profiles.data?.items ?? [];
+  const ready = list.find((p) => p.enabled && (p.scope_ids ?? []).length > 0);
+  const first = list[0];
+  const engineOff = health.data?.engine === false;
+  const steps: Step[] = [
+    {
+      done: hasTargets,
+      title: t('Dodaj cele', 'Add targets'),
+      text: t('Utwórz zakres i wpisz sieci, które wolno skanować. Skaner nigdy nie wychodzi poza tę listę.', 'Create a scope and enter the networks that may be scanned. The scanner never leaves this list.'),
+      state: hasTargets ? fmtInt(addresses) + ' ' + plural(addresses, ['adres w zakresie', 'adresy w zakresie', 'adresów w zakresie'], ['address in scope', 'addresses in scope']) : (scopes.data?.total ? t('zakres istnieje, brakuje w nim celów', 'a scope exists, it has no target yet') : undefined),
+      to: '/targets', cta: can('targets:create') ? t('Otwórz cele', 'Open targets') : t('Zobacz cele', 'View targets'),
+    },
+    {
+      done: Boolean(ready),
+      title: t('Przygotuj profil skanu', 'Prepare a scan profile'),
+      text: first && !ready
+        ? t('Profil „' + first.name + '” jest gotowy. Przypisz mu zakres, ustaw tempo i okna czasowe.', 'The profile "' + first.name + '" is ready. Give it a scope, then set the rate and the time windows.')
+        : t('Profil łączy zakresy z portami, tempem i oknami czasowymi.', 'A profile joins scopes with ports, rate and time windows.'),
+      state: ready ? t('profil „' + ready.name + '” ma przypisany zakres', 'the profile "' + ready.name + '" has a scope') : undefined,
+      to: can('scans:configure') ? (first ? '/profiles/' + first.id : '/profiles/new') : '/profiles',
+      cta: can('scans:configure') ? t('Otwórz profil', 'Open the profile') : t('Zobacz profile', 'View profiles'),
+    },
+    {
+      done: false,
+      title: t('Uruchom pierwszy skan', 'Start the first scan'),
+      text: t('Przebieg pokaże postęp na mapie przestrzeni adresowej. Po nim pulpit powie, co działa w sieci i co się zmieniło.', 'The run shows its progress on the address-space map. After it the dashboard says what is on the network and what changed.'),
+      blocked: engineOff ? t('Silnik skanowania nie jest podłączony w tej instalacji. Zaimportuj wyniki z pliku.', 'The scan engine is not connected in this installation. Import results from a file.') : undefined,
+      to: '/profiles', cta: can('scans:run') ? t('Przejdź do uruchomienia', 'Go to start') : undefined,
+    },
+  ];
+  const next = steps.findIndex((s) => !s.done);
+  return (
+    <section aria-labelledby="first-run-title" data-testid="first-run">
+      <h2 id="first-run-title" className="text-xl font-semibold tracking-[-0.015em]">{t('Czujka nie ma jeszcze danych o sieci.', 'Czujka has no data about the network yet.')}</h2>
+      <p className="mt-2 max-w-[70ch] text-base text-ink-2">{t('Trzy kroki dzielą tę instalację od pierwszego obchodu. Każdy krok można wykonać teraz albo wrócić do niego później.', 'Three steps stand between this installation and its first watch. Do each step now or come back to it later.')}</p>
+      <ol className="mt-4 border-y border-rule">
+        {steps.map((s, i) => (
+          <li key={s.title} className="grid grid-cols-[28px_minmax(0,1fr)] items-start gap-x-3 gap-y-2 border-b border-rule py-3 last:border-b-0 sm:grid-cols-[28px_minmax(0,1fr)_auto]">
+            <span className={cx('num mt-px flex h-[22px] w-[22px] items-center justify-center border text-xs', s.done ? 'border-st-new text-st-new' : i === next ? 'border-accent text-ink' : 'border-rule-strong text-ink-3')} aria-hidden="true">
+              {s.done ? <Icon name="check" size={12} /> : i + 1}
+            </span>
+            <div className="min-w-0">
+              <p className={cx('text-sm font-medium', s.done ? 'text-ink-2' : 'text-ink')}>{s.title}<span className="sr-only">{s.done ? ' (' + t('zrobione', 'done') + ')' : ''}</span></p>
+              <p className="mt-0.5 max-w-[72ch] text-sm text-ink-2">{s.text}</p>
+              {s.state ? <p className="mt-1 text-xs text-ink-3">{s.state}</p> : null}
+              {s.blocked ? <p className="mt-1 flex items-start gap-1.5 text-xs text-ink-2"><Icon name="info" size={12} className="mt-0.5 flex-none text-ink-3" />{s.blocked}</p> : null}
+            </div>
+            {s.cta && s.to ? (
+              <Link to={s.to} className={cx('col-start-2 inline-flex h-[30px] items-center gap-1.5 justify-self-start whitespace-nowrap border px-3 text-sm sm:col-start-3 sm:justify-self-end', i === next && !s.blocked ? 'border-accent bg-accent font-medium text-accent-ink hover:bg-accent-strong' : 'border-rule-strong text-ink hover:bg-raised')}>
+                {s.cta}<Icon name="arrowRight" size={12} />
+              </Link>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+      {can('results:create') ? (
+        <p className="mt-3 flex flex-wrap items-center gap-x-2 text-sm text-ink-2">
+          <Icon name="upload" size={14} className="text-ink-3" />
+          {t('Masz już wyniki z nmap? Nie potrzebujesz skanu:', 'You already have nmap results? No scan is needed:')}
+          <Link to="/transfer" className="link">{t('zaimportuj plik XML', 'import the XML file')}</Link>
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const q = useItem<Dash>('/dashboard', undefined, { refetchInterval: 60_000 });
   const now = useNow();
-  const { can } = useSession();
   if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
   if (!q.data) return <div className="p-4 sm:p-6"><div className="skeleton mb-3 h-8 w-[min(520px,80%)]" /><div className="skeleton mb-6 h-4 w-[min(380px,60%)]" /><SkeletonRows rows={10} /></div>;
   const d = q.data;
   void now;
   const st = d.safety;
+  const h0 = d.headline;
+  const fresh = !d.last_run && !d.active_run && h0.hosts_up + h0.hosts_down + h0.hosts_unstable + h0.services_open + h0.findings_open + h0.changes_unacked === 0;
+  if (fresh) {
+    return (
+      <div className="mx-auto max-w-[1480px] space-y-5 p-4 sm:p-6">
+        <h1 className="sr-only">{t('Pulpit', 'Dashboard')}</h1>
+        <div className="grid gap-x-10 gap-y-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <FirstRun d={d} />
+          <div className="space-y-4">
+            <SafetyPanel st={st} />
+            <IdleRun d={d} />
+          </div>
+        </div>
+        <p className="pb-2 text-2xs text-ink-3">{t('Stan na', 'As of')} {fmtDateTime(d.generated_at)}</p>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto max-w-[1480px] space-y-4 p-4 sm:p-6">
       <h1 className="sr-only">{t('Pulpit', 'Dashboard')}</h1>
@@ -316,19 +427,7 @@ export default function Dashboard() {
             })}
           </ul>
         </Panel>
-        <Panel title={t('Bezpieczeństwo skanowania', 'Scan safety')} actions={<Link to="/admin?tab=safety" className="link">{can('safety:manage') ? t('Polityka', 'Policy') : t('Podgląd polityki', 'View the policy')}</Link>}>
-          <p className={cx('mb-2 flex items-center gap-2 text-sm font-medium', st.emergency_stop ? 'text-danger' : 'text-ink')}>
-            <Icon name={st.emergency_stop ? 'stop' : 'shield'} className={st.emergency_stop ? '' : 'text-st-new'} />
-            {st.emergency_stop ? t('Stop awaryjny aktywny', 'Emergency stop is active') : t('Skaner działa w trybie bezpiecznej detekcji', 'The scanner runs in safe-detection mode')}
-          </p>
-          <dl>
-            <Stat label={t('Limit pakietów', 'Packet cap')} value={<>{fmtInt(st.max_pps)} <span className="font-sans text-xs font-normal text-ink-3">pps</span></>} />
-            <Stat label={t('Limit żądań HTTP', 'HTTP request cap')} value={<>{st.max_http_rps} <span className="font-sans text-xs font-normal text-ink-3">{t('na s, ', 'per s, ')}{st.max_per_host_rps} {t('na host', 'per host')}</span></>} />
-            <Stat label={t('Metody HTTP', 'HTTP methods')} value={(st.allowed_methods ?? []).join(', ')} />
-            <Stat label={t('Wykluczenia', 'Exclusions')} value={(st.exclusions ?? []).length} />
-            <Stat label={t('Stop awaryjny', 'Emergency stop')} value={<HostlessState on={st.emergency_stop} />} mono={false} />
-          </dl>
-        </Panel>
+        <SafetyPanel st={st} />
       </div>
       <p className="pb-2 text-2xs text-ink-3">{t('Stan na', 'As of')} {fmtDateTime(d.generated_at)}</p>
     </div>

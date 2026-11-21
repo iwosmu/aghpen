@@ -31,7 +31,8 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 10_000,
       refetchOnWindowFocus: false,
-      retry: (count, err) => !(err instanceof ApiError && err.status >= 400 && err.status < 500) && count < 2,
+      // A 4xx answer and a 501 (module not connected) do not change on a second try.
+      retry: (count, err) => !(err instanceof ApiError && ((err.status >= 400 && err.status < 500) || err.status === 501)) && count < 2,
     },
   },
 });

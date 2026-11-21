@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
+import { NextSteps } from '../ui/NextSteps';
 import { usePage } from '../api/hooks';
 import type { Service, ServiceGroup } from '../api/types';
 import { t, plural } from '../i18n';
@@ -95,7 +96,7 @@ export default function Services() {
         <DataTable
           rows={list.data?.items} cols={cols} rowKey={(s) => s.id} rowHref={(s) => '/services/' + s.id} loading={list.isPending} error={list.error} retry={() => list.refetch()} dim={list.isPlaceholderData}
           sort={u.get('sort', '-interest')} onSort={(s) => u.set({ sort: s })} rowClass={(s) => (s.state === 'gone' ? 'text-ink-3' : undefined)}
-          empty={<Empty icon="services" title={active ? t('Żadna usługa nie pasuje do filtrów', 'No service matches the filters') : t('Nie ma jeszcze żadnej usługi', 'There is no service yet')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Usługi pojawią się po pierwszym skanie.', 'Services appear after the first scan.')} />}
+          empty={<Empty icon="services" title={active ? t('Żadna usługa nie pasuje do filtrów', 'No service matches the filters') : t('Nie ma jeszcze żadnej usługi', 'There is no service yet')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Usługi pojawią się po pierwszym skanie albo po imporcie wyników.', 'Services appear after the first scan or after an import of results.')} action={active ? undefined : <NextSteps />} />}
           mobile={(s) => (
             <div>
               <div className="flex items-center justify-between gap-2"><span className="mono text-sm">{s.ip}:{s.port}</span><InterestScore value={s.interest} /></div>

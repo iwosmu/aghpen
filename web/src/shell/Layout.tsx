@@ -9,6 +9,7 @@ import { roleLabel, roleScope, useSession } from '../session';
 import { invalidate, useAction, useItem, usePage } from '../api/hooks';
 import { post } from '../api/client';
 import { openStream } from '../api/events';
+import { ErrorBoundary } from '../ui/ErrorBoundary';
 import type { Permission, SafetyPolicy, ScanRun } from '../api/types';
 import { Glyph } from '../ui/marks';
 
@@ -287,7 +288,7 @@ export function Layout() {
         </div>
         <StopBanner policy={safety.data} />
         <main id="main" className="min-h-0 flex-1 overflow-y-auto" tabIndex={-1}>
-          <Outlet />
+          <ErrorBoundary key={loc.pathname}><Outlet /></ErrorBoundary>
         </main>
       </div>
     </div>

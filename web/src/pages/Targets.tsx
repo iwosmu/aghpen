@@ -29,7 +29,7 @@ export function PreviewReport({ p, pending }: { p: TargetPreview; pending?: bool
         {cell(p.valid.length, plural(p.valid.length, ['poprawny wpis', 'poprawne wpisy', 'poprawnych wpisów'], ['valid entry', 'valid entries']), 'check', 'new')}
         {cell(p.invalid.length, plural(p.invalid.length, ['błędny', 'błędne', 'błędnych'], ['invalid', 'invalid']), 'x', 'gone')}
         {cell(p.duplicates, plural(p.duplicates, ['duplikat', 'duplikaty', 'duplikatów'], ['duplicate', 'duplicates']), 'ring', 'changed')}
-        {cell(p.excluded, t('adresów wykluczonych polityką', 'addresses excluded by the policy'), 'dashring', 'changed')}
+        {cell(p.excluded, plural(p.excluded, ['adres wykluczony polityką', 'adresy wykluczone polityką', 'adresów wykluczonych polityką'], ['address excluded by the policy', 'addresses excluded by the policy']), 'dashring', 'changed')}
       </div>
       <p className="mt-2 border-t border-rule pt-2 text-sm">{t('Do zakresu trafi ', 'The scope gains ')}<span className="num text-base font-semibold">{fmtInt(p.address_count)}</span> {plural(p.address_count, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}.</p>
       {p.invalid.length ? (

@@ -47,7 +47,9 @@ export function useLiveRun(id: number | null | undefined, opts?: { withChunks?: 
   const [recent, setRecent] = useState<(HostEvent & { at: number })[]>([]);
   const [connected, setConnected] = useState(false);
   const status = run.data?.status;
-  const live = status === 'running' || status === 'analyzing' || status === 'queued' || status === 'paused';
+  // The server ends the stream of a paused or finished run right after its state, so only an
+  // active run keeps a stream. A resume arrives through the global "run" event (Layout).
+  const live = status === 'running' || status === 'analyzing' || status === 'queued';
   useEffect(() => {
     if (!id || !live) return;
     const s = openStream('/runs/' + id + '/events', {
@@ -60,7 +62,13 @@ export function useLiveRun(id: number | null | undefined, opts?: { withChunks?: 
         if (c.status === 'done') invalidate(qc, '/runs/' + id + '/map');
       },
       host: (h: HostEvent) => setRecent((cur) => [{ ...h, at: Date.now() }, ...cur].slice(0, 12)),
-      done: () => { invalidate(qc, '/runs', '/dashboard', '/changes', '/hosts', '/services', '/findings'); },
+      done: (r: ScanRun | null) => {
+        // "done" is the last event: close, or EventSource reconnects to a stream that ends again.
+        s.close();
+        setConnected(false);
+        if (r && r.id) qc.setQueryData(['/runs/' + id, {}], r);
+        invalidate(qc, '/runs', '/dashboard', '/changes', '/hosts', '/services', '/findings');
+      },
     }, setConnected);
     return () => { s.close(); setConnected(false); };
   }, [id, live, qc, opts?.withChunks]);
