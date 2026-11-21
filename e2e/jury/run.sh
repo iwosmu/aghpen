@@ -257,6 +257,15 @@ if want quickstart && [ -n "$DEFPROF" ]; then
   scan "quickstart up again, default profile" "$DEFPROF"
   open_row "quickstart, default profile: 8787 open again" 8787 ""
   change_row "quickstart, default profile: 8787 reported as back" 8787 '^service_returned$' 'wróci' ""
+  # Negative: a run whose port list does not name 8787, right after a run that found it: 8787 stays open, no change.
+  P3=$(api GET "/profiles?limit=100" | jq -r '[.items[] | select(.name == "Szablon jury (e2e): quickstart bez 8787")][0].id // empty')
+  [ -n "$P3" ] || P3=$(api GET "/profiles/$PROF" | jq -c 'del(.id, .created_at, .updated_at, .next_run_at, .last_run_id) | .name = "Szablon jury (e2e): quickstart bez 8787" | .ports = "2223,3001,5673,15673"' \
+    | { read -r body; api POST /profiles "$body"; } | jq -r .id)
+  scan "quickstart, a run that does not name 8787" "$P3"
+  open_row "run without 8787 in its port list: 8787 stays open" 8787 ""
+  c=$(echo "$CH" | jq -r '[.items[] | select(.port == 8787) | .kind] | join(",")')
+  [ -z "$c" ] && ok=1 || ok=0
+  row scenario 8787 change "run without 8787 in its port list: no change on 8787" "" $ok "${c:-none in run $RUN}"
 fi
 
 if want custom-network; then
