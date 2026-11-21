@@ -414,7 +414,8 @@ type groupStats struct {
 	services int
 	http     int
 	packets  int64
-	hosts    []model.HostResult // reported to the sink when the group is final
+	hosts    []model.HostResult      // reported to the sink when the group is final
+	interim  map[string]interimCount // partial results already stored, not yet final
 }
 
 func (r *run) runGroup(ctx context.Context, g *group, want int) {
@@ -448,10 +449,14 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 	switch {
 	case ctx.Err() != nil:
 		status = model.ChunkDeferred
+		var pi interimCount
+		for _, c := range gs.interim {
+			pi.hosts, pi.open, pi.web = pi.hosts+c.hosts, pi.open+c.open, pi.web+c.web
+		}
 		r.stats.update(func(s *model.RunStats) {
-			s.HostsUp -= gs.hostsUp
-			s.ServicesOpen -= gs.services
-			s.HTTPServices -= gs.http
+			s.HostsUp -= gs.hostsUp + pi.hosts
+			s.ServicesOpen -= gs.services + pi.open
+			s.HTTPServices -= gs.http + pi.web
 		})
 	case err != nil:
 		status = model.ChunkFailed

@@ -195,7 +195,7 @@ func (m *memSink) OnProgress(_ context.Context, _ int64, s model.RunStats) error
 func (m *memSink) host(ip string) *model.HostResult {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for i := range m.hosts {
+	for i := len(m.hosts) - 1; i >= 0; i-- { // the last report: a partial one may come first
 		if m.hosts[i].IP == ip {
 			return &m.hosts[i]
 		}
@@ -950,5 +950,49 @@ func TestQuickPathHTTPStopsSlowVersionDetection(t *testing.T) {
 				t.Errorf("http = %+v", s)
 			}
 		}
+	}
+}
+
+// slowSSH is a network whose version detection on port 22 takes a while,
+// like nmap on AMQP (22 s).
+type slowSSH struct{ *fakeNet }
+
+func (s slowSSH) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*probe.Result, error) {
+	if len(req.Hosts) == 1 && len(req.Hosts[0].Ports) == 1 && req.Hosts[0].Ports[0] == 22 {
+		select {
+		case <-ctx.Done():
+			return nil, context.Cause(ctx)
+		case <-time.After(300 * time.Millisecond):
+		}
+	}
+	return s.fakeNet.ServiceScan(ctx, req)
+}
+
+func TestQuickPathStoresAPartialResultFirst(t *testing.T) {
+	netw := slowSSH{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 80, 8080}}}}
+	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	plan.Policy.MaxPerHostRPS = 100
+	sink := newSink()
+	out := e.Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	sink.mu.Lock()
+	reports := append([]model.HostResult(nil), sink.hosts...)
+	sink.mu.Unlock()
+	if len(reports) != 2 {
+		t.Fatalf("reports = %d, want a partial one and the final one", len(reports))
+	}
+	part, final := reports[0], reports[1]
+	if !part.PortsUnknown || part.Services[1].HTTP == nil || part.Services[0].Product != "" {
+		t.Errorf("partial = %+v", part)
+	}
+	if final.PortsUnknown || final.Services[0].Product != "OpenSSH" {
+		t.Errorf("final = %+v", final)
+	}
+	if out.Stats.HostsUp != 1 || out.Stats.ServicesOpen != 3 || out.Stats.HTTPServices != 2 {
+		t.Errorf("stats counted the partial result twice: %+v", out.Stats)
 	}
 }

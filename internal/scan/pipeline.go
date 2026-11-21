@@ -586,19 +586,20 @@ func nameService(s *model.ServiceResult) {
 func (r *run) emitHost(g *group, gs *groupStats, res model.HostResult) {
 	gs.mu.Lock()
 	gs.hosts = append(gs.hosts, res)
+	prev, hadInterim := gs.interim[res.IP]
+	delete(gs.interim, res.IP)
 	gs.mu.Unlock()
+	if hadInterim { // the final result replaces the stored partial one in the counters
+		r.stats.update(func(s *model.RunStats) {
+			s.HostsUp -= prev.hosts
+			s.ServicesOpen -= prev.open
+			s.HTTPServices -= prev.web
+		})
+	}
 	if !res.Up {
 		return
 	}
-	open, web := 0, 0
-	for _, s := range res.Services {
-		if s.State == "open" {
-			open++
-		}
-		if s.HTTP != nil {
-			web++
-		}
-	}
+	open, web := serviceCounts(res)
 	gs.mu.Lock()
 	gs.hostsUp++
 	gs.services += open
@@ -612,6 +613,49 @@ func (r *run) emitHost(g *group, gs *groupStats, res model.HostResult) {
 		s.ServicesOpen += open
 		s.HTTPServices += web
 	})
+}
+
+func serviceCounts(res model.HostResult) (open, web int) {
+	for _, s := range res.Services {
+		if s.State == "open" {
+			open++
+		}
+		if s.HTTP != nil {
+			web++
+		}
+	}
+	return open, web
+}
+
+// interimCount is what a stored partial result added to the run counters.
+type interimCount struct{ hosts, open, web int }
+
+// interimHost stores a partial result of a host before its group ends, so
+// GET /services shows it while the run goes on. It is marked PortsUnknown:
+// the store then marks none of the host's other services gone (the final
+// result does that). The counters grow now; emitHost replaces the partial
+// numbers with the final ones, and a deferred group takes them back.
+func (r *run) interimHost(gs *groupStats, res model.HostResult) {
+	if !res.Up {
+		return
+	}
+	res.PortsUnknown = true
+	open, web := serviceCounts(res)
+	gs.mu.Lock()
+	if gs.interim == nil {
+		gs.interim = map[string]interimCount{}
+	}
+	prev := gs.interim[res.IP]
+	gs.interim[res.IP] = interimCount{1, open, web}
+	gs.mu.Unlock()
+	r.stats.update(func(s *model.RunStats) {
+		s.HostsUp += 1 - prev.hosts
+		s.ServicesOpen += open - prev.open
+		s.HTTPServices += web - prev.web
+	})
+	if err := r.sink.OnHost(r.sinkCtx, res); err != nil {
+		r.log.Warn("sink OnHost (partial) failed", "ip", res.IP, "error", err.Error())
+	}
 }
 
 // portScanTimeout is nmap's --host-timeout for one port-scan process. nmap
@@ -749,6 +793,9 @@ func (r *run) quickHosts(ctx context.Context, g *group, up []probe.Host, attempt
 		go func() {
 			defer wg.Done()
 			results[i] = r.quickHost(ctx, h, attempts, share, procs, gs, g.v6)
+			if unknown[h.IP] {
+				results[i].PortsUnknown, results[i].Reason = true, model.ReasonPortsUnknown
+			}
 		}()
 	}
 	wg.Wait()
@@ -765,9 +812,6 @@ func (r *run) quickHosts(ctx context.Context, g *group, up []probe.Host, attempt
 			nameService(&s)
 			r.match(&s, res.Hostnames)
 			res.Services = append(res.Services, s)
-		}
-		if unknown[res.IP] {
-			res.PortsUnknown, res.Reason = true, model.ReasonPortsUnknown
 		}
 		r.emitHost(g, gs, res)
 	}
@@ -828,7 +872,30 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 			}
 		}
 	})
-	svwg.Wait()
+	svDone := make(chan struct{})
+	go func() { svwg.Wait(); close(svDone) }()
+	select {
+	case <-svDone:
+	default:
+		// version detection still runs (a slow protocol): store what is known
+		mu.Lock()
+		part := quickMerge(res, detected)
+		mu.Unlock()
+		r.finishHost(&part)
+		if ctx.Err() == nil {
+			r.interimHost(gs, part)
+		}
+		<-svDone
+	}
+	res = quickMerge(res, detected)
+	r.finishHost(&res)
+	return res
+}
+
+// quickMerge returns a copy of res with the version-detection answers in
+// detected, and the HTTP-named ports renamed by their page (see quickHost).
+func quickMerge(res model.HostResult, detected map[int]probe.Port) model.HostResult {
+	res.Services = append([]model.ServiceResult(nil), res.Services...)
 	for i := range res.Services {
 		s := &res.Services[i]
 		d, ok := detected[s.Port]
@@ -851,6 +918,5 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 			s.Tunnel = d.Tunnel
 		}
 	}
-	r.finishHost(&res)
 	return res
 }
