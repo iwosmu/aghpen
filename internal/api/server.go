@@ -13,9 +13,11 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/time/rate"
 
 	"github.com/iwosmu/aghpen/internal/auth"
 	"github.com/iwosmu/aghpen/internal/model"
@@ -32,7 +34,18 @@ type Server struct {
 	lookup  runner.LookupFunc
 	handler http.Handler
 	mux     chi.Routes
+	// anonAudit bounds the audit entries of requests without a session
+	// (failed logins, rejected calls): anyone who reaches the port can send
+	// them (security review M4). anonDropped counts the entries it dropped.
+	anonAudit   *rate.Limiter
+	anonDropped atomic.Int64
 }
+
+// Audit budget of requests without a session: a burst, then one per second.
+const (
+	anonAuditPerSec = 1
+	anonAuditBurst  = 60
+)
 
 // New builds the server and its routes.
 func New(d Deps) *Server {
@@ -45,7 +58,7 @@ func New(d Deps) *Server {
 	if d.Version == "" {
 		d.Version = "dev"
 	}
-	s := &Server{d: d, st: d.Store, log: d.Logger, targets: d.TargetParser, lookup: d.Lookup}
+	s := &Server{d: d, st: d.Store, log: d.Logger, targets: d.TargetParser, lookup: d.Lookup, anonAudit: rate.NewLimiter(anonAuditPerSec, anonAuditBurst)}
 	if s.targets == nil {
 		s.targets = BasicTargetParser{}
 	}
@@ -694,6 +707,15 @@ func (s *Server) audit(next http.Handler) http.Handler {
 		a.detail["path"] = r.URL.Path
 		if sw.status >= 400 {
 			a.detail["ok"] = false
+		}
+		if a.user == nil {
+			if !s.anonAudit.Allow() {
+				s.anonDropped.Add(1)
+				return
+			}
+			if n := s.anonDropped.Swap(0); n > 0 {
+				a.detail["dropped_before"] = n // entries without a session dropped by the budget
+			}
 		}
 		e := model.AuditEntry{Action: action, Entity: entity, EntityID: a.entityID, Detail: a.detail, IP: s.clientIP(r)}
 		if a.user != nil {

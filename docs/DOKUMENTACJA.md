@@ -75,7 +75,7 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 
 | Polecenie | Do czego |
 | --- | --- |
-| `czujka` (`cmd/czujka`) | produkt: `serve`, `migrate`, `user create`, `rotate-key`, `genkey`, `healthcheck`, `doctor` (diagnoza instalacji), `backup` i `restore` (kopia szyfrowana), `version` |
+| `czujka` (`cmd/czujka`) | produkt: `serve`, `migrate`, `user create`, `user unlock`, `rotate-key`, `genkey`, `healthcheck`, `doctor` (diagnoza instalacji), `backup` i `restore` (kopia szyfrowana), `version` |
 | `scanprobe` (`cmd/scanprobe`) | sam silnik skanu, bez bazy i API |
 | `fpprobe` (`cmd/fpprobe`) | kolektor HTTP/TLS i sygnatury dla jednego adresu; walidacja sygnatur |
 | `dojoprobe` (`cmd/dojoprobe`) | import, konwersja formatów, wysyłka do DefectDojo |

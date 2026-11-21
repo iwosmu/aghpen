@@ -139,7 +139,7 @@ curl -s -b jar.txt -H "X-CSRF-Token: $CSRF" -X POST $C/auth/logout
 ```
 
 - The profile needs a scope: a profile without one answers 422 `profil nie ma zakresu`. „Ten komputer” in the UI creates a profile with a scope.
-- The session lasts `CZUJKA_SESSION_TTL` (default 12 h). Logins are rate limited (`CZUJKA_LOGIN_RATE_PER_MIN`) and locked after `CZUJKA_LOGIN_MAX_FAILURES` failures.
+- The session lasts `CZUJKA_SESSION_TTL` (default 12 h). Logins are rate limited per address (`CZUJKA_LOGIN_RATE_PER_MIN`, 429) and an account is locked for `CZUJKA_LOGIN_LOCKOUT` after `CZUJKA_LOGIN_MAX_FAILURES` failures; the counter starts again when a lock expires. A locked account answers exactly like an unknown account or a wrong password (401 `unauthorized`, "invalid e-mail or password"); only the audit entry says `reason: locked`. `czujka user unlock EMAIL` clears a lock. The login body is at most 8 KiB and the audited e-mail at most 254 characters. Requests without a session (failed logins, rejected calls) are audited within a budget (a burst of 60, then 1 per second); the next written entry carries `dropped_before` with the count of dropped ones.
 - Use an account with only the permissions the script needs (for example a custom role with `scans:run` and `export:run`).
 
 ## Alert webhook
