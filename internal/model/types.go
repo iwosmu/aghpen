@@ -386,6 +386,9 @@ type RunStats struct {
 	// Warnings are the engine's sanity checks that failed: the run ended,
 	// but its result is not complete. The API and the UI show them.
 	Warnings []string `json:"warnings,omitempty"`
+	// Notes are facts about the run's coverage that the UI shows; unlike
+	// Warnings they are not failed checks (Polish text).
+	Notes []string `json:"notes,omitempty"`
 	// Passes lists the port passes of a run in execution order, only when
 	// the run has more than one (a small scope gets top ports, then the
 	// full range; the /16 gets a dense pass for hosts with many open ports).
@@ -509,6 +512,9 @@ type PassStat struct {
 	Hosts      int    `json:"hosts"`
 	PortsTotal int64  `json:"ports_total"`
 	PortsDone  int64  `json:"ports_done"`
+	// HostsSkipped: live hosts the pass did not cover (full_range: over the
+	// run's host budget; they got only the profile's ports).
+	HostsSkipped int `json:"hosts_skipped,omitempty"`
 }
 
 // Port pass names and states (RunStats.Passes).

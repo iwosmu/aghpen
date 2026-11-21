@@ -224,6 +224,11 @@ export default function RunDetail() {
             </span>
           </div>
         ) : null}
+        {s.notes && s.notes.length > 0 ? (
+          <div data-testid="run-notes" className="border border-rule bg-panel px-3 py-2 text-sm text-ink-2">
+            {s.notes.map((n) => <span key={n} className="block">{n}</span>)}
+          </div>
+        ) : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <section className="border border-rule bg-panel p-3">

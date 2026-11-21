@@ -828,6 +828,9 @@ const (
 // amqpHello reads an AMQP broker's product and version (a variable for tests).
 var amqpHello = probe.AMQPHello
 
+// amqpWait is how long nmap gets to name an AMQP port first.
+var amqpWait = 3 * time.Second
+
 const (
 	amqpTimeout = 3 * time.Second
 	amqpPackets = 10 // handshake, header, Connection.Start, close
@@ -995,14 +998,28 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 
 	// AMQP: the broker names its product and version right after the
 	// client's protocol header; nmap reaches its AMQP probe only after 22 s.
+	// Sent only to an open port that is AMQP's (5672, or a port nmap's port
+	// table names amqp) and that version detection has not named after
+	// amqpWait. Never to other unknown ports (docs/BEZPIECZENSTWO.md).
 	for _, p := range h.Ports {
-		if (p.Proto != "" && p.Proto != "tcp") || p.State != "open" || !(strings.EqualFold(p.Name, "amqp") || p.Port == 5672 || p.Port == 5673) {
+		if (p.Proto != "" && p.Proto != "tcp") || p.State != "open" || !(strings.EqualFold(p.Name, "amqp") || p.Port == 5672) {
 			continue
 		}
 		port := p.Port
 		svwg.Add(1)
 		go func() {
 			defer svwg.Done()
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(amqpWait):
+			}
+			mu.Lock()
+			named := detected[port].Product != ""
+			mu.Unlock()
+			if named {
+				return
+			}
 			t0 := r.e.now()
 			product, version, err := amqpHello(ctx, h.IP, port, amqpTimeout)
 			r.account(gs, &probe.Result{Packets: amqpPackets, PacketsExact: false}, t0)
@@ -1135,6 +1152,7 @@ func (r *run) claimFullRange(hosts []probe.Host, scanned map[string]*probe.Host)
 		left := r.fullLeft.Load()
 		if left < n {
 			r.log.Info("full port range skipped: too many live hosts", "hosts", n, "budget_left", left)
+			r.stats.passSkipHosts(model.PassFullRange, int(n))
 			return false
 		}
 		if r.fullLeft.CompareAndSwap(left, left-n) {

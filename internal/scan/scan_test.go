@@ -1215,7 +1215,11 @@ func (s slowAMQP) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*p
 
 func TestQuickPathReadsTheAMQPVersion(t *testing.T) {
 	defer func(f func(context.Context, string, int, time.Duration) (string, string, error)) { amqpHello = f }(amqpHello)
+	defer func(d time.Duration) { amqpWait = d }(amqpWait)
+	amqpWait = 10 * time.Millisecond
+	var sent []int
 	amqpHello = func(_ context.Context, ip string, port int, _ time.Duration) (string, string, error) {
+		sent = append(sent, port)
 		return "RabbitMQ", "4.3.8", nil
 	}
 	netw := slowAMQP{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 5672}}}}
@@ -1234,6 +1238,9 @@ func TestQuickPathReadsTheAMQPVersion(t *testing.T) {
 	h := sink.host("10.7.0.5")
 	if h == nil || h.Services[1].Name != "amqp" || h.Services[1].Product != "RabbitMQ" || h.Services[1].Version != "4.3.8" {
 		t.Fatalf("host = %+v", h)
+	}
+	if len(sent) != 1 || sent[0] != 5672 {
+		t.Errorf("AMQP header sent to %v: only the AMQP port may get it", sent)
 	}
 }
 
@@ -1263,5 +1270,20 @@ func TestQuickPathResultDoesNotDependOnTiming(t *testing.T) {
 			strings.Join(f.CPE, ",") != strings.Join(s.CPE, ",") || len(f.Technologies) != len(s.Technologies) {
 			t.Errorf("port %d: fast %+v\nslow %+v", f.Port, f, s)
 		}
+	}
+}
+
+func TestFullRangeBudgetLeavesANote(t *testing.T) {
+	k := newStatsKeeper(nil, time.Now)
+	k.addPass(model.PassTopPorts)
+	k.passBegin(model.PassFullRange, 16, 16*64535, 900)()
+	k.passSkipHosts(model.PassFullRange, 7)
+	k.finishPasses(true)
+	s := k.snapshot()
+	if len(s.Notes) != 1 || !strings.Contains(s.Notes[0], "objął 16 z 23") || len(s.Warnings) != 0 {
+		t.Fatalf("notes %q warnings %q", s.Notes, s.Warnings)
+	}
+	if p := s.Passes[1]; p.Hosts != 16 || p.HostsSkipped != 7 {
+		t.Errorf("pass = %+v", p)
 	}
 }

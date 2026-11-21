@@ -114,6 +114,8 @@ export interface RunStats {
   current_pps_basis?: 'measured' | 'pace' | '';
   /** engine sanity checks that failed: the run ended, but its result is not complete (Polish text) */
   warnings?: string[]; ports_unknown?: number;
+  /** facts about coverage, not failed checks (Polish text), e.g. the full-range host budget */
+  notes?: string[];
   /** port passes of a staged run (top ports, then the full range); absent = one pass */
   passes?: RunPass[];
 }
@@ -121,6 +123,8 @@ export interface RunStats {
 export interface RunPass {
   name: 'top_ports' | 'full_range' | 'dense' | string; state: 'pending' | 'running' | 'done' | 'skipped' | string;
   hosts: number; ports_total: number; ports_done: number;
+  /** live hosts the pass did not cover (full_range over its host budget) */
+  hosts_skipped?: number;
 }
 
 export interface RunDiffSummary {
