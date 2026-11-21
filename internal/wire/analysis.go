@@ -286,9 +286,46 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 	if err != nil {
 		return nil, err
 	}
+	// A manual entry or an imported file states only what it contains: per
+	// host, the ports it lists. The other services of the host are not
+	// compared (no false "gone"), and a response-time verdict needs a
+	// response time measured in this run.
+	// A port the source states closed is listed too: the ingest marked its
+	// service gone, and the diff reports it.
+	listedOnly := run.Trigger == "import" || run.Trigger == "manual-entry"
+	closedNow := map[int64]bool{}
+	listedPorts := map[int64]map[int]bool{}
+	if listedOnly {
+		var ids []int64
+		for _, m := range prevIDs {
+			for _, id := range m {
+				ids = append(ids, id)
+			}
+		}
+		if len(ids) > 0 {
+			err := a.st.EachService(ctx, store.ServiceFilter{IDs: ids, State: []string{string(model.ServiceGone)}}, func(s *model.Service) error {
+				closedNow[s.ID] = true
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 	obsStatus := make([]store.ObsStatus, 0, len(hosts))
 	for i := range hosts {
 		h := &hosts[i]
+		if listedOnly {
+			prevSvcs[h.HostID], prevIDs[h.HostID] = onlyListed(h.Services, prevSvcs[h.HostID], prevIDs[h.HostID], closedNow)
+			ports := map[int]bool{}
+			for _, s := range h.Services {
+				ports[s.Port] = true
+			}
+			for _, s := range prevSvcs[h.HostID] {
+				ports[s.Port] = true
+			}
+			listedPorts[h.HostID] = ports
+		}
 		as := assess[h.HostID]
 		obsStatus = append(obsStatus, store.ObsStatus{HostID: h.HostID, Status: string(as.Status)})
 		hs := analyze.HostSnapshot{HostID: h.HostID, IP: h.IP, Up: h.Up, Services: h.Services, ServiceIDs: h.ServiceIDs, PortsUnknown: h.HasUnknownPorts()}
@@ -298,7 +335,11 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 				if hs.History == nil {
 					hs.History = map[string]analyze.ServiceHistory{}
 				}
-				hs.History[key] = analyze.ServiceHistory{LastOpenRun: sh.LastOpenRun, LastOpenAt: sh.LastOpenAt, RunsAway: sh.RunsAway, Response: sh.Response}
+				resp := sh.Response
+				if listedOnly && !measuredResponse(h.Services, key) {
+					resp = nil // the source did not measure a response: no verdict on it
+				}
+				hs.History[key] = analyze.ServiceHistory{LastOpenRun: sh.LastOpenRun, LastOpenAt: sh.LastOpenAt, RunsAway: sh.RunsAway, Response: resp}
 			}
 		}
 		cur.Hosts = append(cur.Hosts, hs)
@@ -311,8 +352,8 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 	// (HostResult.Coverage: the profile's list, plus the dense or full-range
 	// pass when it finished), and carried the others into this run unchanged.
 	// Partial data (re-probes) does not mark at ingest: the profile's port
-	// list (for a re-probe, the probed ports) limits "gone". An imported file
-	// is a full view of the hosts it lists.
+	// list (for a re-probe, the probed ports) limits "gone". A manual entry
+	// or an imported file covers only the ports it lists (listedOnly below).
 	var opts analyze.DiffOptions
 	if hasProf && partialData(run.Trigger) {
 		opts.PortInScope = a.portScope(ctx, prof)
@@ -465,6 +506,9 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 			if f.Port != 0 && opts.PortInScope != nil && !opts.PortInScope("tcp", f.Port) && !opts.PortInScope("udp", f.Port) {
 				return nil // the run did not look at this port
 			}
+			if listedOnly && (f.Port == 0 || !listedPorts[f.HostID][f.Port]) {
+				return nil // an imported file says nothing about the ports it does not list
+			}
 			stale = append(stale, f.ID)
 			return nil
 		})
@@ -495,6 +539,48 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 		a.Notify.NotifyRun(ctx, runID)
 	}
 	return &sum, nil
+}
+
+// onlyListed keeps, of a host's previous services, those on the ports the
+// current result lists (manual entries and imports): open in cur, or
+// stated closed (their service is gone now, closed[id]).
+func onlyListed(cur, prev []model.ServiceResult, prevIDs map[string]int64, closed map[int64]bool) ([]model.ServiceResult, map[string]int64) {
+	listed := make(map[string]bool, len(cur))
+	for _, s := range cur {
+		listed[store.ServiceKey(s.Port, strings.ToLower(s.Proto))] = true
+	}
+	for k, id := range prevIDs {
+		if closed[id] {
+			listed[k] = true
+		}
+	}
+	var out []model.ServiceResult
+	for _, s := range prev {
+		if listed[store.ServiceKey(s.Port, strings.ToLower(s.Proto))] {
+			out = append(out, s)
+		}
+	}
+	var ids map[string]int64
+	if prevIDs != nil {
+		ids = make(map[string]int64, len(listed))
+		for k, id := range prevIDs {
+			if listed[k] {
+				ids[k] = id
+			}
+		}
+	}
+	return out, ids
+}
+
+// measuredResponse reports if the service with this key has an HTTP
+// response time in the current result.
+func measuredResponse(cur []model.ServiceResult, key string) bool {
+	for _, s := range cur {
+		if store.ServiceKey(s.Port, strings.ToLower(s.Proto)) == key {
+			return s.HTTP != nil && s.HTTP.ResponseMs > 0
+		}
+	}
+	return false
 }
 
 // partialData is true for runs whose results do not cover every port of the
