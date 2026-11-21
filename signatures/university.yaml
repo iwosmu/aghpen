@@ -1,0 +1,444 @@
+# Czujka: oprogramowanie typowe dla uczelni (klient: AGH) – dziekanat, biblioteki, repozytoria, e-learning, obliczenia.
+
+- id: usosweb
+  name: USOSweb
+  category: cms
+  description: Uniwersytecki System Obsługi Studiów – serwis USOSweb dla studentów i pracowników.
+  tags: [uczelnia, dziekanat, php]
+  interest: 40
+  classes: [login]
+  aliases: [USOS]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, regex: 'kontroler\.php\?_action=', weight: 0.8}
+      - {type: body, regex: 'USOSweb', weight: 0.6}
+      - {type: title, regex: 'USOSweb', weight: 0.8}
+      - {type: body, regex: '<usos-(?:frame|module-link-tile|layout)|usos-ui', weight: 0.7}
+  version:
+    - {type: body, regex: 'USOSweb\s+([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9]+)?)'}
+
+- id: usos-api
+  name: USOS API
+  category: cms
+  description: Interfejs programistyczny systemu USOS.
+  tags: [uczelnia, dziekanat, api]
+  interest: 40
+  classes: [api]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^USOS ?API', weight: 0.9}
+      - {type: body, regex: 'services/apiref|USOS API', weight: 0.6}
+      - {type: path, path: /services/apisrv/installation, status: [200], contains_all: ['"usos_schema_version"', '"machine_name"'], weight: 0.95}
+  version:
+    - {type: path, path: /services/apisrv/installation, regex: '"version"\s*:\s*"([0-9][0-9a-z.\-]*)"'}
+
+- id: usos-apd
+  name: USOS APD (Archiwum Prac Dyplomowych)
+  category: cms
+  description: Archiwum Prac Dyplomowych systemu USOS.
+  tags: [uczelnia, dziekanat]
+  interest: 35
+  classes: [login]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: 'Archiwum Prac Dyplomowych|^APD\b', weight: 0.7}
+      - {type: body, regex: 'Archiwum Prac Dyplomowych[\s\S]{0,400}USOS|/apd/static/|apd_logo', weight: 0.6}
+
+- id: cas
+  name: CAS (Central Authentication Service)
+  category: security
+  description: Centralne logowanie CAS, używane m.in. przez USOS.
+  tags: [uczelnia, sso]
+  interest: 45
+  classes: [login]
+  cpe: cpe:2.3:a:apereo:central_authentication_service
+  aliases: [Apereo CAS]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: 'Central Authentication Service|Centraln[ya] (?:System|Usługa) Uwierzytelniania|^CAS –|^Login - CAS', weight: 0.8}
+      - {type: body, regex: 'id="fm1"[\s\S]{0,900}name="execution"|name="lt" value="LT-|/cas/login', weight: 0.7}
+      - {type: url, regex: '/cas/login', weight: 0.6}
+      - {type: redirect, regex: '/cas/login\?service=', weight: 0.7}
+
+- id: shibboleth
+  name: Shibboleth
+  category: security
+  description: Logowanie federacyjne Shibboleth (IdP albo SP), typowe dla uczelni i PIONIER.Id.
+  tags: [uczelnia, sso]
+  interest: 45
+  classes: [login]
+  cpe: cpe:2.3:a:shibboleth:identity_provider
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: redirect, regex: '/Shibboleth\.sso/|/idp/profile/(?:SAML2|Shibboleth)|/idp/shibboleth', weight: 0.9}
+      - {type: body, regex: '/Shibboleth\.sso/|/idp/profile/SAML2|shibboleth', weight: 0.6}
+      - {type: cookie, name_regex: '^(_shibsession_|_shibstate_|shib_idp_session)', weight: 0.95}
+
+- id: simplesamlphp
+  name: SimpleSAMLphp
+  category: security
+  description: Dostawca tożsamości SimpleSAMLphp.
+  tags: [uczelnia, sso, php]
+  interest: 45
+  classes: [login]
+  cpe: cpe:2.3:a:simplesamlphp:simplesamlphp
+  implies: [PHP]
+  match:
+    rules:
+      - {type: cookie, name_regex: '^SimpleSAML(SessionID|AuthToken)?$', weight: 0.95}
+      - {type: title, regex: 'SimpleSAMLphp', weight: 0.9}
+      - {type: redirect, regex: '/simplesaml/|/saml2/idp/SSOService\.php', weight: 0.8}
+
+- id: wirtualna-uczelnia
+  name: Wirtualna Uczelnia (Verbis Dean's Office)
+  category: cms
+  description: Wirtualny dziekanat „Wirtualna Uczelnia” (APR System / Verbis).
+  tags: [uczelnia, dziekanat]
+  interest: 40
+  classes: [login]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: 'Wirtualna Uczelnia|Wirtualny Dziekanat', weight: 0.8}
+      - {type: body, regex: 'Verbis Dean''s Office|wu/start\.html|Wirtualna Uczelnia', weight: 0.6}
+
+- id: dspace
+  name: DSpace
+  category: cms
+  description: Repozytorium instytucjonalne DSpace.
+  tags: [uczelnia, repozytorium, java]
+  interest: 25
+  cpe: cpe:2.3:a:duraspace:dspace
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: generator, regex: '^DSpace(?: ([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: body, regex: '<ds-app|dspace-angular|/xmlui/|/jspui/', weight: 0.7}
+      - {type: path, path: /server/api, status: [200], contains: '"dspaceVersion"', weight: 0.95}
+  version:
+    - {type: path, path: /server/api, regex: '"dspaceVersion"\s*:\s*"DSpace ([0-9.]+)'}
+
+- id: ojs
+  name: Open Journal Systems
+  category: cms
+  description: System wydawania czasopism naukowych OJS (także OMP i OPS).
+  tags: [uczelnia, czasopisma, php]
+  interest: 25
+  cpe: cpe:2.3:a:public_knowledge_project:open_journal_systems
+  aliases: [OJS]
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: generator, regex: '^Open (?:Journal Systems|Monograph Press|Preprint Systems)(?: ([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: cookie, name: OJSSID, weight: 0.95}
+      - {type: body, regex: 'pkp_structure_|/lib/pkp/|Open Journal Systems', weight: 0.7}
+
+- id: eprints
+  name: EPrints
+  category: cms
+  description: Repozytorium publikacji EPrints.
+  tags: [uczelnia, repozytorium]
+  interest: 25
+  cpe: cpe:2.3:a:eprints:eprints
+  match:
+    rules:
+      - {type: meta, name: generator, regex: '^EPrints(?: ([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: body, regex: 'ep_tm_header|/cgi/users/home|eprints_', weight: 0.6}
+
+- id: invenio
+  name: Invenio
+  category: cms
+  description: Repozytorium danych badawczych Invenio / InvenioRDM.
+  tags: [uczelnia, repozytorium, python]
+  interest: 25
+  match:
+    rules:
+      - {type: meta, name: generator, regex: '^Invenio', weight: 0.95}
+      - {type: body, regex: 'invenio-(?:app-rdm|search-ui|theme)', weight: 0.8}
+
+- id: omega-psir
+  name: Omega-PSIR
+  category: cms
+  description: Baza wiedzy uczelni Omega-PSIR (system informacji o badaniach).
+  tags: [uczelnia, repozytorium, java]
+  interest: 25
+  match:
+    rules:
+      - {type: body, regex: 'Omega-PSIR|omega-psir', weight: 0.9}
+
+- id: dlibra
+  name: dLibra
+  category: cms
+  description: Biblioteka cyfrowa dLibra (PCSS).
+  tags: [uczelnia, biblioteka, java]
+  interest: 25
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, regex: 'dLibra\s*([0-9]+\.[0-9]+(?:\.[0-9]+)?)?', weight: 0.6, version_group: 1}
+      - {type: url, regex: '/dlibra(?:/|$)', weight: 0.7}
+      - {type: redirect, regex: '/dlibra(?:/|$)', weight: 0.7}
+      - {type: body, regex: 'href="[^"]*/dlibra/', weight: 0.6}
+
+- id: koha
+  name: Koha
+  category: cms
+  description: System biblioteczny Koha (katalog OPAC albo panel bibliotekarza).
+  tags: [uczelnia, biblioteka, perl]
+  interest: 30
+  cpe: cpe:2.3:a:koha:koha
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: generator, regex: '^Koha(?: ([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: body, regex: '/opac-tmpl/|opac-main\.pl|/intranet-tmpl/|koha-community\.org', weight: 0.8}
+      - {type: cookie, name: CGISESSID, weight: 0.3}
+
+- id: aleph-opac
+  name: Ex Libris Aleph / Primo
+  category: cms
+  description: Katalog biblioteczny Ex Libris (Aleph OPAC albo Primo).
+  tags: [uczelnia, biblioteka]
+  interest: 25
+  aliases: [Aleph, Primo]
+  match:
+    rules:
+      - {type: body, regex: '/F/[A-Z0-9-]*\?func=(?:find|file|option)|/exlibris/aleph/', weight: 0.9}
+      - {type: body, regex: 'primo-explore|<primo-explore', weight: 0.9}
+      - {type: redirect, regex: '/F/?$|/F\?|/primo-explore/|/discovery/search', weight: 0.6}
+
+- id: vufind
+  name: VuFind
+  category: cms
+  description: Wyszukiwarka biblioteczna VuFind.
+  tags: [uczelnia, biblioteka, php]
+  interest: 25
+  implies: [PHP]
+  match:
+    rules:
+      - {type: meta, name: generator, regex: '^VuFind(?: ([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: cookie, name: VUFIND_SESSION, weight: 0.95}
+
+- id: ezproxy
+  name: EZproxy
+  category: proxy
+  description: Serwer dostępu do zasobów bibliotecznych OCLC EZproxy.
+  tags: [uczelnia, biblioteka]
+  interest: 40
+  classes: [login]
+  cpe: cpe:2.3:a:oclc:ezproxy
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^EZproxy', weight: 0.95}
+      - {type: cookie, name_regex: '^ezproxy[ln]?$', weight: 0.9}
+      - {type: body, regex: 'EZproxy', weight: 0.5}
+
+- id: bigbluebutton
+  name: BigBlueButton
+  category: cms
+  description: System wideokonferencji BigBlueButton (także interfejs Greenlight).
+  tags: [uczelnia, wideokonferencje]
+  interest: 30
+  cpe: cpe:2.3:a:bigbluebutton:bigbluebutton
+  aliases: [Greenlight]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: path, path: /bigbluebutton/api, status: [200], contains_all: ['<returncode>SUCCESS</returncode>', '<version>'], weight: 0.95}
+      - {type: title, regex: 'BigBlueButton|Greenlight', weight: 0.8}
+      - {type: body, regex: 'bigbluebutton|greenlight', weight: 0.5}
+  version:
+    - {type: path, path: /bigbluebutton/api, regex: '<bbbVersion>([0-9.]+)</bbbVersion>'}
+    - {type: path, path: /bigbluebutton/api, regex: '<version>([0-9.]+)</version>'}
+
+- id: jupyterhub
+  name: JupyterHub
+  category: devops
+  description: Wieloużytkownikowe środowisko notatników JupyterHub.
+  tags: [uczelnia, python, obliczenia]
+  interest: 55
+  classes: [login, dev-tool]
+  cpe: cpe:2.3:a:jupyter:jupyterhub
+  implies: [Python]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: X-Jupyterhub-Version, regex: '^([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: title, equals: JupyterHub, weight: 0.8}
+      - {type: redirect, contains: '/hub/login', weight: 0.7}
+      - {type: favicon, mmh3: [1248917303], weight: 0.7}
+
+- id: jupyter
+  name: Jupyter Notebook / JupyterLab
+  category: devops
+  description: Serwer notatników Jupyter.
+  tags: [uczelnia, python, obliczenia]
+  interest: 60
+  classes: [dev-tool]
+  cpe: cpe:2.3:a:jupyter:notebook
+  aliases: [Jupyter, JupyterLab, 'Jupyter Notebook']
+  implies: [Python]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^(?:Jupyter Notebook|JupyterLab|Jupyter Server|Home Page - Select or create a notebook)', weight: 0.9}
+      - {type: body, regex: 'id="jupyter-config-data"|/static/notebook/|jupyter-main-app', weight: 0.9}
+      - {type: path, path: /api, status: [200], regex: '^\{"version":\s*"([0-9.]+)"\}', weight: 0.6, version_group: 1}
+
+- id: jupyter-open
+  name: Jupyter bez logowania
+  category: devops
+  technology: Jupyter Notebook / JupyterLab
+  description: Serwer Jupyter wpuszcza bez hasła i tokenu. Każdy może uruchomić kod na tym serwerze.
+  tags: [uczelnia, python]
+  interest: 95
+  classes: [dev-tool, admin-panel]
+  match:
+    condition: all
+    rules:
+      - {type: url, regex: '/(?:tree|lab)(?:\?|/|$)', weight: 0.6}
+      - {type: body, regex: 'id="jupyter-config-data"|/static/notebook/', weight: 0.8}
+      - {type: body, regex: 'id="password_input"|name="password"', not: true}
+
+- id: rstudio-server
+  name: RStudio Server
+  category: devops
+  description: Środowisko R w przeglądarce RStudio / Posit Workbench.
+  tags: [uczelnia, obliczenia]
+  interest: 55
+  classes: [login, dev-tool]
+  match:
+    rules:
+      - {type: title, regex: '^RStudio(?: Sign In| Server)?|^Posit Workbench', weight: 0.9}
+      - {type: header, name: Server, regex: '^RStudio', weight: 0.95}
+      - {type: redirect, contains: '/auth-sign-in', weight: 0.8}
+
+- id: overleaf
+  name: Overleaf / ShareLaTeX
+  category: cms
+  description: Edytor LaTeX Overleaf (własna instalacja).
+  tags: [uczelnia, nodejs]
+  interest: 30
+  classes: [login]
+  aliases: [ShareLaTeX]
+  match:
+    rules:
+      - {type: cookie, name_regex: '^(overleaf_session2|sharelatex\.sid)$', weight: 0.95}
+      - {type: title, regex: 'Overleaf|ShareLaTeX', weight: 0.8}
+
+- id: indico
+  name: Indico
+  category: cms
+  description: System obsługi konferencji Indico (CERN).
+  tags: [uczelnia, python]
+  interest: 25
+  match:
+    rules:
+      - {type: body, regex: 'Powered by <a href="https://getindico\.io">Indico</a>(?:\s*v?([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: cookie, name: indico_session, weight: 0.95}
+
+- id: limesurvey
+  name: LimeSurvey
+  category: cms
+  description: System ankiet LimeSurvey.
+  tags: [uczelnia, ankiety, php]
+  interest: 30
+  cpe: cpe:2.3:a:limesurvey:limesurvey
+  implies: [PHP]
+  match:
+    rules:
+      - {type: meta, name: generator, regex: '^LimeSurvey', weight: 0.95}
+      - {type: cookie, name_regex: '^LS-[A-Z]{12,}$', weight: 0.9}
+
+- id: mahara
+  name: Mahara
+  category: cms
+  description: E-portfolio Mahara.
+  tags: [uczelnia, e-learning, php]
+  interest: 25
+  implies: [PHP]
+  match:
+    rules:
+      - {type: meta, name: generator, regex: '^Mahara(?: ([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: cookie, name: mahara, weight: 0.9}
+
+- id: ilias
+  name: ILIAS
+  category: cms
+  description: Platforma e-learningowa ILIAS.
+  tags: [uczelnia, e-learning, php]
+  interest: 25
+  cpe: cpe:2.3:a:ilias:ilias
+  implies: [PHP]
+  match:
+    rules:
+      - {type: cookie, name: ilClientId, weight: 0.95}
+      - {type: body, regex: 'powered by ILIAS(?: \(v([0-9.]+))?', weight: 0.9, version_group: 1}
+
+- id: open-edx
+  name: Open edX
+  category: cms
+  description: Platforma kursów online Open edX.
+  tags: [uczelnia, e-learning, python]
+  interest: 25
+  implies: [Django]
+  match:
+    rules:
+      - {type: cookie, name_regex: '^(edxloggedin|openedx-language-preference|edx-user-info)$', weight: 0.95}
+      - {type: body, regex: 'Powered by Open edX|openedx\.org', weight: 0.7}
+
+- id: seafile
+  name: Seafile
+  category: cms
+  description: Chmura plików Seafile.
+  tags: [uczelnia, pliki, python]
+  interest: 30
+  classes: [login]
+  cpe: cpe:2.3:a:seafile:seafile_server
+  match:
+    rules:
+      - {type: cookie, name: sfcsrftoken, weight: 0.95}
+      - {type: body, regex: 'seafile|/media/css/seahub', weight: 0.6}
+
+- id: mailman
+  name: GNU Mailman
+  category: cms
+  description: Listy dyskusyjne GNU Mailman.
+  tags: [uczelnia, poczta, python]
+  interest: 30
+  cpe: cpe:2.3:a:gnu:mailman
+  aliases: [Mailman]
+  match:
+    rules:
+      - {type: body, regex: 'Delivered by Mailman<br>\s*version ([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: body, regex: 'mailman/listinfo|Postorius|HyperKitty', weight: 0.8}
+
+- id: request-tracker
+  name: Request Tracker (RT)
+  category: cms
+  description: System zgłoszeń Best Practical Request Tracker.
+  tags: [uczelnia, zgloszenia, perl]
+  interest: 35
+  classes: [login]
+  cpe: cpe:2.3:a:bestpractical:request_tracker
+  match:
+    rules:
+      - {type: cookie, name_regex: '^RT_SID_', weight: 0.95}
+      - {type: body, regex: 'RT ([0-9.]+) Copyright[\s\S]{0,60}Best Practical', weight: 0.95, version_group: 1}
+
+- id: opencast
+  name: Opencast
+  category: cms
+  description: System nagrywania wykładów Opencast.
+  tags: [uczelnia, wideo, java]
+  interest: 30
+  match:
+    rules:
+      - {type: title, regex: '^Opencast', weight: 0.8}
+      - {type: redirect, regex: '/admin-ng/login\.html|/engage/ui/', weight: 0.8}

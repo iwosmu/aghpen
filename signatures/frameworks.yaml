@@ -1,0 +1,424 @@
+# Czujka: sygnatury frameworków, języków, bibliotek i generatorów stron.
+
+- id: php
+  name: PHP
+  category: language
+  description: Interpreter PHP ujawniony w nagłówku albo ciasteczku sesji.
+  cpe: cpe:2.3:a:php:php
+  match:
+    rules:
+      - {type: header, name: X-Powered-By, regex: '^PHP(?:/([0-9.]+))?', weight: 0.9, version_group: 1}
+      - {type: header, name: Server, regex: 'PHP/([0-9.]+)', weight: 0.8, version_group: 1}
+      - {type: cookie, name: PHPSESSID, weight: 0.7}
+
+- id: php-builtin-server
+  name: PHP – wbudowany serwer deweloperski
+  category: web-server
+  technology: PHP
+  description: Serwer „php -S” jest narzędziem deweloperskim i nie powinien działać produkcyjnie.
+  interest: 40
+  classes: [staging]
+  match:
+    rules:
+      - {type: header, name: Server, regex: 'PHP [0-9.]+ Development Server', weight: 0.95}
+  version:
+    - {type: header, name: Server, regex: 'PHP ([0-9.]+) Development Server'}
+
+- id: laravel
+  name: Laravel
+  category: framework
+  description: Framework PHP Laravel.
+  tags: [php]
+  cpe: cpe:2.3:a:laravel:laravel
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name: laravel_session, weight: 0.9}
+      - {type: cookie, name: XSRF-TOKEN, weight: 0.4}
+      - {type: body, regex: 'Laravel v[0-9.]+ \(PHP v[0-9.]+\)|<title>Laravel</title>', weight: 0.8}
+  version:
+    - {type: body, regex: 'Laravel v([0-9.]+) \(PHP'}
+
+- id: symfony
+  name: Symfony
+  category: framework
+  description: Framework PHP Symfony.
+  tags: [php]
+  cpe: cpe:2.3:a:sensiolabs:symfony
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name_regex: '^X-Debug-Token(-Link)?$', exists: true, weight: 0.8}
+      - {type: header, name: X-Symfony-Cache, exists: true, weight: 0.9}
+      - {type: body, regex: 'class="sf-toolbar|Symfony\\Component\\|sf-dump', weight: 0.8}
+      - {type: cookie, name: sf_redirect, weight: 0.7}
+
+- id: codeigniter
+  name: CodeIgniter
+  category: framework
+  description: Framework PHP CodeIgniter.
+  tags: [php]
+  implies: [PHP]
+  match:
+    rules:
+      - {type: cookie, name: ci_session, weight: 0.9}
+      - {type: body, regex: 'Welcome to CodeIgniter|CodeIgniter\\\\', weight: 0.7}
+
+- id: cakephp
+  name: CakePHP
+  category: framework
+  description: Framework PHP CakePHP.
+  tags: [php]
+  implies: [PHP]
+  match:
+    rules:
+      - {type: cookie, name: CAKEPHP, weight: 0.9}
+      - {type: meta, name: application-name, contains: 'CakePHP', weight: 0.8}
+
+- id: yii
+  name: Yii
+  category: framework
+  description: Framework PHP Yii.
+  tags: [php]
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name: _csrf-frontend, weight: 0.7}
+      - {type: cookie, name: YII_CSRF_TOKEN, weight: 0.9}
+      - {type: body, regex: 'yii\.(?:js|validation|activeForm)|Powered by <a[^>]+yiiframework\.com', weight: 0.8}
+
+- id: django
+  name: Django
+  category: framework
+  description: Framework Pythona Django.
+  tags: [python]
+  cpe: cpe:2.3:a:djangoproject:django
+  implies: [Python]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name: csrftoken, weight: 0.6}
+      - {type: cookie, name: django_language, weight: 0.8}
+      - {type: body, regex: 'name=["'']csrfmiddlewaretoken["'']', weight: 0.8}
+      - {type: body, regex: '__admin_media_prefix__|/static/admin/css/(?:base|login)\.css', weight: 0.8}
+
+- id: django-admin
+  name: Django – panel administracyjny
+  category: framework
+  technology: Django
+  description: Panel administracyjny Django dostępny publicznie.
+  tags: [python]
+  interest: 50
+  classes: [admin-panel, login]
+  match:
+    rules:
+      - {type: body, contains_all: ['/static/admin/css/', 'csrfmiddlewaretoken'], weight: 0.9}
+      - {type: title, regex: 'Log in \| Django site admin|Django administration|Zaloguj się \| Administracja stroną Django', weight: 0.95}
+
+- id: flask
+  name: Flask
+  category: framework
+  description: Mikroframework Pythona Flask (rozpoznany po serwerze Werkzeug albo ciasteczku sesji).
+  tags: [python]
+  cpe: cpe:2.3:a:palletsprojects:flask
+  implies: [Python]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: Server, regex: '^Werkzeug/', weight: 0.6}
+      - {type: cookie, name: session, regex: '^(?:\.?eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$', weight: 0.6}
+
+- id: fastapi
+  name: FastAPI
+  category: framework
+  description: Framework API FastAPI (strona dokumentacji /docs).
+  tags: [python, api]
+  classes: [api]
+  implies: [Python]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: path, path: /docs, status: [200], contains_all: ['swagger-ui', '/openapi.json'], weight: 0.8}
+      - {type: body, contains_all: ['swagger-ui', "url: '/openapi.json'"], weight: 0.8}
+      - {type: body, regex: '^\{"detail":"Not Found"\}$', weight: 0.6}
+      - {type: title, contains: 'FastAPI - Swagger UI', weight: 0.9}
+
+- id: rails
+  name: Ruby on Rails
+  category: framework
+  description: Framework Ruby on Rails.
+  tags: [ruby]
+  cpe: cpe:2.3:a:rubyonrails:rails
+  implies: [Ruby]
+  aliases: [Rails]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: X-Runtime, regex: '^[0-9.]+$', weight: 0.4}
+      - {type: header, name: X-Request-Id, regex: '^[0-9a-f-]{36}$', weight: 0.2}
+      - {type: meta, name: csrf-param, equals: authenticity_token, weight: 0.8}
+      - {type: cookie, name_regex: '^_[a-z0-9_]+_session$', http_only: true, weight: 0.5}
+      - {type: header, name: X-Powered-By, contains: 'Phusion Passenger', weight: 0.4}
+      - {type: body, regex: 'data-turbo-track|/assets/application-[0-9a-f]{20,}\.(?:js|css)', weight: 0.4}
+
+- id: spring-boot
+  name: Spring Boot
+  category: framework
+  description: Framework Javy Spring Boot (strona błędu Whitelabel, nagłówek kontekstu albo Actuator).
+  tags: [java]
+  cpe: cpe:2.3:a:vmware:spring_boot
+  implies: [Java]
+  aliases: [Spring]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, contains: 'Whitelabel Error Page', weight: 0.9}
+      - {type: header, name: X-Application-Context, exists: true, weight: 0.9}
+      - {type: body, regex: '^\{"timestamp":("[^"]+"|[0-9]+),"status":[0-9]{3},"error":"[^"]+"', weight: 0.8}
+      - {type: path, path: /actuator, status: [200], contains_all: ['"_links"', '/actuator'], weight: 0.95}
+      - {type: path, path: /actuator/health, status: [200, 503], regex: '^\{"status":"(UP|DOWN|OUT_OF_SERVICE)"', weight: 0.8}
+
+- id: express
+  name: Express
+  category: framework
+  description: Framework Node.js Express.
+  tags: [nodejs]
+  cpe: cpe:2.3:a:expressjs:express
+  implies: [Node.js]
+  aliases: ['Node.js Express framework']
+  match:
+    rules:
+      - {type: header, name: X-Powered-By, equals: Express, weight: 0.9}
+      - {type: cookie, name: connect.sid, weight: 0.7}
+      - {type: body, regex: '<pre>Cannot GET /[^<]*</pre>', weight: 0.8}
+
+- id: nextjs
+  name: Next.js
+  category: framework
+  description: Framework React Next.js.
+  tags: [nodejs, react]
+  cpe: cpe:2.3:a:vercel:next.js
+  implies: [React, Node.js]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: X-Powered-By, regex: '^Next\.js(?: ([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: body, regex: 'id="__NEXT_DATA__"|/_next/static/', weight: 0.9}
+      - {type: header, name_regex: '^X-Nextjs-(Cache|Prerender|Matched-Path)$', exists: true, weight: 0.9}
+
+- id: nuxt
+  name: Nuxt
+  category: framework
+  description: Framework Vue Nuxt.
+  tags: [nodejs, vue]
+  implies: [Vue.js, Node.js]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, regex: 'id="__nuxt"|window\.__NUXT__|/_nuxt/', weight: 0.9}
+      - {type: header, name: X-Powered-By, contains: 'Nuxt', weight: 0.9}
+
+- id: aspnet
+  name: ASP.NET
+  category: framework
+  description: Platforma Microsoft ASP.NET.
+  tags: [dotnet, microsoft]
+  cpe: cpe:2.3:a:microsoft:asp.net
+  match:
+    rules:
+      - {type: header, name: X-AspNet-Version, regex: '([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: header, name: X-Powered-By, contains: 'ASP.NET', weight: 0.9}
+      - {type: cookie, name_regex: '^(ASP\.NET_SessionId|\.ASPXAUTH|\.AspNet\.ApplicationCookie|ASPSESSIONID[A-Z]+)$', weight: 0.9}
+      - {type: body, regex: 'name="__VIEWSTATE(?:GENERATOR)?"', weight: 0.8}
+      - {type: header, name: X-AspNetMvc-Version, exists: true, weight: 0.9}
+
+- id: aspnet-core
+  name: ASP.NET Core
+  category: framework
+  description: Platforma Microsoft ASP.NET Core.
+  tags: [dotnet, microsoft]
+  match:
+    rules:
+      - {type: cookie, name_regex: '^\.AspNetCore\.', weight: 0.95}
+      - {type: header, name: Server, equals: Kestrel, weight: 0.8}
+      - {type: body, regex: '_framework/blazor\.(?:server|webassembly|web)\.js', weight: 0.9}
+
+- id: phoenix
+  name: Phoenix
+  category: framework
+  description: Framework Elixira Phoenix.
+  tags: [elixir]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name_regex: '^_[a-z0-9_]+_key$', weight: 0.5}
+      - {type: body, regex: 'phx-(?:socket|track-static)|data-phx-main|/assets/app-[0-9a-f]{32}\.js', weight: 0.7}
+
+- id: java-servlet
+  name: Java (kontener serwletów)
+  category: language
+  technology: Java
+  description: Aplikacja Javy rozpoznana po ciasteczku JSESSIONID albo nagłówku Servlet.
+  cpe: cpe:2.3:a:oracle:jre
+  match:
+    rules:
+      - {type: cookie, name_regex: '^JSESSIONID', weight: 0.8}
+      - {type: header, name: X-Powered-By, regex: 'Servlet|JSP|JSF', weight: 0.8}
+
+- id: struts
+  name: Apache Struts
+  category: framework
+  description: Framework Javy Apache Struts (adresy .action / .do).
+  tags: [java]
+  interest: 25
+  cpe: cpe:2.3:a:apache:struts
+  implies: [Java]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: url, regex: '\.(?:action|do)(?:\?|;|$)', weight: 0.5}
+      - {type: redirect, regex: '\.(?:action|do)(?:\?|;|$)', weight: 0.5}
+      - {type: body, regex: '/struts/(?:js|css|utils)|org\.apache\.struts|name="struts\.token', weight: 0.8}
+
+- id: play-framework
+  name: Play Framework
+  category: framework
+  description: Framework Scala/Java Play.
+  tags: [java, scala]
+  match:
+    rules:
+      - {type: cookie, name: PLAY_SESSION, weight: 0.9}
+      - {type: cookie, name_regex: '^PLAY_(FLASH|LANG)$', weight: 0.8}
+
+- id: streamlit
+  name: Streamlit
+  category: framework
+  description: Aplikacja danych Streamlit, często wystawiana bez uwierzytelniania.
+  tags: [python, dane]
+  interest: 35
+  implies: [Python]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, equals: Streamlit, weight: 0.7}
+      - {type: body, regex: '/_stcore/|streamlit', weight: 0.6}
+
+- id: gradio
+  name: Gradio
+  category: framework
+  description: Interfejs modeli ML Gradio, często wystawiany bez uwierzytelniania.
+  tags: [python, ml]
+  interest: 35
+  implies: [Python]
+  match:
+    rules:
+      - {type: body, regex: 'window\.gradio_config\s*=|<gradio-app', weight: 0.95}
+  version:
+    - {type: body, regex: '"version"\s*:\s*"([0-9.]+)"'}
+
+- id: react
+  name: React
+  category: library
+  description: Biblioteka interfejsu React.
+  match:
+    rules:
+      - {type: body, regex: 'data-reactroot|id="root"></div>\s*<script[^>]+/static/js/main\.[0-9a-f]+\.js|react(?:-dom)?(?:\.production)?\.min\.js', weight: 0.7}
+
+- id: vue
+  name: Vue.js
+  category: library
+  description: Biblioteka interfejsu Vue.js.
+  match:
+    rules:
+      - {type: body, regex: 'data-v-app|data-server-rendered="true"|vue(?:\.runtime)?(?:\.global)?(?:\.prod)?(?:\.min)?\.js|id="app" data-v-', weight: 0.7}
+
+- id: angular
+  name: Angular
+  category: library
+  description: Framework interfejsu Angular / AngularJS.
+  match:
+    rules:
+      - {type: body, regex: '<app-root|ng-version="([0-9.]+)"', weight: 0.8, version_group: 1}
+      - {type: body, regex: '\bng-app=|angular(?:\.min)?\.js', weight: 0.7}
+
+- id: jquery
+  name: jQuery
+  category: library
+  description: Biblioteka JavaScript jQuery.
+  cpe: cpe:2.3:a:jquery:jquery
+  match:
+    rules:
+      - {type: body, regex: 'jquery[.-]([0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:\.slim)?(?:\.min)?\.js', weight: 0.9, version_group: 1}
+      - {type: body, regex: '/jquery(?:\.slim)?(?:\.min)?\.js', weight: 0.8}
+
+- id: bootstrap
+  name: Bootstrap
+  category: library
+  description: Biblioteka CSS Bootstrap.
+  cpe: cpe:2.3:a:getbootstrap:bootstrap
+  match:
+    rules:
+      - {type: body, regex: 'bootstrap(?:\.bundle)?(?:\.min)?\.(?:css|js)', weight: 0.8}
+  version:
+    - {type: body, regex: 'bootstrap[@/-]([0-9]+\.[0-9]+\.[0-9]+)'}
+
+- id: hugo
+  name: Hugo
+  category: framework
+  description: Generator stron statycznych Hugo.
+  tags: [static-site]
+  match:
+    rules:
+      - {type: meta, name: generator, regex: '^Hugo(?: ([0-9.]+))?', weight: 0.95, version_group: 1}
+
+- id: jekyll
+  name: Jekyll
+  category: framework
+  description: Generator stron statycznych Jekyll.
+  tags: [static-site]
+  match:
+    rules:
+      - {type: meta, name: generator, regex: '^Jekyll(?: v?([0-9.]+))?', weight: 0.95, version_group: 1}
+
+- id: docusaurus
+  name: Docusaurus
+  category: framework
+  description: Generator dokumentacji Docusaurus.
+  tags: [static-site, dokumentacja]
+  match:
+    rules:
+      - {type: meta, name: generator, regex: '^Docusaurus(?: v?([0-9.]+))?', weight: 0.95, version_group: 1}
+
+- id: mkdocs
+  name: MkDocs
+  category: framework
+  description: Generator dokumentacji MkDocs.
+  tags: [static-site, dokumentacja]
+  match:
+    rules:
+      - {type: meta, name: generator, regex: '^mkdocs-([0-9.]+)', weight: 0.95, version_group: 1}
+
+- id: sphinx
+  name: Sphinx
+  category: framework
+  description: Generator dokumentacji Sphinx.
+  tags: [static-site, dokumentacja]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, regex: 'Created using <a href="https?://(?:www\.)?sphinx-doc\.org/">Sphinx</a> ([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: body, regex: '_static/(?:documentation_options|sphinx_highlight|doctools)\.js', weight: 0.8}
+
+- id: gatsby
+  name: Gatsby
+  category: framework
+  description: Generator stron Gatsby.
+  tags: [static-site, react]
+  implies: [React]
+  match:
+    rules:
+      - {type: meta, name: generator, regex: '^Gatsby(?: ([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: body, contains: 'id="___gatsby"', weight: 0.9}
