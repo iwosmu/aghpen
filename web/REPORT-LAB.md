@@ -95,3 +95,48 @@ Backend observations:
 | 5. Interest | No change: waiting for the recalibration. | – |
 | 6. Login, empty product, viewer | Login: one line under the heading: what Czujka does and that it only detects (GET and HEAD, never tries to log in). Empty product checked as `viewer` on a fresh stack. Every page crawled as `viewer` on the lab stack: 0 responses 401/403, 0 toasts; edit forms show "Tylko odczyt…"; `/setup` now redirects a role without create/configure/run rights to the dashboard. | `83-before-login-*` → `83-after-login-1440/390`; `84-after-empty-product-viewer-1440/390`; `viewer_*` |
 | 7. Demo mode | `?present=1` (or Shift+P) zooms the UI one step (×1.125) for 1080p; `?present=0` turns it off. The safety strip stays. There is no dev chrome to hide. At 1920 × 1080 the normal UI already records cleanly; present mode fills the width better. | `98-normal-1920-dashboard`, `98-present-1920-dashboard`, `98-present-1920-time` |
+
+## 10. Operator lock (CZUJKA_ALLOWED_NETWORKS, b89755f)
+
+Checked on the czui stack restarted with `CZUJKA_ALLOWED_NETWORKS=10.66.0.0/16`.
+
+| Place | What the UI shows | Screenshot |
+| --- | --- | --- |
+| Safety page | A locked block "Zablokowane przez operatora wdrożenia" with the lock networks above the editable allowed networks, and one sentence: no user, an administrator included, can widen it. A live warning names entries outside the lock before saving. A refused save (422) shows the reason next to the field, in Polish. | `lock-1-safety-refused` |
+| Top safety strip | Lock icon and `10.66.0.0/16` in the chip; the tooltip names the lock and says no user can widen it. | visible in every screenshot |
+| Wizard, network step | One line about the lock under the ranges; the live preview counts and marks entries outside the lock ("blokada"). | `lock-2-wizard-preview` |
+| Target preview (Cele) | Same lock line and marking in `PreviewReport`. | `lock-3-targets-preview` |
+| Ad-hoc run | New dialog "Skan wybranych adresów" on Przebiegi (`POST /runs/adhoc`; there was no UI for it). It marks addresses outside the lock as you type, and shows the 422 refusal as "Zablokowane przez operatora wdrożenia" plus the per-address reason. | `lock-4-adhoc-refused` |
+
+Backend observations:
+
+1. A policy saved before the lock keeps `allowed_networks` outside it (here `127.0.0.0/8`). Every later `PUT /settings/safety` answers 422 until an administrator removes that entry, even a change of `max_pps` only; the wizard's limits step also sends the whole policy and gets the same 422. The UI warns about such entries, but the server could flag or drop them at start.
+2. `/targets/preview` gives `line: 0` for entries dropped by the policy or the lock. The UI used the line as a React key; fixed in the UI, and it shows "–" instead of "wiersz 0".
+3. The 422 texts of `PUT /settings/safety` and `POST /runs/adhoc` are English; the UI translates the lock cases (`lib/lock.ts`, tested).
+
+## 11. DefectDojo end to end through the UI (local DefectDojo 3.5.202)
+
+Czujka (czui stack, lab data) talks to DefectDojo at `http://host.docker.internal:18080` (from the container). New product type objects were not needed: the type `Czujka` existed. Products created: `Czujka UI e2e` (default) and `Czujka UI e2e – hosty niestabilne` (scope mapping for the scope "Laboratorium: hosty niestabilne").
+
+| # | Step | Result | Evidence |
+| --- | --- | --- | --- |
+| 1 | Settings: URL, API key, test with version, product type / product / engagement, scope mapping, `status_sync` | PASS: "Połączono z DefectDojo 3.5.202 jako admin", settings saved and read back | `dojo-1-settings` |
+| 2 | Export selected findings and a filtered set; links; fields in DefectDojo | PASS: 3 selected findings of a host in the mapped scope went to the mapped product (test #25), 2 selected + the filter "waga: wysoka" (33) to the default product (test #26). In DefectDojo: title, severity, description with evidence, endpoint `http://10.66.70.14:49152`, `unique_id_from_tool` = the Czujka key. The links Czujka writes back do not open in the browser (backend 1) | `dojo-2a`…`dojo-2e`, `dojo-pair-*` |
+| 3 | Export again | PASS: "Nowe w DefectDojo 0, Zaktualizowane 33"; no duplicate `unique_id_from_tool` in the test | `dojo-3-export-again` |
+| 4 | DefectDojo: false positive, risk accepted, mitigated; Czujka: dry run, conflict, apply | PASS: dry run proposed #719 → fałszywy alarm, #718 → zaakceptowane, #717 → rozwiązane; #716 (status "w analizie" set by an analyst in Czujka, mitigated in DefectDojo) listed as a conflict and kept; "Zastosowano: 3" | `dojo-4a-pull-dry-run`, `dojo-4b-pull-applied` |
+| 5 | Resolve in Czujka and sync; reappear and sync | PASS: sync "Zamknięte: 1" (DefectDojo: Inactive, Mitigated); the next run saw the exposure again and reopened the finding in Czujka; sync "ponownie otwarte: 2" (DefectDojo: Active). With `status_sync` on, the sync also ran by itself after a run (audit `finding.sync.defectdojo`, actor `system`) | `dojo-5a`…`dojo-5d` |
+| 6 | Run as "Nmap Scan", then the next run into the same test | PARTIAL: run #90 → test #27, run #91 → a new test #28; the same run #91 again → re-import into #28 ("Bez zmian 3"). The next run does not go into the same test (backend 2). New UI button "Do DefectDojo" on a completed run | `dojo-6a`…`dojo-6c` |
+| 7 | Generic Findings file route both ways | PASS: `czujka-findings.dojo.json` from Import / eksport, uploaded by hand in the DefectDojo UI as "Generic Findings Import": "processed a total of 301 findings" with the same severity split (33 / 18 / 33 / 217). A DefectDojo API findings list (test #28) imported into Czujka: format `dojo-api-json`, 3 created | `dojo-7b`, `dojo-7c`, `dojo-7d` |
+| 8 | Errors: wrong key, unreachable URL, DefectDojo down during an export | PASS: wrong key → "DefectDojo odrzucił token API… HTTP 403"; unreachable → "brak połączenia z DefectDojo… connection refused"; nginx of DefectDojo stopped 2 s into an export of 265 findings → the dialog shows "Usługa zewnętrzna nie odpowiada…" and a retry hint; after the restart the same export gave 40 new + 225 updated and 0 duplicates (backend 3) | `dojo-8a`…`dojo-8d` |
+
+UI changes for this flow: export of the filtered set (button "Pasujące do DefectDojo" / "Wszystkie do DefectDojo" with a confirmation that says existing findings are updated), "Do DefectDojo" on a completed run (Nmap Scan import, result with the test link and re-import counts), the status pull lists every proposed change and every conflict (Czujka status vs DefectDojo state, reason), the apply button disappears after applying, one error after a failed export (no duplicate toast) plus a retry hint, and a hint under the URL when it is a container-only address.
+
+Backend problems (exact):
+
+1. `dojo_url` is built from the integration URL. With `http://host.docker.internal:18080` (the only address the container can use for a DefectDojo bound to 127.0.0.1) every link in Czujka points to a host the analyst's browser cannot open. A separate link base (for example `link_url` in `DefectDojoSettings`) would fix it; the UI only warns.
+2. `POST /runs/{id}/export/defectdojo` keys the test by run: the next run of the same profile creates a new "Nmap Scan" test instead of a re-import into the previous one, so DefectDojo never closes ports that disappeared between runs.
+3. When DefectDojo goes down during `POST /findings/export/defectdojo`, `/import-scan` may already have created the findings (test #26 grew to 258) while Czujka stores no `dojo_id` (the follow-up `GET /findings/?test=…` failed with EOF). The findings stay unlinked until the export is repeated; the repeat matches them by `unique_id_from_tool`, so there are no duplicates. The error text is the raw Go error.
+4. A resolved policy-violation finding is reopened by the rule evaluation after the next run while the exposure is still there (every 2 minutes on profile 4). So a DefectDojo "mitigated" taken in by the pull is undone within one run and the next sync reopens it in DefectDojo (#717). Correct if "resolved" means "fixed", but it looks like ping-pong to an analyst.
+5. Severity: "Panel administracyjny: phpMyAdmin (10.66.10.10:80)" is `info` (interest 75) in Czujka and DefectDojo; for the accuracy owner.
+
+Left in DefectDojo (the README does not call them disposable): products `Czujka UI e2e` (tests #26 API findings, #27 and #28 Nmap Scan, #29 the manual Generic Findings import, which duplicates the API findings in the same product; simple risk acceptance enabled for step 4) and `Czujka UI e2e – hosty niestabilne` (test #25). In Czujka: 3 findings imported from DefectDojo test #28 ("Open Port: …/TCP").

@@ -1,14 +1,16 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import { useAction, useItem, usePage } from '../api/hooks';
-import { del, patch, post, put } from '../api/client';
+import { ApiError, del, patch, post, put } from '../api/client';
 import type { AuditEntry, DefectDojoSettings, DojoPullResult, DojoScopeMapping, DojoSyncResult, DojoTestResult, Permission, PermissionInfo, Role, SafetyPolicy, Scope, User } from '../api/types';
 import { t, getLang, plural } from '../i18n';
 import { cx, fmtDateTime, fmtInt, fmtRelative } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
+import { lockMessage, outsideLock } from '../lib/lock';
 import { Button, Check, Dialog, ErrorState, Field, IconButton, InlineError, PageHeader, Panel, ReadOnlyNote, Select, SkeletonRows, Tabs } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 import { DataTable, FilterBar, FilterField, Pager, SearchField, type Col } from '../ui/table';
-import { Glyph } from '../ui/marks';
+import { FindingStatusMark, Glyph } from '../ui/marks';
 import { useDraft } from '../ui/edit';
 import { roleLabel, useSession } from '../session';
 import { NoAccess } from '../shell/Layout';
@@ -203,6 +205,9 @@ function SafetyTab() {
       <span className="relative block"><input type="number" min={1} className="field num pr-14" disabled={!canManage} value={f[k]} onChange={(e) => setF({ ...f, [k]: Number(e.target.value) })} /><span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-ink-3">{suffix}</span></span>
     </Field>
   );
+  const op = q.data.operator_networks ?? [];
+  const outside = outsideLock(lines(nets), op);
+  const lockErr = save.error instanceof ApiError && save.error.status === 422 ? lockMessage(save.error.message, getLang()) : null;
   const dirty = JSON.stringify(lines(excl)) !== JSON.stringify(q.data.exclusions ?? []) || JSON.stringify(lines(nets)) !== JSON.stringify(q.data.allowed_networks ?? [])
     || JSON.stringify({ ...f, exclusions: null, allowed_networks: null }) !== JSON.stringify({ ...q.data, exclusions: null, allowed_networks: null });
   return (
@@ -221,9 +226,21 @@ function SafetyTab() {
           <Field label={t('Zabronione porty', 'Denied ports')} hint={t('np. 9100: surowy port drukarek', 'for example 9100: the raw printer port')}><input className="field mono" disabled={!canManage} value={f.denied_ports} onChange={(e) => setF({ ...f, denied_ports: e.target.value })} /></Field>
         </div>
         <div className="mt-3">
-          <Field label={t('Dozwolone sieci', 'Allowed networks')} hint={nets.trim() ? t('Czujka skanuje tylko adresy z tych sieci. Cel spoza nich zostanie odrzucony przy dodawaniu, imporcie i starcie skanu.', 'Czujka scans only addresses in these networks. A target outside them is refused when it is added, imported or planned.') : t('Puste = bez ograniczenia. Wpisz CIDR-y (jeden w wierszu), aby Czujka nie wyszła poza swoje sieci nawet przez pomyłkę.', 'Empty = no limit. Enter CIDRs (one per line) so that Czujka never leaves its networks, even by mistake.')}>
-            <textarea className="field mono" rows={3} disabled={!canManage} value={nets} onChange={(e) => setNets(e.target.value)} placeholder={'10.66.0.0/16\n149.156.0.0/16'} data-testid="allowed-networks" />
+          {op.length ? (
+            <div className="mb-3 border border-rule bg-sunk px-3 py-2.5" data-testid="operator-lock">
+              <p className="flex items-center gap-1.5 text-sm font-medium text-ink"><Icon name="lock" size={14} className="text-ink-2" />{t('Zablokowane przez operatora wdrożenia', 'Locked by the deployment operator')}</p>
+              <p className="mt-1.5 flex flex-wrap gap-1.5">{op.map((n) => <span key={n} className="mono border border-rule-strong px-1.5 py-0.5 text-sm text-ink">{n}</span>)}</p>
+              <p className="mt-1.5 max-w-[72ch] text-xs text-ink-2">{t('Operator ustawił tę granicę przy wdrożeniu (CZUJKA_ALLOWED_NETWORKS). Żaden użytkownik, także administrator, nie może jej poszerzyć; dozwolone sieci poniżej mogą ją tylko zawęzić.', 'The operator set this boundary at deployment (CZUJKA_ALLOWED_NETWORKS). No user, an administrator included, can widen it; the allowed networks below can only narrow it.')}</p>
+            </div>
+          ) : null}
+          <Field label={t('Dozwolone sieci', 'Allowed networks')} hint={op.length && !nets.trim() ? t('Puste = cała sieć z blokady operatora.', 'Empty = the whole network of the operator lock.') : nets.trim() ? t('Czujka skanuje tylko adresy z tych sieci. Cel spoza nich zostanie odrzucony przy dodawaniu, imporcie i starcie skanu.', 'Czujka scans only addresses in these networks. A target outside them is refused when it is added, imported or planned.') : t('Puste = bez ograniczenia. Wpisz CIDR-y (jeden w wierszu), aby Czujka nie wyszła poza swoje sieci nawet przez pomyłkę.', 'Empty = no limit. Enter CIDRs (one per line) so that Czujka never leaves its networks, even by mistake.')}>
+            <textarea className="field mono" rows={3} disabled={!canManage} value={nets} onChange={(e) => setNets(e.target.value)} placeholder={'10.66.0.0/16\n149.156.0.0/16'} data-testid="allowed-networks" aria-invalid={outside.length > 0 || Boolean(lockErr)} />
           </Field>
+          {lockErr ? (
+            <p role="alert" className="mt-1.5 flex items-start gap-1.5 text-xs text-danger" data-testid="allowed-lock-error"><Icon name="lock" size={14} className="mt-px flex-none" /><span>{lockErr}</span></p>
+          ) : outside.length ? (
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs text-st-changed" data-testid="allowed-outside-lock"><Icon name="lock" size={14} className="mt-px flex-none" /><span>{t('Poza blokadą operatora: ', 'Outside the operator lock: ')}<span className="mono">{outside.join(', ')}</span>{t('. Serwer odrzuci zapis polityki, dopóki te wpisy tu są.', '. The server refuses to save the policy while these entries are here.')}</span></p>
+          ) : null}
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label={t('Wykluczenia (nigdy nie skanowane)', 'Exclusions (never scanned)')} hint={t('adres albo CIDR, jeden w wierszu', 'an address or a CIDR, one per line')}><textarea className="field mono" rows={5} disabled={!canManage} value={excl} onChange={(e) => setExcl(e.target.value)} /></Field>
@@ -238,7 +255,7 @@ function SafetyTab() {
             </div>
           </div>
         </div>
-        <div className="mt-3"><InlineError error={save.error} /></div>
+        <div className="mt-3">{lockErr ? <p className="text-xs text-danger">{t('Polityka nie została zapisana: popraw dozwolone sieci.', 'The policy was not saved: fix the allowed networks.')}</p> : <InlineError error={save.error} />}</div>
         <p className="mt-3 text-2xs text-ink-3">{t('Ostatnia zmiana:', 'Last change:')} <span className="num">{fmtDateTime(q.data.updated_at)}</span></p>
       </Panel>
 
@@ -290,7 +307,7 @@ function DojoTab() {
         <p className="mb-3 max-w-[72ch] text-sm text-ink-2">{t('Czujka wysyła wybrane znaleziska do DefectDojo jako jeden test w zaangażowaniu. Ponowny eksport aktualizuje istniejące wpisy zamiast tworzyć duplikaty.', 'Czujka sends chosen findings to DefectDojo as one test in an engagement. A repeated export updates existing entries instead of making duplicates.')}</p>
         <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label={t('Integracja włączona', 'Integration enabled')} />
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Field label={t('Adres DefectDojo', 'DefectDojo URL')}><input className="field mono" value={f.url} onChange={(e) => { setF({ ...f, url: e.target.value }); setTest(null); }} placeholder="https://defectdojo.example" /></Field>
+          <Field label={t('Adres DefectDojo', 'DefectDojo URL')} hint={/\/\/(host\.docker\.internal|localhost|127\.)/.test(f.url) ? t('Czujka zapisuje odnośniki do znalezisk z tym adresem. Adres widoczny tylko z kontenera (host.docker.internal, localhost) nie otworzy się w przeglądarce analityka.', 'Czujka writes finding links with this address. An address visible only from the container (host.docker.internal, localhost) does not open in the analyst browser.') : undefined}><input className="field mono" value={f.url} onChange={(e) => { setF({ ...f, url: e.target.value }); setTest(null); }} placeholder="https://defectdojo.example" /></Field>
           <Field label={t('Klucz API', 'API key')} hint={f.api_key_set ? t('Klucz jest zapisany i zaszyfrowany. Wpisz nowy tylko, aby go zmienić.', 'A key is stored and encrypted. Type a new one only to replace it.') : t('Klucz nie jest jeszcze ustawiony.', 'No key is set yet.')}>
             <input className="field mono" type="password" autoComplete="off" value={key} onChange={(e) => { setKey(e.target.value); setTest(null); }} placeholder={f.api_key_set ? '••••••••••••••••' : ''} />
           </Field>
@@ -339,7 +356,7 @@ function DojoTab() {
           <p className="mt-1 text-xs text-ink-3">{t('Status ustawiony przez analityka w Czujce wygrywa: różnicę pokazujemy jako konflikt, nie nadpisujemy.', 'A status that an analyst set in Czujka wins: a difference shows as a conflict and is not overwritten.')}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button size="sm" icon="download" busy={pullRun.isPending && !pullRun.variables} disabled={!q.data.api_key_set} onClick={() => pullRun.mutate(false)} data-testid="dojo-pull">{t('Sprawdź statusy w DefectDojo', 'Check the statuses in DefectDojo')}</Button>
-            {pull && (pull.updates ?? []).length ? <Button size="sm" variant="primary" icon="check" busy={pullRun.isPending && pullRun.variables === true} onClick={() => pullRun.mutate(true)}>{t('Zastosuj ' + (pull.updates ?? []).length + ' zmian', 'Apply ' + (pull.updates ?? []).length + ' changes')}</Button> : null}
+            {pull && (pull.updates ?? []).length && !pull.applied ? <Button size="sm" variant="primary" icon="check" busy={pullRun.isPending && pullRun.variables === true} onClick={() => pullRun.mutate(true)}>{t('Zastosuj ' + (pull.updates ?? []).length + ' zmian', 'Apply ' + (pull.updates ?? []).length + ' changes')}</Button> : null}
             <Button size="sm" icon="upload" busy={syncRun.isPending} disabled={!q.data.api_key_set} onClick={() => syncRun.mutate(undefined)}>{t('Wyślij statusy do DefectDojo', 'Push the statuses to DefectDojo')}</Button>
           </div>
           {!q.data.api_key_set ? <p className="mt-1 text-xs text-ink-3">{t('Najpierw zapisz adres i klucz API.', 'Save the URL and the API key first.')}</p> : null}
@@ -347,7 +364,29 @@ function DojoTab() {
           {pull ? (
             <div className="mt-2 border border-rule p-2 text-sm" data-testid="dojo-pull-result">
               <p>{t('Sprawdzono ' + fmtInt(pull.checked) + ' znalezisk: ' + (pull.updates ?? []).length + ' zmian do przyjęcia, ' + count(pull.conflicts) + ' konfliktów, ' + count(pull.missing) + ' brakujących w DefectDojo.', 'Checked ' + fmtInt(pull.checked) + ' findings: ' + (pull.updates ?? []).length + ' changes to take, ' + count(pull.conflicts) + ' conflicts, ' + count(pull.missing) + ' missing in DefectDojo.')}{pull.applied ? ' ' + t('Zastosowano: ' + pull.applied + '.', 'Applied: ' + pull.applied + '.') : ''}</p>
-              {(pull.updates ?? []).slice(0, 8).map((x) => <p key={x.finding_id} className="mono text-xs text-ink-2">#{x.finding_id} {x.from} → {x.to} <span className="text-ink-3">{x.reason}</span></p>)}
+              {(pull.updates ?? []).length ? (
+                <ul className="mt-2 max-h-[220px] overflow-auto border-t border-rule">
+                  {(pull.updates ?? []).map((x) => (
+                    <li key={x.finding_id} className="grid gap-x-3 border-b border-rule py-1.5 text-xs last:border-b-0 sm:grid-cols-[250px_minmax(0,1fr)]" data-testid="dojo-pull-update">
+                      <span><Link className="link num" to={'/findings?open=' + x.finding_id}>#{x.finding_id}</Link> <FindingStatusMark status={x.from} /> → <FindingStatusMark status={x.to} /></span>
+                      <span className="text-ink-2">{x.reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {Array.isArray(pull.conflicts) && pull.conflicts.length ? (
+                <div className="mt-2 border-t border-rule pt-2" data-testid="dojo-pull-conflicts">
+                  <p className="text-xs font-medium text-ink">{t('Konflikty: decyzja analityka w Czujce zostaje', 'Conflicts: the analyst decision in Czujka stays')}</p>
+                  <ul>
+                    {pull.conflicts.map((x) => (
+                      <li key={x.finding_id} className="grid gap-x-3 border-b border-rule py-1.5 text-xs last:border-b-0 sm:grid-cols-[250px_minmax(0,1fr)]">
+                        <span><Link className="link num" to={'/findings?open=' + x.finding_id}>#{x.finding_id}</Link> <span className="text-ink-3">{t('Czujka', 'Czujka')}</span> <FindingStatusMark status={x.local} /></span>
+                        <span className="text-ink-2">{t('DefectDojo: ', 'DefectDojo: ')}<span className="mono">{x.remote}</span> · {x.reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </div>
           ) : null}
           {sync ? <p className="mt-2 text-sm" data-testid="dojo-sync-result">{t('Zamknięte: ' + sync.closed + ', ponownie otwarte: ' + sync.reopened + ', pominięte: ' + sync.skipped + (count(sync.errors) ? ', błędy: ' + count(sync.errors) : '') + '.', 'Closed: ' + sync.closed + ', reopened: ' + sync.reopened + ', skipped: ' + sync.skipped + (count(sync.errors) ? ', errors: ' + count(sync.errors) : '') + '.')}</p> : null}

@@ -60,6 +60,8 @@ export interface SafetyPolicy {
   allowed_ports: string; denied_ports: string; exclusions: string[]; allowed_methods: string[];
   emergency_stop: boolean; user_agent: string; updated_at: string;
   allowed_networks?: string[] | null;
+  /** Operator lock (CZUJKA_ALLOWED_NETWORKS), read only; empty = no lock. */
+  operator_networks?: string[] | null;
 }
 
 export interface DiscoveryOpts {
@@ -256,7 +258,8 @@ export interface DefectDojoSettings {
 }
 export interface DojoScopeMapping { scope_id: number; product_type_name: string; product_name: string; engagement_name: string }
 export interface DojoPullUpdate { finding_id: number; key: string; dojo_id: number; from: string; to: string; dojo_changed_at: string | null; reason: string }
-export interface DojoPullResult { checked: number; updates: DojoPullUpdate[] | null; conflicts: DojoPullUpdate[] | number | null; missing: unknown; errors: unknown; applied: number }
+export interface DojoPullConflict { finding_id: number; key: string; dojo_id: number; local: string; remote: string; reason: string }
+export interface DojoPullResult { checked: number; updates: DojoPullUpdate[] | null; conflicts: DojoPullConflict[] | number | null; missing: unknown; errors: unknown; applied: number }
 export interface DojoSyncResult { closed: number; reopened: number; skipped: number; errors: unknown }
 export interface FindingsImportReport { format: string; findings: number; skipped: number; invalid: InvalidLine[] | null; created: number; updated: number; hosts_created: number; run_id: number | null }
 export interface ManualEntryResult { run: ScanRun; host: Host }

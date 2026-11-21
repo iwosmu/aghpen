@@ -132,6 +132,16 @@ export default function Findings() {
   const bulk = useAction(async (body: Record<string, unknown>) => { await Promise.all(ids.map((id) => patch('/findings/' + id, body))); return ids.length; }, {
     success: (n) => t('Zmieniono znalezisk: ' + n, 'Findings updated: ' + n), onSuccess: () => { invalidate(qc, '/findings', '/dashboard'); setSelected(new Set()); },
   });
+  const [confirmAll, setConfirmAll] = useState(false);
+  const dojoFilter = () => {
+    const list = (k: string) => (u.get(k) ? u.get(k).split(',').filter(Boolean) : undefined);
+    return {
+      status: list('status'), severity: list('severity'), type: u.get('type') || undefined, tag: u.get('tag') || undefined, q: u.get('q') || undefined,
+      host_id: u.get('host_id') ? Number(u.get('host_id')) : undefined, min_interest: u.get('min_interest') ? Number(u.get('min_interest')) : undefined,
+      exported: u.get('exported') ? u.get('exported') === 'true' : undefined,
+    };
+  };
+  const exportAll = useAction(() => post<DojoExportResult>('/findings/export/defectdojo', { filter: dojoFilter() }), { silent: true, onSuccess: (r) => { setResult(r); setConfirmAll(false); invalidate(qc, '/findings'); } });
   const exportDojo = useAction(() => post<DojoExportResult>('/findings/export/defectdojo', { ids }), { silent: false, onSuccess: (r) => { setResult(r); invalidate(qc, '/findings'); setSelected(new Set()); } });
   const active = FILTERS.filter((k) => u.get(k)).length;
   const cols: Col<Finding>[] = [
@@ -156,7 +166,7 @@ export default function Findings() {
         title={t('Znaleziska', 'Findings')}
         sub={t('Rzeczy warte decyzji człowieka: panele administracyjne, środowiska testowe, wygasłe certyfikaty, nowe ekspozycje. Każde ma dowód i status.', 'Things that deserve a human decision: admin panels, staging environments, expired certificates, new exposures. Each has evidence and a status.')}
         readOnly={!canEdit}
-        actions={<><ExportButtons kind="findings" query={filters} />{can('results:create') ? <Button variant="primary" icon="plus" onClick={() => setManual(true)}>{t('Dodaj ręcznie', 'Add by hand')}</Button> : null}</>}
+        actions={<>{canExport && q.data && q.data.total > 0 ? <Button icon="upload" onClick={() => setConfirmAll(true)} disabled={Boolean(u.get('assignee'))} title={u.get('assignee') ? t('Filtr „przypisane” nie działa w eksporcie do DefectDojo: usuń go albo zaznacz znaleziska ręcznie.', 'The assignee filter does not apply to the DefectDojo export: clear it or select findings by hand.') : undefined} data-testid="dojo-export-filtered">{active ? t('Pasujące do DefectDojo', 'Matching to DefectDojo') : t('Wszystkie do DefectDojo', 'All to DefectDojo')}</Button> : null}<ExportButtons kind="findings" query={filters} />{can('results:create') ? <Button variant="primary" icon="plus" onClick={() => setManual(true)}>{t('Dodaj ręcznie', 'Add by hand')}</Button> : null}</>}
       />
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
         <SearchField value={text} onChange={setText} placeholder={t('tytuł, adres, opis', 'title, address, text')} />
@@ -197,6 +207,14 @@ export default function Findings() {
       {q.data ? <Pager total={q.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}
       {open ? <DetailDialog id={open} onClose={() => u.set({ open: null }, { keepOffset: true })} /> : null}
       {manual ? <ManualDialog onClose={() => setManual(false)} /> : null}
+      <Dialog open={confirmAll} onClose={() => setConfirmAll(false)} width={460} title={t('Eksportować pasujące znaleziska?', 'Export the matching findings?')}
+        footer={<><Button onClick={() => setConfirmAll(false)}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="upload" busy={exportAll.isPending} onClick={() => exportAll.mutate(undefined)} data-testid="dojo-export-filtered-go">{t('Eksportuj', 'Export')} {q.data?.total ?? 0}</Button></>}>
+        <p className="text-sm">{active
+          ? t('Do DefectDojo trafi ' + (q.data?.total ?? 0) + ' ' + plural(q.data?.total ?? 0, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']) + ' pasujących do bieżących filtrów. Te, które już tam są, zostaną zaktualizowane, nie zdublowane.', (q.data?.total ?? 0) + ' findings that match the current filters go to DefectDojo. Those already there are updated, not duplicated.')
+          : t('Do DefectDojo trafią wszystkie znaleziska (' + (q.data?.total ?? 0) + '). Te, które już tam są, zostaną zaktualizowane, nie zdublowane.', 'All findings (' + (q.data?.total ?? 0) + ') go to DefectDojo. Those already there are updated, not duplicated.')}</p>
+        <div className="mt-3"><InlineError error={exportAll.error} /></div>
+        {exportAll.error ? <p className="mt-2 text-xs text-ink-2" data-testid="dojo-export-retry-hint">{t('Część znalezisk mogła już trafić do DefectDojo. Ponów eksport, gdy DefectDojo odpowiada: Czujka rozpozna je po kluczu i zaktualizuje, bez duplikatów.', 'Some findings may already be in DefectDojo. Repeat the export when DefectDojo answers: Czujka recognises them by key and updates them, without duplicates.')}</p> : null}
+      </Dialog>
       <Dialog open={result !== null} onClose={() => setResult(null)} title={t('Eksport do DefectDojo', 'Export to DefectDojo')} width={480} footer={<Button variant="primary" onClick={() => setResult(null)}>{t('Gotowe', 'Done')}</Button>}>
         {result ? (
           <div className="space-y-3 text-sm" data-testid="dojo-result">
