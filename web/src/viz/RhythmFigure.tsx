@@ -128,8 +128,7 @@ export function RhythmFigure() {
         'Diagram: over a few weeks Czujka learns when a host answers. Silence at night is usual and raises no alarm. On Wednesday at 10:00 the host is silent although it usually answers then: Czujka checks it three times and raises an alarm.',
       )}</p>
       <div ref={root} aria-hidden="true" className="p-5 sm:p-6 xl:p-7">
-        <div className="mono mb-4 flex items-baseline justify-between gap-3 text-2xs uppercase tracking-[0.16em] text-ink-3">
-          <span>{t('schemat', 'diagram')}</span>
+        <div className="mono mb-4 flex h-4 items-baseline justify-end gap-3 text-2xs uppercase tracking-[0.16em] text-ink-3">
           <span className="grid justify-items-end whitespace-nowrap text-ink-2">
             {[1, 2, 3, 4, 5].map((w) => (
               <span key={w} data-week={w} className="opacity-0 [grid-area:1/1]">{w <= 4 ? t('tydzień ' + w, 'week ' + w) : t('ten tydzień', 'this week')}</span>

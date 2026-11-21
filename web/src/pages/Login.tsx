@@ -62,8 +62,8 @@ export default function Login() {
           <Button variant="ghost" size="sm" icon="globe" onClick={() => setLang(lang === 'pl' ? 'en' : 'pl')}>{lang === 'pl' ? 'English' : 'Polski'}</Button>
         </header>
 
-        <div className="flex flex-1 flex-col justify-center gap-10 py-8 lg:gap-12 lg:py-6 2xl:gap-20">
-        <main className="grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-center lg:gap-14 2xl:gap-24">
+        <div className="flex flex-1 flex-col gap-10 pb-2 pt-8 lg:pt-6">
+        <main className="grid flex-1 content-center gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-center lg:gap-14 2xl:gap-24">
           <div>
             <p className="font-display max-w-[12ch] text-[clamp(56px,7.4vw,148px)] leading-[0.92] tracking-[-0.015em] text-ink">
               {lang === 'pl' ? <>Co zmieniło się w&nbsp;<em className="text-ink-2">sieci</em>.</> : <>What changed on the <em className="text-ink-2">network</em>.</>}
@@ -122,7 +122,7 @@ export default function Login() {
         </main>
 
         <footer className="border-t border-white/10 pt-6">
-          <ul className="grid max-w-[880px] grid-cols-3 gap-4 sm:gap-10" data-testid="login-numbers">
+          <ul className="grid grid-cols-3 gap-4 sm:gap-10" data-testid="login-numbers">
             {numbers.map(([k, v]) => (
               <li key={k}>
                 <span className="font-display block text-[clamp(30px,3vw,52px)] leading-none text-ink">{k}</span>
