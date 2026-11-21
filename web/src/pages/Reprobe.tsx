@@ -28,7 +28,7 @@ function SettingsForm({ s, onDone }: { s: ReprobeSettings; onDone: () => void })
     <div className="mt-3 space-y-3 border-t border-rule pt-3" data-testid="reprobe-settings">
       <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label={t('Ponowne sprawdzenia włączone', 'Re-probing enabled')} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('Budżet na godzinę', 'Budget per hour')} hint={t('najwięcej adresów sprawdzanych w ciągu godziny', 'at most this many addresses per hour')}><input type="number" min={1} className="field num" value={f.budget_per_hour} onChange={(e) => setF({ ...f, budget_per_hour: Number(e.target.value) })} /></Field>
+        <Field label={t('Limit adresów na godzinę', 'Address limit per hour')} hint={t('najwięcej adresów sprawdzanych w ciągu godziny', 'at most this many addresses per hour')}><input type="number" min={1} className="field num" value={f.budget_per_hour} onChange={(e) => setF({ ...f, budget_per_hour: Number(e.target.value) })} /></Field>
         <Field label={t('Kroki potwierdzania (minuty)', 'Confirmation steps (minutes)')} hint={t('po ilu minutach od pierwszego braku odpowiedzi', 'minutes after the first miss')} error={!ok && steps ? t('wpisz dodatnie liczby, np. 10, 30, 90', 'enter positive numbers, for example 10, 30, 90') : undefined}><input className="field mono" value={steps} onChange={(e) => setSteps(e.target.value)} /></Field>
       </div>
       <Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!ok} onClick={() => save.mutate(undefined)}>{t('Zapisz', 'Save')}</Button>
@@ -50,20 +50,20 @@ export function ReprobePanel({ hostId, limit = 8 }: { hostId?: number; limit?: n
   const probes = (p.probes ?? []).filter((x) => !hostId || x.host_id === hostId);
   const skipped = (p.skipped ?? []).filter((x) => !hostId || x.host_id === hostId);
   return (
-    <Panel title={title} actions={!hostId && canConfigure ? <button type="button" className="link text-xs" onClick={() => setEdit((v) => !v)}>{edit ? t('Zamknij ustawienia', 'Close the settings') : t('Ustawienia', 'Settings')}</button> : undefined}>
+    <Panel title={title} actions={!hostId && canConfigure ? <button type="button" className="link text-xs" onClick={() => setEdit((v) => !v)}>{edit ? t('Zamknij ustawienia', 'Close settings') : t('Ustawienia', 'Settings')}</button> : undefined}>
       <div data-testid="reprobe-plan">
         {p.blocked && p.enabled ? <p className="mb-2 flex items-start gap-2 text-sm text-danger"><Icon name="stop" size={14} className="mt-0.5" />{p.blocked}</p> : null}
-        {!p.enabled ? <p className="text-sm text-ink-2">{t('Ponowne sprawdzenia zostały wyłączone (w nowej instalacji są włączone). Po ponownym włączeniu Czujka sprawdzi pojedyncze hosty, które przestały odpowiadać, zamiast czekać na następny pełny skan; nowy host w ciągu kilku minut.', 'Re-probing was turned off (a new installation has it on). When it is on again, Czujka checks single hosts that went silent instead of waiting for the next full scan; a new host within minutes.')}</p> : !hostId ? (
+        {!p.enabled ? <p className="text-sm text-ink-2">{t('Ponowne sprawdzenia są wyłączone.', 'Re-probing is off.')}</p> : !hostId ? (
           <p className="mb-2 text-xs text-ink-3"><span className="num text-ink">{fmtInt(p.due_now)}</span> {t('do sprawdzenia teraz', 'due now')} · <span className="num text-ink">{fmtInt(p.used_last_hour)}</span> / <span className="num">{fmtInt(p.budget_per_hour)}</span> {t('adresów w ostatniej godzinie', 'addresses in the last hour')}</p>
         ) : null}
-        {p.enabled && probes.length === 0 && skipped.length === 0 ? <p className="text-sm text-ink-2">{hostId ? t('Ten host nie czeka na ponowne sprawdzenie.', 'This host is not waiting for a re-probe.') : t('Nic nie czeka na ponowne sprawdzenie. Każdy host odpowiada albo czeka na pełny skan.', 'Nothing waits for a re-probe. Every host answers or waits for the full scan.')}</p> : null}
+        {p.enabled && probes.length === 0 && skipped.length === 0 ? <p className="text-sm text-ink-2">{hostId ? t('Ten host nie czeka na ponowne sprawdzenie.', 'This host is not waiting for a re-probe.') : t('Nic nie czeka na ponowne sprawdzenie.', 'Nothing is waiting for a re-probe.')}</p> : null}
         {probes.length ? (
           <ul className="divide-y divide-rule">
             {probes.slice(0, limit).map((x, i) => (
               <li key={x.host_id + ':' + i} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 py-1.5 text-sm">
                 <span className="min-w-0">
                   {!hostId ? <Link to={'/hosts/' + x.host_id} className="mono link mr-2">{x.ip}</Link> : null}
-                  <span className={cx('mr-2 text-2xs uppercase tracking-wide', x.kind === 'confirm' ? 'text-st-changed' : 'text-accent')}>{x.kind === 'confirm' ? t('potwierdzenie', 'confirm') + ' ' + x.step + '/' + x.steps : t('spodziewana odpowiedź', 'likely up')}</span>
+                  <span className={cx('mr-2 text-2xs uppercase tracking-wide', x.kind === 'confirm' ? 'text-st-changed' : 'text-accent')}>{x.kind === 'confirm' ? t('potwierdzenie', 'confirm') + ' ' + x.step + '/' + x.steps : t('spodziewana odpowiedź', 'response expected')}</span>
                   <span className="text-ink-2">{x.reason}</span>
                   {ports(x.ports) ? <span className="mono ml-1.5 text-2xs text-ink-3">{ports(x.ports)}</span> : null}
                 </span>

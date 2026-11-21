@@ -61,7 +61,7 @@ export function MissingHostLines({ changes, names }: { changes: Change[]; names?
         const v = verdicts.get(m.host_id);
         const state = !v ? 'unconfirmed' : v.kind === 'host_gone' ? 'gone' : 'back';
         const head = state === 'unconfirmed'
-          ? t('nie odpowiada (niepotwierdzone)', 'is not answering (unconfirmed)')
+          ? t('nie odpowiada (niepotwierdzone)', 'is not responding (unconfirmed)')
           : state === 'gone'
             ? t('zniknął (potwierdzone ' + fmtTime(v!.at) + ')', 'is gone (confirmed ' + fmtTime(v!.at) + ')')
             : t('znów odpowiada (' + fmtTime(v!.at) + ')', 'answers again (' + fmtTime(v!.at) + ')');
@@ -73,7 +73,7 @@ export function MissingHostLines({ changes, names }: { changes: Change[]; names?
               {svcs.length ? <>{t(', miał ', ', it had ')}{svcs.length} {plural(svcs.length, ['usługę', 'usługi', 'usług'], ['service', 'services'])}{': '}{svcs.slice(0, 8).map((c, i) => (
                 <span key={c.id}>{i ? ', ' : ''}<Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link">:{c.port}{(names?.(c) || nameOf(c)) ? ' ' + (names?.(c) || nameOf(c)) : ''}</Link></span>
               ))}{svcs.length > 8 ? t(' i ' + (svcs.length - 8) + ' więcej', ' and ' + (svcs.length - 8) + ' more') : ''}</> : null}
-              {state === 'unconfirmed' ? <span className="block text-xs text-ink-3">{t('Czujka sprawdzi go ponownie za kilka minut i pokaże tu wynik.', 'Czujka checks it again within minutes and shows the result here.')}</span> : null}
+              {state === 'unconfirmed' ? <span className="block text-xs text-ink-3">{t('Czujka sprawdzi go ponownie za kilka minut.', 'Czujka checks it again within minutes.')}</span> : null}
             </span>
           </li>
         );

@@ -24,7 +24,7 @@ export function WeekHeatmap({ buckets, nowIndex }: { buckets: AvailBucket[]; now
       <div>
         <div className="font-medium text-ink">{label}</div>
         {n === 0
-          ? <div className="text-ink-3">{t('brak prób w tej godzinie', 'no probe in this hour')}</div>
+          ? <div className="text-ink-3">{t('brak prób w tej godzinie', 'no probes in this hour')}</div>
           : <div className="text-ink-2"><span className="num text-ink">{fmtPct(b.up / n)}</span> · {t('odpowiedź w ' + b.up + ' z ' + n + ' prób', 'answered ' + b.up + ' of ' + n + ' probes')}</div>}
       </div>
     );
@@ -62,12 +62,12 @@ export function WeekHeatmap({ buckets, nowIndex }: { buckets: AvailBucket[]; now
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-2">
         <span className="inline-flex items-center gap-1.5">
-          {t('odpowiedzi:', 'answered:')}
+          {t('odpowiedzi:', 'responses:')}
           <span className="num text-2xs text-ink-3">0%</span>
           <span className="inline-flex gap-px">{[0, 1, 2, 3, 4, 5].map((s) => <span key={s} className="block h-[10px] w-[18px]" style={{ background: 'var(--seq-' + s + ')' }} />)}</span>
           <span className="num text-2xs text-ink-3">100%</span>
         </span>
-        <span className="inline-flex items-center gap-1.5"><span className="block h-[10px] w-[10px]" style={{ boxShadow: 'inset 0 0 0 1px var(--rule-strong)' }} />{t('brak prób', 'no probe')}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="block h-[10px] w-[10px]" style={{ boxShadow: 'inset 0 0 0 1px var(--rule-strong)' }} />{t('brak prób', 'no probes')}</span>
         {nowIndex !== undefined ? <span className="inline-flex items-center gap-1.5"><span className="block h-[10px] w-[10px] border-[1.5px] border-ink" />{t('teraz', 'now')}</span> : null}
       </div>
       {tip.node}
