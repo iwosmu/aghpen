@@ -59,7 +59,7 @@ export function PreviewReport({ p, pending }: { p: TargetPreview; pending?: bool
             const lock = isLockRefusal(l.reason);
             return (
               <li key={i} className="grid grid-cols-[64px_minmax(0,1fr)] gap-x-2 border-b border-rule py-1 text-xs sm:grid-cols-[64px_minmax(0,150px)_minmax(0,1fr)]" data-lock={lock || undefined}>
-                <span className="num text-ink-3">{lock ? <span className="inline-flex items-center gap-1 text-ink-2"><Icon name="lock" size={12} />{t('blokada', 'lock')}</span> : l.line > 0 ? t('wiersz', 'line') + ' ' + l.line : '–'}</span><span className="mono truncate text-ink">{l.value}</span><span className="col-span-2 text-danger sm:col-span-1">{l.reason}</span>
+                <span className="num inline-flex items-center gap-1 text-ink-3">{lock ? <Icon name="lock" size={12} className="text-ink-2" /> : null}{t('wiersz', 'line')} {l.line}</span><span className="mono truncate text-ink">{l.value}</span><span className="col-span-2 text-danger sm:col-span-1">{l.reason}</span>
               </li>
             );
           })}

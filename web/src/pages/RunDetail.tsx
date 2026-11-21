@@ -311,7 +311,7 @@ export function phaseText(s: ScanRun['stats'], chunks: number, addrs: number): s
   return t('Wykrywanie hostów w ', 'Discovering hosts in ') + where + t('. Postęp rośnie po zakończeniu każdej podgrupy.', '. Progress grows as each chunk finishes.');
 }
 
-interface DojoRunResult { test_id: number; test_url: string; reimport: boolean; created: number; closed: number; reactivated: number; untouched: number; total: number }
+interface DojoRunResult { test_id: number; test_url: string; reimport: boolean; mode?: 'import' | 'reimport'; title?: string; created: number; closed: number; reactivated: number; untouched: number; total: number }
 
 /** Uploads the nmap XML of a completed run to DefectDojo as an "Nmap Scan" import (a second upload re-imports into the same test). */
 export function DojoRunButton({ runId }: { runId: number }) {
@@ -324,7 +324,8 @@ export function DojoRunButton({ runId }: { runId: number }) {
         footer={<Button variant="primary" onClick={() => { setRes(null); send.reset(); }}>{t('Gotowe', 'Done')}</Button>}>
         {res ? (
           <div className="space-y-3 text-sm" data-testid="run-dojo-result">
-            <p className="flex items-center gap-2"><Glyph name="check" tone="new" />{res.reimport ? t('Ponowny import do tego samego testu.', 'Re-imported into the same test.') : t('Nowy test w DefectDojo.', 'A new test in DefectDojo.')}</p>
+            <p className="flex items-center gap-2"><Glyph name="check" tone="new" />{(res.mode ?? (res.reimport ? 'reimport' : 'import')) === 'reimport' ? t('Ponowny import (reimport) do testu profilu: DefectDojo zamyka to, czego nowy przebieg już nie widzi.', 'Re-import into the profile test: DefectDojo closes what the new run no longer sees.') : t('Pierwszy import: nowy test w DefectDojo.', 'First import: a new test in DefectDojo.')}</p>
+            <p className="text-xs text-ink-2" data-testid="run-dojo-mode">{t('Tryb', 'Mode')} <span className="mono text-ink">{res.mode ?? (res.reimport ? 'reimport' : 'import')}</span>{res.title ? <> · {t('test', 'test')} <span className="text-ink">{res.title}</span></> : null}</p>
             <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1">
               <dt className="text-ink-2">{t('Nowe obserwacje', 'New findings')}</dt><dd className="num">{res.created}</dd>
               <dt className="text-ink-2">{t('Zamknięte (zniknęły)', 'Closed (gone)')}</dt><dd className="num">{res.closed}</dd>

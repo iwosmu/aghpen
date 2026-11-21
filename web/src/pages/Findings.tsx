@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { NextSteps } from '../ui/NextSteps';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidate, useAction, useItem, usePage } from '../api/hooks';
-import { del, patch, post } from '../api/client';
+import { ApiError, del, patch, post } from '../api/client';
 import type { DojoExportResult, Finding, FindingStatus, Severity } from '../api/types';
 import { t, plural } from '../i18n';
 import { fmtDateTime, fmtRelative } from '../lib/format';
@@ -213,7 +213,7 @@ export default function Findings() {
           ? t('Do DefectDojo trafi ' + (q.data?.total ?? 0) + ' ' + plural(q.data?.total ?? 0, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']) + ' pasujących do bieżących filtrów. Te, które już tam są, zostaną zaktualizowane, nie zdublowane.', (q.data?.total ?? 0) + ' findings that match the current filters go to DefectDojo. Those already there are updated, not duplicated.')
           : t('Do DefectDojo trafią wszystkie znaleziska (' + (q.data?.total ?? 0) + '). Te, które już tam są, zostaną zaktualizowane, nie zdublowane.', 'All findings (' + (q.data?.total ?? 0) + ') go to DefectDojo. Those already there are updated, not duplicated.')}</p>
         <div className="mt-3"><InlineError error={exportAll.error} /></div>
-        {exportAll.error ? <p className="mt-2 text-xs text-ink-2" data-testid="dojo-export-retry-hint">{t('Część znalezisk mogła już trafić do DefectDojo. Ponów eksport, gdy DefectDojo odpowiada: Czujka rozpozna je po kluczu i zaktualizuje, bez duplikatów.', 'Some findings may already be in DefectDojo. Repeat the export when DefectDojo answers: Czujka recognises them by key and updates them, without duplicates.')}</p> : null}
+        {exportAll.error && !(exportAll.error instanceof ApiError && exportAll.error.code === 'dojo_unconfirmed') ? <p className="mt-2 text-xs text-ink-2" data-testid="dojo-export-retry-hint">{t('Część znalezisk mogła już trafić do DefectDojo. Ponów eksport, gdy DefectDojo odpowiada: Czujka rozpozna je po kluczu i zaktualizuje, bez duplikatów.', 'Some findings may already be in DefectDojo. Repeat the export when DefectDojo answers: Czujka recognises them by key and updates them, without duplicates.')}</p> : null}
       </Dialog>
       <Dialog open={result !== null} onClose={() => setResult(null)} title={t('Eksport do DefectDojo', 'Export to DefectDojo')} width={480} footer={<Button variant="primary" onClick={() => setResult(null)}>{t('Gotowe', 'Done')}</Button>}>
         {result ? (
