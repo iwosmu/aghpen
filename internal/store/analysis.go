@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/iwosmu/aghpen/internal/analyze"
 	"github.com/iwosmu/aghpen/internal/model"
 )
 
@@ -67,12 +68,20 @@ var changeSort = map[string]string{"id": "c.id", "at": "c.at", "kind": "c.kind",
 
 // ListChanges returns a page of changes, newest first by default.
 func (s *Store) ListChanges(ctx context.Context, f ChangeFilter) (model.Page[model.Change], error) {
-	return listPage[model.Change](ctx, s.db, changeCols, "changes c", f.where(), orderBy(f.Sort, changeSort, "c.at DESC", "c.id DESC"), f.ListOpts, nil)
+	p, err := listPage[model.Change](ctx, s.db, changeCols, "changes c", f.where(), orderBy(f.Sort, changeSort, "c.at DESC", "c.id DESC"), f.ListOpts, nil)
+	for i := range p.Items {
+		p.Items[i].Summary = analyze.ChangeSummary(p.Items[i])
+	}
+	return p, err
 }
 
 // EachChange streams every change that matches the filter.
 func (s *Store) EachChange(ctx context.Context, f ChangeFilter, fn func(*model.Change) error) error {
-	return streamAll[model.Change](ctx, s.db, changeCols, "changes c", f.where(), orderBy(f.Sort, changeSort, "c.at DESC", "c.id DESC"), nil, fn)
+	return streamAll[model.Change](ctx, s.db, changeCols, "changes c", f.where(), orderBy(f.Sort, changeSort, "c.at DESC", "c.id DESC"), nil,
+		func(c *model.Change) error {
+			c.Summary = analyze.ChangeSummary(*c)
+			return fn(c)
+		})
 }
 
 // InsertChanges stores the changes that the analysis found, in one statement.
@@ -121,7 +130,9 @@ func (s *Store) AckChanges(ctx context.Context, ids []int64, by string) (int, er
 
 // GetChange returns one change.
 func (s *Store) GetChange(ctx context.Context, id int64) (model.Change, error) {
-	return jsonRow[model.Change](ctx, s.db, wrapJSON("SELECT "+changeCols+" FROM changes c WHERE c.id = $1"), id)
+	c, err := jsonRow[model.Change](ctx, s.db, wrapJSON("SELECT "+changeCols+" FROM changes c WHERE c.id = $1"), id)
+	c.Summary = analyze.ChangeSummary(c)
+	return c, err
 }
 
 // ---------- findings ----------

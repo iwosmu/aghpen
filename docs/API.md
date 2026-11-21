@@ -60,6 +60,7 @@ Base path `/api/v1`. JSON bodies use the types of `internal/model/types.go` (the
 | GET `/service-groups` | results:read | → `Page<ServiceGroup>` |
 | GET `/technologies` | results:read | → `NameCount[]` (name, count, extra = category) |
 | GET `/changes` | results:read | filters `run_id, kind, severity, host_id, acked, expected, from, to` → `Page<Change>` |
+| GET `/changes/{id}` | results:read | → `Change` |
 | POST `/changes/{id}/ack` · POST `/changes/ack` | results:update | `{ids}` |
 | GET `/diff?from={runId}&to={runId}` | results:read | → `DiffReport` |
 | GET `/findings` · GET `/findings/{id}` | results:read | filters `status, severity, type, host_id, tag, min_interest, exported` → `Finding` |
@@ -100,6 +101,7 @@ Base path `/api/v1`. JSON bodies use the types of `internal/model/types.go` (the
 
 ## Notes
 
+- **Change summaries and language.** `Change.summary` is rendered when the change is read, from its stored fields (`kind`, `ip`, `port`, `field`, `before`, `after`, `expected`, `detail`), by one function (`analyze.RenderSummary`). The language comes from `?lang=en|pl`; without it, from the first tag of `Accept-Language` (`en`, `en-*` → English); default Polish. This holds for `/changes`, `/changes/{id}`, `/hosts/{id}/changes`, `POST /changes/{id}/ack`, `/diff`, `/dashboard` (`recent_changes`) and `/export/changes.{json,csv}`. The run report, the webhook and the live SSE stream use Polish. `Change.detail` (object, optional) holds the values behind the sentence and the internal measures: `rule`, `p_alive`, `misses_to_down`, `open_services`, `services`, `ports`, `product`, `name`, `expired`, `self_signed`, `values`, `flags`, `simhash_distance`, `pattern`, `stability_pct`. Changes stored before migration 0007 have no `detail`: the server reads the missing values from their stored text, so they also render in the current wording and in both languages. For an unknown kind the stored text is returned. The change search (`q`) matches the stored Polish text. Host-state values in `before`/`after` (field `status`): `up`, `missing` (not responding, unconfirmed), `down`, `unstable`, `expected-offline` (outside usual hours).
 - **host_missing.** A host that answered in the previous run and is silent now, but is not yet reported inactive, gets the change `host_missing` (severity medium). Its open services count in `summary.services_unreachable`; they are not gone. `Headline.hosts_missing` on the dashboard counts these hosts of the last run; the global SSE stream sends the change as `change`. `host_gone` follows when the model (or the profile rule `retry.down_after_misses`) reports the host inactive.
 - **Services of a host that went down.** When a scan reports a known host as down, its open and filtered services become `unknown` (not gone: the port was not checked). A service becomes `gone` (change `service_gone`) only when a full scan finds the host up and the port not open.
 - **down_after_misses** in `AvailabilityProfile`: how many misses in a row, counted from now, would report the host inactive. For a host that is already down it is the rule value of the profile (`retry.down_after_misses`, or the model threshold), never 0.
