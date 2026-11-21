@@ -53,6 +53,10 @@ type HostSnapshot struct {
 	// not answer, leave it empty or carry the last known services forward;
 	// Diff never reports a service of a silent host as gone.
 	Services []model.ServiceResult
+	// PortsUnknown: the host answered, but its port scan did not finish.
+	// A previous service that Services does not list is unreachable in this
+	// run, not gone.
+	PortsUnknown bool
 	// ServiceIDs maps "port/proto" to the store id, when known.
 	ServiceIDs map[string]int64
 }
@@ -338,6 +342,10 @@ func (d *differ) host(prev, cur *HostSnapshot) {
 	gone := make([]*model.ServiceResult, 0)
 	for k, p := range prevSvc {
 		if c, ok := curSvc[k]; ok && isOpen(c) {
+			continue
+		}
+		if _, listed := curSvc[k]; cur.PortsUnknown && !listed && isOpen(p) {
+			d.unreachable++ // the port scan did not finish: not measured, not gone
 			continue
 		}
 		proto := p.Proto

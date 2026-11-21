@@ -68,16 +68,23 @@ func NewEvaluator(rules []*Rule, now time.Time) *Evaluator {
 	return e
 }
 
+// sevInterest is the base interest of a policy finding. A rule often
+// restates what the engine already reports about the same service (an
+// admin panel outside the management network is also the engine's
+// admin-panel finding, 75): the policy finding ranks just below it, so the
+// first screen shows different problems, not one fact twice. Measured on
+// the lab dashboard before: the two policy findings of one service and
+// the engine's finding all read 100.
 func sevInterest(s model.Severity) int {
 	switch s {
 	case model.SevHigh:
-		return 80
-	case model.SevMedium:
 		return 60
+	case model.SevMedium:
+		return 45
 	case model.SevLow:
-		return 40
+		return 30
 	}
-	return 20
+	return 15
 }
 
 func addrOf(h *HostRec) (netip.Addr, bool) {
@@ -268,10 +275,8 @@ func (e *Evaluator) serviceViolation(r *Rule, h *HostRec, s *SvcRec, ev []model.
 	if title == "" && s.Result != nil && s.Result.HTTP != nil {
 		title = s.Result.HTTP.Title
 	}
-	interest := sevInterest(r.Severity) + s.Service.Interest/5
-	if interest > 100 {
-		interest = 100
-	}
+	// the service's own interest adds at most 9: high severity stays under 70
+	interest := sevInterest(r.Severity) + min(s.Service.Interest, 99)/10
 	var what []string
 	for _, x := range ev {
 		what = append(what, x.Where+": "+x.Snippet)

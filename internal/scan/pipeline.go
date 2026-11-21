@@ -14,7 +14,7 @@ import (
 
 const (
 	discoveryHostTimeout = 30 * time.Second
-	portScanHostTimeout  = 5 * time.Minute
+	portScanHostTimeout  = 5 * time.Minute // the floor; see portScanTimeout
 	serviceHostTimeout   = 3 * time.Minute
 	udpHostTimeout       = time.Minute
 	defaultBackoff       = 1500 * time.Millisecond
@@ -254,8 +254,12 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 	}
 	t0 := r.e.now()
 	end := r.stats.begin(rate)
+	nports := 0
+	if r.ports != nil {
+		nports = int(r.ports.Count())
+	}
 	ps, err := r.prober.PortScan(ctx, probe.PortScanRequest{
-		Hosts: ips, Ports: r.ports, MaxRate: rate, MaxRetries: 2, HostTimeout: portScanHostTimeout, IPv6: g.v6,
+		Hosts: ips, Ports: r.ports, MaxRate: rate, MaxRetries: 2, HostTimeout: portScanTimeout(len(ips), nports, rate), IPv6: g.v6,
 	})
 	end()
 	r.account(gs, ps, t0)
@@ -269,18 +273,31 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 	// A host that discovery found but that gave the port scan no answer at
 	// all (not even a closed port) lost its probes, usually its neighbour
 	// resolution under load: nmap then marks it down and reports no port.
-	// Scan those hosts once more before their ports are recorded as none.
+	// A host whose scan hit --host-timeout has no port either. Scan those
+	// hosts once more before their ports are recorded as none.
 	var silent []string
 	for _, h := range hosts {
 		if p := scanned[h.IP]; h.Up && (p == nil || !p.Responded) {
 			silent = append(silent, h.IP)
 		}
 	}
+	timedOut := func() []string {
+		var out []string
+		for _, h := range hosts {
+			if p := scanned[h.IP]; p != nil && p.TimedOut {
+				out = append(out, h.IP)
+			}
+		}
+		return out
+	}
+	if t := timedOut(); len(t) > 0 {
+		r.log.Warn("port scan timed out for hosts", "group", g.id, "hosts", len(t), "of", len(hosts), "rate", rate, "ports", nports)
+	}
 	if len(silent) > 0 && ctx.Err() == nil {
 		t1 := r.e.now()
 		end := r.stats.begin(rate)
 		again, err := r.prober.PortScan(ctx, probe.PortScanRequest{
-			Hosts: silent, Ports: r.ports, MaxRate: rate, MaxRetries: 3, HostTimeout: portScanHostTimeout, IPv6: g.v6,
+			Hosts: silent, Ports: r.ports, MaxRate: rate, MaxRetries: 3, HostTimeout: portScanTimeout(len(silent), nports, rate), IPv6: g.v6,
 		})
 		end()
 		r.account(gs, again, t1)
@@ -290,6 +307,8 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 				if again.Hosts[i].Responded {
 					scanned[again.Hosts[i].IP] = &again.Hosts[i]
 					n++
+				} else if again.Hosts[i].TimedOut {
+					scanned[again.Hosts[i].IP] = &again.Hosts[i]
 				}
 			}
 			r.stats.update(func(s *model.RunStats) { s.Retried += len(silent) })
@@ -298,6 +317,21 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 			return context.Cause(ctx)
 		}
 	}
+	unknown := map[string]bool{}
+	if t := timedOut(); len(t) > 0 {
+		for _, ip := range t {
+			unknown[ip] = true
+		}
+		r.stats.update(func(s *model.RunStats) { s.PortsUnknown += len(t) })
+		r.stats.warn("Skan portów nie skończył się dla części hostów (limit czasu nmap). Ich usługi w tym przebiegu są nieznane, nie zniknęły.")
+	}
+	var answered int64
+	for _, h := range hosts {
+		if p := scanned[h.IP]; p != nil && (p.Responded || len(p.Ports) > 0) {
+			answered++
+		}
+	}
+	r.portAnswered.Add(answered)
 	var up []probe.Host
 	for _, h := range hosts {
 		p := scanned[h.IP]
@@ -391,6 +425,9 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 			defer wg.Done()
 			defer func() { <-r.hostSem }()
 			res := r.buildHost(ctx, h, attempts)
+			if unknown[h.IP] {
+				res.PortsUnknown, res.Reason = true, model.ReasonPortsUnknown
+			}
 			if ctx.Err() != nil {
 				return // half-collected: the chunk is deferred and scanned again
 			}
@@ -524,4 +561,19 @@ func (r *run) emitHost(g *group, gs *groupStats, res model.HostResult) {
 		s.ServicesOpen += open
 		s.HTTPServices += web
 	})
+}
+
+// portScanTimeout is nmap's --host-timeout for one port-scan process. nmap
+// scans the hosts of one process side by side at the process's packet rate,
+// so one host may need the whole process's time: hosts x ports / rate, and
+// up to three times that when ports are filtered (two retransmissions).
+// Measured on the public instance (8 parallel groups at 105 pps each): a
+// group with about 35 live hosts and 1000 ports needs over 330 s, and a fixed
+// 5 minutes dropped every host of that group without a single port.
+func portScanTimeout(hosts, ports, rate int) time.Duration {
+	if rate < 1 {
+		rate = 1
+	}
+	need := time.Duration(float64(hosts) * float64(ports) * 3 / float64(rate) * float64(time.Second))
+	return max(portScanHostTimeout, need)
 }

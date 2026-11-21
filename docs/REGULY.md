@@ -185,3 +185,7 @@ version:
 ```
 
 Wyjaśnienie reguły: „nagłówek X-Infokiosk-Node występuje tylko w tej usłudze i w 1 podobnych instancjach (0 z 28 pozostałych usług)”. Retro-hunt: przykład i drugi kiosk, obie z wersją 4.2.1, 0 wysłanych pakietów.
+
+## Ocena ciekawości obserwacji z reguły
+
+Obserwacja z reguły ma ocenę z ważności reguły: wysoka 60, średnia 45, niska 30, informacyjna 15. Ocena usługi dodaje najwyżej 9 punktów (jedna dziesiąta). Reguła często powtarza fakt, który silnik już zgłasza dla tej samej usługi (panel administracyjny poza siecią zarządzania to też obserwacja silnika „panel administracyjny”, 75). Dlatego obserwacja z reguły stoi tuż pod obserwacją silnika, a pierwszy ekran pokazuje różne problemy, nie jeden fakt dwa razy. Przed tą zmianą w laboratorium obie obserwacje z reguł dla jednej usługi i obserwacja silnika miały po 100.

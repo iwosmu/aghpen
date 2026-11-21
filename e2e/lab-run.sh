@@ -18,7 +18,8 @@
 # It scans only 10.66.0.0/16 (the lab). Output: $LR_OUT (default e2e/out/lab-run-<name>-<time>).
 # Environment: LR_PROJECT (czacc), LR_PORT (18520), LR_IP (10.66.0.30), LR_STATES ("t0 t1 t2"),
 # LR_PROFILE (JSON merged into the seeded profile), LR_NAME, LR_SKIP_BUILD=1, LR_KEEP=1 (keep the product),
-# LR_FINAL_STATE (state to leave the lab in, default t0), LR_FRESH=0 (reuse the running product and its database).
+# LR_FINAL_STATE (state to leave the lab in, default t0), LR_FRESH=0 (reuse the running product and its database),
+# LR_IGNORE_NEIGH=1 (run even when the Docker host's neighbour table is nearly full; see e2e/neigh-check.sh).
 set -uo pipefail
 cd "$(dirname "$0")/.."
 PROJECT=${LR_PROJECT:-czacc}
@@ -111,6 +112,13 @@ log "profile $PROFILE: $(echo "$PJSON" | jq -c '{ports, discovery, udp, version_
 api POST /profiles/$PROFILE/estimate | jq -c . | tee -a "$OUT/run.log"
 
 # ---- runs ----
+# The neighbour table is global for the whole Docker host; a nearly full table
+# loses hosts and ports in every scan on the machine (e2e/neigh-check.sh).
+if ! NB=$(e2e/neigh-check.sh); then
+  log "$NB"
+  [ "${LR_IGNORE_NEIGH:-0}" = 1 ] || { log "the neighbour table is nearly full: results would be wrong (LR_IGNORE_NEIGH=1 runs anyway)"; exit 3; }
+fi
+log "before: $NB"
 mem_sampler
 trap 'rm -f "$OUT/.mem.on"' EXIT
 PREV=""
@@ -149,6 +157,7 @@ for st in $STATES; do
   echo "$R" | jq . > "$OUT/run-$st.json"
   log "run $RUN $(echo "$R" | jq -r .status) in $WALL s; tx packets on the lab interface: $((P1 - P0)), peak $PEAK pps; $(echo "$R" | jq -c '{hosts_up: .stats.hosts_up, services: .stats.services_open, packets: .stats.packets_sent, avg_pps: (.stats.avg_pps|floor), peak_pps: .stats.peak_pps, http_requests: .stats.http_requests, elapsed: .stats.elapsed_sec}')"
   echo "$st run=$RUN wall=$WALL tx=$((P1 - P0)) peak=$PEAK" >> "$OUT/runs.txt"
+  e2e/neigh-check.sh -json > "$OUT/neigh-$st.json"; log "after $st: $(e2e/neigh-check.sh)"
   curl -sS -b "$JAR" -o "$OUT/export-$st.json" "$API/export/runs/$RUN.json"
   api GET "/changes?run_id=$RUN&limit=1000" > "$OUT/changes-$st.json"
   go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$st.json" -ignore "$IGNORE" -max-list 0 > "$OUT/score-$st.txt"

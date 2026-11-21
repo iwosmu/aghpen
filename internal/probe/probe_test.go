@@ -419,3 +419,25 @@ func TestDiscoverArgsARPOnly(t *testing.T) {
 		t.Errorf("unprivileged ARP-only args = %q", args)
 	}
 }
+
+// nmap 7.97 with -Pn on Ethernet: the host timed out, the reason is still
+// arp-response (measured in the lab). Its ports are unknown.
+func TestParseXMLTimedOutHost(t *testing.T) {
+	x := `<?xml version="1.0"?><nmaprun scanner="nmap" args="nmap -sS -Pn">
+<host starttime="1" endtime="4" timedout="true"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.66.10.20" addrtype="ipv4"/><address addr="5A:B7:8C:5E:04:F9" addrtype="mac"/><hostnames></hostnames>
+</host>
+<host><status state="up" reason="arp-response"/><address addr="10.66.10.21" addrtype="ipv4"/>
+<ports><extraports state="closed" count="999"/><port protocol="tcp" portid="9090"><state state="open" reason="syn-ack"/></port></ports></host>
+<runstats><finished exit="success"/><hosts up="2" down="0" total="2"/></runstats></nmaprun>`
+	res, err := ParseXML(strings.NewReader(x))
+	if err != nil || len(res.Hosts) != 2 {
+		t.Fatalf("res %+v err %v", res, err)
+	}
+	if h := res.Hosts[0]; !h.TimedOut || h.Responded || len(h.Ports) != 0 {
+		t.Errorf("timed out host = %+v", h)
+	}
+	if h := res.Hosts[1]; h.TimedOut || !h.Responded || len(h.Ports) != 1 {
+		t.Errorf("finished host = %+v", h)
+	}
+}

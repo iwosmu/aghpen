@@ -147,6 +147,16 @@ export default function RunDetail() {
           </div>
         ) : null}
 
+        {s.warnings && s.warnings.length > 0 ? (
+          <div role="alert" data-testid="run-warnings" className="flex items-start gap-2 border border-danger/60 bg-st-gone-wash px-3 py-2 text-sm">
+            <Icon name="alert" className="mt-0.5 text-danger" />
+            <span>
+              <span className="font-medium">{t('Wynik skanu jest niepełny.', 'The scan result is incomplete.')}</span>
+              {s.warnings.map((w) => <span key={w} className="block">{w}</span>)}
+            </span>
+          </div>
+        ) : null}
+
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <section className="border border-rule bg-panel p-3">
             <div className="flex items-baseline justify-between gap-3">

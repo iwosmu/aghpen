@@ -110,6 +110,8 @@ export interface RunStats {
   packets_estimated?: number;
   /** measured: exact counts of finished stages; pace: includes the pinned nmap pace of running stages. */
   current_pps_basis?: 'measured' | 'pace' | '';
+  /** engine sanity checks that failed: the run ended, but its result is not complete (Polish text) */
+  warnings?: string[]; ports_unknown?: number;
 }
 
 export interface RunDiffSummary {

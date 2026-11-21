@@ -61,8 +61,22 @@ func (k *statsKeeper) update(fn func(s *model.RunStats)) {
 	k.mu.Unlock()
 }
 
+// warn adds a warning to the run once. The text is what the user reads
+// (Polish, like the rest of the UI); the caller logs in English.
+func (k *statsKeeper) warn(text string) {
+	k.update(func(s *model.RunStats) {
+		for _, w := range s.Warnings {
+			if w == text {
+				return
+			}
+		}
+		s.Warnings = append(s.Warnings, text)
+	})
+}
+
 // begin marks the start of a rate-paced probe stage. Call the returned
 // function when the stage ends, just before addStage.
+
 func (k *statsKeeper) begin(rate int) (end func()) {
 	k.mu.Lock()
 	k.flightSeq++
