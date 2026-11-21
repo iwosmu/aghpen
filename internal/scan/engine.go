@@ -269,6 +269,13 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 		s.ChunksTotal = s.ChunksDone + len(units)
 	})
 	if r.fullPlanned = r.fullRangePlanned(int64(total)); r.fullPlanned {
+		if r.ports.Count() >= 65535 {
+			// every port asked for: the top ports go first, so their services
+			// show within seconds, and the second pass scans the rest
+			if top, err := probe.EffectivePorts("top-1000", plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil && top.Count() > 0 {
+				r.ports = top
+			}
+		}
 		r.fullLeft.Store(fullRangeMaxHosts)
 		r.stats.addPass(model.PassTopPorts)
 		r.stats.addPass(model.PassFullRange)

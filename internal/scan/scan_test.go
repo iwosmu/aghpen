@@ -1092,3 +1092,62 @@ func TestEstimateCountsTheFullRange(t *testing.T) {
 		t.Errorf("explicit list: %+v", est)
 	}
 }
+
+// The extra passes keep the policy's port lists: a stack whose policy allows
+// only its own published ports must never see another port probed.
+func TestExtraPassesKeepTheAllowedPorts(t *testing.T) {
+	netw := &recordingNet{fakeNet: &fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 80, 40000}}}}
+	e := New(Deps{Prober: netw, Logger: quiet})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.Ports = "top-100"
+	plan.Policy.AllowedPorts = "22,80,8080"
+	sink := newSink()
+	if out := e.Run(context.Background(), plan, sink); out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	allowed, _ := probe.ParsePorts("22,80,8080")
+	for _, ps := range netw.scanned {
+		for _, p := range ps.List() {
+			if !allowed.Has(p) {
+				t.Fatalf("port %d probed outside allowed_ports", p)
+			}
+		}
+	}
+	if h := sink.host("10.7.0.5"); h == nil || len(h.Services) != 2 {
+		t.Errorf("host = %+v", h)
+	}
+}
+
+type recordingNet struct {
+	*fakeNet
+	mu      sync.Mutex
+	scanned []*probe.PortSet
+}
+
+func (n *recordingNet) PortScan(ctx context.Context, req probe.PortScanRequest) (*probe.Result, error) {
+	n.mu.Lock()
+	n.scanned = append(n.scanned, req.Ports)
+	n.mu.Unlock()
+	return n.fakeNet.PortScan(ctx, req)
+}
+
+func TestExplicitFullRangeGoesTopPortsFirst(t *testing.T) {
+	netw := &recordingNet{fakeNet: &fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 40000}}}}
+	e := New(Deps{Prober: netw, Logger: quiet})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.Ports = "1-65535"
+	sink := newSink()
+	out := e.Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	if len(netw.scanned) < 2 || netw.scanned[0].Count() != 1000 || netw.scanned[0].Count()+netw.scanned[len(netw.scanned)-1].Count() != 65535 {
+		t.Errorf("scans: %d", len(netw.scanned))
+	}
+	if h := sink.host("10.7.0.5"); h == nil || len(h.Services) != 2 {
+		t.Errorf("host = %+v", h)
+	}
+	if p := out.Stats.Passes; len(p) != 2 || p[1].PortsTotal != 64535 {
+		t.Errorf("passes = %+v", p)
+	}
+}

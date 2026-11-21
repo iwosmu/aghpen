@@ -739,7 +739,8 @@ func (r *run) densePass(ctx context.Context, g *group, scanned map[string]*probe
 	if r.ports == nil || ctx.Err() != nil {
 		return nil
 	}
-	rest, err := probe.ParsePorts(densePorts)
+	// the policy's allowed and denied ports hold here too
+	rest, err := probe.EffectivePorts(densePorts, r.plan.Policy.AllowedPorts, r.plan.Policy.DeniedPorts)
 	if err != nil {
 		return nil
 	}
@@ -1029,10 +1030,11 @@ func (r *run) fullRangePlanned(addresses int64) bool {
 }
 
 func fullRangeFor(spec string, ports *probe.PortSet, addresses int64) bool {
-	if ports == nil || ports.Count() >= 65535 || addresses > fullRangeMaxAddresses {
+	if ports == nil || addresses > fullRangeMaxAddresses {
 		return false
 	}
-	return strings.Contains(strings.ToLower(spec), "top-")
+	// "1-65535" itself is split the same way: top ports first, then the rest
+	return ports.Count() >= 65535 || strings.Contains(strings.ToLower(spec), "top-")
 }
 
 // claimFullRange decides the full-range pass for one group: every live host
@@ -1072,7 +1074,8 @@ type fullScan struct {
 
 // fullRangeScan scans the ports outside the profile's list on the live hosts.
 func (r *run) fullRangeScan(ctx context.Context, g *group, up []probe.Host, rate int, gs *groupStats) fullScan {
-	rest, err := probe.ParsePorts("1-65535")
+	// the policy's allowed and denied ports hold here too
+	rest, err := probe.EffectivePorts("1-65535", r.plan.Policy.AllowedPorts, r.plan.Policy.DeniedPorts)
 	if err != nil {
 		return fullScan{err: err}
 	}
