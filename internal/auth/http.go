@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"time"
 
@@ -42,41 +41,9 @@ func ClearCookie(w http.ResponseWriter, secure bool) {
 	http.SetCookie(w, &http.Cookie{Name: CookieName, Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: secure, MaxAge: -1})
 }
 
-func safeMethod(m string) bool {
+// SafeMethod reports whether an HTTP method does not change state.
+func SafeMethod(m string) bool {
 	return m == http.MethodGet || m == http.MethodHead || m == http.MethodOptions
-}
-
-// Authenticate is the middleware that resolves the session cookie. With a
-// valid session the principal is put in the request context. Mutating requests
-// of a session must carry the CSRF token. Requests without a session pass on;
-// RequireSession and Require reject them where a session is needed.
-func (s *Service) Authenticate(next http.Handler, fail ErrorWriter) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c, err := r.Cookie(CookieName)
-		if err != nil || c.Value == "" {
-			next.ServeHTTP(w, r)
-			return
-		}
-		p, err := s.authenticate(r.Context(), c.Value)
-		if errors.Is(err, ErrNoSession) {
-			next.ServeHTTP(w, r)
-			return
-		}
-		if err != nil {
-			fail(w, r, http.StatusInternalServerError, "internal", "session lookup failed")
-			return
-		}
-		r = r.WithContext(WithPrincipal(r.Context(), p))
-		if !safeMethod(r.Method) && !p.CheckCSRF(r.Header.Get(CSRFHeader)) {
-			fail(w, r, http.StatusForbidden, "forbidden", "missing or wrong CSRF token: send the csrf_token of the session in the X-CSRF-Token header")
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (s *Service) authenticate(ctx context.Context, token string) (*Principal, error) {
-	return s.AuthenticateToken(ctx, token)
 }
 
 // RequireSession rejects requests without a session with 401.
