@@ -221,5 +221,11 @@
 @keyframes bar-move { from { background-position: 0 0; } to { background-position: 17px 0; } }
 @media (prefers-reduced-motion: reduce) { .bar-active { animation: none; } }
 
+/* The login rail is dark in both themes: figures on it keep the dark ramp. */
+.on-rail {
+  --seq-0: #1b2533; --seq-1: #184f95; --seq-2: #256abf; --seq-3: #3987e5; --seq-4: #6da7ec; --seq-5: #b7d3f6;
+  --st-gone: #e5556a; --st-gone-wash: #3a1a24;
+}
+
 /* Presentation mode (?present=1 or Shift+P): one step larger for a 1080p recording. */
 html[data-present] { zoom: 1.125; }
