@@ -363,6 +363,15 @@ type HostResult struct {
 	OSGuess    string          `json:"os_guess"`
 	ObservedAt time.Time       `json:"observed_at"`
 	Services   []ServiceResult `json:"services"`
+	Scripts    []ScriptResult  `json:"scripts,omitempty"` // nmap host scripts, kept for import/export round trips
+}
+
+// ScriptResult is the output of one nmap script (NSE), as found in imported
+// nmap XML. Czujka itself runs only safe default detection; the field keeps
+// imported data lossless.
+type ScriptResult struct {
+	ID     string `json:"id"`
+	Output string `json:"output"`
 }
 
 type ServiceResult struct {
@@ -381,7 +390,8 @@ type ServiceResult struct {
 	TLS          *TLSInfo         `json:"tls"`
 	Matches      []SigMatch       `json:"matches"`
 	Technologies []Technology     `json:"technologies"`
-	Classes      []string         `json:"classes"` // see Class* constants
+	Classes      []string         `json:"classes"`           // see Class* constants
+	Scripts      []ScriptResult   `json:"scripts,omitempty"` // nmap port scripts from imported XML
 }
 
 // Service classes set by the classifier.

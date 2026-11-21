@@ -1,0 +1,146 @@
+[
+  {
+    "id": 0,
+    "key": "default-page/172.31.250.2/tcp-80",
+    "type": "default-page",
+    "title": "Strona domyślna serwera: Welcome to nginx! (172.31.250.2:80)",
+    "description": "Serwer pokazuje stronę domyślną. To zwykle zapomniana lub nieskonfigurowana instalacja.",
+    "severity": "info",
+    "status": "new",
+    "interest": 10,
+    "host_id": 1,
+    "ip": "172.31.250.2",
+    "service_id": null,
+    "port": 80,
+    "url": "http://172.31.250.2:80/",
+    "signature": "",
+    "evidence": [
+      {
+        "matcher": "title",
+        "where": "title",
+        "snippet": "Welcome to nginx!"
+      }
+    ],
+    "note": "",
+    "tags": [
+      "default-page"
+    ],
+    "assignee": "",
+    "first_seen": "2026-11-21T12:05:49Z",
+    "last_seen": "2026-11-21T12:05:49Z",
+    "first_run_id": 1,
+    "last_run_id": 1,
+    "overrides": null,
+    "dojo_id": null,
+    "dojo_url": "",
+    "manual": false
+  },
+  {
+    "id": 0,
+    "key": "interesting-header/172.31.250.2/tcp-80",
+    "type": "interesting-header",
+    "title": "Nagłówki ujawniają szczegóły oprogramowania: Server (172.31.250.2:80)",
+    "description": "Odpowiedź HTTP zawiera nagłówki, które ujawniają oprogramowanie, jego wersję lub środowisko.",
+    "severity": "info",
+    "status": "new",
+    "interest": 10,
+    "host_id": 1,
+    "ip": "172.31.250.2",
+    "service_id": null,
+    "port": 80,
+    "url": "http://172.31.250.2:80/",
+    "signature": "",
+    "evidence": [
+      {
+        "matcher": "header",
+        "where": "header:Server",
+        "snippet": "nginx/1.31.9"
+      }
+    ],
+    "note": "",
+    "tags": [
+      "interesting-header"
+    ],
+    "assignee": "",
+    "first_seen": "2026-11-21T12:05:49Z",
+    "last_seen": "2026-11-21T12:05:49Z",
+    "first_run_id": 1,
+    "last_run_id": 1,
+    "overrides": null,
+    "dojo_id": null,
+    "dojo_url": "",
+    "manual": false
+  },
+  {
+    "id": 0,
+    "key": "interesting-header/172.31.250.3/tcp-80",
+    "type": "interesting-header",
+    "title": "Nagłówki ujawniają szczegóły oprogramowania: Server (172.31.250.3:80)",
+    "description": "Odpowiedź HTTP zawiera nagłówki, które ujawniają oprogramowanie, jego wersję lub środowisko.",
+    "severity": "info",
+    "status": "new",
+    "interest": 5,
+    "host_id": 2,
+    "ip": "172.31.250.3",
+    "service_id": null,
+    "port": 80,
+    "url": "http://172.31.250.3:80/",
+    "signature": "",
+    "evidence": [
+      {
+        "matcher": "header",
+        "where": "header:Server",
+        "snippet": "Apache/2.4.71 (Unix)"
+      }
+    ],
+    "note": "",
+    "tags": [
+      "interesting-header"
+    ],
+    "assignee": "",
+    "first_seen": "2026-11-21T12:05:49Z",
+    "last_seen": "2026-11-21T12:05:49Z",
+    "first_run_id": 1,
+    "last_run_id": 1,
+    "overrides": null,
+    "dojo_id": null,
+    "dojo_url": "",
+    "manual": false
+  },
+  {
+    "id": 0,
+    "key": "database-exposed/172.31.250.4/tcp-6379",
+    "type": "database-exposed",
+    "title": "Baza danych dostępna z sieci: Redis key-value store 7.4.12 (172.31.250.4:6379)",
+    "description": "Port bazy danych przyjmuje połączenia z sieci, z której wykonano skan. Czujka nie próbuje się łączyć ani logować.",
+    "severity": "low",
+    "status": "new",
+    "interest": 25,
+    "host_id": 3,
+    "ip": "172.31.250.4",
+    "service_id": null,
+    "port": 6379,
+    "url": "",
+    "signature": "",
+    "evidence": [
+      {
+        "matcher": "banner",
+        "where": "port:6379/tcp",
+        "snippet": "Redis key-value store 7.4.12"
+      }
+    ],
+    "note": "",
+    "tags": [
+      "database-exposed"
+    ],
+    "assignee": "",
+    "first_seen": "2026-11-21T12:05:49Z",
+    "last_seen": "2026-11-21T12:05:49Z",
+    "first_run_id": 1,
+    "last_run_id": 1,
+    "overrides": null,
+    "dojo_id": null,
+    "dojo_url": "",
+    "manual": false
+  }
+]
