@@ -1287,3 +1287,38 @@ func TestFullRangeBudgetLeavesANote(t *testing.T) {
 		t.Errorf("pass = %+v", p)
 	}
 }
+
+// tableGuess is a network whose version detection matched no probe on 8080:
+// nmap then reports the port table's name with method "table".
+type tableGuess struct{ *fakeNet }
+
+func (n tableGuess) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*probe.Result, error) {
+	res, err := n.fakeNet.ServiceScan(ctx, req)
+	if err != nil {
+		return res, err
+	}
+	for i := range res.Hosts {
+		for j, p := range res.Hosts[i].Ports {
+			if p.Port == 8080 {
+				res.Hosts[i].Ports[j] = probe.Port{Port: 8080, Proto: "tcp", State: "open", Name: "ibm-db2", Method: "table"}
+			}
+		}
+	}
+	return res, nil
+}
+
+func TestPortTableGuessGivesWayToTheHTTPAnswer(t *testing.T) {
+	netw := tableGuess{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 8080}}}}
+	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	plan.Policy.MaxPerHostRPS = 100
+	sink := newSink()
+	if out := e.Run(context.Background(), plan, sink); out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	h := sink.host("10.7.0.5")
+	if h == nil || h.Services[1].Port != 8080 || h.Services[1].Name != "http" || h.Services[0].Name != "ssh" {
+		t.Fatalf("services = %+v", h.Services)
+	}
+}

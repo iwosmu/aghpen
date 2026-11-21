@@ -524,6 +524,19 @@ func toService(p probe.Port) model.ServiceResult {
 func (r *run) buildHost(ctx context.Context, h probe.Host, attempts int) model.HostResult {
 	res := r.newHostResult(h, attempts)
 	r.httpHost(ctx, &res, nil)
+	// a port that answered HTTP is named by the page when nmap only guessed
+	// its name from the port table (same rule as quickMerge)
+	guess := map[int]bool{}
+	for _, p := range h.Ports {
+		if p.Method == "table" && (p.Proto == "" || p.Proto == "tcp") {
+			guess[p.Port] = true
+		}
+	}
+	for i := range res.Services {
+		if s := &res.Services[i]; s.Proto == "tcp" && s.HTTP != nil && guess[s.Port] {
+			s.Name = ""
+		}
+	}
 	r.finishHost(&res)
 	return res
 }
@@ -917,7 +930,7 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 			continue
 		}
 		port := p.Port
-		pctx, cancel := context.WithTimeout(ctx, quickServiceTimeout)
+		qctx, cancel := context.WithCancel(ctx)
 		cancels[port] = cancel
 		svwg.Add(1)
 		go func() {
@@ -925,10 +938,15 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 			defer cancel()
 			select {
 			case procs <- struct{}{}:
-			case <-pctx.Done():
+			case <-qctx.Done():
 				return
 			}
 			defer func() { <-procs }()
+			// the bound starts when the port's process starts, not while it
+			// waits for a slot: a queued port must not time out unscanned
+			// (the gate's second run named two ports differently that way)
+			pctx, pcancel := context.WithTimeout(qctx, quickServiceTimeout)
+			defer pcancel()
 			t0 := r.e.now()
 			sv, err := r.prober.ServiceScan(pctx, probe.ServiceRequest{
 				Hosts: []probe.HostPorts{{IP: h.IP, Ports: []int{port}}}, Intensity: r.plan.Profile.VersionIntensity,
@@ -1086,15 +1104,15 @@ func quickMerge(res model.HostResult, detected map[int]probe.Port) model.HostRes
 	for i := range res.Services {
 		s := &res.Services[i]
 		d, ok := detected[s.Port]
-		if !ok && s.Proto == "tcp" && s.HTTP != nil {
-			// version detection was stopped by the HTTP answer: the name so
-			// far is the port table's guess (3000 is "ppp"), the page is a fact
+		if (!ok || d.Method == "table") && s.Proto == "tcp" && s.HTTP != nil {
+			// no probe matched: the name so far is the port table's guess
+			// (3000 is "ppp", 50000 "ibm-db2"), the page is a fact
 			s.Name = ""
 		}
 		if !ok || s.Proto != "tcp" {
 			continue
 		}
-		if d.Name != "" {
+		if d.Name != "" && !(d.Method == "table" && s.HTTP != nil) {
 			s.Name = d.Name
 		}
 		s.Product, s.Version, s.ExtraInfo, s.Banner, s.Confidence = d.Product, d.Version, d.ExtraInfo, d.Banner, d.Confidence
