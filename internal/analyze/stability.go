@@ -90,13 +90,25 @@ func BucketIndex(t time.Time, loc *time.Location) int {
 
 // Add records one observation: it updates the histogram bucket of the hour
 // (in loc) and appends to Recent, which is kept sorted by time and capped.
+// A second observation of a run already in Recent (a chunk scanned again
+// after a resume) is merged into the first one: the run counts once, and it
+// counts as "up" when either observation answered.
 func (p *Profile) Add(obs model.HostObservation, loc *time.Location) {
-	i := BucketIndex(obs.At, loc)
-	if obs.Up {
-		p.Buckets[i].Up++
-	} else {
-		p.Buckets[i].Down++
+	if obs.RunID != 0 {
+		for k := range p.Recent {
+			if p.Recent[k].RunID != obs.RunID {
+				continue
+			}
+			old := p.Recent[k]
+			merged := mergeObs(old, obs)
+			p.uncount(old, loc)
+			p.count(merged, loc)
+			p.Recent[k] = merged
+			sort.SliceStable(p.Recent, func(a, b int) bool { return p.Recent[a].At.Before(p.Recent[b].At) })
+			return
+		}
 	}
+	p.count(obs, loc)
 	p.Recent = append(p.Recent, obs)
 	if n := len(p.Recent); n > 1 && p.Recent[n-1].At.Before(p.Recent[n-2].At) {
 		sort.SliceStable(p.Recent, func(a, b int) bool { return p.Recent[a].At.Before(p.Recent[b].At) })
@@ -104,6 +116,81 @@ func (p *Profile) Add(obs model.HostObservation, loc *time.Location) {
 	if len(p.Recent) > RecentCap {
 		p.Recent = append([]model.HostObservation(nil), p.Recent[len(p.Recent)-RecentCap:]...)
 	}
+}
+
+func (p *Profile) count(obs model.HostObservation, loc *time.Location) {
+	i := BucketIndex(obs.At, loc)
+	if obs.Up {
+		p.Buckets[i].Up++
+	} else {
+		p.Buckets[i].Down++
+	}
+}
+
+func (p *Profile) uncount(obs model.HostObservation, loc *time.Location) {
+	i := BucketIndex(obs.At, loc)
+	if obs.Up && p.Buckets[i].Up > 0 {
+		p.Buckets[i].Up--
+	} else if !obs.Up && p.Buckets[i].Down > 0 {
+		p.Buckets[i].Down--
+	}
+}
+
+// mergeObs joins two observations of one run. The answer wins: a host that
+// answered once in the run was alive in that run.
+func mergeObs(a, b model.HostObservation) model.HostObservation {
+	keep := a
+	switch {
+	case b.Up && !a.Up:
+		keep = b
+	case a.Up == b.Up && b.At.After(a.At):
+		keep = b
+	}
+	keep.Attempts = max(a.Attempts, b.Attempts)
+	return keep
+}
+
+// NormalizeProfile returns p with one observation per run id. The store may
+// hold two observations of one run when the engine reported the host twice
+// (a chunk scanned again after a resume); the histogram then counted the run
+// twice. NormalizeProfile merges them as Add does and removes the extra
+// counts from the histogram. Observations with run id 0 stay as they are.
+func NormalizeProfile(p Profile, loc *time.Location) Profile {
+	seen := make(map[int64]bool, len(p.Recent))
+	dup := false
+	for _, o := range p.Recent {
+		if o.RunID == 0 {
+			continue
+		}
+		if seen[o.RunID] {
+			dup = true
+			break
+		}
+		seen[o.RunID] = true
+	}
+	if !dup {
+		return p
+	}
+	out := Profile{Buckets: p.Buckets, Recent: make([]model.HostObservation, 0, len(p.Recent))}
+	idx := make(map[int64]int, len(p.Recent))
+	for _, o := range p.Recent {
+		k, ok := idx[o.RunID]
+		if o.RunID == 0 || !ok {
+			if o.RunID != 0 {
+				idx[o.RunID] = len(out.Recent)
+			}
+			out.Recent = append(out.Recent, o)
+			continue
+		}
+		old := out.Recent[k]
+		merged := mergeObs(old, o)
+		out.uncount(old, loc)
+		out.uncount(o, loc)
+		out.count(merged, loc)
+		out.Recent[k] = merged
+	}
+	sort.SliceStable(out.Recent, func(a, b int) bool { return out.Recent[a].At.Before(out.Recent[b].At) })
+	return out
 }
 
 // MissStep explains one miss of the current miss streak. The UI and the
@@ -127,7 +214,23 @@ type Assessment struct {
 	DownAfterMisses   int // more misses in a row, at the usual scan times, until "down"; 0 when already down
 	Pattern           string
 	Expected          bool // the current absence is explained by the profile
-	Steps             []MissStep
+	// Rule is the per-profile DownAfterMisses rule in force, 0 when the
+	// model decides.
+	Rule  int
+	Steps []MissStep
+}
+
+// AssessOptions are the per-profile inputs of the model.
+type AssessOptions struct {
+	// DownAfterMisses is model.RetryOpts.DownAfterMisses. 0: the model
+	// decides when a host is inactive. N > 0: the host is inactive after N
+	// misses in a row and not before, whatever p_alive and the profile say.
+	DownAfterMisses int
+}
+
+// OptionsFor returns the model inputs of a scan profile.
+func OptionsFor(p model.ScanProfile) AssessOptions {
+	return AssessOptions{DownAfterMisses: max(p.Retry.DownAfterMisses, 0)}
 }
 
 // rates holds the three levels of up-rate estimates built from a histogram.
@@ -233,10 +336,19 @@ func trailingMisses(recent []model.HostObservation) []model.HostObservation {
 // streak: the misses of a host that died must not teach the model that the
 // host is "usually off".
 func Assess(p Profile, loc *time.Location) Assessment {
+	return AssessWith(p, loc, AssessOptions{})
+}
+
+// AssessWith is Assess with the per-profile options. Observations that share
+// a run id count once (NormalizeProfile).
+func AssessWith(p Profile, loc *time.Location, opt AssessOptions) Assessment {
 	if loc == nil {
 		loc = time.UTC
 	}
+	p = NormalizeProfile(p, loc)
+	rule := max(opt.DownAfterMisses, 0)
 	var a Assessment
+	a.Rule = rule
 	full := buildRates(&p.Buckets)
 	if full.nAll > 0 {
 		a.Stability = float64(full.nUp) / float64(full.nAll)
@@ -255,6 +367,9 @@ func Assess(p Profile, loc *time.Location) Assessment {
 		a.PAlive = 1
 		a.Prior = prior(full.nUp)
 		a.DownAfterMisses = downAfterFrom(full, a.Prior, p.Recent, loc)
+		if rule > 0 {
+			a.DownAfterMisses = rule
+		}
 		return a
 	}
 	if full.nUp == 0 {
@@ -293,6 +408,16 @@ func Assess(p Profile, loc *time.Location) Assessment {
 	a.PAlive = pAlive
 
 	switch {
+	case rule > 0 && len(misses) >= rule:
+		a.Status = model.HostDown
+	case rule > 0:
+		a.Status = model.HostUnstable
+		if allExplained {
+			a.Status = model.HostExpectedOffline
+			a.Expected = true
+		}
+		a.DownAfterMisses = rule - len(misses)
+		return a
 	case pAlive < DownThreshold:
 		a.Status = model.HostDown
 	case allExplained:
@@ -353,6 +478,11 @@ func downAfterFrom(r rates, p float64, recent []model.HostObservation, loc *time
 // times, would report this host inactive". It is 0 for a host that is down.
 func DownAfterMisses(p Profile, loc *time.Location) int {
 	return Assess(p, loc).DownAfterMisses
+}
+
+// DownAfterMissesWith is DownAfterMisses with the per-profile options.
+func DownAfterMissesWith(p Profile, loc *time.Location, opt AssessOptions) int {
+	return AssessWith(p, loc, opt).DownAfterMisses
 }
 
 // PAlive returns only the probability of Assess.

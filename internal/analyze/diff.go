@@ -41,6 +41,14 @@ type HostSnapshot struct {
 	// runs with an answer, number of observations). Zero means unknown.
 	Stability    float64
 	Observations int
+	// PAlive and MissesToDown come from the stability model of this run:
+	// the probability that a silent host still exists and the number of
+	// further misses in a row that report it inactive. Rule is the
+	// per-profile DownAfterMisses rule in force (0: the model decides).
+	// They only feed the summaries; SetAssessment fills them.
+	PAlive       float64
+	MissesToDown int
+	Rule         int
 	// Services are the services observed in this run. For a host that did
 	// not answer, leave it empty or carry the last known services forward;
 	// Diff never reports a service of a silent host as gone.
@@ -68,10 +76,16 @@ type DiffOptions struct {
 //	kind             | severity | rule
 //	-----------------+----------+----------------------------------------------------------------
 //	host_new         | low      | a new address answers
-//	host_gone        | medium   | the model reported the host inactive; info when Expected
+//	host_gone        | medium   | the model (or the profile rule DownAfterMisses) reported the
+//	                 |          | host inactive; info when Expected. Its open services get
+//	                 |          | service_gone at the same time
+//	host_missing     | medium   | answered in the previous run, silent now, not yet inactive and
+//	                 |          | not explained by the profile; its services count in
+//	                 |          | services_unreachable, they are not gone
 //	host_back        | low      | a host reported inactive answers again; info when Expected
-//	host_unstable    | low      | a host that was up starts to miss runs; Expected (info) when
-//	                 |          | the host is known to answer irregularly (FlakyStability)
+//	host_unstable    | low      | a host that was not up in the previous run starts to miss;
+//	                 |          | Expected (info) when the host is known to answer irregularly
+//	                 |          | (FlakyStability), also when it answered in the previous run
 //	service_new      | medium   | sensitive class or port (admin panel, database, remote access,
 //	                 |          | dev tool, IoT); low otherwise
 //	service_gone     | low      |
@@ -168,6 +182,8 @@ func Diff(prev *Snapshot, cur Snapshot, opts DiffOptions) ([]model.Change, model
 			sum.HostsBack++
 		case model.ChangeHostUnstable:
 			sum.HostsUnstable++
+		case model.ChangeHostMissing:
+			sum.HostsMissing++
 		case model.ChangeServiceNew:
 			sum.ServicesNew++
 		case model.ChangeServiceGone:
@@ -176,14 +192,29 @@ func Diff(prev *Snapshot, cur Snapshot, opts DiffOptions) ([]model.Change, model
 			sum.ServicesChanged++
 		}
 	}
+	sum.ServicesUnreachable = d.unreachable
 	return d.out, sum
 }
 
+// SetAssessment copies the output of the stability model for this run to the
+// snapshot: status, pattern, stability, p_alive, misses until inactive and
+// the rule. observations is the number of observations of the host.
+func (h *HostSnapshot) SetAssessment(a Assessment, observations int) {
+	h.Status = a.Status
+	h.Pattern = a.Pattern
+	h.Stability = a.Stability
+	h.Observations = observations
+	h.PAlive = a.PAlive
+	h.MissesToDown = a.DownAfterMisses
+	h.Rule = a.Rule
+}
+
 type differ struct {
-	cur    Snapshot
-	prevID int64
-	opts   DiffOptions
-	out    []model.Change
+	cur         Snapshot
+	prevID      int64
+	opts        DiffOptions
+	out         []model.Change
+	unreachable int
 }
 
 func (d *differ) add(h *HostSnapshot, svc *model.ServiceResult, kind model.ChangeKind, sev model.Severity, field string, before, after any, expected bool, summary string) {
@@ -236,8 +267,8 @@ func (d *differ) host(prev, cur *HostSnapshot) {
 		d.add(cur, nil, model.ChangeHostBack, model.SevInfo, "status", string(prev.Status), string(model.HostUp), true,
 			fmt.Sprintf("Host %s znów odpowiada, zgodnie z profilem dostępności%s", cur.IP, patternNote))
 	case !cur.Up && known && cur.Status == model.HostDown && !wasDown:
-		d.add(cur, nil, model.ChangeHostGone, model.SevMedium, "status", string(prev.Status), string(model.HostDown), false,
-			fmt.Sprintf("Host %s zgłoszony jako nieaktywny: nie odpowiada w godzinach, w których zwykle odpowiadał", cur.IP))
+		d.add(cur, nil, model.ChangeHostGone, model.SevMedium, "status", string(prev.Status), string(model.HostDown), false, goneSummary(cur))
+		d.servicesGone(cur, prev)
 	case !cur.Up && known && cur.Status == model.HostExpectedOffline && prev.Status != model.HostExpectedOffline && !wasDown:
 		d.add(cur, nil, model.ChangeHostGone, model.SevInfo, "status", string(prev.Status), string(model.HostExpectedOffline), true,
 			fmt.Sprintf("Host %s nie odpowiada, zgodnie z profilem dostępności%s", cur.IP, patternNote))
@@ -245,7 +276,12 @@ func (d *differ) host(prev, cur *HostSnapshot) {
 		if cur.Observations >= MinObsForExpected && cur.Stability > 0 && cur.Stability < FlakyStability {
 			d.add(cur, nil, model.ChangeHostUnstable, model.SevInfo, "status", string(prev.Status), string(model.HostUnstable), true,
 				fmt.Sprintf("Host %s nie odpowiedział; odpowiada nieregularnie (w ok. %d%% skanów)%s", cur.IP, int(cur.Stability*100+0.5), patternNote))
+		} else if prev.Up {
+			n := openCount(prev.Services)
+			d.unreachable += n
+			d.add(cur, nil, model.ChangeHostMissing, model.SevMedium, "status", string(model.HostUp), "missing", false, missingSummary(cur, n))
 		} else {
+			d.unreachable += openCount(prev.Services)
 			d.add(cur, nil, model.ChangeHostUnstable, model.SevLow, "status", string(prev.Status), string(model.HostUnstable), false,
 				fmt.Sprintf("Host %s nie odpowiedział w porze, w której zwykle odpowiada; jeszcze nie jest zgłoszony jako nieaktywny", cur.IP))
 		}
@@ -793,4 +829,97 @@ func ipLess(a, b string) bool {
 		return false
 	}
 	return a < b
+}
+
+// openCount is the number of open services in the list.
+func openCount(svcs []model.ServiceResult) int {
+	n := 0
+	for i := range svcs {
+		if isOpen(&svcs[i]) {
+			n++
+		}
+	}
+	return n
+}
+
+// servicesGone reports every open service of a host reported inactive as
+// gone. Ports outside the scope of the newer run stay unknown.
+func (d *differ) servicesGone(cur, prev *HostSnapshot) {
+	gone := make([]*model.ServiceResult, 0, len(prev.Services))
+	for i := range prev.Services {
+		p := &prev.Services[i]
+		if !isOpen(p) {
+			continue
+		}
+		proto := p.Proto
+		if proto == "" {
+			proto = "tcp"
+		}
+		if d.opts.PortInScope != nil && !d.opts.PortInScope(proto, p.Port) {
+			continue
+		}
+		gone = append(gone, p)
+	}
+	sort.SliceStable(gone, func(i, j int) bool { return gone[i].Port < gone[j].Port })
+	for _, p := range gone {
+		d.add(cur, p, model.ChangeServiceGone, model.SevLow, "state", "open", "host-down",
+			false, fmt.Sprintf("Usługa %s zniknęła%s: host zgłoszony jako nieaktywny", addr(cur.IP, p.Port), productNote(p)))
+	}
+}
+
+// goneSummary is the sentence of host_gone.
+func goneSummary(h *HostSnapshot) string {
+	if h.Rule > 0 {
+		return fmt.Sprintf("Host %s zgłoszony jako nieaktywny: brak odpowiedzi w %d %s z rzędu (reguła profilu: zgłoszenie po %d %s)",
+			h.IP, h.Rule, plural(h.Rule, "przebiegu", "przebiegach", "przebiegach"), h.Rule, plural(h.Rule, "braku", "brakach", "brakach"))
+	}
+	s := fmt.Sprintf("Host %s zgłoszony jako nieaktywny: nie odpowiada w godzinach, w których zwykle odpowiadał", h.IP)
+	if h.PAlive > 0 {
+		s += "; model: p_alive " + decimalPL(h.PAlive)
+	}
+	return s
+}
+
+// missingSummary is the sentence of host_missing, with the model's view.
+func missingSummary(h *HostSnapshot, open int) string {
+	prev := "w poprzednim aktywny"
+	if open > 0 {
+		prev += fmt.Sprintf(", %d %s", open, plural(open, "otwarta usługa", "otwarte usługi", "otwartych usług"))
+	}
+	s := fmt.Sprintf("Host %s nie odpowiedział w tym przebiegu (%s); ", h.IP, prev)
+	var parts []string
+	if h.PAlive > 0 {
+		parts = append(parts, "p_alive "+decimalPL(h.PAlive))
+	}
+	switch {
+	case h.MissesToDown == 1:
+		parts = append(parts, "zgłoszenie nieaktywności po kolejnym braku")
+	case h.MissesToDown > 1 && h.MissesToDown < DownAfterHorizon:
+		parts = append(parts, fmt.Sprintf("zgłoszenie nieaktywności po %d kolejnych brakach", h.MissesToDown))
+	case h.MissesToDown >= DownAfterHorizon:
+		parts = append(parts, "zgłoszenie nieaktywności dopiero po wielu kolejnych brakach")
+	}
+	if len(parts) == 0 {
+		parts = append(parts, "jeszcze nie zgłoszony jako nieaktywny")
+	}
+	if h.Rule > 0 {
+		parts = append(parts, fmt.Sprintf("reguła profilu: %d %s z rzędu", h.Rule, plural(h.Rule, "brak", "braki", "braków")))
+	}
+	return s + "model: " + strings.Join(parts, ", ")
+}
+
+// plural picks the Polish form for n: one, few (2-4, not 12-14), many.
+func plural(n int, one, few, many string) string {
+	if n == 1 {
+		return one
+	}
+	if m10, m100 := n%10, n%100; m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) {
+		return few
+	}
+	return many
+}
+
+// decimalPL formats a probability with two decimals and a decimal comma.
+func decimalPL(f float64) string {
+	return strings.Replace(strconv.FormatFloat(f, 'f', 2, 64), ".", ",", 1)
 }

@@ -58,8 +58,10 @@ func TestSampleContent(t *testing.T) {
 	for _, out := range []string{html, md} {
 		for _, want := range []string{
 			"Raport z przebiegu #42",
-			"Przybyło: 1 host i 5 usług. Ubyło: 1 host i 1 usługa.",
-			"Najpierw sprawdź 4 zmiany o wadze średniej lub wysokiej.",
+			"Przybyło: 1 host i 5 usług. Ubyło: 1 host i 3 usługi.",
+			"Bez odpowiedzi w tym przebiegu: 1 host (2 usługi bez potwierdzenia)",
+			"Host 10.66.1.80 nie odpowiedział w tym przebiegu (w poprzednim aktywny, 2 otwarte usługi)",
+			"Najpierw sprawdź 5 zmian o wadze średniej lub wysokiej.",
 			"Co nowego", "Co zniknęło", "Co się zmieniło",
 			"Nowa usługa 10.66.3.17:8080 (Jetty 10.0.20)",
 			"Host 10.66.2.5 zgłoszony jako nieaktywny",
@@ -124,8 +126,8 @@ func TestSameContentInBothFormats(t *testing.T) {
 			}
 		}
 	}
-	if n != 15 {
-		t.Errorf("sample has %d listed changes, want 15", n)
+	if n != 17 {
+		t.Errorf("sample has %d listed changes, want 17", n)
 	}
 	for _, f := range d.Findings {
 		if !strings.Contains(md, "`"+f.Addr+"`") {

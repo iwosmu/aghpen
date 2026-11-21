@@ -222,8 +222,9 @@ func sampleInput() Input {
 			a, n = assessAt(sampleCur)
 		}
 		isUp := a.Status == model.HostUp
-		cur.Hosts = append(cur.Hosts, analyze.HostSnapshot{HostID: h.id, IP: h.ip, Up: isUp, Status: a.Status,
-			Pattern: a.Pattern, Stability: a.Stability, Observations: n, Services: h.cur})
+		hs := analyze.HostSnapshot{HostID: h.id, IP: h.ip, Up: isUp, Services: h.cur}
+		hs.SetAssessment(a, n)
+		cur.Hosts = append(cur.Hosts, hs)
 
 		if !isUp {
 			mh := model.Host{ID: h.id, IP: h.ip, Hostnames: h.hostnames}

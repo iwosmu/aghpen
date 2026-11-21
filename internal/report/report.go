@@ -253,7 +253,7 @@ var findingStatusPL = map[model.FindingStatus]string{
 
 var kindPL = map[model.ChangeKind]string{
 	model.ChangeHostNew: "Nowy host", model.ChangeHostGone: "Host nieaktywny", model.ChangeHostBack: "Host znów odpowiada",
-	model.ChangeHostUnstable: "Host niestabilny", model.ChangeServiceNew: "Nowa usługa", model.ChangeServiceGone: "Usługa zniknęła",
+	model.ChangeHostUnstable: "Host niestabilny", model.ChangeHostMissing: "Host bez odpowiedzi", model.ChangeServiceNew: "Nowa usługa", model.ChangeServiceGone: "Usługa zniknęła",
 	model.ChangeServiceChanged: "Zmiana usługi", model.ChangeTechNew: "Nowa technologia", model.ChangeTechGone: "Technologia zniknęła",
 	model.ChangeTechVersion: "Zmiana wersji", model.ChangeTitle: "Zmiana tytułu", model.ChangeHTTPStatus: "Zmiana statusu HTTP",
 	model.ChangeCert: "Zmiana certyfikatu", model.ChangeHeaders: "Zmiana nagłówków", model.ChangeCookies: "Zmiana ciasteczek",
@@ -322,7 +322,7 @@ func changeGroup(k model.ChangeKind) int {
 	switch k {
 	case model.ChangeHostNew, model.ChangeHostBack, model.ChangeServiceNew:
 		return 0
-	case model.ChangeHostGone, model.ChangeServiceGone:
+	case model.ChangeHostGone, model.ChangeServiceGone, model.ChangeHostMissing:
 		return 1
 	}
 	return 2
@@ -499,7 +499,7 @@ func build(in Input) doc {
 	switch {
 	case first:
 		d.Lead = "To pierwszy przebieg tego profilu. Nie ma jeszcze punktu odniesienia, więc raport pokazuje stan sieci, a nie zmiany."
-	case unexpected == 0 && s.HostsNew+s.HostsGone+s.HostsBack+s.ServicesNew+s.ServicesGone+s.ServicesChanged == 0:
+	case unexpected == 0 && s.HostsNew+s.HostsGone+s.HostsBack+s.HostsMissing+s.ServicesNew+s.ServicesGone+s.ServicesChanged == 0:
 		d.Lead = "Od poprzedniego przebiegu nie ma zmian, które wymagają uwagi."
 	default:
 		var parts []string
@@ -522,6 +522,13 @@ func build(in Input) doc {
 		}
 		if len(gone) > 0 {
 			parts = append(parts, "Ubyło: "+joinAnd(gone)+".")
+		}
+		if s.HostsMissing > 0 {
+			miss := "Bez odpowiedzi w tym przebiegu: " + nHosts(s.HostsMissing)
+			if s.ServicesUnreachable > 0 {
+				miss += " (" + nServices(s.ServicesUnreachable) + " bez potwierdzenia)"
+			}
+			parts = append(parts, miss+"; to jeszcze nie jest zgłoszenie nieaktywności.")
 		}
 		if s.HostsBack > 0 {
 			parts = append(parts, "Powroty po nieaktywności: "+nHosts(s.HostsBack)+".")
