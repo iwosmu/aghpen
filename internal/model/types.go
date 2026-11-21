@@ -753,6 +753,11 @@ type Service struct {
 	LastChanged  *time.Time          `json:"last_changed"`
 	Overrides    map[string]Override `json:"overrides"`
 	Latest       *ServiceObservation `json:"latest,omitempty"` // only on GET /services/{id}
+	// ResponseMs is the HTTP response time of the latest observation in ms;
+	// nil for a service without an HTTP answer. ResponseSlow: that time is
+	// slow against the service's own baseline (analyze.ResponseSeries).
+	ResponseMs   *int `json:"response_ms"`
+	ResponseSlow bool `json:"response_slow"`
 }
 
 type InterestReason struct {

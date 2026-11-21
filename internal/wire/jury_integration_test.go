@@ -64,6 +64,11 @@ func TestJuryTemplateReturnedServiceAndResponseTime(t *testing.T) {
 	if k["service_gone 192.168.65.254:8787"] != 1 || k["response_slower 192.168.65.254:8085"] != 1 {
 		t.Fatalf("run 2: %v", k)
 	}
+	// The service list carries the latest response time and the slow flag.
+	if sp, _ := st.ListServices(ctx, store.ServiceFilter{Port: 8085}); len(sp.Items) != 1 || sp.Items[0].ResponseMs == nil ||
+		*sp.Items[0].ResponseMs != 640 || !sp.Items[0].ResponseSlow {
+		t.Fatalf("service list after run 2: %+v", sp.Items)
+	}
 	run3, ch := scan(self, gitea, flask, web(8085, "WordPress", 95))
 	k = kinds(ch)
 	if k["service_returned 192.168.65.254:8787"] != 1 || k["service_new 192.168.65.254:8787"] != 0 || k["response_recovered 192.168.65.254:8085"] != 1 {
@@ -103,5 +108,8 @@ func TestJuryTemplateReturnedServiceAndResponseTime(t *testing.T) {
 	pts, err := st.ResponseSeries(ctx, wp.Items[0].ID, 50)
 	if err != nil || len(pts) != 3 || pts[0].Ms != 90 || pts[1].Ms != 640 || pts[2].Ms != 95 {
 		t.Fatalf("series %+v %v", pts, err)
+	}
+	if wp.Items[0].ResponseSlow || wp.Items[0].ResponseMs == nil || *wp.Items[0].ResponseMs != 95 {
+		t.Errorf("after the recovery: %+v", wp.Items[0])
 	}
 }

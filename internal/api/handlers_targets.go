@@ -230,6 +230,9 @@ func (s *Server) saveTargets(r *http.Request, scopeID int64, p model.TargetPrevi
 	if err != nil {
 		return p, err
 	}
+	for i := range saved {
+		saved[i].MapsTo = targets.MapsTo(saved[i].Value)
+	}
 	p.Valid = saved
 	p.Duplicates += dup
 	p.AddressCount = 0

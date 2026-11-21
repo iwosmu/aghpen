@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"net/netip"
 	"os"
 	"strconv"
@@ -97,7 +98,7 @@ func FromEnv(get func(string) string) (Config, error) {
 		return c, err
 	}
 	if c.PublishedPort == 0 {
-		if _, p, ok := strings.Cut(c.Listen, ":"); ok {
+		if _, p, err := net.SplitHostPort(c.Listen); err == nil {
 			c.PublishedPort, _ = strconv.Atoi(p)
 		}
 	}

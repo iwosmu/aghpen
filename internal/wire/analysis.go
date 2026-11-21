@@ -393,8 +393,13 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 			if hasID {
 				id := sid
 				fs.ServiceID = &id
+				var resp []int
+				if sh, ok := histories[sid]; ok {
+					resp = sh.Response
+				}
+				pts := analyze.ResponseSeries(append(append([]int(nil), resp...), analyze.ResponseValue(&sv)))
 				svcRows = append(svcRows, store.ServiceAnalysis{ID: sid, Interest: score, InterestWhy: why, GroupKey: key,
-					Classes: analyze.EffectiveClasses(&sv, h.Hostnames)})
+					Classes: analyze.EffectiveClasses(&sv, h.Hostnames), ResponseSlow: pts[len(pts)-1].Slow})
 			}
 			if hasID && self[sid] {
 				continue // Czujka itself: listed and tagged, no finding
