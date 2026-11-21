@@ -16,6 +16,7 @@ const (
 	discoveryHostTimeout = 30 * time.Second
 	portScanHostTimeout  = 5 * time.Minute
 	serviceHostTimeout   = 3 * time.Minute
+	udpHostTimeout       = time.Minute
 	defaultBackoff       = 1500 * time.Millisecond
 	maxBackoff           = 30 * time.Second
 )
@@ -153,6 +154,41 @@ func (r *run) scanGroup(ctx context.Context, g *group, rate int, gs *groupStats)
 	return nil
 }
 
+// udpStage probes the allow-listed UDP services of the hosts that are up
+// and adds the ports that answered to them. It runs after the TCP stages of
+// the group and inside the same packet share.
+func (r *run) udpStage(ctx context.Context, g *group, up []probe.Host, rate int, gs *groupStats) error {
+	scanner, ok := r.prober.(probe.UDPScanner)
+	if !ok {
+		return nil
+	}
+	ips := make([]string, len(up))
+	for i, h := range up {
+		ips[i] = h.IP
+	}
+	t0 := r.e.now()
+	end := r.stats.begin(rate)
+	res, err := scanner.UDPScan(ctx, probe.UDPScanRequest{Hosts: ips, Ports: r.udpPorts, MaxRate: rate, HostTimeout: udpHostTimeout, IPv6: g.v6})
+	end()
+	r.account(gs, res, t0)
+	if err != nil {
+		if ctx.Err() != nil {
+			return context.Cause(ctx)
+		}
+		r.log.Warn("UDP scan failed, keeping the TCP data", "error", err.Error())
+		r.stats.update(func(s *model.RunStats) { s.Errors++ })
+		return nil
+	}
+	byIP := map[string][]probe.Port{}
+	for _, h := range res.Hosts {
+		byIP[h.IP] = h.Ports
+	}
+	for i := range up {
+		up[i].Ports = append(up[i].Ports, byIP[up[i].IP]...)
+	}
+	return nil
+}
+
 // retryRound probes the missing hosts again. The last round uses a second
 // method: a direct TCP connect to the ports the host had open before.
 func (r *run) retryRound(ctx context.Context, g *group, missing []model.HostHint, last bool, rate int, gs *groupStats) ([]probe.Host, error) {
@@ -216,9 +252,11 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 		ips[i] = h.IP
 	}
 	t0 := r.e.now()
+	end := r.stats.begin(rate)
 	ps, err := r.prober.PortScan(ctx, probe.PortScanRequest{
 		Hosts: ips, Ports: r.ports, MaxRate: rate, MaxRetries: 2, HostTimeout: portScanHostTimeout, IPv6: g.v6,
 	})
+	end()
 	r.account(gs, ps, t0)
 	if err != nil {
 		return fmt.Errorf("port scan: %w", err)
@@ -295,6 +333,12 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 					}
 				}
 			}
+		}
+	}
+
+	if len(r.udpPorts) > 0 && len(up) > 0 {
+		if err := r.udpStage(ctx, g, up, rate, gs); err != nil {
+			return err
 		}
 	}
 

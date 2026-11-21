@@ -122,17 +122,18 @@ for mode in thorough balanced fast; do
 done
 
 # J. Real applications, real fingerprints: one engine run with the HTTP/TLS
-#    collector and the built-in signature library. The check compares
+#    collector, the built-in signature library and the optional UDP scan. The check compares
 #    technologies, versions and classes with what the lab really runs.
 ./lab.sh apps || exit 1
 echo
-echo "== J-apps: scanprobe -targets 10.76.0.0/24 -ports top-100,3000,8181,8443 -pps 500 -http -http-rps 20 -per-host-rps 8 -max-paths 12"
+echo "== J-apps: scanprobe -targets 10.76.0.0/24 -ports top-100,3000,8181,8443 -pps 500 -http -http-rps 20 -per-host-rps 8 -max-paths 12 -udp"
 docker run --rm --name czeng-scanner --network czeng-apps --ip 10.76.0.2 -v "$BIN:/work:ro" --entrypoint /work/scanprobe "$IMG" \
   -targets 10.76.0.0/24 -exclude 10.76.0.1,10.76.0.2 -ports top-100,3000,8181,8443 -pps 500 \
-  -http -http-rps 20 -per-host-rps 8 -max-paths 12 -measure-iface eth0 -quiet >"$OUT/J-apps.jsonl" 2>"$OUT/J-apps.log"
+  -http -http-rps 20 -per-host-rps 8 -max-paths 12 -udp -measure-iface eth0 -quiet >"$OUT/J-apps.jsonl" 2>"$OUT/J-apps.log"
 echo "exit code $?"
-grep -E 'http stage|COMPLETED|FAILED' "$OUT/J-apps.log" | cut -c1-300
+grep -E 'http stage|UDP scan|COMPLETED|FAILED' "$OUT/J-apps.log" | sed -E 's/^time=[^ ]+ level=//' | cut -c1-300
 check J-apps -expect apps
+grep -q '"port":53,"proto":"udp","state":"open"' "$OUT/J-apps.jsonl" || { echo "FAIL: 53/udp was not reported on the DNS host"; FAILED=1; }
 
 # H. Emergency stop: the engine refuses to start and sends nothing.
 scan H-emergency l2 -targets 10.77.0.0/22 -ports "$PORTS" -emergency-stop -measure-iface eth0 -quiet

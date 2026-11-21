@@ -16,9 +16,9 @@ type stageRec struct {
 }
 
 // statsKeeper holds the run counters. Packets are counted when a probe
-// stage ends: nmap reports its raw packet count then. CurrentPPS spreads
-// the packets of the stages that ended in the last seconds evenly over the
-// time those stages ran.
+// stage ends: nmap reports its raw packet count then. CurrentPPS covers the
+// last seconds: the exact packets of the stages that ended, spread over the
+// time they ran, plus the rate share of the paced stages that still run.
 type statsKeeper struct {
 	mu        sync.Mutex
 	s         model.RunStats // cumulative, earlier sessions of a resumed run included
@@ -31,10 +31,21 @@ type statsKeeper struct {
 	now       func() time.Time
 	peakPPS   float64
 	sessionPk int64
+	flights   map[int]flight // paced probe stages that run now
+	flightSeq int
+}
+
+// flight is a probe stage that is still running. Its packet count is known
+// only when it ends. Until then CurrentPPS counts it at its rate share: the
+// nmap runner pins the send rate to that share (--min-rate = --max-rate),
+// and the lab measurements show 247 of 250 packets per second.
+type flight struct {
+	start time.Time
+	rate  int
 }
 
 func newStatsKeeper(prev *model.RunStats, now func() time.Time) *statsKeeper {
-	k := &statsKeeper{now: now, started: now()}
+	k := &statsKeeper{now: now, started: now(), flights: map[int]flight{}}
 	if prev != nil {
 		k.s = *prev
 		k.prevSec = prev.ElapsedSec
@@ -47,6 +58,21 @@ func (k *statsKeeper) update(fn func(s *model.RunStats)) {
 	k.mu.Lock()
 	fn(&k.s)
 	k.mu.Unlock()
+}
+
+// begin marks the start of a rate-paced probe stage. Call the returned
+// function when the stage ends, just before addStage.
+func (k *statsKeeper) begin(rate int) (end func()) {
+	k.mu.Lock()
+	k.flightSeq++
+	id := k.flightSeq
+	k.flights[id] = flight{start: k.now(), rate: rate}
+	k.mu.Unlock()
+	return func() {
+		k.mu.Lock()
+		delete(k.flights, id)
+		k.mu.Unlock()
+	}
 }
 
 // addStage records the packets of one finished probe stage.
@@ -92,6 +118,15 @@ func (k *statsKeeper) snapshot() model.RunStats {
 		}
 	}
 	k.stages = keep
+	for _, f := range k.flights {
+		lo := f.start
+		if lo.Before(from) {
+			lo = from
+		}
+		if d := now.Sub(lo); d > 0 {
+			recent += float64(f.rate) * d.Seconds()
+		}
+	}
 	win := ppsWindow
 	if active < win {
 		win = active

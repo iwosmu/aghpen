@@ -92,23 +92,24 @@ func (e *Engine) Prober() probe.Prober {
 
 // run is the state of one Run call.
 type run struct {
-	e       *Engine
-	log     *slog.Logger
-	plan    model.ScanPlan
-	sink    model.ResultSink
-	sinkCtx context.Context // survives cancellation, so the final state reaches the store
-	prober  probe.Prober
-	ports   *probe.PortSet
-	disc    model.DiscoveryOpts
-	mode    string          // discovery mode: fast, balanced or thorough
-	local   []targets.Range // directly connected IPv4 networks
-	lim     Limits
-	sizer   *sizer
-	budget  *Budget
-	stats   *statsKeeper
-	httpLim *probe.Limiter
-	hostSem chan struct{}
-	paths   []string
+	e        *Engine
+	log      *slog.Logger
+	plan     model.ScanPlan
+	sink     model.ResultSink
+	sinkCtx  context.Context // survives cancellation, so the final state reaches the store
+	prober   probe.Prober
+	ports    *probe.PortSet
+	disc     model.DiscoveryOpts
+	mode     string          // discovery mode: fast, balanced or thorough
+	local    []targets.Range // directly connected IPv4 networks
+	lim      Limits
+	sizer    *sizer
+	budget   *Budget
+	stats    *statsKeeper
+	httpLim  *probe.Limiter
+	hostSem  chan struct{}
+	paths    []string
+	udpPorts []int // allow-listed UDP ports to probe; empty: no UDP stage
 
 	hostnames map[string][]string
 	hints     map[string]model.HostHint
@@ -202,6 +203,22 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 		r.paths = e.deps.Signatures.ExtraPaths()
 		if len(r.paths) > lim.MaxPaths {
 			r.paths = r.paths[:lim.MaxPaths]
+		}
+	}
+
+	if plan.Profile.UDP.Enabled {
+		udp, err := probe.UDPPorts(plan.Profile.UDP.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts)
+		_, can := r.prober.(probe.UDPScanner)
+		switch {
+		case err != nil:
+			return fail(fmt.Errorf("scan: UDP ports: %w", err))
+		case len(udp) == 0:
+			log.Warn("UDP scan skipped: the profile and the safety policy leave no allow-listed UDP port")
+		case !can || !r.prober.Privileged():
+			log.Warn("UDP scan skipped: it needs nmap with raw sockets (root or CAP_NET_RAW)", "prober", r.prober.Name(), "privileged", r.prober.Privileged())
+		default:
+			r.udpPorts = udp
+			log.Info("UDP scan is on", "ports", fmt.Sprint(udp))
 		}
 	}
 
@@ -604,6 +621,11 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 	}
 	if plan.Profile.ServiceDetection {
 		packets += live * 3 * 14 // about 3 open ports per host, about 14 packets per version probe
+	}
+	if plan.Profile.UDP.Enabled {
+		if udp, err := probe.UDPPorts(plan.Profile.UDP.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil {
+			packets += live * float64(len(udp)) * 2 // one retry for silent ports
+		}
 	}
 	if plan.Profile.Retry.UnstableRetries > 0 {
 		packets += float64(len(plan.Hints)) * 0.1 * probes * float64(plan.Profile.Retry.UnstableRetries)

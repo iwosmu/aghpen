@@ -181,6 +181,7 @@ func CheckApps(out Output) (fails []string) {
 		port int
 	}
 	svc := map[key]model.ServiceResult{}
+	udp := map[key]string{}
 	seen := map[string]bool{}
 	for _, h := range out.Hosts {
 		if seen[h.IP] {
@@ -188,7 +189,17 @@ func CheckApps(out Output) (fails []string) {
 		}
 		seen[h.IP] = true
 		for _, s := range h.Services {
+			if s.Proto == "udp" {
+				udp[key{h.IP, s.Port}] = s.Name
+				continue
+			}
 			svc[key{h.IP, s.Port}] = s
+		}
+	}
+	// the optional UDP scan: DNS and NTP answer on 10.76.0.70, nothing else is reported
+	if len(udp) > 0 {
+		if udp[key{"10.76.0.70", 53}] != "domain" || udp[key{"10.76.0.70", 123}] != "ntp" || len(udp) != 2 {
+			fails = append(fails, fmt.Sprintf("UDP services = %v, want only 10.76.0.70 53/domain and 123/ntp", udp))
 		}
 	}
 	for _, w := range Apps {
@@ -237,7 +248,7 @@ func contains(xs []string, x string) bool {
 }
 
 func printApps(w io.Writer, out Output) {
-	fmt.Fprintf(w, "%-11s %-5s %-34s %-52s %s\n", "IP", "PORT", "HTTP / TLS", "TECHNOLOGIES (signature engine)", "CLASSES")
+	fmt.Fprintf(w, "%-11s %-9s %-34s %-52s %s\n", "IP", "PORT", "HTTP / TLS", "TECHNOLOGIES (signature engine)", "CLASSES")
 	for _, h := range out.Hosts {
 		for _, s := range h.Services {
 			web := "-"
@@ -251,7 +262,7 @@ func printApps(w io.Writer, out Output) {
 			if s.TLS != nil {
 				web += fmt.Sprintf(" tls self-signed=%v", s.TLS.SelfSigned)
 			}
-			fmt.Fprintf(w, "%-11s %-5d %-34s %-52s %s\n", h.IP, s.Port, web, strings.Join(techs(s), ", "), strings.Join(s.Classes, ", "))
+			fmt.Fprintf(w, "%-11s %-9s %-34s %-52s %s\n", h.IP, fmt.Sprintf("%d/%s", s.Port, s.Proto), web, strings.Join(techs(s), ", "), strings.Join(s.Classes, ", "))
 		}
 	}
 	if s := out.Summary; s != nil {

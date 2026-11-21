@@ -24,6 +24,11 @@ s.serve_forever()"
     iptables -A INPUT -p icmp -j DROP 2>/dev/null || iptables-legacy -A INPUT -p icmp -j DROP
     exec python3 -m http.server "$PORT" --directory /srv/www
     ;;
+  udp)
+    # UDP services for the optional UDP scan: DNS on 53 and NTP on 123.
+    ntpd -l 2>/dev/null || true
+    exec dnsmasq -k --no-resolv --no-hosts --address=/lab.test/10.76.0.70
+    ;;
   router)
     # Forwards between the scanner network and the lab and hides the scanner
     # behind its own lab address.

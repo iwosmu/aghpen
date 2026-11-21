@@ -218,6 +218,8 @@ func main() {
 		iface       = flag.String("measure-iface", "", "measure transmitted packets on this interface (Linux), e.g. eth0")
 		estimate    = flag.Bool("estimate", false, "print the traffic estimate and exit")
 		emergency   = flag.Bool("emergency-stop", false, "set the policy emergency stop (the run must be refused)")
+		udp         = flag.Bool("udp", false, "also probe the allow-listed UDP services (DNS, NTP, NetBIOS-NS, SNMP, IKE, SSDP, mDNS); needs raw sockets")
+		udpPorts    = flag.String("udp-ports", "", "with -udp: subset of the UDP allow-list, e.g. 53,123,161")
 		httpStage   = flag.Bool("http", false, "HTTP/TLS fingerprints and signatures: the real collector and the built-in signature library")
 		noSigPaths  = flag.Bool("no-sig-paths", false, "with -http: do not GET the extra safe paths that signatures ask for")
 		httpRPS     = flag.Float64("http-rps", 10, "with -http: HTTP requests per second, all hosts together")
@@ -283,6 +285,7 @@ func main() {
 			Discovery:        model.DiscoveryOpts{ICMPEcho: true, ICMPTimestamp: true, TCPSynPorts: []int{22, 80, 443, 3389, 8080}, TCPAckPorts: []int{80, 443}, ARP: !*noARP, SkipDiscovery: *skipDisc, Mode: *discMode},
 			ServiceDetection: !*noSV,
 			VersionIntensity: *intensity,
+			UDP:              model.UDPOpts{Enabled: *udp, Ports: *udpPorts},
 			Rate:             model.RateLimits{MaxPPS: *pps, MaxParallelChunks: *parallel},
 			Chunking:         model.ChunkingOpts{Adaptive: !*fixed, InitialSize: *chunkInit, MinSize: *chunkMin, MaxSize: *chunkMax, TargetSeconds: *chunkTarget},
 			Retry:            model.RetryOpts{UnstableRetries: *retries, BackoffMs: int(backoff.Milliseconds())},
