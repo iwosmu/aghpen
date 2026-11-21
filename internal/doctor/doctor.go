@@ -493,9 +493,21 @@ func NeighbourSysctl(n int64) string {
 // during a scan, the kernel evicts the host's own entries too: name
 // resolution and other traffic of the whole host break.
 func (d *Deps) neighbourTable(ctx context.Context) (string, string, string) {
+	var total, largest int64
+	if d.Store != nil {
+		local, _ := d.Interfaces()
+		total, largest = OnLinkAddresses(ctx, d.targets(ctx), local, d.Resolve)
+	}
+	fix := "Skan sieci lokalnej tworzy wpis ARP dla każdego sondowanego adresu. Limit jest wspólny dla całego hosta (także dla kontenerów): po przepełnieniu jądro usuwa wpisy hosta i przestaje działać m.in. DNS. Na hoście (nie w kontenerze) wykonaj:\n" +
+		"cat <<'EOF' | sudo tee /etc/sysctl.d/90-czujka-neigh.conf\n" + NeighbourSysctl(largest) + "\nEOF\nsudo sysctl --system"
 	raw, err := d.ReadFile(GCThresh3)
 	if err != nil {
-		return Skip, "nie można odczytać " + GCThresh3 + " (system inny niż Linux?)", ""
+		// The kernel shows gc_thresh* only in the host's network namespace: a
+		// container (other than network_mode: host) cannot read the limit.
+		if largest == 0 {
+			return Skip, "nie można odczytać limitu (" + GCThresh3 + "; w kontenerze jądro go ukrywa); żaden włączony zakres nie leży w sieci lokalnej skanera", ""
+		}
+		return Warn, fmt.Sprintf("nie można odczytać limitu z wnętrza kontenera (jądro pokazuje gc_thresh3 tylko w przestrzeni sieciowej hosta); największy zakres ma %d adresów w sieci lokalnej skanera, potrzebne gc_thresh3 >= %d. Sprawdź na hoście: sysctl net.ipv4.neigh.default.gc_thresh3", largest, 2*largest+1024), fix
 	}
 	limit, err := strconv.ParseInt(strings.TrimSpace(string(raw)), 10, 64)
 	if err != nil {
@@ -504,14 +516,10 @@ func (d *Deps) neighbourTable(ctx context.Context) (string, string, string) {
 	if d.Store == nil {
 		return OK, fmt.Sprintf("gc_thresh3 = %d; bez bazy danych nie da się policzyć celów w sieci lokalnej", limit), ""
 	}
-	local, _ := d.Interfaces()
-	total, largest := OnLinkAddresses(ctx, d.targets(ctx), local, d.Resolve)
 	detail := fmt.Sprintf("gc_thresh3 = %d; adresów w sieci lokalnej skanera: %d w największym zakresie, %d we wszystkich włączonych", limit, largest, total)
 	if largest == 0 {
 		return OK, detail + " (skan przez bramę nie zapełnia tablicy sąsiadów)", ""
 	}
-	fix := "Skan sieci lokalnej tworzy wpis ARP dla każdego sondowanego adresu. Limit jest wspólny dla całego hosta (także dla kontenerów): po przepełnieniu jądro usuwa wpisy hosta i przestaje działać m.in. DNS. Na hoście (nie w kontenerze) wykonaj:\n" +
-		"cat <<'EOF' | sudo tee /etc/sysctl.d/90-czujka-neigh.conf\n" + NeighbourSysctl(largest) + "\nEOF\nsudo sysctl --system"
 	switch {
 	case limit < largest:
 		return Fail, detail + ": skan przepełni tablicę sąsiadów", fix

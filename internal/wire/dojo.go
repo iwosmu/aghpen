@@ -111,6 +111,56 @@ func (d Dojo) exported(ctx context.Context) ([]model.Finding, error) {
 	return out, err
 }
 
+// linkOrphans stores the DefectDojo id and link of findings that an export
+// sent but did not confirm (defectdojo.UnconfirmedError): Czujka findings
+// without dojo_id whose key DefectDojo holds. It returns how many it linked.
+func (d Dojo) linkOrphans(ctx context.Context, c *defectdojo.Client, s model.DefectDojoSettings) (int, error) {
+	no := false
+	var unlinked []model.Finding
+	err := d.st.EachFinding(ctx, store.FindingFilter{Exported: &no}, func(f *model.Finding) error {
+		if len(unlinked) < 20000 {
+			unlinked = append(unlinked, *f)
+		}
+		return nil
+	})
+	if err != nil || len(unlinked) == 0 {
+		return 0, err
+	}
+	def := defectdojo.TargetFromSettings(s)
+	groups := map[defectdojo.Target][]model.Finding{def: unlinked}
+	if maps := scopeMappings(s); len(maps) > 0 {
+		ids := make([]int64, 0, len(unlinked))
+		for _, f := range unlinked {
+			ids = append(ids, f.HostID)
+		}
+		scopes, err := d.st.HostScopeIDs(ctx, ids)
+		if err != nil {
+			return 0, err
+		}
+		groups = defectdojo.GroupByTarget(unlinked, func(f model.Finding) []int64 { return scopes[f.HostID] }, maps, def)
+	}
+	n := 0
+	for t, part := range groups {
+		keys := make([]string, 0, len(part))
+		for _, f := range part {
+			keys = append(keys, f.Key)
+		}
+		refs, err := c.LinkOrphans(ctx, t, keys)
+		if err != nil {
+			return n, err
+		}
+		for _, f := range part {
+			if ref, ok := refs[f.Key]; ok {
+				if err := d.st.SetFindingDojo(ctx, f.ID, ref.ID, ref.URL); err != nil {
+					return n, err
+				}
+				n++
+			}
+		}
+	}
+	return n, nil
+}
+
 // PullStatus reads the DefectDojo state of every exported finding and
 // proposes Czujka status updates (defectdojo.ProposeStatusUpdates). With
 // apply it writes them as edits by "defectdojo" (the audit log and the status
@@ -121,6 +171,11 @@ func (d Dojo) PullStatus(ctx context.Context, s model.DefectDojoSettings, apply 
 	if err != nil {
 		return out, err
 	}
+	linked, err := d.linkOrphans(ctx, c, s)
+	if err != nil {
+		out.Errors = append(out.Errors, fmt.Sprintf("łączenie niepotwierdzonych eksportów: %v", err))
+	}
+	out.Linked = linked
 	findings, err := d.exported(ctx)
 	if err != nil {
 		return out, err

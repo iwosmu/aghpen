@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/netip"
+	"strings"
 	"time"
 
 	"github.com/iwosmu/aghpen/internal/model"
@@ -149,4 +151,110 @@ func (s *Store) PutDefectDojo(ctx context.Context, d model.DefectDojoSettings) (
 func (s *Store) ClearDefectDojoKey(ctx context.Context) error {
 	_, err := s.db.Exec(ctx, `UPDATE settings SET secret = '' WHERE key = $1`, keyDefectDojo)
 	return err
+}
+
+// LockClamp is what ClampAllowedToLock changed in the stored allowed_networks.
+type LockClamp struct {
+	Lock     []string `json:"lock"`
+	Before   []string `json:"before"`
+	After    []string `json:"after"`
+	Dropped  []string `json:"dropped"`  // no address in common with the lock
+	Narrowed []string `json:"narrowed"` // "wider → part inside the lock"
+}
+
+// Changed reports whether the stored policy was rewritten.
+func (c LockClamp) Changed() bool { return len(c.Dropped)+len(c.Narrowed) > 0 }
+
+// ClampAllowedToLock intersects the stored allowed_networks with the operator
+// lock (Options.OperatorNetworks). Call it at start: a policy saved before the
+// lock (or under a wider lock) then lies inside the lock again. A network
+// inside the lock stays; a network wider than parts of the lock is replaced
+// by those parts; a network with nothing in common is dropped. A change is
+// stored and written to the audit log ("safety.lock_clamp", by "system").
+// When every network is dropped the list becomes empty, which leaves the lock
+// alone as the bound.
+func (s *Store) ClampAllowedToLock(ctx context.Context) (LockClamp, error) {
+	out := LockClamp{Lock: append([]string{}, s.sh.operator...)}
+	var lock []netip.Prefix
+	for _, v := range s.sh.operator {
+		if p, ok := parseNet(v); ok {
+			lock = append(lock, p)
+		}
+	}
+	if len(lock) == 0 {
+		return out, nil
+	}
+	p := DefaultSafetyPolicy()
+	if _, _, err := s.getSetting(ctx, keySafety, &p); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return out, nil
+		}
+		return out, err
+	}
+	out.Before = nonNil(p.AllowedNetworks)
+	after := []string{}
+	seen := map[string]bool{}
+	add := func(v string) {
+		if !seen[v] {
+			seen[v] = true
+			after = append(after, v)
+		}
+	}
+	for _, v := range p.AllowedNetworks {
+		n, ok := parseNet(v)
+		if !ok {
+			out.Dropped = append(out.Dropped, v)
+			continue
+		}
+		inside := false
+		var parts []string
+		for _, q := range lock {
+			if q.Addr().BitLen() != n.Addr().BitLen() {
+				continue
+			}
+			switch {
+			case q.Bits() <= n.Bits() && q.Contains(n.Addr()):
+				inside = true
+			case n.Bits() < q.Bits() && n.Contains(q.Addr()):
+				parts = append(parts, q.String())
+			}
+		}
+		switch {
+		case inside:
+			add(n.String())
+		case len(parts) > 0:
+			for _, x := range parts {
+				add(x)
+			}
+			out.Narrowed = append(out.Narrowed, n.String()+" → "+strings.Join(parts, ", "))
+		default:
+			out.Dropped = append(out.Dropped, v)
+		}
+	}
+	out.After = after
+	if !out.Changed() {
+		return out, nil
+	}
+	p.AllowedNetworks = after
+	if _, err := s.PutSafetyPolicy(ctx, p); err != nil {
+		return out, err
+	}
+	err := s.InsertAudit(ctx, model.AuditEntry{UserEmail: "system", Action: "safety.lock_clamp", Entity: "safety",
+		Detail: map[string]any{"lock": out.Lock, "before": out.Before, "after": out.After, "dropped": nonNil(out.Dropped), "narrowed": nonNil(out.Narrowed)}})
+	return out, err
+}
+
+// parseNet reads a CIDR or a single address as a masked prefix.
+func parseNet(v string) (netip.Prefix, bool) {
+	v = strings.TrimSpace(v)
+	if strings.Contains(v, "/") {
+		p, err := netip.ParsePrefix(v)
+		return p.Masked(), err == nil
+	}
+	a, err := netip.ParseAddr(v)
+	if err != nil {
+		return netip.Prefix{}, false
+	}
+	a = a.Unmap()
+	return netip.PrefixFrom(a, a.BitLen()), true
 }

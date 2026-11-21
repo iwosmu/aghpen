@@ -45,7 +45,11 @@ const (
 
 // Config configures a Client.
 type Config struct {
-	URL       string // base URL, for example http://127.0.0.1:18080 ("/api/v2" is added)
+	URL string // base URL, for example http://127.0.0.1:18080 ("/api/v2" is added)
+	// LinkURL is the base of the links shown to people (test, finding,
+	// product pages). Empty: URL. It differs when Czujka reaches DefectDojo
+	// at an address a browser cannot open (http://host.docker.internal:18080).
+	LinkURL   string
 	APIKey    string // API v2 token
 	VerifyTLS bool   // false accepts any certificate (lab instances with self-signed certificates)
 	Timeout   time.Duration
@@ -58,12 +62,13 @@ type Config struct {
 
 // FromSettings builds a Config from the stored settings.
 func FromSettings(s model.DefectDojoSettings) Config {
-	return Config{URL: s.URL, APIKey: s.APIKey, VerifyTLS: s.VerifyTLS}
+	return Config{URL: s.URL, APIKey: s.APIKey, VerifyTLS: s.VerifyTLS, LinkURL: s.LinkURL}
 }
 
 // Client is a DefectDojo API v2 client. It is safe for concurrent use.
 type Client struct {
 	base          *url.URL // without a trailing slash
+	link          *url.URL // base of the links for people; nil: base
 	key           string
 	http          *http.Client
 	importTimeout time.Duration
@@ -102,7 +107,35 @@ func New(cfg Config) (*Client, error) {
 	if it <= 0 {
 		it = DefaultImportTimeout
 	}
-	return &Client{base: u, key: strings.TrimSpace(cfg.APIKey), http: hc, importTimeout: it, userAgent: firstNonEmpty(cfg.UserAgent, "czujka-defectdojo/1")}, nil
+	c := &Client{base: u, key: strings.TrimSpace(cfg.APIKey), http: hc, importTimeout: it, userAgent: firstNonEmpty(cfg.UserAgent, "czujka-defectdojo/1")}
+	if l := strings.TrimSpace(cfg.LinkURL); l != "" {
+		lu, err := ParseLinkURL(l)
+		if err != nil {
+			return nil, err
+		}
+		c.link = lu
+	}
+	return c, nil
+}
+
+// ParseLinkURL validates the public base of DefectDojo links (http or https,
+// with a host) and drops a trailing slash and "/api/v2".
+func ParseLinkURL(raw string) (*url.URL, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return nil, fmt.Errorf("defectdojo: niepoprawny adres linków %q (wymagany http:// albo https:// z nazwą hosta)", raw)
+	}
+	u.Path = strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(u.Path, "/"), "/api/v2"), "/")
+	u.RawQuery, u.Fragment = "", ""
+	return u, nil
+}
+
+// web is the base of the links for people: LinkURL, else the API base.
+func (c *Client) web() string {
+	if c.link != nil {
+		return c.link.String()
+	}
+	return c.base.String()
 }
 
 // BaseURL returns the normalised base URL.
@@ -428,7 +461,7 @@ func (c *Client) Ensure(ctx context.Context, t Target) (Location, error) {
 		id = created.ID
 	}
 	loc.ProductID = id
-	loc.ProductURL = fmt.Sprintf("%s/product/%d", c.base, id)
+	loc.ProductURL = fmt.Sprintf("%s/product/%d", c.web(), id)
 
 	id, ok, err = c.findByName(ctx, "engagements/", url.Values{"product": {strconv.FormatInt(loc.ProductID, 10)}}, "name", t.EngagementName)
 	if err != nil {
@@ -448,7 +481,7 @@ func (c *Client) Ensure(ctx context.Context, t Target) (Location, error) {
 		id = created.ID
 	}
 	loc.EngagementID = id
-	loc.EngagementURL = fmt.Sprintf("%s/engagement/%d", c.base, id)
+	loc.EngagementURL = fmt.Sprintf("%s/engagement/%d", c.web(), id)
 	return loc, nil
 }
 
@@ -543,7 +576,7 @@ func (c *Client) scanImport(ctx context.Context, scanType string, engagementID, 
 		return ImportResult{}, err
 	}
 	res := ImportResult{TestID: firstID(resp.Test, resp.TestID, testID), Reimport: testID != 0}
-	res.TestURL = fmt.Sprintf("%s/test/%d", c.base, res.TestID)
+	res.TestURL = fmt.Sprintf("%s/test/%d", c.web(), res.TestID)
 	if s := resp.Statistics; s != nil {
 		res.Total = s.After.Total.Total
 		if s.Delta != nil {
@@ -578,8 +611,13 @@ func (c *Client) ImportNmapXML(ctx context.Context, t Target, title string, xmlF
 	if err != nil {
 		return ImportResult{}, err
 	}
-	res, err := c.scanImport(ctx, scanTypeNmap, loc.EngagementID, testID, title, "czujka-nmap.xml", xmlFile, scanDate,
-		map[string]string{"active": "true", "verified": "false", "tags": "czujka"})
+	extra := map[string]string{"active": "true", "verified": "false", "tags": "czujka"}
+	if testID != 0 {
+		// A later run of the same profile replaces the picture: what the new
+		// XML no longer has is closed in the test.
+		extra["close_old_findings"] = "true"
+	}
+	res, err := c.scanImport(ctx, scanTypeNmap, loc.EngagementID, testID, title, "czujka-nmap.xml", xmlFile, scanDate, extra)
 	if err != nil {
 		return res, fmt.Errorf("import nmap XML do DefectDojo nie powiódł się: %w", err)
 	}

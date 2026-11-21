@@ -73,6 +73,58 @@ func Description(f model.Finding) string { return interchange.DojoDescription(f)
 
 func toGeneric(f model.Finding) interchange.DojoGenericFinding { return interchange.ToDojoGeneric(f) }
 
+// MsgUnconfirmed is the answer when DefectDojo accepted an import and then
+// did not answer the read that confirms it.
+const MsgUnconfirmed = "wysłano, nie potwierdzono: powtórz eksport"
+
+// UnconfirmedError means: the findings were sent (import-scan answered 201)
+// but the follow-up read failed, so Czujka does not know their DefectDojo ids.
+// Repeating the export is safe: the findings are then found by key.
+type UnconfirmedError struct {
+	Sent  int // findings in the imports that went through
+	Cause error
+}
+
+func (e *UnconfirmedError) Error() string {
+	return fmt.Sprintf("%s (DefectDojo przyjął %d obserwacji, ale nie odpowiedział na odczyt kontrolny: %v)", MsgUnconfirmed, e.Sent, e.Cause)
+}
+
+func (e *UnconfirmedError) Unwrap() error { return e.Cause }
+
+// LinkOrphans finds, by key, the findings that DefectDojo holds in the test
+// "Czujka findings" of the target but that Czujka has not linked (an export
+// that was sent but not confirmed). It never creates anything: when the
+// product, the engagement or the test does not exist, it returns no links.
+func (c *Client) LinkOrphans(ctx context.Context, t Target, keys []string) (map[string]FindingRef, error) {
+	out := map[string]FindingRef{}
+	if len(keys) == 0 {
+		return out, nil
+	}
+	t = t.withDefaults()
+	pt, ok, err := c.findByName(ctx, "products/", url.Values{}, "name", t.ProductName)
+	if err != nil || !ok {
+		return out, err
+	}
+	eng, ok, err := c.findByName(ctx, "engagements/", url.Values{"product": {strconv.FormatInt(pt, 10)}}, "name", t.EngagementName)
+	if err != nil || !ok {
+		return out, err
+	}
+	testID, ok, err := c.findTest(ctx, eng, FindingsTestTitle)
+	if err != nil || !ok {
+		return out, err
+	}
+	have, err := c.existingFindings(ctx, testID)
+	if err != nil {
+		return out, err
+	}
+	for _, k := range keys {
+		if df, ok := have[k]; ok {
+			out[k] = FindingRef{ID: df.ID, URL: fmt.Sprintf("%s/finding/%d", c.web(), df.ID)}
+		}
+	}
+	return out, nil
+}
+
 // existingFindings reads the findings of a test, keyed by unique_id_from_tool.
 // When a key exists more than once (data from another tool or an old
 // export), the oldest finding wins.
@@ -174,14 +226,22 @@ func (c *Client) ExportFindings(ctx context.Context, t Target, findings []model.
 	}
 	if testID != 0 {
 		out.Result.TestID = testID
-		out.Result.TestURL = fmt.Sprintf("%s/test/%d", c.base, testID)
+		out.Result.TestURL = fmt.Sprintf("%s/test/%d", c.web(), testID)
 	}
 
 	// Read back what DefectDojo holds now: ids for the links and the proof of creation.
 	if len(fresh) > 0 && testID != 0 {
 		after, err := c.existingFindings(ctx, testID)
 		if err != nil {
-			return out, err
+			// The import went through, the read did not: DefectDojo holds
+			// findings that Czujka has not linked. The next export (they are
+			// "known" by key then) or the status pull (LinkOrphans) links them.
+			sent := len(fresh) - out.Result.Failed
+			out.Result.Failed += sent
+			if len(out.Result.Errors) < 50 {
+				out.Result.Errors = append(out.Result.Errors, MsgUnconfirmed)
+			}
+			return out, &UnconfirmedError{Sent: sent, Cause: err}
 		}
 		for _, f := range fresh {
 			df, ok := after[f.Key]
@@ -190,7 +250,7 @@ func (c *Client) ExportFindings(ctx context.Context, t Target, findings []model.
 				continue
 			}
 			out.Result.Exported++
-			out.Findings[f.Key] = FindingRef{ID: df.ID, URL: fmt.Sprintf("%s/finding/%d", c.base, df.ID), Created: true}
+			out.Findings[f.Key] = FindingRef{ID: df.ID, URL: fmt.Sprintf("%s/finding/%d", c.web(), df.ID), Created: true}
 			// The import keeps most fields; status flags that the import ignores are set here.
 			if patch := diffPatch(f, df, true); len(patch) > 0 {
 				if err := c.sendJSON(ctx, http.MethodPatch, fmt.Sprintf("findings/%d/", df.ID), patch, nil); err != nil {
@@ -206,7 +266,7 @@ func (c *Client) ExportFindings(ctx context.Context, t Target, findings []model.
 			return out, err
 		}
 		df := existing[f.Key]
-		ref := FindingRef{ID: df.ID, URL: fmt.Sprintf("%s/finding/%d", c.base, df.ID)}
+		ref := FindingRef{ID: df.ID, URL: fmt.Sprintf("%s/finding/%d", c.web(), df.ID)}
 		if patch := diffPatch(f, df, false); len(patch) > 0 {
 			if err := c.sendJSON(ctx, http.MethodPatch, fmt.Sprintf("findings/%d/", df.ID), patch, nil); err != nil {
 				fail("nie można zaktualizować obserwacji %s (DefectDojo #%d): %v", f.Key, df.ID, err)
@@ -339,7 +399,7 @@ func (c *Client) ListFindings(ctx context.Context, testID int64) ([]FindingView,
 			eps = []string{}
 		}
 		sort.Strings(eps)
-		out = append(out, FindingView{ID: it.ID, URL: fmt.Sprintf("%s/finding/%d", c.base, it.ID), Title: it.Title, Severity: it.Severity,
+		out = append(out, FindingView{ID: it.ID, URL: fmt.Sprintf("%s/finding/%d", c.web(), it.ID), Title: it.Title, Severity: it.Severity,
 			Active: it.Active, Key: it.UniqueIDFromTool, Tags: it.Tags, Endpoints: eps})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })

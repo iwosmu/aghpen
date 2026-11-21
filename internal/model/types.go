@@ -958,6 +958,10 @@ type DefectDojoSettings struct {
 	// applies the status changes made in DefectDojo (status pull).
 	StatusSync    bool               `json:"status_sync"`
 	ScopeMappings []DojoScopeMapping `json:"scope_mappings"` // per-scope product and engagement
+	// LinkURL is the public base of the DefectDojo links that Czujka stores
+	// and shows (dojo_url, test_url). Empty: url. Set it when Czujka reaches
+	// DefectDojo at an address a browser cannot open.
+	LinkURL string `json:"link_url"`
 }
 
 // DojoScopeMapping sends the findings of one scope to its own DefectDojo

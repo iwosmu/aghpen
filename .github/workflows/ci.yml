@@ -1,0 +1,97 @@
+# Czujka CI: Go (format, build, vet, unit tests), integration tests against
+# PostgreSQL 17 with pg_tde in a container, and the web UI (typecheck, lint,
+# tests, build).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: go (gofmt, build, vet, unit tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          out=$(gofmt -l cmd internal e2e)
+          if [ -n "$out" ]; then echo "gofmt needed:"; echo "$out"; exit 1; fi
+      - name: build
+        run: go build ./...
+      - name: vet
+        run: go vet ./...
+      - name: unit tests (database tests skip without CZUJKA_TEST_DB_URL)
+        run: go test -count=1 ./...
+
+  integration:
+    name: integration tests (PostgreSQL 17 + pg_tde)
+    runs-on: ubuntu-latest
+    needs: go
+    env:
+      CZUJKA_TEST_DB_URL: postgres://czujka:czujka@127.0.0.1:55432/czujka?sslmode=disable
+      CZUJKA_TEST_REQUIRE_TDE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: nmap (engine tests)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq nmap
+      - name: database image with pg_tde
+        run: docker build -t czujka-db:17 deploy/db
+      - name: start the database
+        run: |
+          docker run -d --name czujka-ci-pg -e POSTGRES_USER=czujka -e POSTGRES_PASSWORD=czujka -e POSTGRES_DB=czujka \
+            -p 127.0.0.1:55432:5432 czujka-db:17
+          for _ in $(seq 1 90); do
+            docker exec czujka-ci-pg psql -h 127.0.0.1 -U czujka -d czujka -Atc "SELECT 1 FROM pg_extension WHERE extname = 'pg_tde'" 2>/dev/null | grep -q 1 && exit 0
+            sleep 1
+          done
+          docker logs czujka-ci-pg; exit 1
+      - name: all tests against the database
+        run: go test -count=1 -p 4 ./...
+      - name: database log on failure
+        if: failure()
+        run: docker logs czujka-ci-pg | tail -100
+
+  web:
+    name: web (typecheck, lint, tests, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  image:
+    name: product image builds
+    runs-on: ubuntu-latest
+    needs: [go, web]
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker build
+        run: docker build -f deploy/Dockerfile --build-arg VERSION=ci-${{ github.sha }} -t czujka:ci .
+      - name: binary runs in the image
+        run: docker run --rm czujka:ci version

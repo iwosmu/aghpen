@@ -132,6 +132,49 @@ func (s *Server) listTargets(w http.ResponseWriter, r *http.Request) {
 
 // preview removes duplicates and computes the counters of a parsed target list.
 func (s *Server) preview(r *http.Request, valid []model.Target, invalid []model.InvalidLine) (model.TargetPreview, error) {
+	return s.previewAt(r, valid, invalid, nil)
+}
+
+// lineOf returns the line (from 1) of the source that holds a target value; 0 when unknown.
+type lineOf func(value string) int
+
+// textLines maps target values to the first line of text that holds them:
+// each line is parsed alone with the same parser; a value the parser does
+// not find on one line (a JSON file, say) is searched as text.
+func (s *Server) textLines(text string) lineOf {
+	var idx map[string]int
+	var lines []string
+	return func(v string) int {
+		if idx == nil {
+			idx = map[string]int{}
+			lines = strings.Split(text, "\n")
+			for i, ln := range lines {
+				if strings.TrimSpace(ln) == "" {
+					continue
+				}
+				ts, _ := s.targets.ParseText(ln)
+				for _, t := range ts {
+					if _, ok := idx[t.Value]; !ok {
+						idx[t.Value] = i + 1
+					}
+				}
+			}
+		}
+		if n, ok := idx[v]; ok {
+			return n
+		}
+		for i, ln := range lines {
+			if strings.Contains(ln, v) {
+				return i + 1
+			}
+		}
+		return 0
+	}
+}
+
+// previewAt is preview with the source lines: an entry that the safety
+// policy or the operator lock drops keeps its real line number.
+func (s *Server) previewAt(r *http.Request, valid []model.Target, invalid []model.InvalidLine, at lineOf) (model.TargetPreview, error) {
 	p := model.TargetPreview{Valid: []model.Target{}, Invalid: invalid}
 	if p.Invalid == nil {
 		p.Invalid = []model.InvalidLine{}
@@ -166,7 +209,10 @@ func (s *Server) preview(r *http.Request, valid []model.Target, invalid []model.
 			p.AddressCount += t.Addresses
 		}
 		for _, d := range dropped {
-			d.Line = 0
+			d.Line = 0 // FilterAllowed numbers its own input, not the source
+			if at != nil {
+				d.Line = at(d.Value)
+			}
 			p.Invalid = append(p.Invalid, d)
 		}
 	}
@@ -191,25 +237,29 @@ func (s *Server) saveTargets(r *http.Request, scopeID int64, p model.TargetPrevi
 }
 
 // parseTargetBody accepts {"text": "..."} or an array of Target objects.
-func (s *Server) parseTargetBody(w http.ResponseWriter, r *http.Request) ([]model.Target, []model.InvalidLine, bool) {
+func (s *Server) parseTargetBody(w http.ResponseWriter, r *http.Request) ([]model.Target, []model.InvalidLine, lineOf, bool) {
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxJSONBody))
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, "bad_request", "the request body is too large or unreadable")
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
 	trim := bytes.TrimSpace(body)
 	if len(trim) > 0 && trim[0] == '[' {
 		var items []model.Target
 		if err := json.Unmarshal(trim, &items); err != nil {
 			writeErr(w, http.StatusBadRequest, "bad_request", "the request body is not a valid target list: "+err.Error())
-			return nil, nil, false
+			return nil, nil, nil, false
 		}
 		valid, invalid := []model.Target{}, []model.InvalidLine{}
+		pos := map[string]int{} // value → item number, from 1
 		for i, it := range items {
 			t, err := ParseTarget(it.Value)
 			if err != nil {
 				invalid = append(invalid, model.InvalidLine{Line: i + 1, Value: it.Value, Reason: err.Error()})
 				continue
+			}
+			if _, ok := pos[t.Value]; !ok {
+				pos[t.Value] = i + 1
 			}
 			t.Note, t.Source = it.Note, "api"
 			if it.Tags != nil {
@@ -217,25 +267,25 @@ func (s *Server) parseTargetBody(w http.ResponseWriter, r *http.Request) ([]mode
 			}
 			valid = append(valid, t)
 		}
-		return valid, invalid, true
+		return valid, invalid, func(v string) int { return pos[v] }, true
 	}
 	var in struct {
 		Text string `json:"text"`
 	}
 	if err := json.Unmarshal(trim, &in); err != nil {
 		writeErr(w, http.StatusBadRequest, "bad_request", "the request body is not valid JSON: "+err.Error())
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
 	valid, invalid := s.targets.ParseText(in.Text)
-	return valid, invalid, true
+	return valid, invalid, s.textLines(in.Text), true
 }
 
 func (s *Server) previewTargets(w http.ResponseWriter, r *http.Request) {
-	valid, invalid, ok := s.parseTargetBody(w, r)
+	valid, invalid, at, ok := s.parseTargetBody(w, r)
 	if !ok {
 		return
 	}
-	p, err := s.preview(r, valid, invalid)
+	p, err := s.previewAt(r, valid, invalid, at)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -252,11 +302,11 @@ func (s *Server) addTargets(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	valid, invalid, ok := s.parseTargetBody(w, r)
+	valid, invalid, at, ok := s.parseTargetBody(w, r)
 	if !ok {
 		return
 	}
-	p, err := s.preview(r, valid, invalid)
+	p, err := s.previewAt(r, valid, invalid, at)
 	if err == nil {
 		p, err = s.saveTargets(r, id, p)
 	}
@@ -306,7 +356,7 @@ func (s *Server) importTargets(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnprocessableEntity, "validation", err.Error())
 		return
 	}
-	p, err := s.preview(r, valid, invalid)
+	p, err := s.previewAt(r, valid, invalid, s.textLines(string(data)))
 	if err != nil {
 		s.fail(w, r, err)
 		return

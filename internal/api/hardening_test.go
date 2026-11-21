@@ -110,4 +110,91 @@ func TestOperatorLockThroughTheAPI(t *testing.T) {
 	if resp.StatusCode != 422 || !strings.Contains(string(raw), "CZUJKA_ALLOWED_NETWORKS") {
 		t.Fatalf("ad-hoc run outside the lock: %d %s", resp.StatusCode, raw)
 	}
+	// The 422 texts are Polish, without the sentinel prefix.
+	if !strings.Contains(string(raw), "każdy cel leży poza") || strings.Contains(string(raw), "invalid:") {
+		t.Fatalf("ad-hoc 422 must be Polish: %s", raw)
+	}
+	resp, raw = admin.raw("PUT", "/api/v1/settings/safety", map[string]any{"allowed_networks": []string{"10.0.0.0/8"}}, map[string]string{auth.CSRFHeader: admin.csrf, "Content-Type": "application/json"})
+	if resp.StatusCode != 422 || !strings.Contains(string(raw), "leży poza blokadą operatora") || strings.Contains(string(raw), "validation:") {
+		t.Fatalf("safety 422 must be Polish: %d %s", resp.StatusCode, raw)
+	}
+	resp, raw = admin.raw("PUT", "/api/v1/settings/safety", map[string]any{"max_pps": 0}, map[string]string{auth.CSRFHeader: admin.csrf, "Content-Type": "application/json"})
+	if resp.StatusCode != 422 || !strings.Contains(string(raw), "limit pakietów") {
+		t.Fatalf("max_pps 422 must be Polish: %d %s", resp.StatusCode, raw)
+	}
+
+	// /targets/preview gives the real line of an entry the lock drops.
+	admin.want(200, "POST", "/api/v1/targets/preview", map[string]string{"text": "# lista\n10.66.4.1\n\n8.8.4.4\n10.66.4.2, 1.0.0.1\n"}, &prev)
+	lines := map[string]int{}
+	for _, d := range prev.Invalid {
+		lines[d.Value] = d.Line
+	}
+	if lines["8.8.4.4"] != 4 || lines["1.0.0.1"] != 5 || len(prev.Valid) != 2 {
+		b, _ := json.Marshal(prev)
+		t.Fatalf("line numbers of dropped entries: %v in %s", lines, b)
+	}
+	admin.want(200, "POST", "/api/v1/targets/preview", []map[string]string{{"value": "10.66.4.1"}, {"value": "9.9.9.9"}}, &prev)
+	if len(prev.Invalid) != 1 || prev.Invalid[0].Line != 2 {
+		t.Fatalf("item number of a dropped entry: %+v", prev.Invalid)
+	}
+}
+
+// A policy saved before the operator lock: at start the stored networks are
+// intersected with the lock (dropped and narrowed ones are audited), and a
+// PUT that changes another field is not refused because of them.
+func TestOldPolicyUnderANewLock(t *testing.T) {
+	_, dbURL := storetest.NewWithURL(t)
+	kr, _ := crypto.NewKeyring(storetest.Key)
+	ctx := context.Background()
+	old, err := store.Open(ctx, dbURL, store.Options{Keyring: kr, Location: time.UTC})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, _ := old.GetSafetyPolicy(ctx)
+	p.AllowedNetworks = []string{"10.66.5.0/24", "10.0.0.0/8", "192.168.0.0/16"}
+	if _, err := old.PutSafetyPolicy(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+
+	st, err := store.Open(ctx, dbURL, store.Options{Keyring: kr, Location: time.UTC, OperatorNetworks: []string{"10.66.0.0/16"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(st.Close)
+	a := auth.New(st, auth.Config{PerMinute: 10000, MaxFails: 3})
+	if _, err := a.Seed(ctx, "admin@example.org", adminPW); err != nil {
+		t.Fatal(err)
+	}
+	bus := runner.NewBus()
+	mgr := runner.New(st, runner.Options{Engine: quickEngine{}, Bus: bus})
+	e := &env{t: t, st: st, mgr: mgr, srv: newTestServer(t, Deps{Store: st, Auth: a, Runner: mgr, Bus: bus, Version: "test", CookieSecure: "false"}, mgr)}
+	admin := e.login("admin@example.org", adminPW)
+
+	// Before the clamp: a PUT that changes only max_pps passes.
+	var pol model.SafetyPolicy
+	admin.want(200, "PUT", "/api/v1/settings/safety", map[string]any{"max_pps": 321}, &pol)
+	if pol.MaxPPS != 321 || len(pol.AllowedNetworks) != 3 {
+		t.Fatalf("a PUT of another field: %+v", pol)
+	}
+	// The start-up clamp.
+	c, err := st.ClampAllowedToLock(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.Changed() || strings.Join(c.After, ",") != "10.66.5.0/24,10.66.0.0/16" || strings.Join(c.Dropped, ",") != "192.168.0.0/16" ||
+		len(c.Narrowed) != 1 || c.Narrowed[0] != "10.0.0.0/8 → 10.66.0.0/16" {
+		t.Fatalf("clamp: %+v", c)
+	}
+	admin.want(200, "GET", "/api/v1/settings/safety", nil, &pol)
+	if strings.Join(pol.AllowedNetworks, ",") != "10.66.5.0/24,10.66.0.0/16" || pol.MaxPPS != 321 {
+		t.Fatalf("stored after the clamp: %+v", pol)
+	}
+	var n int
+	if err := st.Pool().QueryRow(ctx, `SELECT count(*) FROM audit_log WHERE action = 'safety.lock_clamp' AND detail->'dropped' ? '192.168.0.0/16'`).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("audit entry of the clamp: %d %v", n, err)
+	}
+	if c2, _ := st.ClampAllowedToLock(ctx); c2.Changed() {
+		t.Fatalf("a second clamp changes nothing: %+v", c2)
+	}
 }
