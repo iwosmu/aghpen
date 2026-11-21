@@ -136,6 +136,11 @@ func openWith(ctx context.Context, withOldKeys bool, mutate func(*config.Config)
 	if err := cfg.RequireDB(); err != nil {
 		return cfg, nil, log, err
 	}
+	if f := strings.TrimSpace(os.Getenv("CZUJKA_DB_PASSWORD_FILE")); f != "" {
+		if err := adoptLegacyDBPassword(ctx, cfg.DBURL, f+"_legacy", log); err != nil {
+			return cfg, nil, log, err
+		}
+	}
 	var old []string
 	if withOldKeys {
 		old = cfg.OldMasterKeys
