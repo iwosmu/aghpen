@@ -11,7 +11,7 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 | [`docs/slides/czujka.pdf`](slides/czujka.pdf) | polski | jury: prezentacja, 10 slajdów |
 | [`docs/DEMO.md`](DEMO.md) | polski | jury, zespół: lista ujęć, pokaz, notatki do slajdów, przygotowanie, pytania |
 | [`docs/demo/README.md`](demo/README.md) | polski | zespół: nagrywanie filmu demo jednym poleceniem |
-| `docs/WYNIKI.md` (w przygotowaniu) | polski | jury: pomiary na laboratorium 70 hostów |
+| [`docs/WYNIKI.md`](WYNIKI.md) | polski | jury: pomiary na laboratorium 70 hostów |
 | [`docs/WDROZENIE.md`](WDROZENIE.md) | polski | administrator |
 | [`docs/BEZPIECZENSTWO.md`](BEZPIECZENSTWO.md) | polski | jury, administrator, zespół bezpieczeństwa |
 | [`docs/ALGORYTMY.md`](ALGORYTMY.md) | polski | jury, opiekunowie kodu |
@@ -32,7 +32,7 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 
 **[demo/](demo/README.md): film.** `record.mjs` nagrywa film z prawdziwego interfejsu (Playwright, każda klatka z Chromium, cięcie w ffmpeg), z napisami i tekstem lektora z kodami czasu; `record.sh` robi to jednym poleceniem.
 
-**WYNIKI.md: wyniki (w przygotowaniu).** Precyzja i czułość wykrycia hostów, usług i technologii na laboratorium 70 hostów, czas skanu /16. Pisze zespół dokładności.
+**WYNIKI.md: wyniki.** Precyzja i czułość wykrycia hostów, usług i technologii na laboratorium 70 hostów, tempo zmierzone na przewodzie, czas skanu /16, czas uruchomienia, szablon organizatorów.
 
 **[WDROZENIE.md](WDROZENIE.md): wdrożenie.** Wymagania, start przez `docker compose`, wszystkie zmienne `CZUJKA_*`, pierwsze logowanie, konta, kopia zapasowa i odtwarzanie, rotacja klucza, aktualizacja, dołączanie skanera do sieci, rozwiązywanie problemów. Polecenia zostały wykonane; miejsca niesprawdzone są oznaczone.
 
@@ -81,6 +81,6 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 
 ## Czego brakuje w dokumentacji
 
-- `docs/WYNIKI.md`: pomiary trafności (w przygotowaniu).
+- `docs/WYNIKI.md`: pomiary trafności, tempa i czasu uruchomienia.
 - Instrukcja użytkownika interfejsu ekran po ekranie.
 - Polska wersja `ARCHITECTURE.md` i `API.md`.
