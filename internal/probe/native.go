@@ -114,7 +114,7 @@ func (n *Native) Discover(ctx context.Context, req DiscoverRequest) (*Result, er
 		ports = DefaultSynPorts
 	}
 	lim := nativeLimiter(req.MaxRate)
-	passes := 1 + req.MaxRetries
+	passes := 1 + max(0, req.MaxRetries)
 	var sent atomic.Int64
 	var mu sync.Mutex
 	res := &Result{}

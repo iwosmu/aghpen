@@ -87,15 +87,10 @@ func (r *run) scanGroup(ctx context.Context, g *group, rate int, gs *groupStats)
 			})
 		}
 	} else {
-		t0 := r.e.now()
-		res, err := r.prober.Discover(ctx, probe.DiscoverRequest{
-			Targets: tgts, Opts: r.disc, MaxRate: rate, MaxRetries: 1, HostTimeout: discoveryHostTimeout, IPv6: g.v6,
-		})
-		r.account(gs, res, t0)
-		if err != nil {
-			return fmt.Errorf("host discovery: %w", err)
+		var err error
+		if live, err = r.discover(ctx, g, tgts, rate, gs); err != nil {
+			return err
 		}
-		live = res.Hosts
 	}
 	if err := r.deepScan(ctx, g, live, 1, rate, gs, found); err != nil {
 		return err
@@ -371,20 +366,14 @@ func (r *run) buildHost(ctx context.Context, h probe.Host, attempts int) model.H
 		res.Services[i] = toService(p)
 	}
 
-	fp := r.e.deps.Fingerprinter
-	if fp != nil && r.plan.Profile.HTTP.Enabled && len(res.Services) > 0 {
-		// One fingerprint call makes several requests (page, favicon, extra
-		// paths). The limiters charge the whole call, so the average rate
-		// per host and in total stays under the limits.
-		cost := 1 + len(r.paths)
-		if r.plan.Profile.HTTP.Favicon {
-			cost++
-		}
+	if r.e.deps.Fingerprinter != nil && r.plan.Profile.HTTP.Enabled && len(res.Services) > 0 {
+		// One limiter per host: every request to this address takes a token,
+		// whichever service it goes to.
 		perHost := r.lim.PerHostRPS
 		if d := r.lim.PerHostDelay; d > 0 && 1/d.Seconds() < perHost {
 			perHost = 1 / d.Seconds()
 		}
-		hostLim := probe.NewLimiter(perHost, cost)
+		hostLim := probe.NewLimiter(perHost, 1)
 		sem := make(chan struct{}, r.lim.PerHostConc)
 		hostname := ""
 		if len(res.Hostnames) > 0 {
@@ -405,46 +394,14 @@ func (r *run) buildHost(ctx context.Context, h probe.Host, attempts int) model.H
 					return
 				}
 				defer func() { <-sem }()
-				if hostLim.WaitN(ctx, cost) != nil || r.httpLim.WaitN(ctx, cost) != nil {
-					return
-				}
-				h, t, err := fp.Fingerprint(ctx, model.FingerprintRequest{
-					IP: res.IP, Port: svc.Port, Hostname: hostname, TLSHint: svc.Tunnel == "ssl", NameHint: svc.Name,
-					Opts: r.plan.Profile.HTTP, UserAgent: r.plan.Policy.UserAgent, Paths: r.paths,
-				})
-				if err != nil {
-					r.log.Debug("fingerprint failed", "ip", res.IP, "port", svc.Port, "error", err.Error())
-				}
-				svc.HTTP, svc.TLS = h, t
-				if t != nil && svc.Tunnel == "" {
-					svc.Tunnel = "ssl"
-				}
-				if h != nil {
-					n := int64(1 + len(h.Paths) + len(h.Redirects))
-					if h.FaviconSHA256 != "" || h.FaviconMMH3 != nil {
-						n++
-					}
-					r.stats.update(func(s *model.RunStats) { s.HTTPRequests += n })
-				}
+				r.httpStage(ctx, hostLim, &res, svc, hostname)
 			}()
 		}
 		wg.Wait()
 	}
 
-	if sigs := r.e.deps.Signatures; sigs != nil {
-		for i := range res.Services {
-			svc := &res.Services[i]
-			m, t, c := sigs.Match(svc)
-			if m != nil {
-				svc.Matches = m
-			}
-			if t != nil {
-				svc.Technologies = t
-			}
-			if c != nil {
-				svc.Classes = c
-			}
-		}
+	for i := range res.Services {
+		r.match(&res.Services[i], res.Hostnames)
 	}
 	return res
 }
@@ -458,12 +415,13 @@ func containsStr(xs []string, s string) bool {
 	return false
 }
 
-// emitHost sends one host to the sink and counts it.
+// emitHost counts one host and keeps it until its group ends. A host goes
+// to the sink only when its chunk is final: a group that is cut (pause,
+// window end) is scanned again, and its hosts must not be reported twice.
 func (r *run) emitHost(g *group, gs *groupStats, res model.HostResult) {
-	if err := r.sink.OnHost(r.sinkCtx, res); err != nil {
-		r.log.Warn("sink OnHost failed", "ip", res.IP, "error", err.Error())
-		r.stats.update(func(s *model.RunStats) { s.Errors++ })
-	}
+	gs.mu.Lock()
+	gs.hosts = append(gs.hosts, res)
+	gs.mu.Unlock()
 	if !res.Up {
 		return
 	}

@@ -33,7 +33,7 @@ type DiscoverRequest struct {
 	Targets     []string // single IPs, CIDRs, "a.b.c.d-N" ranges; validated before use
 	Opts        model.DiscoveryOpts
 	MaxRate     int // probe packets per second for this process
-	MaxRetries  int
+	MaxRetries  int // 0 or less: the default (1)
 	HostTimeout time.Duration
 	IPv6        bool
 }
