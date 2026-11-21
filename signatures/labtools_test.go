@@ -78,13 +78,13 @@ func TestLabtoolsSignatures(t *testing.T) {
 	toxi := &model.ServiceResult{Port: 8474, Proto: "tcp", State: "open", Name: "http", Product: "Golang net/http server",
 		HTTP: page(t, 404, "toxiproxy-root.txt", base+":8474/")}
 	toxi.HTTP.Paths = []model.PathProbe{{Path: "/version", Status: 200, Excerpt: fixture(t, "toxiproxy-version.json")}}
-	check(t, eng, toxi, want{"toxiproxy-api", "Toxiproxy", "2.12.0", model.ClassAPI})
+	check(t, eng, toxi, want{"toxiproxy-api", "Toxiproxy", "2.12.0", model.ClassUnauthControlAPI})
 
 	// Traefik v3.1 with api.insecure, modern-proxy :8086 over plain HTTP.
 	tr := &model.ServiceResult{Port: 8086, Proto: "tcp", State: "open", Name: "http", Product: "Golang net/http server",
 		HTTP: page(t, 200, "traefik-dashboard.html", base+":8086/dashboard/")}
 	tr.HTTP.Paths = []model.PathProbe{{Path: "/api/version", Status: 200, Excerpt: fixture(t, "traefik-api-version.json")}}
-	check(t, eng, tr, want{"traefik-api-insecure", "Traefik", "3.1.7", model.ClassAdminPanel})
+	check(t, eng, tr, want{"traefik-api-insecure", "Traefik", "3.1.7", model.ClassUnauthControlAPI})
 
 	// Nginx Proxy Manager, modern :80 (default site) and :81 (admin; already in panels.yaml).
 	npm := &model.ServiceResult{Port: 80, Proto: "tcp", State: "open", Name: "http", Product: "OpenResty web app server",
@@ -105,10 +105,10 @@ func TestLabtoolsSignatures(t *testing.T) {
 	// WordPress install pages: 4.7.5 (vulnerable :8088, image wordpress:4.7) and 7.1.5 (modern :8080, wordpress:latest).
 	wp47 := &model.ServiceResult{Port: 8088, Proto: "tcp", State: "open", Name: "http", Product: "Apache httpd", Version: "2.4.10",
 		HTTP: page(t, 200, "wordpress-47-install.html", base+":8088/wp-admin/install.php")}
-	check(t, eng, wp47, want{"wordpress-installer", "WordPress", "4.7.5", model.ClassAdminPanel})
+	check(t, eng, wp47, want{"wordpress-installer", "WordPress", "4.7.5", model.ClassInstallPage})
 	wp := &model.ServiceResult{Port: 8080, Proto: "tcp", State: "open", Name: "http", Product: "Apache httpd", Version: "2.4.71",
 		HTTP: page(t, 200, "wordpress-latest-install.html", base+":8080/wp-admin/install.php")}
-	check(t, eng, wp, want{"wordpress-installer", "WordPress", "7.1.5", ""})
+	check(t, eng, wp, want{"wordpress-installer", "WordPress", "7.1.5", model.ClassInstallPage})
 
 	// Adminer, phpMyAdmin, Gitea and RabbitMQ Management are in panels.yaml already; Adminer is checked on its real page.
 	adm := &model.ServiceResult{Port: 8089, Proto: "tcp", State: "open", Name: "http", HTTP: page(t, 200, "adminer.html", base+":8089/")}

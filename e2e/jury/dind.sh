@@ -34,7 +34,8 @@ inner 'apk add -q --no-cache bash curl jq >/dev/null' || exit 1
 COPYFILE_DISABLE=1 tar --exclude='._*' -c deploy lab/jury e2e/jury | docker exec -i "$N" sh -c 'mkdir -p /work && tar -x -C /work'
 
 log "copying images into the jury machine"
-docker save "czujka:$TAG" czujka-db:17 | docker exec -i "$N" docker load -q
+docker image inspect alpine:3.22 >/dev/null 2>&1 || docker pull -q alpine:3.22 >/dev/null
+docker save "czujka:$TAG" czujka-db:17 alpine:3.22 | docker exec -i "$N" docker load -q
 IMAGES=$(for f in lab/jury/docker-compose-*.yml e2e/jury/compose/*.yml; do docker compose --env-file e2e/jury/env/proxy-base.env -f "$f" config --images 2>/dev/null; done | sort -u)
 for img in $IMAGES; do
   if docker image inspect "$img" >/dev/null 2>&1 && docker save "$img" | docker exec -i "$N" docker load -q >/dev/null 2>&1; then echo "  copied $img"

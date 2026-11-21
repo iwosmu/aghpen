@@ -22,13 +22,13 @@ TARGET=${JURY_TARGET:-host.docker.internal}
 # dind.sh sets 0: there the operator lock (CZUJKA_ALLOWED_NETWORKS) confines every scan to the throwaway jury machine,
 # and the juror flow (the default profile) must scan its real port list.
 GUARD=${JURY_GUARD:-1}
-# Template ports that the default profile (top-1000 + infrastructure ports) does not cover; measured with nmap 7.97.
-DEFAULT_MISSES=" 2223 5673 8474 8787 15432 15673 21000 21010 "
+# The default profile ("Ten komputer" copies it) must cover every template port: a miss is a FAIL.
 PORTS=21,80,81,443,2223,3001,5673,6379,8080,8081,8085,8086,8088,8089,8090,8474,8787,8888,15432,15673,21000-21010
 ONLY=${JURY_ONLY:-quickstart custom-network modern version vulnerable proxy}
 JAR=$(mktemp); CSRF=
 PASSES=0; FAILS=0; GAPS=0; CLOSED=0
 TABLE=()
+JUROR=()
 ts() { date +%H:%M:%S; }
 log() { echo "[$(ts)] $*"; }
 api() { # method path [json]
@@ -114,9 +114,21 @@ scan() { # label [profile] -> sets RUN, SV, FN, CH
   local t0 st p=${2:-$PROF}
   t0=$(date +%s)
   RUN=$(api POST /runs "{\"profile_id\":$p}" | jq -r .id)
+  # Time to the first service: the first "host" event with services on the run's event stream (SSE).
+  local fs="$JAR.first.$RUN"; rm -f "$fs"
+  ( curl -sN -b "$JAR" --max-time 7200 "$API/runs/$RUN/events" | while IFS= read -r l; do
+      case $l in
+        "event: host"*) h=1 ;;
+        data:*) if [ "${h:-0}" = 1 ] && echo "$l" | grep -qE '"services":(\[\{|[1-9])'; then date +%s > "$fs"; break; fi; h=0 ;;
+      esac
+    done ) &
+  local sse=$!
   while :; do st=$(api GET "/runs/$RUN" | jq -r .status); case $st in completed|failed|cancelled) break ;; esac; sleep 3; done
+  RUNSECS=$(( $(date +%s) - t0 )); FIRSTSVC=
+  [ -s "$fs" ] && FIRSTSVC=$(( $(cat "$fs") - t0 ))
+  kill "$sse" 2>/dev/null; wait "$sse" 2>/dev/null
   local r; r=$(api GET "/runs/$RUN")
-  log "$1: run $RUN $st in $(( $(date +%s) - t0 )) s: $(echo "$r" | jq -c '{hosts: .stats.hosts_up, services: .stats.services_open, packets: .stats.packets_sent, warnings: (.warnings // [] | length)}')"
+  log "$1: run $RUN $st in $RUNSECS s (first service after ${FIRSTSVC:-?} s): $(echo "$r" | jq -c '{hosts: .stats.hosts_up, services: .stats.services_open, packets: .stats.packets_sent, warnings: (.warnings // [] | length)}')"
   SV=$(api GET "/services?limit=500"); FN=$(api GET "/findings?limit=2000"); CH=$(api GET "/changes?run_id=$RUN&limit=500")
   RUNSTATUS=$st
 }
@@ -148,13 +160,14 @@ juror() { # stack: what a juror sees with the default profile on target $TARGET
   [ -n "$DEFPROF" ] || return 0
   scan "$1 with the default profile" "$DEFPROF"
   JUROR_RUN=$RUN
-  local port owner s
+  local port s found=0 total=0
   for port in $(grep -v '^#' "$E/truth.tsv" | awk -F'\t' -v s="$1" '$1 == s && $3 == "open" {print $2}'); do
-    owner=; [[ "$DEFAULT_MISSES" == *" $port "* ]] && owner=engine
     s=$(svc "$port")
-    if [ "$(echo "$s" | jq -r '.state // ""')" = open ]; then row "juror:$1" "$port" open "found with the default profile" "$owner" 1 "$(echo "$s" | jq -r '[.name, .product, .version] | map(select(. != null and . != "")) | join(" ")')"
-    else row "juror:$1" "$port" open "found with the default profile" "$owner" 0 "not in run $RUN${owner:+, port outside the default port list}"; fi
+    total=$((total + 1))
+    if [ "$(echo "$s" | jq -r '.state // ""')" = open ]; then found=$((found + 1)); row "juror:$1" "$port" open "found with the default profile" "" 1 "$(echo "$s" | jq -r '[.name, .product, .version] | map(select(. != null and . != "")) | join(" ")')"
+    else row "juror:$1" "$port" open "found with the default profile" "" 0 "not in run $RUN"; fi
   done
+  JUROR+=("$(printf '%s\t%s/%s\t%s\t%s\t%s' "$1" "$found" "$total" "${FIRSTSVC:-?}" "$RUNSECS" "$RUN")")
 }
 truth() { # stack
   # awk keeps empty columns (read with a tab IFS would merge them); \x1f is not whitespace.
@@ -272,5 +285,10 @@ echo
 echo "=== Summary ==="
 printf '%s\n' "${TABLE[@]}" | awk -F'\t' '{print $1}' | sed 's/ (.*//' | sort | uniq -c
 echo "PASS: $PASSES  FAIL: $FAILS  GAP: $GAPS  GAP CLOSED: $CLOSED"
-rm -f "$JAR" "$JAR.pol"
+if [ ${#JUROR[@]} -gt 0 ]; then
+  echo "Default profile on target $TARGET (the juror flow), per stack:"
+  printf '  %-16s %-14s %-20s %-18s %s\n' stack "template ports" "first service (s)" "run finished (s)" run
+  printf '%s\n' "${JUROR[@]}" | while IFS=$'\t' read -r a b c d e; do printf '  %-16s %-14s %-20s %-18s %s\n' "$a" "$b" "$c" "$d" "$e"; done
+fi
+rm -f "$JAR" "$JAR.pol" "$JAR".first.*
 [ "$FAILS" -eq 0 ] && echo "JURY TEMPLATE OK" || exit 1

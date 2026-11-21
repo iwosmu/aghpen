@@ -19,6 +19,8 @@ modern	443	name	https
 modern	8080	open	-		WordPress latest (7.1.5), installer not finished
 modern	8080	tech	WordPress@7.1.5
 modern	8080	sig	wordpress-installer
+modern	8080	class	install-page
+modern	8080	finding	Niedokończona instalacja aplikacji
 modern	8081	open	-		phpMyAdmin 5.2.3
 modern	8081	tech	phpMyAdmin
 modern	8081	class	admin-panel
@@ -30,6 +32,8 @@ modern	6379	finding	Port bazy danych otwarty na sieć skanowaną
 proxy	8085	open	-		WordPress latest behind Traefik and Toxiproxy, installer not finished
 proxy	8085	tech	WordPress@7.1.5
 proxy	8085	sig	wordpress-installer
+proxy	8085	class	install-page
+proxy	8085	finding	Niedokończona instalacja aplikacji
 proxy	8086	open	-		Traefik v3.1 dashboard and API with api.insecure=true
 proxy	8086	tech	Traefik	engine	same cause as the row below: the HTTPS answer is a 404 everywhere
 proxy	8086	sig	traefik-api-insecure	engine	the port also answers TLS (Traefik default cert, every path 404); the collector tries only HTTPS
@@ -37,6 +41,8 @@ proxy	8474	open	-		Toxiproxy 2.12.0 control API, no authentication
 proxy	8474	tech	Toxiproxy@2.12.0
 proxy	8474	sig	toxiproxy-api
 proxy	8474	class	api
+proxy	8474	class	unauth-control-api
+proxy	8474	finding	API sterujące bez uwierzytelniania
 vulnerable	21	open	-		vsftpd (fauria/vsftpd), plain-text FTP
 vulnerable	21	name	ftp
 vulnerable	21	finding	Telnet albo FTP dostępny w sieci
@@ -47,6 +53,8 @@ vulnerable	8088	open	-		WordPress 4.7.5 (image wordpress:4.7), outdated, install
 vulnerable	8088	tech	WordPress@4.7.5
 vulnerable	8088	sig	wordpress-installer
 vulnerable	8088	finding	Przestarzała główna wersja CMS
+vulnerable	8088	class	install-page
+vulnerable	8088	finding	Niedokończona instalacja aplikacji
 vulnerable	8089	open	-		Adminer
 vulnerable	8089	tech	Adminer
 vulnerable	8089	finding	Panel administracyjny poza siecią zarządzania
@@ -63,13 +71,15 @@ custom-network	15432	tech	PostgreSQL
 custom-network	15432	finding	Port bazy danych otwarty na sieć skanowaną
 custom-network	5673	open	-		RabbitMQ 3.13.7 AMQP
 custom-network	5673	name	amqp
-custom-network	5673	notech	RabbitMQ Management	accuracy	the alias in panels.yaml maps nmap's product RabbitMQ to the management panel
+custom-network	5673	notech	RabbitMQ Management		AMQP is the broker, not its management panel
 custom-network	15673	open	-		RabbitMQ management UI
-custom-network	15673	tech	RabbitMQ Management
+custom-network	15673	tech	RabbitMQ
+custom-network	15673	class	admin-panel
 custom-network	15673	finding	Panel administracyjny poza siecią zarządzania
 custom-network	3001	open	-		Gitea 28.4.0, installer not finished
 custom-network	3001	tech	Gitea@28.4.0
 custom-network	3001	sig	gitea-installer
+custom-network	3001	finding	Niedokończona instalacja aplikacji	accuracy	the gitea-installer signature (signatures/panels.yaml) has no install-page class yet
 custom-network	2223	open	-		Gitea SSH (OpenSSH 10.3)
 custom-network	2223	tech	OpenSSH
 custom-network	8787	open	-		nginx (alpine) default page

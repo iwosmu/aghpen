@@ -10,7 +10,7 @@
   description: API sterujące Toxiproxy bez uwierzytelnienia. Każdy, kto je widzi, może dodać opóźnienia, ograniczyć pasmo albo zerwać połączenia do usług za proxy.
   tags: [go, chaos, api]
   interest: 75
-  classes: [api, dev-tool, admin-panel]
+  classes: [api, dev-tool, admin-panel, unauth-control-api]
   match:
     min_confidence: 0.6
     rules:
@@ -27,7 +27,7 @@
   description: Traefik uruchomiony z api.insecure=true. API i panel pokazują routery, usługi i adresy zaplecza każdemu bez logowania.
   tags: [go, proxy, api]
   interest: 70
-  classes: [api, admin-panel, dev-tool]
+  classes: [api, admin-panel, dev-tool, unauth-control-api]
   match:
     rules:
       - {type: path, path: /api/version, status: [200], contains_all: ['"Version"', '"Codename"'], weight: 0.95}
@@ -88,7 +88,7 @@
   description: Instalator WordPressa (wp-admin/install.php) jest dostępny. Kto go wypełni, zostaje administratorem strony i może uruchomić własny kod PHP.
   tags: [php, install]
   interest: 85
-  classes: [admin-panel]
+  classes: [admin-panel, install-page]
   match:
     min_confidence: 0.6
     rules:
