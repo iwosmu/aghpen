@@ -85,10 +85,15 @@ func (c Client) Post(ctx context.Context, endpoint, secret, event string, body [
 		return res
 	}
 	defer resp.Body.Close()
-	snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 	res.Status = resp.StatusCode
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		res.Error = fmt.Sprintf("odpowiedź HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(snippet)))
+		// Only the status: the body of an internal endpoint may hold
+		// anything, and it would reach the UI and the audit log (security review L2).
+		res.Error = fmt.Sprintf("odpowiedź HTTP %d", resp.StatusCode)
+		if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+			res.Error += " (przekierowanie; Czujka nie podąża za przekierowaniem, podaj adres docelowy)"
+		}
 	}
 	return res
 }

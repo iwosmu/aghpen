@@ -222,7 +222,7 @@ func (c *Client) RemoteStatuses(ctx context.Context, ids []int64) (map[int64]Rem
 			out[id] = RemoteStatus{DojoID: id, Missing: true}
 		case err != nil:
 			if len(errs) < 50 {
-				errs = append(errs, fmt.Sprintf("odczyt obserwacji DefectDojo #%d: %v", id, err))
+				errs = append(errs, fmt.Sprintf("odczyt znaleziska DefectDojo #%d: %v", id, err))
 			}
 		default:
 			out[id] = d.remote()
@@ -303,19 +303,19 @@ func (c *Client) SyncLifecycle(ctx context.Context, findings []model.Finding, no
 			// DefectDojo sets the mitigated time itself; editing it is refused
 			// unless EDITABLE_MITIGATED_DATA is on (checked on 3.5.202).
 			patch := map[string]any{"is_mitigated": true, "active": false}
-			note := fmt.Sprintf("Czujka: obserwacja %s nie jest już widoczna (ostatnio widziana %s, przebieg #%d). Oznaczona jako usunięta.",
+			note := fmt.Sprintf("Czujka: znalezisko %s zniknęło (ostatnia obserwacja %s, skan #%d). Zamknięte.",
 				f.Key, f.LastSeen.UTC().Format("2006-01-02 15:04 UTC"), f.LastRunID)
 			if err := c.lifecycle(ctx, *f.DojoID, patch, note); err != nil {
-				res.Errors = append(res.Errors, fmt.Sprintf("zamknięcie obserwacji DefectDojo #%d: %v", *f.DojoID, err))
+				res.Errors = append(res.Errors, fmt.Sprintf("zamknięcie znaleziska DefectDojo #%d: %v", *f.DojoID, err))
 				continue
 			}
 			res.Closed++
 		case (f.Status == model.FindingNew || f.Status == model.FindingTriaged) && r.Flags.IsMitigated && !decided:
 			patch := map[string]any{"is_mitigated": false, "active": true}
-			note := fmt.Sprintf("Czujka: obserwacja %s jest znów widoczna (przebieg #%d, %s). Ponownie otwarta.",
+			note := fmt.Sprintf("Czujka: znalezisko %s wróciło (skan #%d, %s). Otwarte ponownie.",
 				f.Key, f.LastRunID, f.LastSeen.UTC().Format("2006-01-02 15:04 UTC"))
 			if err := c.lifecycle(ctx, *f.DojoID, patch, note); err != nil {
-				res.Errors = append(res.Errors, fmt.Sprintf("ponowne otwarcie obserwacji DefectDojo #%d: %v", *f.DojoID, err))
+				res.Errors = append(res.Errors, fmt.Sprintf("ponowne otwarcie znaleziska DefectDojo #%d: %v", *f.DojoID, err))
 				continue
 			}
 			res.Reopened++
@@ -421,7 +421,7 @@ func (c *Client) AttachFile(ctx context.Context, kind string, id int64, title, f
 // evidence lines, plain text. Cookie values are never in Finding.Evidence.
 func EvidenceText(f model.Finding) []byte {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Czujka – dowody obserwacji\n\nKlucz: %s\nTytuł: %s\nTyp: %s\nHost: %s\n", f.Key, f.Title, f.Type, f.IP)
+	fmt.Fprintf(&b, "Czujka – dowody znaleziska\n\nKlucz: %s\nTytuł: %s\nTyp: %s\nHost: %s\n", f.Key, f.Title, f.Type, f.IP)
 	if f.Port != 0 {
 		fmt.Fprintf(&b, "Port: %d\n", f.Port)
 	}
@@ -429,7 +429,7 @@ func EvidenceText(f model.Finding) []byte {
 		fmt.Fprintf(&b, "URL: %s\n", f.URL)
 	}
 	if !f.FirstSeen.IsZero() {
-		fmt.Fprintf(&b, "Pierwsza obserwacja: %s\nOstatnia obserwacja: %s (przebieg #%d)\n", f.FirstSeen.UTC().Format(time.RFC3339),
+		fmt.Fprintf(&b, "Pierwsza obserwacja: %s\nOstatnia obserwacja: %s (skan #%d)\n", f.FirstSeen.UTC().Format(time.RFC3339),
 			f.LastSeen.UTC().Format(time.RFC3339), f.LastRunID)
 	}
 	if f.Signature != "" {
@@ -439,7 +439,6 @@ func EvidenceText(f model.Finding) []byte {
 	for _, e := range f.Evidence {
 		fmt.Fprintf(&b, "- [%s] %s: %s\n", e.Matcher, e.Where, e.Snippet)
 	}
-	b.WriteString("\nBezpieczna detekcja: tylko GET/HEAD, bez logowania, bez payloadów.\n")
 	return []byte(b.String())
 }
 
@@ -454,7 +453,7 @@ func (c *Client) AttachEvidence(ctx context.Context, findings []model.Finding) (
 		}
 		name := "czujka-evidence-" + safeName(f.Key) + ".txt"
 		if err := c.AttachFile(ctx, "findings", *f.DojoID, "Czujka: dowody "+f.Key, name, EvidenceText(f)); err != nil {
-			errs = append(errs, fmt.Sprintf("załącznik do obserwacji DefectDojo #%d: %v", *f.DojoID, err))
+			errs = append(errs, fmt.Sprintf("załącznik do znaleziska DefectDojo #%d: %v", *f.DojoID, err))
 			continue
 		}
 		n++
@@ -464,7 +463,7 @@ func (c *Client) AttachEvidence(ctx context.Context, findings []model.Finding) (
 
 // AttachRunXML uploads the nmap XML of a run to a DefectDojo test.
 func (c *Client) AttachRunXML(ctx context.Context, testID, runID int64, xml []byte) error {
-	return c.AttachFile(ctx, "tests", testID, fmt.Sprintf("Czujka: nmap XML przebiegu #%d", runID), fmt.Sprintf("czujka-run-%d.xml", runID), xml)
+	return c.AttachFile(ctx, "tests", testID, fmt.Sprintf("Czujka: nmap XML skanu #%d", runID), fmt.Sprintf("czujka-run-%d.xml", runID), xml)
 }
 
 func safeName(s string) string {

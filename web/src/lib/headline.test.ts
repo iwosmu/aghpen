@@ -21,8 +21,8 @@ describe('headline helpers', () => {
   });
   it('lists only the non-zero change counts', () => {
     expect(changeParts({ added: 0, gone: 0, changed: 0, missing: 1, unstable: 0 }, 'pl', pl)).toEqual(['1 host nie odpowiada (niepotwierdzone)']);
-    expect(changeParts({ added: 0, gone: 0, changed: 0, missing: 0, unstable: 0, confirmedGone: 2 }, 'pl', pl)).toEqual(['2 hosty zniknęły (potwierdzone)']);
-    expect(changeParts({ added: 96, gone: 2, changed: 0, missing: 0, unstable: 0 }, 'pl', pl)).toEqual(['96 nowych ekspozycji', '2 zniknięcia']);
+    expect(changeParts({ added: 0, gone: 0, changed: 0, missing: 0, unstable: 0, confirmedGone: 2 }, 'pl', pl)).toEqual(['2 hosty nieaktywne']);
+    expect(changeParts({ added: 96, gone: 2, changed: 0, missing: 0, unstable: 0 }, 'pl', pl)).toEqual(['96 nowych ekspozycji', '2 usługi zniknęły']);
   });
   it('treats a rate within 5 % of the cap as normal', () => {
     expect(overCap(800, 800)).toBe(false);

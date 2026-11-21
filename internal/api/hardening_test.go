@@ -99,7 +99,7 @@ func TestOperatorLockThroughTheAPI(t *testing.T) {
 	admin.want(201, "POST", "/api/v1/scopes", map[string]string{"name": "Poza blokadą"}, &sc)
 	var prev model.TargetPreview
 	admin.want(201, "POST", fmt.Sprintf("/api/v1/scopes/%d/targets", sc.ID), map[string]string{"text": "8.8.8.0/24\n10.66.3.0/24\n0.0.0.0/0"}, &prev)
-	if len(prev.Valid) != 1 || prev.Valid[0].Value != "10.66.3.0/24" || len(prev.Invalid) != 2 || !strings.Contains(prev.Invalid[0].Reason, "CZUJKA_ALLOWED_NETWORKS") {
+	if len(prev.Valid) != 1 || prev.Valid[0].Value != "10.66.3.0/24" || len(prev.Invalid) != 2 || !strings.Contains(prev.Invalid[0].Reason, "blokadą operatora") {
 		b, _ := json.Marshal(prev)
 		t.Fatalf("targets outside the lock: %s", b)
 	}
@@ -107,11 +107,11 @@ func TestOperatorLockThroughTheAPI(t *testing.T) {
 	var prof model.ScanProfile
 	admin.want(201, "POST", "/api/v1/profiles", map[string]any{"name": "W blokadzie", "scope_ids": []int64{sc.ID}, "ports": "80", "enabled": true}, &prof)
 	resp, raw := admin.raw("POST", "/api/v1/runs/adhoc", map[string]any{"profile_id": prof.ID, "addresses": []string{"1.1.1.1"}, "ports": "80"}, map[string]string{auth.CSRFHeader: admin.csrf, "Content-Type": "application/json"})
-	if resp.StatusCode != 422 || !strings.Contains(string(raw), "CZUJKA_ALLOWED_NETWORKS") {
+	if resp.StatusCode != 422 || !strings.Contains(string(raw), "blokadą operatora") {
 		t.Fatalf("ad-hoc run outside the lock: %d %s", resp.StatusCode, raw)
 	}
 	// The 422 texts are Polish, without the sentinel prefix.
-	if !strings.Contains(string(raw), "każdy cel leży poza") || strings.Contains(string(raw), "invalid:") {
+	if !strings.Contains(string(raw), "Każdy cel leży poza") || strings.Contains(string(raw), "invalid:") {
 		t.Fatalf("ad-hoc 422 must be Polish: %s", raw)
 	}
 	resp, raw = admin.raw("PUT", "/api/v1/settings/safety", map[string]any{"allowed_networks": []string{"10.0.0.0/8"}}, map[string]string{auth.CSRFHeader: admin.csrf, "Content-Type": "application/json"})
@@ -119,7 +119,7 @@ func TestOperatorLockThroughTheAPI(t *testing.T) {
 		t.Fatalf("safety 422 must be Polish: %d %s", resp.StatusCode, raw)
 	}
 	resp, raw = admin.raw("PUT", "/api/v1/settings/safety", map[string]any{"max_pps": 0}, map[string]string{auth.CSRFHeader: admin.csrf, "Content-Type": "application/json"})
-	if resp.StatusCode != 422 || !strings.Contains(string(raw), "limit pakietów") {
+	if resp.StatusCode != 422 || !strings.Contains(string(raw), "Pakiety na sekundę") {
 		t.Fatalf("max_pps 422 must be Polish: %d %s", resp.StatusCode, raw)
 	}
 

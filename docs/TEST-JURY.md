@@ -67,15 +67,15 @@ Scenariusze zmian, ze zdaniami, które Czujka zapisała w „Zmianach”:
 | Scenariusz | Rodzaj zmiany | Zdanie Czujki |
 | --- | --- | --- |
 | `./quickstart.sh change` (profil z portami szablonu i profil domyślny) | `service_gone` | „Usługa 172.18.0.1:8787 zniknęła (nginx 1.31.9)” |
-| `./quickstart.sh up` | `service_returned` | „Usługa 172.18.0.1:8787 wróciła po 53 s (nie było jej w 1 skanie) (nginx 1.31.9)”; na profilu domyślnym „wróciła po 1 min” |
+| `./quickstart.sh up` | `service_returned` | „Usługa 172.18.0.1:8787 wróciła po 53 s (nginx 1.31.9)”; na profilu domyślnym „wróciła po 1 min” |
 | przebieg, którego lista portów nie zawiera 8787, zaraz po przebiegu, który go znalazł | brak zmiany | 8787 zostaje otwarty, w wynikach przebiegu z `carried=true` (nie skanowany w tym przebiegu) |
 | zamiana `custom-network` na `modern` | `service_gone`, `service_new` | „Usługa 172.18.0.1:3001 zniknęła (Golang net/http server)”, „Nowa usługa 172.18.0.1:8080 (Apache httpd 2.4.71)” |
-| `redis:7` na `redis:6` (kopia pliku compose) | `tech_version` | „Zmiana wersji Redis na 172.18.0.1:6379: 7.4.12 → 6.2.24” |
+| `redis:7` na `redis:6` (kopia pliku compose) | `tech_version` | „Zmiana wersji Redis, 172.18.0.1:6379: 7.4.12 → 6.2.24” |
 | Toxiproxy: opóźnienie 500 ms | `response_slower` | „Usługa 172.18.0.1:8085 odpowiada wolniej: 555 ms (zwykle 16 ms)” |
 | Toxiproxy: `timeout` 1 s | wynik usługi | HTTP 502 po 1011 ms w ostatniej obserwacji 8085 |
 | Toxiproxy: `bandwidth` 100 KB/s, `slow_close` 1 s | brak zmiany | skan kończy się, port 8085 zostaje otwarty |
-| drugi host (nginx w osobnej sieci dockera w maszynie jury) zatrzymany, skan | `host_missing`, `service_unreachable` | „Host 172.31.250.10 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 1 otwartą usługę: 80/tcp http nginx” |
-| ten sam host, bez kolejnego skanu | `host_gone`, `service_gone` po 110 s (sprawdzenie ponowne Czujki) | „Host 172.31.250.10 zgłoszony jako nieaktywny”, „Usługa 172.31.250.10:80 zniknęła (nginx 1.31.9): host zgłoszony jako nieaktywny” |
+| drugi host (nginx w osobnej sieci dockera w maszynie jury) zatrzymany, skan | `host_missing`, `service_unreachable` | „Host 172.31.250.10 nie odpowiada (niepotwierdzone), miał 1 otwartą usługę” |
+| ten sam host, bez kolejnego skanu | `host_gone`, `service_gone` po 110 s (sprawdzenie ponowne Czujki) | „Host 172.31.250.10 nieaktywny, …”, „Usługa 172.31.250.10:80 zniknęła (nginx 1.31.9), host nieaktywny” |
 
 Na każdym stosie dwa przebiegi bez zmiany w szablonie (profil domyślny, potem profil z portami szablonu) dają te same produkty, wersje i technologie na każdym porcie szablonu, a drugi przebieg nie ma żadnej zmiany technologii ani wersji.
 

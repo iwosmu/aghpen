@@ -17,7 +17,7 @@ const TEMPLATE = [
   'id: moja-sygnatura',
   'name: Moja sygnatura',
   'category: panel',
-  'description: Co rozpoznaje ta regula',
+  'description: Co rozpoznaje ta sygnatura',
   'safe: true',
   'paths: [/login]',
   'match:',
@@ -106,20 +106,20 @@ export default function SignatureEditor() {
       <PageHeader
         back={{ to: '/signatures', label: t('Sygnatury', 'Signatures') }}
         title={isNew ? t('Nowa sygnatura', 'New signature') : sig?.name ?? ''}
-        sub={builtin ? t('Sygnatura wbudowana: treści nie można zmienić. Można ją wyłączyć albo skopiować jako własną.', 'A built-in signature: its text cannot be changed. You can disable it or copy it as your own.') : t('Edytor reguły w YAML. Walidacja działa w trakcie pisania, a test na zapisanych wynikach nie wysyła żadnego pakietu.', 'The YAML rule editor. Validation runs as you type, and the test on stored results sends no packet.')}
+        sub={builtin ? t('Sygnatura wbudowana. Można ją wyłączyć albo skopiować.', 'Built-in signature. You can disable or copy it.') : undefined}
         readOnly={!canWrite && !(builtin && can('signatures:update'))}
         actions={<>
-          {builtin && can('signatures:update') ? <span className="flex items-center gap-2 text-sm text-ink-2">{t('Aktywna', 'Active')}<Switch checked={enabled} disabled={toggle.isPending} onChange={(x) => toggle.mutate(x)} label={t('Sygnatura aktywna', 'Signature active')} /></span> : null}
-          {!isNew && can('signatures:create') ? <Button icon="copy" onClick={() => navigate('/signatures/new?from=' + id)}>{t('Kopiuj jako własną', 'Copy as custom')}</Button> : null}
+          {builtin && can('signatures:update') ? <span className="flex items-center gap-2 text-sm text-ink-2">{t('Włączona', 'Enabled')}<Switch checked={enabled} disabled={toggle.isPending} onChange={(x) => toggle.mutate(x)} label={t('Sygnatura włączona', 'Signature enabled')} /></span> : null}
+          {!isNew && can('signatures:create') ? <Button icon="copy" onClick={() => navigate('/signatures/new?from=' + id)}>{t('Kopiuj', 'Copy')}</Button> : null}
           {!isNew && !builtin && can('signatures:delete') ? <Button variant="danger" icon="trash" onClick={() => setConfirmDelete(true)}>{t('Usuń', 'Delete')}</Button> : null}
-          {canWrite ? <Button variant="primary" icon="check" busy={save.isPending} disabled={!v?.ok || pending || !dirty} onClick={() => save.mutate(undefined)}>{t('Zapisz sygnaturę', 'Save the signature')}</Button> : null}
+          {canWrite ? <Button variant="primary" icon="check" busy={save.isPending} disabled={!v?.ok || pending || !dirty} onClick={() => save.mutate(undefined)}>{t('Zapisz sygnaturę', 'Save signature')}</Button> : null}
         </>}
       />
       <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         <div className="min-w-0">
           <div className="flex items-center justify-between gap-3 border border-b-0 border-rule bg-panel px-3 py-1.5 text-xs text-ink-2">
             <span className="mono">{isNew ? t('nowa.yaml', 'new.yaml') : (sig?.slug ?? '') + '.yaml'}</span>
-            {canWrite ? <span className="flex items-center gap-2">{t('Aktywna po zapisie', 'Active after saving')}<Switch checked={enabled} onChange={setEnabled} label={t('Aktywna po zapisie', 'Active after saving')} /></span> : null}
+            {canWrite ? <span className="flex items-center gap-2">{t('Włączona po zapisie', 'Enabled after saving')}<Switch checked={enabled} onChange={setEnabled} label={t('Włączona po zapisie', 'Enabled after saving')} /></span> : null}
           </div>
           <div className="relative flex border border-rule bg-[var(--sunk)]" style={{ height: 'max(360px, calc(100dvh - 330px))' }}>
             <div ref={gutter} className="mono w-[46px] flex-none select-none overflow-hidden border-r border-rule py-2 text-right text-xs leading-[20px] text-ink-3" aria-hidden="true">
@@ -131,7 +131,7 @@ export default function SignatureEditor() {
             <textarea
               className="mono min-w-0 flex-1 resize-none whitespace-pre bg-transparent px-3 py-2 text-xs leading-[20px] text-ink outline-none focus-visible:outline-none"
               style={{ tabSize: 2 }} spellCheck={false} wrap="off" value={yaml} readOnly={!canWrite}
-              aria-label={t('Treść sygnatury w YAML', 'Signature text in YAML')} aria-invalid={errors.length > 0}
+              aria-label={t('Treść sygnatury (YAML)', 'Signature text (YAML)')} aria-invalid={errors.length > 0}
               onScroll={(e) => { if (gutter.current) gutter.current.scrollTop = e.currentTarget.scrollTop; }}
               onChange={(e) => setYaml(e.target.value)}
               onKeyDown={(e) => {
@@ -150,7 +150,7 @@ export default function SignatureEditor() {
         </div>
 
         <div className="min-w-0 space-y-4">
-          <Panel title={t('Walidacja', 'Validation')} actions={pending ? <span className="inline-flex items-center gap-1.5 text-ink-3"><Spinner />{t('sprawdzam', 'checking')}</span> : undefined}>
+          <Panel title={t('Walidacja', 'Validation')} actions={pending ? <span className="inline-flex items-center gap-1.5 text-ink-3"><Spinner />{t('sprawdzanie', 'checking')}</span> : undefined}>
             {validation.error ? <InlineError error={validation.error} /> : !v ? <div className="skeleton h-10" /> : (
               <div data-testid="validation">
                 <p className="flex items-center gap-2 text-sm font-medium">
@@ -175,22 +175,22 @@ export default function SignatureEditor() {
                     })}
                   </ul>
                 ) : null}
-                {(v.paths ?? []).length ? <p className="mt-2 text-xs text-ink-2">{t('Dodatkowe żądania GET na usługę:', 'Extra GET requests per service:')} {(v.paths ?? []).map((p) => <span key={p} className="mono mr-2 text-ink">{p}</span>)}</p> : <p className="mt-2 text-xs text-ink-3">{t('Sygnatura nie prosi o dodatkowe ścieżki: korzysta z danych już zebranych.', 'The signature asks for no extra path: it uses data that is already collected.')}</p>}
+                {(v.paths ?? []).length ? <p className="mt-2 text-xs text-ink-2">{t('Dodatkowe żądania GET na usługę:', 'Extra GET requests per service:')} {(v.paths ?? []).map((p) => <span key={p} className="mono mr-2 text-ink">{p}</span>)}</p> : <p className="mt-2 text-xs text-ink-3">{t('Bez dodatkowych ścieżek.', 'No extra paths.')}</p>}
               </div>
             )}
           </Panel>
 
-          <Panel title={t('Test na zapisanych wynikach', 'Test on stored results')} actions={<Button size="sm" icon="history" busy={retro.isPending} disabled={!v?.ok || pending} onClick={() => retro.mutate(yaml)}>{t('Uruchom test', 'Run the test')}</Button>}>
-            {!hunt ? <p className="text-sm text-ink-2">{t('Sprawdź regułę na danych z poprzednich skanów, zanim ją zapiszesz. Test czyta bazę i nie dotyka sieci.', 'Check the rule against data of earlier scans before you save it. The test reads the database and does not touch the network.')}</p> : (
+          <Panel title={t('Test na zapisanych wynikach', 'Test on stored results')} actions={<Button size="sm" icon="history" busy={retro.isPending} disabled={!v?.ok || pending} onClick={() => retro.mutate(yaml)}>{t('Uruchom test', 'Run test')}</Button>}>
+            {!hunt ? null : (
               <div className={cx(!huntFresh && 'opacity-60')} data-testid="retrohunt">
                 <p className="text-sm">
-                  {t('Dopasowano ', 'Matched ')}<span className="num text-base font-semibold">{fmtInt(hunt.result.total_hits ?? (hunt.result.hits ?? []).length)}</span> {plural(hunt.result.total_hits ?? (hunt.result.hits ?? []).length, ['zapisaną usługę', 'zapisane usługi', 'zapisanych usług'], ['stored service', 'stored services'])}{t(', wysłano ', ', ')}<span className="num text-base font-semibold">{hunt.result.packets_sent}</span> {t('pakietów.', 'packets sent.')}
+                  {t('Dopasowano ', 'Matched ')}<span className="num text-base font-semibold">{fmtInt(hunt.result.total_hits ?? (hunt.result.hits ?? []).length)}</span> {plural(hunt.result.total_hits ?? (hunt.result.hits ?? []).length, ['zapisaną usługę', 'zapisane usługi', 'zapisanych usług'], ['stored service', 'stored services'])}.
                 </p>
-                <p className="text-xs text-ink-3">{t('Przejrzano ' + fmtInt(hunt.result.scanned) + ' obserwacji w ' + hunt.result.took_ms + ' ms.', 'Checked ' + fmtInt(hunt.result.scanned) + ' observations in ' + hunt.result.took_ms + ' ms.')}{!huntFresh ? ' ' + t('Treść zmieniła się od tego testu.', 'The text has changed since this test.') : ''}</p>
-                {hunt.result.truncated ? <p className="mt-1 text-xs text-ink-2" data-testid="retro-truncated">{t('Lista pokazuje pierwsze ' + fmtInt((hunt.result.hits ?? []).length) + ' z ' + fmtInt(hunt.result.total_hits ?? 0) + ' trafień.', 'The list shows the first ' + fmtInt((hunt.result.hits ?? []).length) + ' of ' + fmtInt(hunt.result.total_hits ?? 0) + ' hits.')}</p> : null}
+                <p className="text-xs text-ink-3">{t('Sprawdzone obserwacje: ' + fmtInt(hunt.result.scanned) + '.', 'Observations checked: ' + fmtInt(hunt.result.scanned) + '.')}{!huntFresh ? ' ' + t('Treść zmieniła się od tego testu.', 'The text has changed since this test.') : ''}</p>
+                {hunt.result.truncated ? <p className="mt-1 text-xs text-ink-2" data-testid="retro-truncated">{t('Pierwsze ' + fmtInt((hunt.result.hits ?? []).length) + ' z ' + fmtInt(hunt.result.total_hits ?? 0) + ' dopasowań.', 'First ' + fmtInt((hunt.result.hits ?? []).length) + ' of ' + fmtInt(hunt.result.total_hits ?? 0) + ' matches.')}</p> : null}
                 {(hunt.result.missing_paths ?? []).length ? (
                   <div className="mt-2 border border-rule-strong bg-st-changed-wash px-2.5 py-2 text-xs" data-testid="retro-missing">
-                    <p className="flex items-start gap-1.5 text-ink"><Glyph name="delta" tone="changed" size={12} /><span>{t('Reguły ścieżek nie mogły trafić w ' + fmtInt(hunt.result.incomplete ?? 0) + ' obserwacjach: tych ścieżek skaner wtedy nie pobrał. Wynik jest dolną granicą; następny skan je pobierze.', 'Path rules could not match in ' + fmtInt(hunt.result.incomplete ?? 0) + ' observations: the scanner did not fetch these paths then. The result is a lower bound; the next scan fetches them.')}</span></p>
+                    <p className="flex items-start gap-1.5 text-ink"><Glyph name="delta" tone="changed" size={12} /><span>{t('W ' + fmtInt(hunt.result.incomplete ?? 0) + ' obserwacjach skaner nie pobrał tych ścieżek. Następny skan je pobierze.', 'In ' + fmtInt(hunt.result.incomplete ?? 0) + ' observations the scanner had not fetched these paths. The next scan fetches them.')}</span></p>
                     <p className="mono mt-1 text-ink-2">{(hunt.result.missing_paths ?? []).join('  ')}</p>
                   </div>
                 ) : null}
@@ -204,15 +204,15 @@ export default function SignatureEditor() {
                       </li>
                     ))}
                   </ul>
-                ) : <p className="mt-2 text-sm text-ink-2">{t('Żadna zapisana usługa nie pasuje. Reguła może być zbyt wąska.', 'No stored service matches. The rule may be too narrow.')}</p>}
+                ) : <p className="mt-2 text-sm text-ink-2">{t('Żadna zapisana usługa nie pasuje.', 'No stored services match.')}</p>}
               </div>
             )}
           </Panel>
         </div>
       </div>
-      <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)} title={t('Usunąć sygnaturę?', 'Delete the signature?')} width={420}
-        footer={<><Button onClick={() => setConfirmDelete(false)}>{t('Anuluj', 'Cancel')}</Button><Button variant="dangerSolid" busy={remove.isPending} onClick={() => remove.mutate(undefined)}>{t('Usuń sygnaturę', 'Delete the signature')}</Button></>}>
-        <p className="text-sm">{t('Dotychczasowe dopasowania zostają w historii. Kolejne skany nie będą już używać tej reguły.', 'Past matches stay in the history. Later scans no longer use this rule.')}</p>
+      <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)} title={t('Usunąć sygnaturę?', 'Delete signature?')} width={420}
+        footer={<><Button onClick={() => setConfirmDelete(false)}>{t('Anuluj', 'Cancel')}</Button><Button variant="dangerSolid" busy={remove.isPending} onClick={() => remove.mutate(undefined)}>{t('Usuń sygnaturę', 'Delete signature')}</Button></>}>
+        <p className="text-sm">{t('Dopasowania zostają w historii. Kolejne skany nie użyją tej sygnatury.', 'Matches stay in the history. Later scans do not use this signature.')}</p>
       </Dialog>
     </div>
   );

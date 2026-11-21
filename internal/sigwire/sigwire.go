@@ -192,8 +192,9 @@ func (w *Wire) Validate(yaml string) (model.SignatureValidation, model.Signature
 // RetroHunt is api.RetroHunter. It streams the stored observations from the
 // store into the matcher one at a time, so memory use does not grow with the
 // number of observations. It sends no packet. With latestOnly it checks only
-// the newest observation of every service.
-func (w *Wire) RetroHunt(ctx context.Context, yaml string, latestOnly bool) (model.RetroHuntResult, error) {
+// the newest observation of every service. Without cookieValues (a caller
+// without results:update) cookie values are blanked before matching.
+func (w *Wire) RetroHunt(ctx context.Context, yaml string, latestOnly, cookieValues bool) (model.RetroHuntResult, error) {
 	h, val := sig.NewHunter(yaml)
 	if h == nil {
 		var msgs []string
@@ -213,6 +214,13 @@ func (w *Wire) RetroHunt(ctx context.Context, yaml string, latestOnly bool) (mod
 	err := w.st.EachObservation(ctx, store.ObsFilter{LatestOnly: latestOnly}, func(o *store.ObservationRow) error {
 		if o.Result.Port == 0 {
 			o.Result.Port = o.Port
+		}
+		if !cookieValues && o.Result.HTTP != nil {
+			// Names and flags stay; a value rule then never matches, so hit
+			// or no hit tells nothing about the value (security review M1).
+			for i := range o.Result.HTTP.Cookies {
+				o.Result.HTTP.Cookies[i].Value = ""
+			}
 		}
 		h.Add(&o.ServiceObservation, o.IP)
 		return ctx.Err()

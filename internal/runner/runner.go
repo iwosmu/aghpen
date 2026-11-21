@@ -210,13 +210,13 @@ func (m *Manager) BuildPlan(ctx context.Context, profile model.ScanProfile, run 
 		m.log.Warn("target outside the allowed networks dropped from the plan", "target", d.Value, "reason", d.Reason)
 	}
 	if len(kept) == 0 {
-		where := "dozwolonymi sieciami polityki bezpieczeństwa"
+		msg := "Każdy cel leży poza dozwolonymi sieciami"
 		if len(plan.Policy.OperatorNetworks) > 0 {
-			where += " albo blokadą operatora (CZUJKA_ALLOWED_NETWORKS: " + strings.Join(plan.Policy.OperatorNetworks, ", ") + ")"
+			msg += " albo poza blokadą operatora (" + strings.Join(plan.Policy.OperatorNetworks, ", ") + ")"
 		}
-		msg := "każdy cel leży poza " + where
+		msg += "."
 		if len(dropped) > 0 {
-			msg += "; " + dropped[0].Value + ": " + dropped[0].Reason
+			msg += " " + dropped[0].Value + ": " + dropped[0].Reason
 		}
 		return plan, fmt.Errorf("%w: %s", ErrInvalid, msg)
 	}

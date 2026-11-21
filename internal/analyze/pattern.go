@@ -34,8 +34,8 @@ var plDay = [7]string{"nd", "pn", "wt", "śr", "cz", "pt", "sb"}
 var mondayFirst = [7]int{1, 2, 3, 4, 5, 6, 0}
 
 // Pattern describes the availability histogram in short Polish text, for
-// example "zwykle aktywny pn–pt 08–16" or "odpowiada w ok. 50% skanów, bez
-// wzorca dobowego". It returns "" when there is too little data.
+// example "zwykle aktywny pn–pt 08–16" or "aktywny w ok. 50% skanów, bez
+// wzorca". It returns "" when there is too little data.
 func Pattern(b [168]model.AvailBucket) string {
 	up, all, cells := 0, 0, 0
 	for _, c := range b {
@@ -50,10 +50,10 @@ func Pattern(b [168]model.AvailBucket) string {
 	}
 	share := float64(up) / float64(all)
 	if share >= AlwaysOnRate {
-		return fmt.Sprintf("odpowiada stale (%d%% skanów)", int(math.Round(share*100)))
+		return fmt.Sprintf("aktywny stale (%d%% skanów)", int(math.Round(share*100)))
 	}
 	if !clock.IsDefault() {
-		return clockPattern(b, share)
+		return clockPattern(share)
 	}
 
 	if float64(all)/float64(cells) >= MinCellObs {
@@ -68,7 +68,7 @@ func Pattern(b [168]model.AvailBucket) string {
 	if pct == 0 {
 		pct = int(math.Max(1, math.Round(share*100)))
 	}
-	return fmt.Sprintf("odpowiada w ok. %d%% skanów, bez wzorca dobowego", pct)
+	return fmt.Sprintf("aktywny w ok. %d%% skanów, bez wzorca", pct)
 }
 
 // cellState is 1 for "on", -1 for "off", 0 for mixed or not observed.
@@ -176,7 +176,7 @@ func dailyPattern(b [168]model.AvailBucket) string {
 	if observed == 0 || nOn == 0 || nOff == 0 || float64(decisive)/float64(observed) < PatternDecisive {
 		return ""
 	}
-	return "zwykle aktywny w godz. " + hourText(hours)
+	return "zwykle aktywny " + hourText(hours)
 }
 
 // dayText names a weekday set: "codziennie", "pn–pt", "sb–nd", "pn, śr, pt".
@@ -246,19 +246,9 @@ func hourText(hours [24]bool) string {
 	return fmt.Sprintf("%02d–%02d", start, end)
 }
 
-// clockPattern describes a histogram under a lab clock: the share of answers
-// and the buckets in which the host is usually off.
-func clockPattern(b [168]model.AvailBucket, share float64) string {
-	var off []string
-	for i := 0; i < clock.Buckets(); i++ {
-		n := b[i].Up + b[i].Down
-		if n > 0 && float64(b[i].Up)/float64(n) <= PatternOffRate {
-			off = append(off, fmt.Sprint(i))
-		}
-	}
-	s := fmt.Sprintf("odpowiada w ok. %d%% skanów (zegar laboratoryjny: %v × %d)", int(math.Round(share*100)), clock.Width, clock.Buckets())
-	if len(off) > 0 {
-		s += ", zwykle nieaktywny w kubełkach " + strings.Join(off, ",")
-	}
-	return s
+// clockPattern describes a histogram under a lab clock: the share of
+// answers only. The buckets of the lab clock are not hours, so the text
+// names no time; the clock itself is in the log.
+func clockPattern(share float64) string {
+	return fmt.Sprintf("aktywny w ok. %d%% skanów", int(math.Round(share*100)))
 }

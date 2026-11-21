@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/iwosmu/aghpen/internal/auth"
 	"github.com/iwosmu/aghpen/internal/kcap"
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/runner"
@@ -134,7 +135,7 @@ func (s *Server) updateSignature(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.YAML != nil && *in.YAML != g.YAML {
 		if g.Builtin {
-			writeErr(w, http.StatusForbidden, "forbidden", "a built-in signature cannot be edited; disable it and add your own copy")
+			writeErr(w, http.StatusForbidden, "forbidden", "Sygnatury wbudowanej nie można zmienić. Wyłącz ją albo skopiuj.")
 			return
 		}
 		if s.d.Signatures == nil {
@@ -173,7 +174,7 @@ func (s *Server) deleteSignature(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if g.Builtin {
-		writeErr(w, http.StatusForbidden, "forbidden", "a built-in signature cannot be deleted; disable it")
+		writeErr(w, http.StatusForbidden, "forbidden", "Sygnatury wbudowanej nie można usunąć. Wyłącz ją.")
 		return
 	}
 	if err := s.st.DeleteSignature(r.Context(), id); err != nil {
@@ -231,7 +232,7 @@ func (s *Server) retroHunt(w http.ResponseWriter, r *http.Request) {
 		notWired(w, "retro-hunt (internal/sig)")
 		return
 	}
-	res, err := s.d.RetroHunter.RetroHunt(r.Context(), in.YAML, in.LatestOnly)
+	res, err := s.d.RetroHunter.RetroHunt(r.Context(), in.YAML, in.LatestOnly, canSeeCookies(r))
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, "validation", err.Error())
 		return
@@ -280,17 +281,17 @@ func checkSafety(in *model.SafetyPolicy, cur model.SafetyPolicy) error {
 	sameList := func(a, b []string) bool { return slices.Equal(a, b) || (len(a) == 0 && len(b) == 0) }
 	switch {
 	case in.MaxPPS != cur.MaxPPS && (in.MaxPPS < 1 || in.MaxPPS > 100000):
-		return invalid("max_pps: limit pakietów na sekundę musi mieścić się w przedziale 1–100000")
+		return invalid("Pakiety na sekundę: od 1 do 100000.")
 	case in.MaxHTTPRPS != cur.MaxHTTPRPS && (in.MaxHTTPRPS <= 0 || in.MaxHTTPRPS > 10000):
-		return invalid("max_http_rps: limit żądań HTTP na sekundę musi być większy od 0 i nie większy niż 10000")
+		return invalid("Żądania HTTP na sekundę: powyżej 0, najwyżej 10000.")
 	case (in.MaxPerHostRPS != cur.MaxPerHostRPS || in.MaxHTTPRPS != cur.MaxHTTPRPS) && (in.MaxPerHostRPS <= 0 || in.MaxPerHostRPS > in.MaxHTTPRPS):
-		return invalid("max_per_host_rps: limit żądań na jeden host musi być większy od 0 i nie większy niż max_http_rps (%g)", in.MaxHTTPRPS)
+		return invalid("Żądania na host: powyżej 0, najwyżej %g.", in.MaxHTTPRPS)
 	case in.MaxPathsPerHost != cur.MaxPathsPerHost && (in.MaxPathsPerHost < 0 || in.MaxPathsPerHost > 100):
-		return invalid("max_paths_per_host: liczba dodatkowych ścieżek na usługę musi mieścić się w przedziale 0–100")
+		return invalid("Dodatkowe ścieżki na usługę: od 0 do 100.")
 	case in.UserAgent != cur.UserAgent && (strings.TrimSpace(in.UserAgent) == "" || len(in.UserAgent) > 300 || strings.ContainsAny(in.UserAgent, "\r\n")):
-		return invalid("user_agent: wymagana jedna niepusta linia, najwyżej 300 znaków")
+		return invalid("User-Agent: jedna linia, od 1 do 300 znaków.")
 	case (in.AllowedPorts != cur.AllowedPorts || in.DeniedPorts != cur.DeniedPorts) && strings.ContainsAny(in.AllowedPorts+in.DeniedPorts, " ;|&$`'\"\\\n"):
-		return invalid("allowed_ports i denied_ports: wymagana lista portów w składni nmap, np. 22,80,443,8000-8100")
+		return invalid("Porty: lista w składni nmap, np. 22,80,443,8000-8100.")
 	}
 	// Safe detection only: the scanner never uses a method other than GET or
 	// HEAD. A stored value is cleaned; a sent one is refused.
@@ -300,7 +301,7 @@ func checkSafety(in *model.SafetyPolicy, cur model.SafetyPolicy) error {
 		m = strings.ToUpper(strings.TrimSpace(m))
 		if m != http.MethodGet && m != http.MethodHead {
 			if changedMethods {
-				return invalid("allowed_methods: dozwolone są tylko GET i HEAD (bezpieczna detekcja), podano %q", m)
+				return invalid("Metody HTTP: tylko GET i HEAD.")
 			}
 			continue
 		}
@@ -315,7 +316,7 @@ func checkSafety(in *model.SafetyPolicy, cur model.SafetyPolicy) error {
 		for _, e := range in.Exclusions {
 			t, perr := ParseTarget(e)
 			if perr != nil {
-				return invalid("exclusions: %q nie jest adresem IP, blokiem CIDR, zakresem ani domeną", e)
+				return invalid("Wykluczenia: %q nie jest adresem IP, CIDR, przedziałem ani domeną.", e)
 			}
 			ex = append(ex, t.Value)
 		}
@@ -330,7 +331,7 @@ func checkSafety(in *model.SafetyPolicy, cur model.SafetyPolicy) error {
 		op, _ := runner.ParseAllowed(cur.OperatorNetworks)
 		for _, n := range nets {
 			if len(op) > 0 && !runner.PrefixInside(n, op) {
-				return invalid("allowed_networks: sieć %s leży poza blokadą operatora (CZUJKA_ALLOWED_NETWORKS: %s); poszerzyć ją może tylko operator wdrożenia", n, strings.Join(cur.OperatorNetworks, ", "))
+				return invalid("Sieć %s leży poza blokadą operatora (%s).", n, strings.Join(cur.OperatorNetworks, ", "))
 			}
 			in.AllowedNetworks = append(in.AllowedNetworks, n.String())
 		}
@@ -415,6 +416,27 @@ func (s *Server) getDojo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, d)
 }
 
+var errDojoKeyHost = invalid("api_key: the stored API key is used only with the stored DefectDojo address; send the API key for the new address")
+
+// sameOrigin reports whether two URLs have the same scheme, host and port.
+func sameOrigin(a, b string) bool {
+	ua, err1 := url.Parse(strings.TrimSpace(a))
+	ub, err2 := url.Parse(strings.TrimSpace(b))
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	port := func(u *url.URL) string {
+		if p := u.Port(); p != "" {
+			return p
+		}
+		if strings.EqualFold(u.Scheme, "http") {
+			return "80"
+		}
+		return "443"
+	}
+	return strings.EqualFold(ua.Scheme, ub.Scheme) && strings.EqualFold(ua.Hostname(), ub.Hostname()) && port(ua) == port(ub)
+}
+
 func checkDojo(d *model.DefectDojoSettings) error {
 	d.URL = strings.TrimRight(strings.TrimSpace(d.URL), "/")
 	if d.URL != "" {
@@ -444,11 +466,17 @@ func (s *Server) putDojo(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	prevURL, keySet := in.URL, in.APIKeySet
 	if !decode(w, r, &in) {
 		return
 	}
 	if err := checkDojo(&in); err != nil {
 		s.fail(w, r, err)
+		return
+	}
+	if keySet && in.APIKey == "" && prevURL != "" && !sameOrigin(prevURL, in.URL) {
+		// The stored key would go to the new host at the next export (security review L1).
+		s.fail(w, r, errDojoKeyHost)
 		return
 	}
 	if in.ScopeMappings == nil {
@@ -484,12 +512,19 @@ func (s *Server) testDojo(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if in.APIKey == "" {
-		in.APIKey = stored.APIKey // test the stored key when the form sends none
-	}
 	if err := checkDojo(&in); err != nil {
 		s.fail(w, r, err)
 		return
+	}
+	if in.APIKey == "" {
+		// Test the stored key when the form sends none, but only against the
+		// stored host: the key must not go to an address from the request
+		// (security review L1).
+		if stored.URL != "" && !sameOrigin(stored.URL, in.URL) {
+			s.fail(w, r, errDojoKeyHost)
+			return
+		}
+		in.APIKey = stored.APIKey
 	}
 	auditSet(r, "integration.defectdojo.test", "integration", "defectdojo", map[string]any{"url": in.URL})
 	if s.d.Dojo == nil {
@@ -505,6 +540,25 @@ func (s *Server) testDojo(w http.ResponseWriter, r *http.Request) {
 func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
+	// Without a session only status and version (security review L6): the
+	// port is reachable from the scanned network, and the key id, the
+	// gateway and the prober are nobody else's business. The root /healthz
+	// has no session middleware, so the cookie is checked here.
+	p := principal(r)
+	if p == nil {
+		if c, err := r.Cookie(auth.CookieName); err == nil && c.Value != "" && s.d.Auth != nil {
+			p, _ = s.d.Auth.AuthenticateToken(ctx, c.Value)
+		}
+	}
+	if p == nil {
+		out := map[string]any{"status": "ok", "version": s.d.Version}
+		code := http.StatusOK
+		if err := s.st.Ping(ctx); err != nil {
+			out["status"], code = "error", http.StatusServiceUnavailable
+		}
+		writeJSON(w, code, out)
+		return
+	}
 	out := map[string]any{"status": "ok", "version": s.d.Version, "db": "ok", "tde": false}
 	if err := s.st.Ping(ctx); err != nil {
 		out["status"], out["db"] = "error", "unreachable"
@@ -525,7 +579,7 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 	if gw := targets.HostGateway(); gw.IsValid() {
 		out["host_gateway"] = gw.String()
 	}
-	if p := principal(r); p != nil && s.d.KernelCap != nil && p.Can(model.PermSafetyManage) {
+	if s.d.KernelCap != nil && p.Can(model.PermSafetyManage) {
 		out["kernel_cap"] = s.d.KernelCap.Status(ctx)
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -548,7 +602,7 @@ func (s *Server) importResults(w http.ResponseWriter, r *http.Request) {
 	if scopeID != 0 && !principal(r).Can(model.PermTargetsCreate) {
 		// An import into a scope adds its hosts as targets: that needs
 		// targets:create, not only results:create (security review L6).
-		writeErr(w, http.StatusForbidden, "forbidden", "import do zakresu dodaje cele, więc wymaga uprawnienia targets:create; zaimportuj wyniki bez zakresu")
+		writeErr(w, http.StatusForbidden, "forbidden", "Twoja rola nie może dodawać celów. Zaimportuj wyniki bez zakresu.")
 		return
 	}
 	if scopeID != 0 {
@@ -788,7 +842,9 @@ func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 		}
 		rw = newRowWriter(w, kind, format, []string{"id", "run_id", "prev_run_id", "at", "kind", "severity", "ip", "port", "summary", "field", "before",
 			"after", "expected", "acked_by", "acked_at"})
+		lang := reqLang(r)
 		err = s.st.EachChange(ctx, f, func(v *model.Change) error {
+			v.Summary = summaryIn(*v, lang)
 			return rw.write(v, func() []string {
 				prev := ""
 				if v.PrevRunID != nil {
@@ -912,7 +968,7 @@ func (s *Server) exportRunDojo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !settings.Enabled || settings.URL == "" || settings.APIKey == "" {
-		writeErr(w, http.StatusConflict, "conflict", "DefectDojo is not configured: set the URL and the API key and enable the integration")
+		writeErr(w, http.StatusConflict, "conflict", "DefectDojo nie jest skonfigurowane. Podaj adres i klucz API na stronie Administracja.")
 		return
 	}
 	var buf bytes.Buffer

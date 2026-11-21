@@ -8,7 +8,7 @@ export function NextSteps() {
   return (
     <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
       <Link className="link" to="/runs">{t('Przejdź do skanów', 'Go to scans')}</Link>
-      {can('results:create') ? <Link className="link" to="/transfer">{t('Zaimportuj wyniki z pliku', 'Import results from a file')}</Link> : null}
+      {can('results:create') ? <Link className="link" to="/transfer">{t('Zaimportuj wyniki', 'Import results')}</Link> : null}
     </span>
   );
 }

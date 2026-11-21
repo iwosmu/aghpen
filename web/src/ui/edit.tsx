@@ -47,7 +47,7 @@ export function OverrideNote({ o, onRevert, canEdit }: { o: Override | undefined
       <Icon name="edit" size={12} className="text-st-changed" />
       <span>{t('skaner zaobserwował', 'the scanner observed')} <span className="mono text-ink">{show(o.observed) || t('(pusto)', '(empty)')}</span>, {t('analityk ustawił', 'the analyst set')} <span className="mono text-ink">{show(o.value)}</span></span>
       <span className="text-ink-3">{o.by} · {fmtDateTime(o.at)}</span>
-      {canEdit ? <button type="button" className="link inline-flex items-center gap-1" onClick={onRevert}><Icon name="undo" size={12} />{t('Przywróć wartość ze skanu', 'Restore the scanned value')}</button> : null}
+      {canEdit ? <button type="button" className="link inline-flex items-center gap-1" onClick={onRevert}><Icon name="undo" size={12} />{t('Przywróć wartość ze skanu', 'Restore scanned value')}</button> : null}
     </span>
   );
 }
@@ -69,7 +69,7 @@ export function ExportButtons({ kind, query, label }: { kind: 'hosts' | 'service
   };
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className="hidden text-xs text-ink-3 lg:inline">{label ?? t('Eksport widoku', 'Export this view')}</span>
+      <span className="hidden text-xs text-ink-3 lg:inline">{label ?? t('Eksport widoku', 'Export view')}</span>
       <Button size="sm" icon="download" busy={busy === 'csv'} onClick={() => run('csv')}>CSV</Button>
       <Button size="sm" icon="download" busy={busy === 'json'} onClick={() => run('json')}>JSON</Button>
     </span>

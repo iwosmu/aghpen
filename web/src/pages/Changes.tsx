@@ -51,32 +51,30 @@ export default function Changes() {
   const [text, setText] = useDraft(u.get('q'), (v) => u.set({ q: v }));
   const ackMany = useAction((ids: number[]) => post<{ acked: number }>('/changes/ack', { ids }), {
     invalidate: ['/changes', '/dashboard'], onSuccess: () => setSelected(new Set()),
-    success: (r) => t('Potwierdzono zmian: ' + r.acked, 'Acknowledged changes: ' + r.acked),
+    success: (r) => t('Przejrzane zmiany: ' + r.acked, 'Changes reviewed: ' + r.acked),
   });
   const ackOne = useAction((id: number) => post('/changes/' + id + '/ack'), { invalidate: ['/changes', '/dashboard'] });
   const active = FILTERS.filter((k) => u.get(k)).length;
   const rows = q.data?.items;
-  const selectable = (rows ?? []).filter((c) => !c.acked_at);
   const cols: Col<Change>[] = [
-    { id: 'kind', header: t('Rodzaj', 'Kind'), cell: (c) => <ChangeMark kind={c.kind} expected={c.expected} /> },
+    { id: 'kind', header: t('Rodzaj', 'Type'), cell: (c) => <ChangeMark kind={c.kind} expected={c.expected} /> },
     { id: 'what', header: t('Co się zmieniło', 'What changed'), wrap: true, cell: (c) => (
       <div className="min-w-[220px] py-1"><div className={c.expected ? 'text-ink-2' : ''}>{changeSummary(c)}</div><BeforeAfter c={c} /></div>
     ) },
     { id: 'addr', header: t('Adres', 'Address'), sort: 'ip', cell: (c) => <Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link">{c.ip}{c.port ? ':' + c.port : ''}</Link> },
     { id: 'sev', header: t('Waga', 'Severity'), sort: 'severity', hide: 'md', cell: (c) => c.expected ? <span className="text-xs text-ink-3">{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} /> },
-    { id: 'run', header: t('Skan', 'Run'), hide: 'lg', cell: (c) => <Link to={'/runs/' + c.run_id} className="num link">#{c.run_id}</Link> },
+    { id: 'run', header: t('Skan', 'Scan'), hide: 'lg', cell: (c) => <Link to={'/runs/' + c.run_id} className="num link">#{c.run_id}</Link> },
     { id: 'at', header: t('Kiedy', 'When'), sort: 'at', hide: 'xl', cell: (c) => <span className="num text-ink-2" title={fmtDateTime(c.at)}>{fmtRelative(c.at)}</span> },
-    { id: 'ack', header: t('Potwierdzenie', 'Acknowledged'), cell: (c) => c.acked_at
+    { id: 'ack', header: t('Przejrzana', 'Reviewed'), cell: (c) => c.acked_at
       ? <span className="inline-flex items-center gap-1.5 text-xs text-ink-2" title={fmtDateTime(c.acked_at)}><Icon name="check" size={12} className="text-st-new" />{c.acked_by.split('@')[0]}</span>
-      : canAck ? <Button size="sm" onClick={(e) => { e.stopPropagation(); e.preventDefault(); ackOne.mutate(c.id); }}>{t('Potwierdź', 'Acknowledge')}</Button> : <span className="text-xs text-ink-3">{t('nie', 'no')}</span> },
+      : canAck ? <Button size="sm" onClick={(e) => { e.stopPropagation(); e.preventDefault(); ackOne.mutate(c.id); }}>{t('Oznacz', 'Mark')}</Button> : <span className="text-xs text-ink-3">{t('nie', 'no')}</span> },
   ];
   return (
     <div>
       <PageHeader
         title={t('Zmiany', 'Changes')}
-        sub={t('Dziennik różnic między kolejnymi skanami. Zmiana „oczekiwana” zgadza się z profilem dostępności hosta i nie wymaga reakcji.', 'The log of differences between runs. An "expected" change fits the availability profile of the host and needs no reaction.')}
         readOnly={!canAck}
-        actions={<><ExportButtons kind="changes" query={filters} /><LinkButton to="/changes/compare" icon="compare">{t('Porównaj dwa skany', 'Compare two runs')}</LinkButton></>}
+        actions={<><ExportButtons kind="changes" query={filters} /><LinkButton to="/changes/compare" icon="compare">{t('Porównaj dwa skany', 'Compare two scans')}</LinkButton></>}
       />
       <div className="flex flex-wrap items-center gap-1.5 border-b border-rule px-4 py-2 sm:px-6" role="group" aria-label={t('Szybkie filtry', 'Quick filters')} data-testid="change-quick">
         {(['service_gone', 'host_missing', 'service_unreachable', 'service_returned', 'service_new', 'response_slower', 'response_recovered'] as const).map((k) => {
@@ -92,10 +90,10 @@ export default function Changes() {
       </div>
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
         <SearchField value={text} onChange={setText} placeholder={t('adres albo opis', 'address or text')} />
-        <FilterField label={t('Skan', 'Run')} width={150}>
+        <FilterField label={t('Skan', 'Scan')} width={150}>
           <Select value={u.get('run_id')} onChange={(v) => u.set({ run_id: v })} options={[{ value: '', label: t('wszystkie', 'all') }, ...(runs.data?.items ?? []).map((r) => ({ value: String(r.id), label: '#' + r.id + ' · ' + fmtDateTime(r.finished_at).slice(0, 10) }))]} />
         </FilterField>
-        <FilterField label={t('Rodzaj', 'Kind')} width={200}>
+        <FilterField label={t('Rodzaj', 'Type')} width={200}>
           <Select value={u.get('kind')} onChange={(v) => u.set({ kind: v })} options={[{ value: '', label: t('wszystkie', 'all') }, ...CHANGE_KINDS.map((k) => ({ value: k, label: changeKindInfo(k).label }))]} />
         </FilterField>
         <FilterField label={t('Waga', 'Severity')} width={120}>
@@ -104,15 +102,15 @@ export default function Changes() {
         <FilterField label={t('Oczekiwane', 'Expected')} width={150}>
           <Select value={u.get('expected')} onChange={(v) => u.set({ expected: v })} options={[{ value: '', label: t('pokaż wszystkie', 'show all') }, { value: 'false', label: t('ukryj oczekiwane', 'hide expected') }, { value: 'true', label: t('tylko oczekiwane', 'expected only') }]} />
         </FilterField>
-        <FilterField label={t('Potwierdzone', 'Acknowledged')} width={140}>
-          <Select value={u.get('acked')} onChange={(v) => u.set({ acked: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'false', label: t('niepotwierdzone', 'not acknowledged') }, { value: 'true', label: t('potwierdzone', 'acknowledged') }]} />
+        <FilterField label={t('Przejrzane', 'Reviewed')} width={140}>
+          <Select value={u.get('acked')} onChange={(v) => u.set({ acked: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'false', label: t('nieprzejrzane', 'not reviewed') }, { value: 'true', label: t('przejrzane', 'reviewed') }]} />
         </FilterField>
       </FilterBar>
       {canAck && selected.size > 0 ? (
         <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-rule-strong bg-accent-wash px-4 py-1.5 text-sm sm:px-6" role="region" aria-label={t('Akcje zbiorcze', 'Bulk actions')}>
           <span><span className="num font-medium">{selected.size}</span> {plural(selected.size, ['zaznaczona zmiana', 'zaznaczone zmiany', 'zaznaczonych zmian'], ['change selected', 'changes selected'])}</span>
-          <Button size="sm" variant="primary" icon="check" busy={ackMany.isPending} onClick={() => ackMany.mutate([...selected].map(Number))}>{t('Potwierdź zaznaczone', 'Acknowledge the selection')}</Button>
-          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>{t('Odznacz', 'Clear')}</Button>
+          <Button size="sm" variant="primary" icon="check" busy={ackMany.isPending} onClick={() => ackMany.mutate([...selected].map(Number))}>{t('Oznacz jako przejrzane', 'Mark as reviewed')}</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>{t('Odznacz', 'Deselect')}</Button>
         </div>
       ) : null}
       <DataTable
@@ -120,7 +118,7 @@ export default function Changes() {
         sort={u.get('sort', '-at')} onSort={(s) => u.set({ sort: s })}
         selected={canAck ? selected : undefined} onSelect={canAck ? setSelected : undefined}
         rowClass={(c) => cx(c.acked_at && 'opacity-70')}
-        empty={<Empty icon="changes" title={active ? t('Żadna zmiana nie pasuje do filtrów', 'No change matches the filters') : t('Nie zapisano jeszcze żadnej zmiany', 'No change has been recorded yet')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Zmiany pojawiają się od drugiego skanu: Czujka porównuje każdy przebieg z poprzednim.', 'Changes appear from the second scan on: Czujka compares each run with the previous one.')} action={active ? undefined : <NextSteps />} />}
+        empty={<Empty icon="changes" title={active ? t('Żadna zmiana nie pasuje do filtrów', 'No changes match the filters') : t('Brak zmian', 'No changes yet')} hint={active ? undefined : t('Zmiany pojawią się po drugim skanie.', 'Changes appear after the second scan.')} action={active ? undefined : <NextSteps />} />}
         mobile={(c) => (
           <div>
             <div className="flex items-center justify-between gap-2"><ChangeMark kind={c.kind} expected={c.expected} /><span className="num text-xs text-ink-3">#{c.run_id}</span></div>
@@ -130,7 +128,6 @@ export default function Changes() {
         )}
       />
       {q.data ? <Pager total={q.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}
-      {canAck && selectable.length > 0 && selected.size === 0 ? <p className="px-4 py-2 text-xs text-ink-3 sm:px-6">{t('Zaznacz wiersze, aby potwierdzić kilka zmian naraz.', 'Select rows to acknowledge several changes at once.')}</p> : null}
-    </div>
+          </div>
   );
 }

@@ -88,6 +88,7 @@ func (s *Server) routes() http.Handler {
 		r.Get("/healthz", s.healthz)
 		r.Post("/auth/login", s.login)
 		r.With(session).Post("/auth/logout", s.logout)
+		r.With(session).Post("/auth/password", s.changePassword)
 		r.With(session).Get("/me", s.me)
 		r.With(session).Get("/permissions", s.permissions)
 		r.With(session).Get("/roles", s.listRoles)
@@ -147,6 +148,7 @@ func (s *Server) routes() http.Handler {
 		r.With(can(model.PermResultsRead)).Get("/technologies", s.listTechnologies)
 		r.With(can(model.PermResultsRead)).Get("/tags", s.listTags)
 		r.With(can(model.PermResultsRead)).Get("/changes", s.listChanges)
+		r.With(can(model.PermResultsRead)).Get("/changes/{id}", s.getChange)
 		r.With(can(model.PermResultsUpdate)).Post("/changes/{id}/ack", s.ackChange)
 		r.With(can(model.PermResultsUpdate)).Post("/changes/ack", s.ackChanges)
 		r.With(can(model.PermResultsRead)).Get("/diff", s.diff)
@@ -248,7 +250,7 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.As(err, new(*runner.ActiveRunError)):
 		var a *runner.ActiveRunError
 		errors.As(err, &a)
-		writeErrDetails(w, http.StatusConflict, "run_active", fmt.Sprintf("Ten profil ma już aktywny przebieg #%d (w kolejce, trwający albo wstrzymany). Wstrzymaj, wznów albo anuluj go, zanim uruchomisz nowy.", a.RunID), map[string]int64{"run_id": a.RunID})
+		writeErrDetails(w, http.StatusConflict, "run_active", fmt.Sprintf("Ten profil ma już skan #%d. Zakończ albo anuluj go przed nowym.", a.RunID), map[string]int64{"run_id": a.RunID})
 	case errors.Is(err, auth.ErrLastAdmin), errors.Is(err, store.ErrConflict), errors.Is(err, runner.ErrActiveRun), errors.Is(err, runner.ErrBadState):
 		writeErr(w, http.StatusConflict, "conflict", msg)
 	case errors.Is(err, auth.ErrForbidden), errors.Is(err, auth.ErrBuiltinRole):

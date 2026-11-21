@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -60,19 +59,11 @@ func (e *Executor) Step(ctx context.Context, now time.Time) (StepReport, error) 
 	}
 	for _, g := range groups {
 		req := Request{ProfileID: g.pid, Trigger: Trigger}
-		kinds := map[string]int{}
 		for _, p := range g.probes {
 			req.Targets = append(req.Targets, Target{HostID: p.HostID, IP: p.IP, Ports: p.Ports})
-			kinds[p.Kind]++
 		}
-		var parts []string
-		if n := kinds[KindConfirm]; n > 0 {
-			parts = append(parts, strconv.Itoa(n)+" "+plural(n, "potwierdzenie", "potwierdzenia", "potwierdzeń")+" braku odpowiedzi")
-		}
-		if n := kinds[KindLikelyUp]; n > 0 {
-			parts = append(parts, strconv.Itoa(n)+" "+plural(n, "sonda", "sondy", "sond")+" w godzinach zwykłej aktywności")
-		}
-		req.Reason = "Ponowne sondowanie: " + strings.Join(parts, ", ")
+		n := len(req.Targets)
+		req.Reason = "Ponowne sprawdzenie: " + strconv.Itoa(n) + " " + plural(n, "host", "hosty", "hostów")
 		run, err := e.B.Start(ctx, req)
 		if err != nil {
 			rep.Errors = append(rep.Errors, err.Error())

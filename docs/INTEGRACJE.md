@@ -270,7 +270,7 @@ Punkty API: `GET`/`PUT /settings/defectdojo`, `POST /settings/defectdojo/test`, 
 | `verify_tls` | weryfikacja certyfikatu serwera; wyłącz tylko dla instancji z certyfikatem samopodpisanym |
 | `auto_export`, `min_interest` | eksport po każdym przebiegu i próg oceny ciekawości |
 
-Test połączenia zwraca nazwę użytkownika i wersję serwera, na przykład „Połączono z DefectDojo 3.5.202 jako admin". Błędy mają jasne komunikaty: zły token, zły adres, błąd TLS, przekroczony czas, odmowa połączenia.
+Test połączenia zwraca nazwę użytkownika i wersję serwera, na przykład „Połączono z DefectDojo 3.5.202 jako admin". Błędy mają jasne komunikaty: zły token, zły adres, błąd TLS, przekroczony czas, odmowa połączenia. Komunikat podaje tylko status HTTP, bez treści odpowiedzi serwera. Klient nie podąża za przekierowaniem (token poszedłby z nim pod nowy adres): odpowiedź 3xx to błąd z prośbą o właściwy adres. Zapisany token trafia tylko pod zapisany adres; test albo zapis z innym adresem wymaga podania tokenu. Adresy integracji wpisuje administrator i mogą celowo wskazywać sieć wewnętrzną.
 
 ### 4.2 Co i jak jest eksportowane
 

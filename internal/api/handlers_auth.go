@@ -53,6 +53,28 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, p.Session())
 }
 
+// changePassword is the self-service password change of the signed-in user.
+func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
+	auditSet(r, "auth.password_change", "user", nil, nil)
+	var in struct {
+		Current string `json:"current_password"`
+		New     string `json:"new_password"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxLoginBody)
+	if !decode(w, r, &in) {
+		return
+	}
+	p := principal(r)
+	if p != nil {
+		auditSet(r, "", "", p.User.ID, nil)
+	}
+	if err := s.d.Auth.ChangePassword(r.Context(), p, in.Current, in.New); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	auditSet(r, "auth.logout", "auth", nil, nil)
 	if err := s.d.Auth.Logout(r.Context(), principal(r)); err != nil {

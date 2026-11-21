@@ -961,8 +961,12 @@ type Change struct {
 	Before    any        `json:"before"`
 	After     any        `json:"after"`
 	Expected  bool       `json:"expected"` // true when the time-of-day profile explains the change
-	AckedBy   string     `json:"acked_by"`
-	AckedAt   *time.Time `json:"acked_at"`
+	// Detail holds the values the summary needs that Before and After do
+	// not carry, and the model's measures kept out of the summary (keys:
+	// analyze.Detail*). Empty on changes stored before it existed.
+	Detail  map[string]any `json:"detail,omitempty"`
+	AckedBy string         `json:"acked_by"`
+	AckedAt *time.Time     `json:"acked_at"`
 }
 
 type RunDiffSummary struct {

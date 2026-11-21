@@ -55,7 +55,7 @@ func importCSV(r *bufio.Reader, opts Options, rep *report, emit func(model.HostR
 		}
 	}
 	if !hasAddr {
-		return errors.New("CSV nie ma kolumny z adresem (ip, host, address); pierwsza linia musi być nagłówkiem")
+		return errors.New("CSV nie ma kolumny z adresem (ip, host, address). Pierwszy wiersz musi być nagłówkiem.")
 	}
 
 	col := newCollector(opts.now(), opts.RunID)

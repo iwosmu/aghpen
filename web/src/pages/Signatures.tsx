@@ -43,11 +43,11 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
   const rep = report?.rep;
   const issues = rep?.validation.issues ?? [];
   return (
-    <Dialog open={open} onClose={close} title={t('Import sygnatur z pliku', 'Import signatures from a file')} width={620}
+    <Dialog open={open} onClose={close} title={t('Import sygnatur', 'Import signatures')} width={620}
       footer={<><Button onClick={close}>{report ? t('Zamknij', 'Close') : t('Anuluj', 'Cancel')}</Button>{!report ? <Button variant="primary" icon="upload" busy={run.isPending} disabled={!file} onClick={() => file && run.mutate(file)}>{t('Importuj', 'Import')}</Button> : null}</>}>
       {!report ? (
         <div className="space-y-3">
-          <p className="text-sm text-ink-2">{t('Przyjmowane formaty: plik sygnatur Czujki (YAML), lista YAML lub JSON, mapa nazwa → sygnatura, pasywne szablony nuclei. Każda sygnatura przechodzi walidację bezpieczeństwa; odrzucona nie jest zapisywana. Sygnatur wbudowanych import nie zastępuje.', 'Accepted formats: a Czujka signature file (YAML), a YAML or JSON list, a name → signature map, passive nuclei templates. Every signature goes through the safety validation; a rejected one is not stored. The import never replaces built-in signatures.')}</p>
+          <p className="text-sm text-ink-2">{t('Formaty: plik sygnatur Czujki (YAML), lista YAML lub JSON, pasywne szablony nuclei. Import nie zastępuje sygnatur wbudowanych.', 'Formats: a Czujka signature file (YAML), a YAML or JSON list, passive nuclei templates. The import never replaces built-in signatures.')}</p>
           <label className="block">
             <span className="label mb-1 block">{t('Plik', 'File')}</span>
             <FileInput testId="sig-import-file" accept=".yaml,.yml,.json,.txt" file={file} onFile={setFile} />
@@ -58,10 +58,10 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
         <div className="space-y-3" data-testid="sig-import-report">
           <p className="flex items-start gap-2 text-sm">
             <Glyph name={report.stored ? 'check' : 'x'} tone={report.stored ? 'new' : 'gone'} />
-            <span>{report.stored ? t('Zapisano: ', 'Stored: ') : t('Nic nie zapisano. ', 'Nothing was stored. ')}<span className="num font-medium">{(rep?.created ?? []).length}</span> {t('nowych', 'new')}, <span className="num font-medium">{(rep?.updated ?? []).length}</span> {t('zastąpionych', 'replaced')}, <span className="num font-medium">{(rep?.skipped ?? []).length}</span> {t('pominiętych', 'skipped')}, <span className="num font-medium">{issues.filter((i) => i.level === 'error').length}</span> {t('błędów', 'errors')}.</span>
+            <span>{report.stored ? t('Zapisano. ', 'Stored. ') : t('Nic nie zapisano. ', 'Nothing was stored. ')}{t('Nowe', 'New')}: <span className="num font-medium">{(rep?.created ?? []).length}</span>, {t('zastąpione', 'replaced')}: <span className="num font-medium">{(rep?.updated ?? []).length}</span>, {t('pominięte', 'skipped')}: <span className="num font-medium">{(rep?.skipped ?? []).length}</span>, {t('błędy', 'errors')}: <span className="num font-medium">{issues.filter((i) => i.level === 'error').length}</span>.</span>
           </p>
           <ul className="max-h-[320px] overflow-auto border-t border-rule text-sm">
-            {(rep?.created ?? []).map((s) => <li key={'c' + s} className="flex h-[30px] items-center gap-2 border-b border-rule"><Glyph name="plus" tone="new" size={12} /><span className="mono">{s}</span><span className="ml-auto text-xs text-ink-3">{t('nowa', 'new')}</span></li>)}
+            {(rep?.created ?? []).map((s) => <li key={'c' + s} className="flex h-[30px] items-center gap-2 border-b border-rule"><Glyph name="plus" tone="new" size={12} /><span className="mono">{s}</span><span className="ml-auto text-xs text-ink-3">{t('nowa', 'new: (count after the label)')}</span></li>)}
             {(rep?.updated ?? []).map((s) => <li key={'u' + s} className="flex h-[30px] items-center gap-2 border-b border-rule"><Glyph name="delta" tone="changed" size={12} /><span className="mono">{s}</span><span className="ml-auto text-xs text-ink-3">{t('zastąpiona', 'replaced')}</span></li>)}
             {(rep?.skipped ?? []).map((s) => <li key={'s' + s.slug} className="flex min-h-[30px] items-center gap-2 border-b border-rule py-1"><Glyph name="ring" tone="expected" size={12} /><span className="mono">{s.slug}</span><span className="ml-auto text-right text-xs text-ink-3">{s.reason}</span></li>)}
             {issues.map((i, n) => <li key={'i' + n} className="flex min-h-[30px] items-start gap-2 border-b border-rule py-1"><Glyph name={i.level === 'error' ? 'x' : 'delta'} tone={i.level === 'error' ? 'gone' : 'changed'} size={12} /><span className="min-w-0"><span className="mono text-xs text-ink-2">{i.path}</span> <span className={i.safety ? 'text-danger' : ''}>{i.message}</span>{i.safety ? <span className="ml-1 text-2xs text-danger">{t('(bezpieczeństwo)', '(safety)')}</span> : null}</span></li>)}
@@ -89,7 +89,7 @@ export default function Signatures() {
   const toggle = useAction((s: Signature) => patch<Signature>('/signatures/' + s.id, { enabled: !s.enabled }), { invalidate: ['/signatures'] });
   const active = FILTERS.filter((k) => u.get(k)).length;
   const cols: Col<Signature>[] = [
-    { id: 'on', header: t('Aktywna', 'Active'), width: 76, cell: (s) => canToggle
+    { id: 'on', header: t('Włączona', 'Enabled'), width: 76, cell: (s) => canToggle
       ? <Switch checked={s.enabled} disabled={toggle.isPending} onChange={() => toggle.mutate(s)} label={(s.enabled ? t('Wyłącz sygnaturę ', 'Disable signature ') : t('Włącz sygnaturę ', 'Enable signature ')) + s.name} />
       : s.enabled ? <span className="inline-flex items-center gap-1.5 text-xs"><Glyph name="check" tone="new" size={12} />{t('tak', 'yes')}</span> : <span className="inline-flex items-center gap-1.5 text-xs text-ink-3"><Glyph name="ring" tone="expected" size={12} />{t('nie', 'no')}</span> },
     { id: 'name', header: t('Sygnatura', 'Signature'), sort: 'name', wrap: true, cell: (s) => (
@@ -100,34 +100,33 @@ export default function Signatures() {
     ) },
     { id: 'slug', header: 'ID', hide: 'xl', cell: (s) => <span className="mono text-xs text-ink-2">{s.slug}</span> },
     { id: 'cat', header: t('Kategoria', 'Category'), sort: 'category', cell: (s) => <span className="text-ink-2">{categoryLabel(s.category)}</span> },
-    { id: 'tags', header: t('Tagi', 'Tags'), hide: 'lg', cell: (s) => <Tags tags={s.tags} max={3} /> },
+    { id: 'tags', header: t('Tagi', 'Tags'), hide: '2xl', cell: (s) => <Tags tags={s.tags} max={3} /> },
     { id: 'src', header: t('Źródło', 'Source'), hide: 'md', cell: (s) => s.builtin ? <span className="text-ink-3">{t('wbudowana', 'built-in')}</span> : <span>{t('własna', 'custom')} <span className="text-xs text-ink-3">{s.author.split('@')[0]}</span></span> },
-    { id: 'matches', header: t('Trafienia', 'Matches'), sort: 'match_count', align: 'right', cell: (s) => s.match_count ? <span className="num">{fmtInt(s.match_count)}</span> : <span className="num text-ink-3">0</span> },
-    { id: 'upd', header: t('Zmieniona', 'Updated'), hide: 'xl', cell: (s) => <span className="num text-ink-2">{fmtRelative(s.updated_at)}</span> },
+    { id: 'matches', header: t('Dopasowania', 'Matches'), sort: 'match_count', align: 'right', cell: (s) => s.match_count ? <span className="num">{fmtInt(s.match_count)}</span> : <span className="num text-ink-3">0</span> },
+    { id: 'upd', header: t('Zmieniona', 'Updated'), hide: '2xl', cell: (s) => <span className="num text-ink-2">{fmtRelative(s.updated_at)}</span> },
   ];
   return (
     <div>
       <PageHeader
         title={t('Sygnatury', 'Signatures')}
-        sub={t('Reguły, które rozpoznają technologie i rodzaje usług po odpowiedzi serwera. Sygnatura tylko czyta: metody GET i HEAD, bez danych wysyłanych do usługi.', 'Rules that recognise technologies and kinds of services from the server response. A signature only reads: GET and HEAD, no data sent to the service.')}
         readOnly={!canToggle && !can('signatures:create')}
-        actions={can('signatures:create') ? <><Button icon="upload" onClick={() => setImportOpen(true)} data-testid="sig-import">{t('Importuj z pliku', 'Import from a file')}</Button><LinkButton to="/signatures/new" variant="primary" icon="plus">{t('Nowa sygnatura', 'New signature')}</LinkButton></> : null}
+        actions={can('signatures:create') ? <><Button icon="upload" onClick={() => setImportOpen(true)} data-testid="sig-import">{t('Importuj', 'Import')}</Button><LinkButton to="/signatures/new" variant="primary" icon="plus">{t('Nowa sygnatura', 'New signature')}</LinkButton></> : null}
       />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
         <SearchField value={text} onChange={setText} placeholder={t('nazwa, identyfikator, opis', 'name, id, description')} width={240} />
         <FilterField label={t('Kategoria', 'Category')} width={170}><Select value={u.get('category')} onChange={(v) => u.set({ category: v })} options={[{ value: '', label: t('wszystkie', 'all') }, ...TECH_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c) }))]} /></FilterField>
-        <FilterField label={t('Stan', 'State')} width={130}><Select value={u.get('enabled')} onChange={(v) => u.set({ enabled: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'true', label: t('aktywne', 'active') }, { value: 'false', label: t('wyłączone', 'disabled') }]} /></FilterField>
+        <FilterField label={t('Stan', 'Status')} width={130}><Select value={u.get('enabled')} onChange={(v) => u.set({ enabled: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'true', label: t('włączone', 'enabled') }, { value: 'false', label: t('wyłączone', 'disabled') }]} /></FilterField>
         <FilterField label={t('Źródło', 'Source')} width={130}><Select value={u.get('builtin')} onChange={(v) => u.set({ builtin: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'true', label: t('wbudowane', 'built-in') }, { value: 'false', label: t('własne', 'custom') }]} /></FilterField>
       </FilterBar>
       <DataTable
         rows={q.data?.items} cols={cols} rowKey={(s) => s.id} rowHref={(s) => '/signatures/' + s.id} loading={q.isPending} error={q.error} retry={() => q.refetch()} dim={q.isPlaceholderData}
         sort={u.get('sort', 'name')} onSort={(s) => u.set({ sort: s })} rowClass={(s) => (s.enabled ? undefined : 'text-ink-3')}
-        empty={<Empty icon="signatures" title={active ? t('Żadna sygnatura nie pasuje do filtrów', 'No signature matches the filters') : t('Biblioteka sygnatur jest pusta', 'The signature library is empty')} hint={active ? undefined : t('Napisz pierwszą regułę w edytorze i sprawdź ją na zapisanych wynikach, zanim ją włączysz.', 'Write the first rule in the editor and test it on stored results before you enable it.')} />}
+        empty={<Empty icon="signatures" title={active ? t('Żadna sygnatura nie pasuje do filtrów', 'No signatures match the filters') : t('Brak sygnatur', 'No signatures yet')} />}
         mobile={(s) => (
           <div>
             <div className="flex items-center justify-between gap-2"><span className="text-sm font-medium">{s.name}</span><span className="num text-xs text-ink-2">{s.match_count}</span></div>
-            <div className="mt-0.5 text-xs text-ink-3">{categoryLabel(s.category)} · {s.builtin ? t('wbudowana', 'built-in') : t('własna', 'custom')} · {s.enabled ? t('aktywna', 'active') : t('wyłączona', 'disabled')}</div>
+            <div className="mt-0.5 text-xs text-ink-3">{categoryLabel(s.category)} · {s.builtin ? t('wbudowana', 'built-in') : t('własna', 'custom')} · {s.enabled ? t('włączona', 'enabled') : t('wyłączona', 'disabled')}</div>
           </div>
         )}
       />

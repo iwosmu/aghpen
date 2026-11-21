@@ -76,13 +76,14 @@ echo "DefectDojo answers at $DOJO_URL (user $(dojo "/user_profile/" | jq -r .use
 step "1. Start the stack from a clean state"
 $DC down -v --remove-orphans >/dev/null 2>&1 || true
 $DC up -d --build --wait 2>&1 | grep -E "Healthy|Error|error" || true
-curl -sS $BASE/healthz | jq -c "{status, db, tde, tables: .tde_detail.tables, encrypted: .tde_detail.encrypted, engine}"
-check "healthz" "$(curl -sS $BASE/healthz | jq -r '"\(.status) tde=\(.tde) engine=\(.engine)"')" "ok tde=true engine=true"
+check "healthz without a session: status and version only" "$(curl -sS $BASE/healthz | jq -r 'keys | join(",")')" "status,version"
 
 step "2. Log in; the first start seeded a safety policy and one profile, nothing else"
 LOGIN=$(curl -sS -c "$JAR" -H "Content-Type: application/json" -d "{\"email\":\"$ADMIN\",\"password\":\"$ADMIN_PW\"}" $API/auth/login)
 CSRF=$(echo "$LOGIN" | jq -r .csrf_token)
 echo "$LOGIN" | jq -c "{user: .user.email, role: .user.role_slug, permissions: (.permissions | length)}"
+curl -sS -b "$JAR" $BASE/healthz | jq -c "{status, db, tde, tables: .tde_detail.tables, encrypted: .tde_detail.encrypted, engine}"
+check "healthz with a session" "$(curl -sS -b "$JAR" $BASE/healthz | jq -r '"\(.status) tde=\(.tde) engine=\(.engine)"')" "ok tde=true engine=true"
 api GET /settings/safety | jq -c "{max_pps, max_http_rps, max_per_host_rps, allowed_methods, emergency_stop}"
 api GET /profiles | jq -c '.items[] | {name, ports, max_pps: .rate.max_pps, scope_ids, schedule_enabled: .schedule.enabled}'
 check "seed" "profiles=$(api GET /profiles | jq .total) hosts=$(api GET /hosts | jq .total) findings=$(api GET /findings | jq .total) scopes=$(api GET /scopes | jq .total)" "profiles=1 hosts=0 findings=0 scopes=0"

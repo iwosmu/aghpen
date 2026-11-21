@@ -71,7 +71,7 @@ export function Spinner() {
 // ---------- Layout pieces ----------
 export function PageHeader({ title, sub, actions, readOnly, back }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode; readOnly?: boolean; back?: { to: string; label: string } }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-rule px-4 pb-3 pt-4 sm:px-6">
+    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-rule/70 px-4 pb-4 pt-5 sm:px-6 lg:px-8">
       <div className="min-w-0">
         {back ? (
           <Link to={back.to} className="mb-1 inline-flex items-center gap-1 text-xs text-ink-3 hover:text-ink">
@@ -194,21 +194,21 @@ export function explainError(error: unknown): Explained {
   const msg = e?.message ?? String(error ?? '');
   if (!(e instanceof ApiError)) return { title: t('Wystąpił błąd', 'Something went wrong'), detail: msg, code: 'error', calm: false, icon: 'alert', retryable: true };
   const base = { code: e.code, calm: false, icon: 'alert', retryable: false };
-  if (e.status === 0) return { ...base, title: t('Brak połączenia z serwerem Czujki', 'Cannot reach the Czujka server'), detail: t('Sprawdź połączenie i spróbuj ponownie.', 'Check the connection and try again.'), retryable: true };
-  if (e.status === 501 || e.code === 'not_wired') return { ...base, calm: true, icon: 'info', title: t('Funkcja niedostępna w tej instalacji', 'This function is not available in this installation'), detail: t('Ten moduł nie jest podłączony do serwera. Pozostałe funkcje działają normalnie.', 'This module is not connected to the server. Everything else works as usual.') + ' (' + msg + ')' };
-  if (e.status === 401) return { ...base, icon: 'lock', title: t('Sesja wygasła', 'The session has expired'), detail: t('Zaloguj się ponownie.', 'Sign in again.') };
-  if (e.status === 403 && /csrf/i.test(msg)) return { ...base, icon: 'lock', title: t('Sesja wymaga odświeżenia', 'The session needs a refresh'), detail: t('Odśwież stronę i powtórz operację.', 'Reload the page and repeat the operation.') };
+  if (e.status === 0) return { ...base, title: t('Brak połączenia z serwerem', 'Cannot reach the server'), detail: t('Sprawdź połączenie i spróbuj ponownie.', 'Check the connection and try again.'), retryable: true };
+  if (e.status === 501 || e.code === 'not_wired') return { ...base, calm: true, icon: 'info', title: t('Funkcja niedostępna w tej instalacji', 'Not available in this installation'), detail: t('Ten moduł nie jest podłączony do serwera. Pozostałe funkcje działają normalnie.', 'This module is not connected to the server. Everything else works as usual.') + ' (' + msg + ')' };
+  if (e.status === 401) return { ...base, icon: 'lock', title: t('Sesja wygasła', 'Session expired'), detail: t('Zaloguj się ponownie.', 'Sign in again.') };
+  if (e.status === 403 && /csrf/i.test(msg)) return { ...base, icon: 'lock', title: t('Odśwież stronę', 'Reload the page'), detail: t('Potem powtórz operację.', 'Then repeat the operation.') };
   if (e.status === 403) return { ...base, icon: 'lock', title: t('Brak uprawnień', 'No permission'), detail: t('Twoja rola nie pozwala na tę operację.', 'Your role does not allow this operation.') + ' (' + msg + ')' };
   if (e.status === 404) return { ...base, title: t('Nie znaleziono', 'Not found'), detail: t('Ten obiekt nie istnieje albo został usunięty.', 'This object does not exist or was deleted.') };
-  if (e.code === 'emergency_stop') return { ...base, icon: 'stop', title: t('Stop awaryjny jest aktywny', 'The emergency stop is active'), detail: t('Żaden skan nie wystartuje, dopóki blokada nie zostanie zwolniona.', 'No scan starts until the stop is released.') };
-  if (e.status === 409) return { ...base, title: t('Operacja jest sprzeczna z bieżącym stanem', 'The operation conflicts with the current state'), detail: msg };
+  if (e.code === 'emergency_stop') return { ...base, icon: 'stop', title: t('Stop awaryjny jest włączony', 'The emergency stop is on'), detail: t('Najpierw wyłącz stop awaryjny.', 'Turn off the emergency stop first.') };
+  if (e.status === 409) return { ...base, title: t('Tej operacji nie można teraz wykonać', 'This operation is not possible now'), detail: msg };
   if (e.code === 'dojo_unconfirmed') return { ...base, icon: 'alert', retryable: true, title: t('Wysłano, nie potwierdzono', 'Sent, not confirmed'), detail: getLang() === 'pl' ? msg.replace(/^Wysłano, nie potwierdzono:\s*(\S)/, (_m, c: string) => c.toUpperCase()) : 'Repeat the export. DefectDojo accepted the data but stopped answering before it confirmed it. Repeating the export, or pulling the statuses, links these findings by key, without duplicates.' };
   const locked = e.status === 422 ? lockMessage(msg, getLang()) : null;
-  if (locked) return { ...base, icon: 'lock', title: t('Zablokowane przez operatora wdrożenia', 'Blocked by the deployment operator'), detail: locked };
-  if (e.status === 422 || e.code === 'validation') return { ...base, title: t('Dane nie przeszły walidacji', 'The data did not pass validation'), detail: msg };
+  if (locked) return { ...base, icon: 'lock', title: t('Blokada operatora', 'Operator lock'), detail: locked };
+  if (e.status === 422 || e.code === 'validation') return { ...base, title: t('Błędne dane', 'Invalid data'), detail: msg };
   if (e.status === 429) return { ...base, icon: 'clock', title: t('Zbyt wiele prób', 'Too many attempts'), detail: t('Spróbuj ponownie za kilka minut.', 'Try again in a few minutes.') + ' (' + msg + ')' };
   if (e.status === 400) return { ...base, title: t('Nieprawidłowe żądanie', 'Bad request'), detail: msg };
-  if (e.status === 502 || e.status === 503 || e.status === 504) return { ...base, title: t('Usługa zewnętrzna nie odpowiada', 'An external service does not answer'), detail: msg, retryable: true };
+  if (e.status === 502 || e.status === 503 || e.status === 504) return { ...base, title: t('Usługa zewnętrzna nie odpowiada', 'An external service is not responding'), detail: msg, retryable: true };
   return { ...base, title: t('Błąd serwera', 'Server error'), detail: msg, retryable: true };
 }
 
@@ -231,8 +231,8 @@ export function Unavailable({ what, error }: { what?: ReactNode; error?: unknown
     <div role="status" data-testid="unavailable" className="flex items-start gap-2 border border-rule bg-sunk px-3 py-2.5 text-sm">
       <Icon name="info" className="mt-0.5 flex-none text-ink-3" size={14} />
       <div className="min-w-0">
-        <p className="font-medium text-ink">{t('Funkcja niedostępna w tej instalacji', 'This function is not available in this installation')}</p>
-        <p className="text-xs text-ink-2">{what ?? t('Ten moduł nie jest podłączony do serwera. Pozostałe funkcje działają normalnie.', 'This module is not connected to the server. Everything else works as usual.')}</p>
+        <p className="font-medium text-ink">{t('Funkcja niedostępna w tej instalacji', 'Not available in this installation')}</p>
+        {what ? <p className="text-xs text-ink-2">{what}</p> : null}
         {msg ? <p className="mono mt-0.5 break-words text-2xs text-ink-3">{msg}</p> : null}
       </div>
     </div>
@@ -418,7 +418,7 @@ export function TagInput({ value, onChange, placeholder }: { value: string[]; on
       {value.map((x) => <Chip key={x} onRemove={() => onChange(value.filter((y) => y !== x))}>{x}</Chip>)}
       <input
         className="h-[20px] min-w-[90px] flex-1 bg-transparent text-sm outline-none placeholder:text-ink-3"
-        value={draft} placeholder={placeholder ?? t('dodaj tag i Enter', 'add a tag, press Enter')}
+        value={draft} placeholder={placeholder ?? t('dodaj tag', 'add a tag')}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(); }

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iwosmu/aghpen/internal/analyze"
 	"github.com/iwosmu/aghpen/internal/model"
 )
 
@@ -135,23 +136,23 @@ func scopeOf(run model.ScanRun) string {
 	return run.Trigger
 }
 
-var sevPL = map[string]string{"info": "info", "low": "niska", "medium": "średnia", "high": "wysoka"}
+var sevPL = map[string]string{"info": "informacja", "low": "niska", "medium": "średnia", "high": "wysoka"}
 
 // text is the Slack/Mattermost message: plain lines with bare URLs, which
 // both render as links.
 func text(p Payload, nChanges, nFindings int) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "*Czujka: przebieg #%d przeanalizowany* (%s)\n", p.RunID, p.Scope)
+	fmt.Fprintf(&b, "*Czujka: skan #%d przeanalizowany* (%s)\n", p.RunID, p.Scope)
 	if len(p.Counts) > 0 {
 		var parts []string
-		for _, k := range []struct{ key, label string }{
-			{"host_new", "nowe hosty"}, {"service_new", "nowe usługi"}, {"service_gone", "usługi zniknęły"}, {"host_gone", "hosty nieaktywne"},
-			{"host_missing", "hosty nie odpowiadają (niepotwierdzone)"}, {"service_returned", "usługi wróciły"}, {"response_slower", "wolniejsze odpowiedzi"},
-			{"findings_new", "nowe ustalenia"},
-		} {
-			if n := p.Counts[k.key]; n > 0 {
-				parts = append(parts, fmt.Sprintf("%s: %d", k.label, n))
+		for _, k := range []model.ChangeKind{model.ChangeHostNew, model.ChangeServiceNew, model.ChangeServiceGone, model.ChangeHostGone,
+			model.ChangeHostMissing, model.ChangeServiceReturned, model.ChangeResponseSlower} {
+			if n := p.Counts[string(k)]; n > 0 {
+				parts = append(parts, fmt.Sprintf("%s: %d", analyze.KindLabel(k), n))
 			}
+		}
+		if n := p.Counts["findings_new"]; n > 0 {
+			parts = append(parts, fmt.Sprintf("nowe znaleziska: %d", n))
 		}
 		if len(parts) > 0 {
 			b.WriteString(strings.Join(parts, ", ") + "\n")
@@ -164,9 +165,9 @@ func text(p Payload, nChanges, nFindings int) string {
 		fmt.Fprintf(&b, "• [%s] %s %s\n", sevPL[c.Severity], c.Summary, c.URL)
 	}
 	if more := nChanges - len(p.Changes) + nFindings - len(p.Findings); more > 0 {
-		fmt.Fprintf(&b, "… i %d więcej\n", more)
+		fmt.Fprintf(&b, "… pozostałe: %d\n", more)
 	}
-	fmt.Fprintf(&b, "Przebieg: %s", p.RunURL)
+	fmt.Fprintf(&b, "Skan: %s", p.RunURL)
 	return b.String()
 }
 

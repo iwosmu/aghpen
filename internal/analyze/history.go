@@ -111,18 +111,14 @@ func (d *differ) response(h *HostSnapshot, s *model.ServiceResult, hist ServiceH
 	pts := ResponseSeries(append(append([]int(nil), hist.Response...), cur))
 	n := len(pts)
 	last, prev := pts[n-1], pts[n-2]
-	at := addr(h.IP, s.Port)
 	before := map[string]any{"baseline_ms": last.Baseline, "ms": msOrNil(prev.Ms)}
 	switch {
 	case last.Slow && !prev.Slow && cur >= 0:
-		d.add(h, s, model.ChangeResponseSlower, model.SevLow, "http.response_ms", before, map[string]any{"ms": cur},
-			false, fmt.Sprintf("Usługa %s odpowiada wolniej: %d ms (%s)", at, cur, usualText(last.Baseline)))
+		d.add(h, s, model.ChangeResponseSlower, model.SevLow, "http.response_ms", before, map[string]any{"ms": cur}, false, nil)
 	case last.Slow && !prev.Slow:
-		d.add(h, s, model.ChangeResponseSlower, model.SevLow, "http.response_ms", before, map[string]any{"ms": nil, "error": "no_answer"},
-			false, fmt.Sprintf("Usługa %s: port otwarty, ale HTTP nie odpowiedział w czasie (%s)", at, usualText(last.Baseline)))
+		d.add(h, s, model.ChangeResponseSlower, model.SevLow, "http.response_ms", before, map[string]any{"ms": nil, "error": "no_answer"}, false, nil)
 	case !last.Slow && prev.Slow && cur >= 0:
-		d.add(h, s, model.ChangeResponseRecovered, model.SevInfo, "http.response_ms", before, map[string]any{"ms": cur},
-			false, fmt.Sprintf("Usługa %s znów odpowiada w zwykłym czasie: %d ms (%s)", at, cur, usualText(last.Baseline)))
+		d.add(h, s, model.ChangeResponseRecovered, model.SevInfo, "http.response_ms", before, map[string]any{"ms": cur}, false, nil)
 	}
 }
 
@@ -145,14 +141,11 @@ func (d *differ) serviceReturned(h *HostSnapshot, s *model.ServiceResult, hist S
 	}
 	before := map[string]any{"state": "gone", "last_open_run_id": hist.LastOpenRun, "last_open_at": hist.LastOpenAt.UTC(),
 		"away_seconds": int64(away.Seconds()), "runs_away": hist.RunsAway}
-	d.add(h, s, model.ChangeServiceReturned, sev, "state", before, "open", false,
-		fmt.Sprintf("Usługa %s wróciła po %s (nie było jej w %s)%s", addr(h.IP, s.Port), awayText(away), runsText(hist.RunsAway), productNote(s)))
+	d.add(h, s, model.ChangeServiceReturned, sev, "state", before, "open", false, productDetail(s))
 }
 
 func awayText(d time.Duration) string {
 	switch {
-	case d <= 0:
-		return "przerwie"
 	case d < time.Minute:
 		return fmt.Sprintf("%d s", int(d.Seconds()))
 	case d < time.Hour:
@@ -162,16 +155,6 @@ func awayText(d time.Duration) string {
 	default:
 		return fmt.Sprintf("%d dniach", int(d.Hours()/24))
 	}
-}
-
-func runsText(n int) string {
-	switch {
-	case n == 1:
-		return "1 skanie"
-	case n > 1:
-		return fmt.Sprintf("%d skanach", n)
-	}
-	return "poprzednim skanie"
 }
 
 // usualText names the usual response time of a service. A service on the same

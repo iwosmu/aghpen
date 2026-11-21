@@ -17,10 +17,10 @@ func BuiltinRoles() []model.Role {
 		model.PermTargetsCreate, model.PermTargetsDelete, model.PermResultsCreate, model.PermResultsDelete,
 		model.PermSignaturesCreate, model.PermSignaturesDelete, model.PermScansConfigure)
 	return []model.Role{
-		{Slug: model.RoleAdmin, Name: "Administrator", Description: "Administracja: pełny dostęp, użytkownicy, role, polityka bezpieczeństwa", Builtin: true, Permissions: ordered(model.AllPermissions)},
-		{Slug: model.RoleEditor, Name: "Edytor", Description: "Dodawanie, usuwanie, modyfikacja: cele, wyniki, sygnatury, konfiguracja i uruchamianie skanów, eksport", Builtin: true, Permissions: ordered(editor)},
-		{Slug: model.RoleAnalyst, Name: "Analityk", Description: "Modyfikacja i odczyt: edycja celów, wyników i sygnatur, uruchamianie skanów, eksport", Builtin: true, Permissions: ordered(analyst)},
-		{Slug: model.RoleViewer, Name: "Obserwator", Description: "Odczyt: tylko podgląd", Builtin: true, Permissions: ordered(read)},
+		{Slug: model.RoleAdmin, Name: "Administrator", Description: "Pełny dostęp", Builtin: true, Permissions: ordered(model.AllPermissions)},
+		{Slug: model.RoleEditor, Name: "Edytor", Description: "Cele, wyniki, sygnatury, profile, skany, eksport", Builtin: true, Permissions: ordered(editor)},
+		{Slug: model.RoleAnalyst, Name: "Analityk", Description: "Edycja celów, wyników i sygnatur, skany, eksport", Builtin: true, Permissions: ordered(analyst)},
+		{Slug: model.RoleViewer, Name: "Obserwator", Description: "Tylko odczyt", Builtin: true, Permissions: ordered(read)},
 	}
 }
 
@@ -58,8 +58,8 @@ func PermissionCatalog() []PermissionInfo {
 		model.PermScansRun:         {"scans", "Uruchamianie, wstrzymywanie i anulowanie skanów", "Start, pause and cancel scans"},
 		model.PermScansConfigure:   {"scans", "Konfiguracja profili i harmonogramów", "Configure profiles and schedules"},
 		model.PermResultsRead:      {"results", "Podgląd wyników", "View results"},
-		model.PermResultsUpdate:    {"results", "Edycja wyników, tagów i ustaleń", "Edit results, tags and findings"},
-		model.PermResultsCreate:    {"results", "Dodawanie ustaleń i import wyników", "Add findings and import results"},
+		model.PermResultsUpdate:    {"results", "Edycja wyników, tagów i znalezisk", "Edit results, tags and findings"},
+		model.PermResultsCreate:    {"results", "Dodawanie znalezisk i import wyników", "Add findings and import results"},
 		model.PermResultsDelete:    {"results", "Usuwanie wyników", "Delete results"},
 		model.PermSignaturesRead:   {"signatures", "Podgląd sygnatur", "View signatures"},
 		model.PermSignaturesCreate: {"signatures", "Dodawanie sygnatur", "Add signatures"},
@@ -67,8 +67,8 @@ func PermissionCatalog() []PermissionInfo {
 		model.PermSignaturesDelete: {"signatures", "Usuwanie sygnatur", "Delete signatures"},
 		model.PermExportRun:        {"export", "Eksport danych i wysyłka do DefectDojo", "Export data and push to DefectDojo"},
 		model.PermIntegrations:     {"admin", "Zarządzanie integracjami", "Manage integrations"},
-		model.PermSafetyManage:     {"safety", "Polityka bezpieczeństwa i zwolnienie blokady", "Safety policy and release of the stop"},
-		model.PermEmergencyStop:    {"safety", "Awaryjne zatrzymanie skanowania", "Emergency stop"},
+		model.PermSafetyManage:     {"safety", "Polityka bezpieczeństwa i stop awaryjny", "Safety policy and emergency stop"},
+		model.PermEmergencyStop:    {"safety", "Stop awaryjny", "Emergency stop"},
 		model.PermUsersManage:      {"admin", "Zarządzanie użytkownikami", "Manage users"},
 		model.PermRolesManage:      {"admin", "Zarządzanie rolami", "Manage roles"},
 		model.PermAuditRead:        {"admin", "Podgląd dziennika audytu", "View the audit log"},

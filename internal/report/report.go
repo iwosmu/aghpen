@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iwosmu/aghpen/internal/analyze"
 	"github.com/iwosmu/aghpen/internal/model"
 )
 
@@ -101,7 +102,7 @@ type findingRow struct {
 	Title         string
 	Addr          string
 	Interest      int
-	Notes         []string // "nowa w tym przebiegu", status
+	Notes         []string // "nowe w tym skanie", status
 	Evidence      []evidenceRow
 	EvidenceMore  int
 }
@@ -241,28 +242,18 @@ var runStatusPL = map[model.RunStatus]string{
 
 var pausePL = map[string]string{
 	model.PauseWindowClosed: "okno czasowe się zamknęło", model.PauseManual: "wstrzymany ręcznie",
-	model.PauseEmergency: "zatrzymanie awaryjne",
+	model.PauseEmergency: "stop awaryjny",
 }
 
 var triggerPL = map[string]string{"manual": "ręcznie", "schedule": "z harmonogramu", "import": "import pliku"}
 
 var hostStatusPL = map[model.HostStatus]string{
 	model.HostUp: "aktywny", model.HostUnstable: "niestabilny", model.HostDown: "nieaktywny",
-	model.HostExpectedOffline: "przerwa zgodna z rytmem", model.HostUnknown: "nieznany",
+	model.HostExpectedOffline: "poza godzinami", model.HostUnknown: "nieznany",
 }
 
 var findingStatusPL = map[model.FindingStatus]string{
-	model.FindingTriaged: "potwierdzona", model.FindingAccepted: "zaakceptowana",
-}
-
-var kindPL = map[model.ChangeKind]string{
-	model.ChangeHostNew: "Nowy host", model.ChangeHostGone: "Host nieaktywny", model.ChangeHostBack: "Host znów odpowiada",
-	model.ChangeHostUnstable: "Host niestabilny", model.ChangeHostMissing: "Nie odpowiada (niepotwierdzone)", model.ChangeServiceUnreachable: "Usługa nie odpowiada (niepotwierdzone)", model.ChangeServiceNew: "Nowa usługa", model.ChangeServiceGone: "Usługa zniknęła",
-	model.ChangeServiceChanged: "Zmiana usługi", model.ChangeTechNew: "Nowa technologia", model.ChangeTechGone: "Technologia zniknęła",
-	model.ChangeTechVersion: "Zmiana wersji", model.ChangeTitle: "Zmiana tytułu", model.ChangeHTTPStatus: "Zmiana statusu HTTP",
-	model.ChangeCert: "Zmiana certyfikatu", model.ChangeHeaders: "Zmiana nagłówków", model.ChangeCookies: "Zmiana ciasteczek",
-	model.ChangeContent: "Zmiana treści", model.ChangeRedirect: "Zmiana przekierowania", model.ChangeClass: "Zmiana klasy usługi",
-	model.ChangeServiceReturned: "Usługa wróciła", model.ChangeResponseSlower: "Wolniejsza odpowiedź", model.ChangeResponseRecovered: "Odpowiedź w normie",
+	model.FindingTriaged: "w analizie", model.FindingAccepted: "zaakceptowane",
 }
 
 var dayPL = [7]string{"nd", "pn", "wt", "śr", "cz", "pt", "sb"}
@@ -337,7 +328,7 @@ func build(in Input) doc {
 	lim := in.Limits.withDefaults()
 	run := in.Run
 	var d doc
-	d.Title = "Raport z przebiegu #" + strconv.FormatInt(run.ID, 10)
+	d.Title = "Raport ze skanu #" + strconv.FormatInt(run.ID, 10)
 	d.Brand = "Czujka"
 	if in.Organization != "" {
 		d.Brand += " · " + in.Organization
@@ -386,15 +377,15 @@ func build(in Input) doc {
 	first := in.PrevRun == nil && in.Summary.PrevRunID == nil
 	switch {
 	case in.PrevRun != nil:
-		cmp := "przebieg #" + strconv.FormatInt(in.PrevRun.ID, 10)
+		cmp := "skan #" + strconv.FormatInt(in.PrevRun.ID, 10)
 		if in.PrevRun.StartedAt != nil {
 			cmp += " z " + in.stamp(*in.PrevRun.StartedAt)
 		}
 		d.Meta = append(d.Meta, kv{"Porównanie z", cmp})
 	case in.Summary.PrevRunID != nil:
-		d.Meta = append(d.Meta, kv{"Porównanie z", "przebieg #" + strconv.FormatInt(*in.Summary.PrevRunID, 10)})
+		d.Meta = append(d.Meta, kv{"Porównanie z", "skan #" + strconv.FormatInt(*in.Summary.PrevRunID, 10)})
 	default:
-		d.Meta = append(d.Meta, kv{"Porównanie z", "brak (pierwszy przebieg)"})
+		d.Meta = append(d.Meta, kv{"Porównanie z", "brak (pierwszy skan)"})
 	}
 
 	if run.Status != "" && run.Status != model.RunCompleted {
@@ -402,13 +393,13 @@ func build(in Input) doc {
 		if st == "" {
 			st = string(run.Status)
 		}
-		d.Notice = "Przebieg nie jest zakończony (stan: " + st
+		d.Notice = "Skan niezakończony (" + st
 		if p := pausePL[run.PauseReason]; p != "" {
 			d.Notice += ", " + p
 		}
 		d.Notice += ")."
 		if run.Stats.AddressesTotal > 0 {
-			d.Notice += fmt.Sprintf(" Sprawdzono %s z %s adresów, więc lista zmian jest niepełna.", num(run.Stats.AddressesDone), num(run.Stats.AddressesTotal))
+			d.Notice += fmt.Sprintf(" Sprawdzono %s z %s adresów. Lista zmian jest niepełna.", num(run.Stats.AddressesDone), num(run.Stats.AddressesTotal))
 		}
 		if run.Error != "" {
 			d.Notice += " Błąd: " + oneLine(run.Error, 200)
@@ -430,7 +421,7 @@ func build(in Input) doc {
 		}
 	}
 	unexpected := len(groups[0]) + len(groups[1]) + len(groups[2])
-	titles := [3]string{"Co nowego", "Co zniknęło", "Co się zmieniło"}
+	titles := [3]string{"Nowe", "Zniknęły", "Zmienione"}
 	empties := [3]string{"Nic nowego.", "Nic nie zniknęło.", "Bez zmian w znanych usługach."}
 	for g := range groups {
 		cs := groups[g]
@@ -453,16 +444,12 @@ func build(in Input) doc {
 		for i, c := range cs {
 			if i == lim.Changes {
 				rest := len(cs) - i
-				sec.More = "i jeszcze " + nChanges(rest) + " o tej samej lub niższej wadze; pełna lista jest w aplikacji."
+				sec.More = "Pozostałe zmiany (" + num(int64(rest)) + ") są w aplikacji."
 				break
 			}
 			sum := oneLine(c.Summary, 240)
 			if sum == "" {
-				sum = kindPL[c.Kind]
-				if sum == "" {
-					sum = string(c.Kind)
-				}
-				sum += " " + hostPort(c.IP, c.Port)
+				sum = analyze.KindLabel(c.Kind) + " " + hostPort(c.IP, c.Port)
 			}
 			sec.Rows = append(sec.Rows, changeRow{Sev: sevClass(c.Severity), SevLabel: sevLabel(c.Severity), Summary: sum})
 		}
@@ -483,8 +470,7 @@ func build(in Input) doc {
 			}
 		}
 		sort.Slice(ips, func(i, j int) bool { return ipLess(ips[i], ips[j]) })
-		d.Expected = nChanges(nExpected) + " " + plural(nExpected, "oczekiwana", "oczekiwane", "oczekiwanych") +
-			": hosty, które o tej porze zwykle nie odpowiadają albo odpowiadają nieregularnie"
+		d.Expected = "Zmiany zgodne ze wzorcem dostępności: " + num(int64(nExpected))
 		if len(ips) > 0 {
 			show := ips
 			if len(show) > 4 {
@@ -496,16 +482,16 @@ func build(in Input) doc {
 			}
 			d.Expected += ")"
 		}
-		d.Expected += ". Model dostępności je wyjaśnia, więc nie są liczone powyżej."
+		d.Expected += ". Nie są liczone powyżej."
 	}
 
 	// --- lead sentence
 	s := in.Summary
 	switch {
 	case first:
-		d.Lead = "To pierwszy przebieg tego profilu. Nie ma jeszcze punktu odniesienia, więc raport pokazuje stan sieci, a nie zmiany."
+		d.Lead = "Pierwszy skan tego profilu. Raport pokazuje stan sieci."
 	case unexpected == 0 && s.HostsNew+s.HostsGone+s.HostsBack+s.HostsMissing+s.ServicesNew+s.ServicesGone+s.ServicesChanged == 0:
-		d.Lead = "Od poprzedniego przebiegu nie ma zmian, które wymagają uwagi."
+		d.Lead = "Brak zmian do przejrzenia od poprzedniego skanu."
 	default:
 		var parts []string
 		var add []string
@@ -516,33 +502,29 @@ func build(in Input) doc {
 			add = append(add, nServices(s.ServicesNew))
 		}
 		if len(add) > 0 {
-			parts = append(parts, "Przybyło: "+joinAnd(add)+".")
+			parts = append(parts, "Nowe: "+joinAnd(add)+".")
 		}
-		var gone []string
 		if s.HostsGone > 0 {
-			gone = append(gone, nHosts(s.HostsGone))
+			parts = append(parts, "Nieaktywne hosty: "+num(int64(s.HostsGone))+".")
 		}
 		if s.ServicesGone > 0 {
-			gone = append(gone, nServices(s.ServicesGone))
-		}
-		if len(gone) > 0 {
-			parts = append(parts, "Ubyło: "+joinAnd(gone)+".")
+			parts = append(parts, "Usługi, które zniknęły: "+num(int64(s.ServicesGone))+".")
 		}
 		if s.HostsMissing > 0 {
-			miss := "Nie odpowiada (niepotwierdzone): " + nHosts(s.HostsMissing)
+			miss := "Nie odpowiadają (niepotwierdzone): " + nHosts(s.HostsMissing)
 			if s.ServicesUnreachable > 0 {
-				miss += ", z nimi " + nServices(s.ServicesUnreachable)
+				miss += " i " + nServices(s.ServicesUnreachable)
 			}
-			parts = append(parts, miss+". Ponowne sondowanie potwierdzi, czy wróciły, czy zniknęły.")
+			parts = append(parts, miss+". Czujka sprawdzi je ponownie.")
 		}
 		if s.HostsBack > 0 {
-			parts = append(parts, "Powroty po nieaktywności: "+nHosts(s.HostsBack)+".")
+			parts = append(parts, "Znów aktywne: "+nHosts(s.HostsBack)+".")
 		}
 		if n := len(groups[2]); n > 0 {
 			parts = append(parts, "Zmiany w znanych hostach i usługach: "+num(int64(n))+".")
 		}
 		if len(parts) == 0 {
-			parts = append(parts, "Od poprzedniego przebiegu: "+nChanges(unexpected)+".")
+			parts = append(parts, "Od poprzedniego skanu: "+nChanges(unexpected)+".")
 		}
 		if attention > 0 {
 			parts = append(parts, "Najpierw sprawdź "+num(int64(attention))+" "+plural(attention, "zmianę", "zmiany", "zmian")+" o wadze średniej lub wysokiej.")
@@ -593,7 +575,7 @@ func build(in Input) doc {
 	for i, k := range targets {
 		if i == lim.Findings {
 			rest := len(fs) - shown
-			d.FindingsMore = "i jeszcze " + num(int64(rest)) + " " + plural(rest, "obserwacja", "obserwacje", "obserwacji") + " o niższym priorytecie; pełna lista jest w aplikacji."
+			d.FindingsMore = "Pozostałe znaleziska (" + num(int64(rest)) + ") są w aplikacji."
 			break
 		}
 		group := byTarget[k]
@@ -609,7 +591,7 @@ func build(in Input) doc {
 			isNew = isNew || (g.FirstRunID == run.ID && run.ID != 0)
 		}
 		if isNew && !first {
-			row.Notes = append(row.Notes, "nowa w tym przebiegu")
+			row.Notes = append(row.Notes, "nowe w tym skanie")
 		}
 		if st := findingStatusPL[f.Status]; st != "" {
 			row.Notes = append(row.Notes, st)
@@ -686,7 +668,7 @@ func build(in Input) doc {
 		}
 		row.What = oneLine(what, 140)
 		if sv.Carried {
-			row.What += " · nie skanowana w tym przebiegu (stan z wcześniejszego)"
+			row.What += " · poza tym skanem"
 		}
 		for j, w := range sv.InterestWhy {
 			if j == 2 {
@@ -756,7 +738,7 @@ func build(in Input) doc {
 			break
 		}
 		if n := others[i]; n > 0 {
-			row.Name = "oraz " + nHosts(n) + " o tym samym rytmie"
+			row.Name = "oraz " + nHosts(n) + " o tym samym wzorcu"
 		}
 		d.Hosts = append(d.Hosts, row)
 	}
@@ -769,10 +751,10 @@ func build(in Input) doc {
 		note = "w tym " + num(int64(attention)) + " o wadze średniej lub wysokiej"
 	}
 	if first {
-		note = "pierwszy przebieg"
+		note = "pierwszy skan"
 	}
 	fig(int64(unexpected), "zmiany do przejrzenia", note)
-	fig(int64(newFindings), plural(newFindings, "nowa obserwacja", "nowe obserwacje", "nowych obserwacji"), "")
+	fig(int64(newFindings), plural(newFindings, "nowe znalezisko", "nowe znaleziska", "nowych znalezisk"), "")
 	delta := func(plus, minus int) string {
 		if first || plus+minus == 0 {
 			return ""
@@ -784,7 +766,7 @@ func build(in Input) doc {
 	// it did not scan (carried) are named in the note, not counted.
 	svcNote := delta(s.ServicesNew, s.ServicesGone)
 	if in.Carried > 0 {
-		c := "bez " + num(int64(in.Carried)) + " " + plural(in.Carried, "usługi nieskanowanej", "usług nieskanowanych", "usług nieskanowanych") + " w tym przebiegu (stan zachowany)"
+		c := "bez " + num(int64(in.Carried)) + " " + plural(in.Carried, "usługi", "usług", "usług") + " poza tym skanem"
 		if svcNote != "" {
 			svcNote += "; " + c
 		} else {
@@ -839,7 +821,7 @@ func build(in Input) doc {
 			d.Params = append(d.Params, kv{"Limity profilu", strings.Join(lims, ", ")})
 		}
 		if w := windowsText(p.Schedule.Windows); w != "" {
-			d.Params = append(d.Params, kv{"Okno skanowania", w})
+			d.Params = append(d.Params, kv{"Okno czasowe", w})
 		}
 	}
 	var pl []string
@@ -895,20 +877,16 @@ func build(in Input) doc {
 	}
 	d.Traffic = append(d.Traffic, kv{"Czas aktywnego skanowania", dur(st.ElapsedSec)})
 	if st.ChunksTotal > 0 {
-		d.Traffic = append(d.Traffic, kv{"Fragmenty zakresu", strconv.Itoa(st.ChunksDone) + " z " + strconv.Itoa(st.ChunksTotal)})
+		d.Traffic = append(d.Traffic, kv{"Podgrupy", strconv.Itoa(st.ChunksDone) + " z " + strconv.Itoa(st.ChunksTotal)})
 	}
-	d.Traffic = append(d.Traffic, kv{"Hosty sondowane ponownie", num(int64(st.Retried))})
+	d.Traffic = append(d.Traffic, kv{"Hosty sprawdzone ponownie", num(int64(st.Retried))})
 	d.Traffic = append(d.Traffic, kv{"Błędy", num(int64(st.Errors))})
 
 	if run.Trigger == "import" {
-		d.Safety = "Ten przebieg pochodzi z importu pliku. Czujka nie wysłała w nim żadnych pakietów."
-	} else {
-		d.Safety = "Czujka wykrywa obecność usług i ich cech. Nie loguje się, nie wysyła payloadów i nie zgaduje haseł."
-		if methods != "" {
-			d.Safety += " Polityka w chwili skanu dopuszczała tylko metody HTTP: " + methods + "."
-		}
+		d.Safety = "Skan z importu pliku. Czujka nie wysłała pakietów."
+	} else if methods != "" {
+		d.Safety = "Metody HTTP dozwolone w tym skanie: " + methods + "."
 	}
-	d.Footer = "Obserwacje w raporcie są informacyjne: opisują to, co widać z sieci, a nie potwierdzone podatności."
 	return d
 }
 
@@ -920,7 +898,7 @@ func ffloat(f float64) string {
 
 func discoveryText(o model.DiscoveryOpts) string {
 	if o.SkipDiscovery {
-		return "pominięte: każdy adres traktowany jak aktywny"
+		return "pominięte, każdy adres liczy się jako aktywny"
 	}
 	var p []string
 	if o.ICMPEcho {

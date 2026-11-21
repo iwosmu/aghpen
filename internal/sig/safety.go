@@ -2,7 +2,9 @@ package sig
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
+	"unicode"
 )
 
 // The safe-mode rules for extra request paths. A signature may only ask for
@@ -19,7 +21,7 @@ var denySubstrings = []string{
 	"configuration.php", "config.php", "config.inc", "settings.php", "settings.py", "local.xml",
 	"database.yml", "parameters.yml", "appsettings", "docker-compose", "dockerfile",
 	"etc/", "proc/", "cgi-bin/luci/;", "jolokia", "actuator/env", "actuator/gateway", "actuator/loggers",
-	"xmlrpc", "phpunit", "eval-stdin",
+	"xmlrpc", "phpunit", "eval-stdin", "flushall", "flushdb", "resetpassword",
 }
 
 // denyTokens are refused as a whole word of the path or query (words are
@@ -91,7 +93,6 @@ func CheckPath(path string) string {
 			}
 		}
 	}
-	low := strings.ToLower(path)
 	lowPath := strings.ToLower(p)
 	if strings.HasSuffix(lowPath, "~") {
 		return "kopie zapasowe edytora (końcówka „~”) są zabronione"
@@ -101,17 +102,8 @@ func CheckPath(path string) string {
 			return fmt.Sprintf("ukryte pliki i katalogi („%s”) są zabronione: mogą zawierać sekrety (.env, .git, .htpasswd)", seg)
 		}
 	}
-	for _, s := range denySubstrings {
-		if strings.Contains(low, s) {
-			return fmt.Sprintf("ścieżka zawiera „%s”: żądania zmieniające stan albo pobierające sekrety są zabronione", s)
-		}
-	}
-	for _, tok := range strings.FieldsFunc(low, func(r rune) bool {
-		return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9')
-	}) {
-		if denyTokens[tok] {
-			return fmt.Sprintf("ścieżka zawiera słowo „%s”: żądania zmieniające stan albo pobierające sekrety są zabronione", tok)
-		}
+	if reason := deniedWords(path); reason != "" {
+		return reason
 	}
 	last := lowPath[strings.LastIndexByte(lowPath, '/')+1:]
 	for _, ext := range denyExtensions {
@@ -122,6 +114,76 @@ func CheckPath(path string) string {
 	if (strings.HasSuffix(last, ".yml") || strings.HasSuffix(last, ".yaml")) &&
 		!strings.Contains(last, "openapi") && !strings.Contains(last, "swagger") && !strings.Contains(last, "api-docs") {
 		return "pliki YAML są zabronione (konfiguracja), z wyjątkiem opisów OpenAPI/Swagger"
+	}
+	return ""
+}
+
+// deniedWords applies the deny substrings and the deny words to s. Words are
+// split on every character that is not a letter or a digit and also at the
+// parts of camelCase words (security review L3): /api/resetPassword has the
+// word "reset", /cache/flushAll the word "flush".
+func deniedWords(s string) string {
+	low := strings.ToLower(s)
+	for _, d := range denySubstrings {
+		if strings.Contains(low, d) {
+			return fmt.Sprintf("ścieżka zawiera „%s”: żądania zmieniające stan albo pobierające sekrety są zabronione", d)
+		}
+	}
+	for _, w := range words(s) {
+		if denyTokens[w] {
+			return fmt.Sprintf("ścieżka zawiera słowo „%s”: żądania zmieniające stan albo pobierające sekrety są zabronione", w)
+		}
+	}
+	return ""
+}
+
+// words splits s into lower-case words: on every character that is not an
+// ASCII letter or digit, and inside a word at a lower-to-upper change
+// (resetPassword) and before the last capital of a capital run (XMLHttp).
+func words(s string) []string {
+	var out []string
+	for _, f := range strings.FieldsFunc(s, func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9')
+	}) {
+		out = append(out, strings.ToLower(f)) // the whole word as well: "flushall"
+		rs := []rune(f)
+		start := 0
+		for i := 1; i < len(rs); i++ {
+			lowUp := unicode.IsLower(rs[i-1]) && unicode.IsUpper(rs[i])
+			capRun := i+1 < len(rs) && unicode.IsUpper(rs[i-1]) && unicode.IsUpper(rs[i]) && unicode.IsLower(rs[i+1])
+			if lowUp || capRun {
+				out = append(out, strings.ToLower(string(rs[start:i])))
+				start = i
+			}
+		}
+		if start > 0 {
+			out = append(out, strings.ToLower(string(rs[start:])))
+		}
+	}
+	return out
+}
+
+// CheckRedirect validates the target of a same-origin redirect before the
+// collector follows it. The path takes the full CheckPath; the query (a
+// redirect often carries an encoded return address) takes the deny words
+// only, on its decoded text. It returns "" when the target may be fetched.
+func CheckRedirect(u *url.URL) string {
+	p := u.EscapedPath()
+	if p == "" {
+		p = "/"
+	}
+	if reason := CheckPath(p); reason != "" {
+		return reason
+	}
+	if u.RawQuery != "" {
+		q, err := url.QueryUnescape(u.RawQuery)
+		if err != nil {
+			q = u.RawQuery
+		}
+		if len(q) > 2*MaxPathLen {
+			return "parametry zapytania przekierowania są za długie"
+		}
+		return deniedWords(q)
 	}
 	return ""
 }

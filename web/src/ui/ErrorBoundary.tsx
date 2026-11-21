@@ -21,9 +21,6 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
       <div role="alert" data-testid="page-crash" className="flex flex-col items-start gap-1.5 px-4 py-8 sm:px-6">
         <Icon name="alert" className="text-danger" size={18} />
         <p className="text-sm font-medium text-ink">{t('Tej strony nie udało się wyświetlić', 'This page could not be shown')}</p>
-        <p className="max-w-[70ch] text-sm text-ink-2">
-          {t('Dane z serwera mają inny kształt, niż oczekuje interfejs. Pozostałe strony działają.', 'The data from the server has a different shape than the interface expects. The other pages work.')}
-        </p>
         <p className="mono max-w-[90ch] break-words text-xs text-ink-3">{error.message}</p>
         <button type="button" className="link mt-2 text-sm" onClick={() => this.setState({ error: null })}>{t('Spróbuj ponownie', 'Try again')}</button>
       </div>

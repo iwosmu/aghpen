@@ -37,12 +37,12 @@ export function responseDelta(c: Change): string {
     // from the slow answer (or no answer) back to the usual time: "901 ms → 1 ms"
     const was = field(c.before, 'ms');
     if (typeof ms !== 'number') return '';
-    return arrow(typeof was === 'number' ? fmtMs(was) : t('nie odpowiadała', 'no answer'), fmtMs(ms));
+    return arrow(typeof was === 'number' ? fmtMs(was) : t('nie odpowiadała', 'no response'), fmtMs(ms));
   }
   const base = field(c.before, 'baseline_ms') ?? field(c.before, 'ms');
   if (typeof base !== 'number') return '';
   if (typeof ms === 'number') return arrow(fmtMs(base), fmtMs(ms));
-  if (ms === null || field(c.after, 'error')) return fmtMs(base) + ' → ' + t('brak odpowiedzi HTTP', 'no HTTP answer');
+  if (ms === null || field(c.after, 'error')) return fmtMs(base) + ' → ' + t('brak odpowiedzi HTTP', 'no HTTP response');
   return '';
 }
 
@@ -78,7 +78,7 @@ export function changeSummary(c: Change): string {
       return 'Service ' + where + ' answers in its usual time again' + (typeof ms === 'number' ? ': ' + fmtMs(ms) : '') + usualText;
     }
     case 'host_gone':
-      return 'Host ' + c.ip + ' reported inactive';
+      return 'Host ' + c.ip + ' reported down';
     case 'service_gone':
       return 'Service ' + where + ' is gone';
     case 'host_missing':

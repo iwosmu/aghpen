@@ -96,7 +96,7 @@ func Markdown(in Input) string {
 	}
 
 	if len(d.Findings) > 0 {
-		w("## Najważniejsze obserwacje\n\n")
+		w("## Najważniejsze znaleziska\n\n")
 		for _, f := range d.Findings {
 			w("### %s\n\n", md(f.Title))
 			line := "waga: **" + f.SevLabel + "** · ciekawość **" + fmt.Sprint(f.Interest) + "**/100 · " + mdCode(f.Addr)
@@ -108,7 +108,7 @@ func Markdown(in Input) string {
 				w("- %s: %s\n", mdCode(e.Where), md(e.Snippet))
 			}
 			if f.EvidenceMore > 0 {
-				w("- i %d więcej w aplikacji\n", f.EvidenceMore)
+				w("- pozostałe (%d) w aplikacji\n", f.EvidenceMore)
 			}
 			if len(f.Evidence) > 0 {
 				w("\n")
@@ -120,7 +120,7 @@ func Markdown(in Input) string {
 	}
 
 	if len(d.Services) > 0 {
-		w("## Najciekawsze usługi\n\n| Adres | Usługa | Dlaczego | Ciekawość |\n| --- | --- | --- | ---: |\n")
+		w("## Najciekawsze usługi\n\n| Adres | Usługa | Powody | Ciekawość |\n| --- | --- | --- | ---: |\n")
 		for _, s := range d.Services {
 			why := make([]string, len(s.Why))
 			for i, x := range s.Why {
@@ -132,13 +132,13 @@ func Markdown(in Input) string {
 	}
 
 	if len(d.Hosts) > 0 {
-		w("## Hosty niestabilne i nieaktywne\n\n| Host | Stan | Zwykły rytm | Szansa, że nadal istnieje | Odpowiada w | Braki z rzędu |\n| --- | --- | --- | ---: | ---: | ---: |\n")
+		w("## Hosty niestabilne i nieaktywne\n\n| Host | Stan | Wzorzec dostępności | Szansa, że działa | Aktywny (%% skanów) | Skany bez odpowiedzi z rzędu |\n| --- | --- | --- | ---: | ---: | ---: |\n")
 		for _, h := range d.Hosts {
 			host := mdCode(h.IP)
 			if h.Name != "" {
 				host += " " + md(h.Name)
 			}
-			w("| %s | %s | %s | %s | %s skanów | %d |\n", host, md(h.Status), md(h.Pattern), h.PAlive, h.Stability, h.Misses)
+			w("| %s | %s | %s | %s | %s | %d |\n", host, md(h.Status), md(h.Pattern), h.PAlive, h.Stability, h.Misses)
 		}
 		if d.HostsMore != "" {
 			w("\n_%s_\n", md(d.HostsMore))
@@ -148,9 +148,13 @@ func Markdown(in Input) string {
 
 	w("## Parametry skanu\n\n")
 	kvTable(d.Params, "Parametr", "Wartość")
-	w("## Ruch faktycznie wysłany\n\n")
+	w("## Wysłany ruch\n\n")
 	kvTable(d.Traffic, "Miara", "Wartość")
-	w("%s\n\n", md(d.Safety))
-	w("_%s_\n", md(d.Footer))
+	if d.Safety != "" {
+		w("%s\n\n", md(d.Safety))
+	}
+	if d.Footer != "" {
+		w("_%s_\n", md(d.Footer))
+	}
 	return b.String()
 }

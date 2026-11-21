@@ -441,6 +441,38 @@ func (s *Service) SetPasswordByEmail(ctx context.Context, email, password string
 	return s.st.DeleteUserSessions(ctx, u.ID)
 }
 
+// ChangePassword sets a new password for the signed-in user after checking
+// the current one. A wrong current password counts as a failed login (a
+// stolen session cannot guess it freely). The other sessions of the user end;
+// the session that made the change stays.
+func (s *Service) ChangePassword(ctx context.Context, p *Principal, current, next string) error {
+	if p == nil {
+		return ErrNoSession
+	}
+	u, err := s.st.GetUserAuthByEmail(ctx, normEmail(p.User.Email))
+	if err != nil {
+		return err
+	}
+	if !VerifyPassword(u.PasswordHash, current) {
+		_, _ = s.st.RecordLoginFailure(ctx, u.ID, s.cfg.MaxFails, s.cfg.Lockout)
+		return fmt.Errorf("%w: current_password: the current password is wrong", ErrValidation)
+	}
+	if err := ValidatePassword(next); err != nil {
+		return fmt.Errorf("%w: new_password: %v", ErrValidation, err)
+	}
+	hash, err := HashPassword(next)
+	if err != nil {
+		return err
+	}
+	if err := s.st.SetPassword(ctx, u.ID, hash); err != nil {
+		return err
+	}
+	if p.tokenHash == nil {
+		return s.st.DeleteUserSessions(ctx, u.ID)
+	}
+	return s.st.DeleteOtherSessions(ctx, u.ID, p.tokenHash)
+}
+
 // UnlockByEmail clears the lock and the failure counter of an account
 // without changing its password (czujka user unlock).
 func (s *Service) UnlockByEmail(ctx context.Context, email string) error {

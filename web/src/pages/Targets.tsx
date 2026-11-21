@@ -18,7 +18,7 @@ import { useSession } from '../session';
 import { Switch } from './Signatures';
 
 function kindLabel(k: string): string {
-  return k === 'cidr' ? 'CIDR' : k === 'range' ? t('zakres', 'range') : k === 'domain' ? t('domena', 'domain') : 'IP';
+  return k === 'cidr' ? 'CIDR' : k === 'range' ? t('przedział', 'range') : k === 'domain' ? t('domena', 'domain') : 'IP';
 }
 
 /** One line about the operator lock, shown where targets are entered. */
@@ -27,7 +27,7 @@ export function OperatorLockNote({ networks }: { networks: string[] | null | und
   return (
     <p className="flex items-start gap-1.5 text-xs text-ink-2" data-testid="lock-note">
       <Icon name="lock" size={13} className="mt-px flex-none text-ink-3" />
-      <span>{t('Zablokowane przez operatora wdrożenia: skanowanie tylko w ', 'Locked by the deployment operator: scanning only inside ')}<span className="mono text-ink">{networks.join(', ')}</span>{t('. Zakres spoza tej granicy zostanie odrzucony; nie poszerzy jej żaden użytkownik, także administrator.', '. A range outside this boundary is refused; no user, an administrator included, can widen it.')}</span>
+      <span>{t('Operator ograniczył skanowanie do ', 'The operator limits scanning to ')}<span className="mono text-ink">{networks.join(', ')}</span>{t('.', '.')}</span>
     </p>
   );
 }
@@ -72,11 +72,11 @@ export function PreviewReport({ p, pending }: { p: TargetPreview; pending?: bool
         {cell(p.excluded, plural(p.excluded, ['adres wykluczony polityką', 'adresy wykluczone polityką', 'adresów wykluczonych polityką'], ['address excluded by the policy', 'addresses excluded by the policy']), 'dashring', 'changed')}
       </div>
       <div className="mt-2"><LoopbackNote targets={p.valid} /></div>
-      <p className="mt-2 border-t border-rule pt-2 text-sm">{t('Do zakresu trafi ', 'The scope gains ')}<span className="num text-base font-semibold">{fmtInt(p.address_count)}</span> {plural(p.address_count, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}.</p>
+      <p className="mt-2 border-t border-rule pt-2 text-sm">{t('Nowe adresy w zakresie: ', 'New addresses in the scope: ')}<span className="num text-base font-semibold">{fmtInt(p.address_count)}</span></p>
       {locked ? (
         <p className="mt-2 flex items-start gap-1.5 border-t border-rule pt-2 text-sm text-ink" data-testid="preview-lock">
           <Icon name="lock" size={14} className="mt-0.5 flex-none text-ink-2" />
-          <span><span className="num font-semibold">{fmtInt(locked)}</span> {plural(locked, ['wpis leży', 'wpisy leżą', 'wpisów leży'], ['entry lies', 'entries lie'])} {t('poza blokadą operatora wdrożenia', 'outside the deployment operator lock')}: {plural(locked, ['nie trafi', 'nie trafią', 'nie trafi'], ['it stays out of the scope', 'they stay out of the scope'])}{t(' do zakresu. Tej granicy nie poszerzy żaden użytkownik.', '. No user can widen this boundary.')}</span>
+          <span><span className="num font-semibold">{fmtInt(locked)}</span> {plural(locked, ['wpis leży', 'wpisy leżą', 'wpisów leży'], ['entry lies', 'entries lie'])} {t('poza blokadą operatora', 'outside the operator lock')}: {plural(locked, ['nie trafi', 'nie trafią', 'nie trafi'], ['it stays out of the scope', 'they stay out of the scope'])}{t(' do zakresu.', '.')}</span>
         </p>
       ) : null}
       {p.invalid.length ? (
@@ -122,12 +122,12 @@ function AddTargets({ scope }: { scope: Scope }) {
   const stale = preview.isFetching || debounced !== text;
   return (
     <Panel title={t('Dodaj cele do zakresu', 'Add targets to the scope')}>
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'manual', label: t('Wpisz ręcznie', 'Type by hand') }, { id: 'file', label: t('Z pliku CSV lub JSON', 'From a CSV or JSON file') }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'manual', label: t('Wpisz', 'Type') }, { id: 'file', label: t('Z pliku CSV lub JSON', 'From a CSV or JSON file') }]} />
       {tab === 'manual' ? (
         <div className="mt-3 grid gap-4 lg:grid-cols-2">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-ink-3"><span>{t('Gotowe cele:', 'Ready targets:')}</span><ThisComputerChip text={text} onChange={setText} /></div>
-            <Field label={t('Cele, jeden w wierszu', 'Targets, one per line')} hint={t('Adres IP, CIDR, zakres a-b albo domena. Tekst po # jest komentarzem.', 'An IP address, CIDR, range a-b or a domain. Text after # is a comment.')}>
+            <Field label={t('Cele, jeden w wierszu', 'Targets, one per line')} hint={t('Adres IP, CIDR, przedział a-b albo domena. Tekst po # jest komentarzem.', 'An IP address, CIDR, range a-b or a domain. Text after # is a comment.')}>
               <textarea className="field mono" rows={8} spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} placeholder={'10.20.48.0/24\n10.30.6.10-10.30.6.40\nlab.uczelnia.example'} data-testid="targets-text" />
             </Field>
             <div className="mt-2"><OperatorLockNote networks={safety.data?.operator_networks} /></div>
@@ -135,13 +135,12 @@ function AddTargets({ scope }: { scope: Scope }) {
               <Button variant="primary" icon="plus" busy={add.isPending} disabled={!p || p.valid.length === 0 || stale || !text.trim()} onClick={() => add.mutate(undefined)}>
                 {p && p.valid.length && text.trim() ? t('Dodaj ' + p.valid.length + ' ' + plural(p.valid.length, ['cel', 'cele', 'celów'], ['', '']), 'Add ' + p.valid.length + ' ' + (p.valid.length === 1 ? 'target' : 'targets')) : t('Dodaj cele', 'Add targets')}
               </Button>
-              {stale && text.trim() ? <span className="inline-flex items-center gap-1.5 text-xs text-ink-3"><Spinner />{t('sprawdzam', 'checking')}</span> : null}
+              {stale && text.trim() ? <span className="inline-flex items-center gap-1.5 text-xs text-ink-3"><Spinner />{t('sprawdzanie', 'checking')}</span> : null}
             </div>
             <div className="mt-2"><InlineError error={add.error ?? preview.error} /></div>
           </div>
           <div>
-            <p className="label mb-1.5">{t('Podgląd przed zapisem', 'Preview before saving')}</p>
-            {text.trim() && p ? <PreviewReport p={p} pending={stale} /> : <p className="border border-dashed border-rule-strong p-3 text-sm text-ink-2">{t('Zacznij pisać: Czujka na bieżąco policzy poprawne wpisy, błędy z powodem, duplikaty, wykluczenia i liczbę adresów.', 'Start typing: Czujka counts valid entries, errors with a reason, duplicates, exclusions and the number of addresses as you go.')}</p>}
+            {text.trim() && p ? <><p className="label mb-1.5">{t('Podgląd przed zapisem', 'Preview before saving')}</p><PreviewReport p={p} pending={stale} /></> : null}
           </div>
         </div>
       ) : (
@@ -152,13 +151,13 @@ function AddTargets({ scope }: { scope: Scope }) {
             </Field>
             <div className="mt-2 flex items-center gap-2">
               <Button variant="primary" icon="upload" busy={imp.isPending} disabled={!file || !dry || dry.valid.length === 0} onClick={() => file && imp.mutate(file)}>{dry && dry.valid.length ? t('Importuj ' + dry.valid.length, 'Import ' + dry.valid.length) : t('Importuj', 'Import')}</Button>
-              {dryRun.isPending ? <span className="inline-flex items-center gap-1.5 text-xs text-ink-3"><Spinner />{t('próba na sucho', 'dry run')}</span> : null}
+              {dryRun.isPending ? <span className="inline-flex items-center gap-1.5 text-xs text-ink-3"><Spinner />{t('sprawdzenie', 'check')}</span> : null}
             </div>
             <div className="mt-2"><InlineError error={dryRun.error ?? imp.error} /></div>
           </div>
           <div>
-            <p className="label mb-1.5">{t('Wynik próby na sucho', 'Dry-run result')}</p>
-            {dry ? <PreviewReport p={dry} /> : <p className="border border-dashed border-rule-strong p-3 text-sm text-ink-2">{t('Po wybraniu pliku Czujka sprawdzi go bez zapisywania. Import ruszy dopiero po Twoim potwierdzeniu.', 'When you choose a file, Czujka checks it without saving. The import starts only after you confirm.')}</p>}
+            <p className="label mb-1.5">{t('Wynik sprawdzenia', 'Check result')}</p>
+            {dry ? <PreviewReport p={dry} /> : <p className="border border-dashed border-rule-strong p-3 text-sm text-ink-2">{t('Czujka sprawdzi plik bez zapisywania.', 'Czujka checks the file without saving.')}</p>}
           </div>
         </div>
       )}
@@ -170,8 +169,8 @@ function ScopeDialog({ scope, onClose, onSaved }: { scope: Scope | null; onClose
   const [f, setF] = useState({ name: scope?.name ?? '', description: scope?.description ?? '', owner: scope?.owner ?? '', criticality: scope?.criticality ?? 3 });
   const save = useAction(() => (scope ? patch<Scope>('/scopes/' + scope.id, f) : post<Scope>('/scopes', f)), { invalidate: ['/scopes'], silent: true, success: t('Zakres zapisany', 'Scope saved'), onSuccess: (s) => { onSaved(s); onClose(); } });
   return (
-    <Dialog open onClose={onClose} width={480} title={scope ? t('Edycja zakresu', 'Edit the scope') : t('Nowy zakres', 'New scope')}
-      footer={<><Button onClick={onClose}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" busy={save.isPending} disabled={!f.name.trim()} onClick={() => save.mutate(undefined)}>{t('Zapisz zakres', 'Save the scope')}</Button></>}>
+    <Dialog open onClose={onClose} width={480} title={scope ? t('Edytuj zakres', 'Edit scope') : t('Nowy zakres', 'New scope')}
+      footer={<><Button onClick={onClose}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" busy={save.isPending} disabled={!f.name.trim()} onClick={() => save.mutate(undefined)}>{t('Zapisz zakres', 'Save scope')}</Button></>}>
       <div className="space-y-3">
         <Field label={t('Nazwa', 'Name')}><input className="field" autoFocus value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
         <Field label={t('Opis', 'Description')}><input className="field" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
@@ -204,12 +203,12 @@ export default function Targets() {
   });
   const cols: Col<Target>[] = [
     { id: 'value', header: t('Cel', 'Target'), cell: (x) => <span className={cx('mono', !x.enabled && 'text-ink-3 line-through')}>{x.value}{x.maps_to ? <span className="ml-2 font-sans text-xs text-ink-3" data-testid="target-maps-to">{t('skanowany jako', 'scanned as')} <span className="mono text-ink-2">{x.maps_to}</span></span> : null}</span> },
-    { id: 'kind', header: t('Rodzaj', 'Kind'), cell: (x) => <span className="text-ink-2">{kindLabel(x.kind)}</span> },
+    { id: 'kind', header: t('Rodzaj', 'Type'), cell: (x) => <span className="text-ink-2">{kindLabel(x.kind)}</span> },
     { id: 'addr', header: t('Adresy', 'Addresses'), align: 'right', cell: (x) => <span className="num">{fmtInt(x.addresses)}</span> },
     { id: 'note', header: t('Notatka', 'Note'), hide: 'md', cell: (x) => <span className="block max-w-[260px] truncate text-ink-2">{x.note || '–'}</span> },
     { id: 'tags', header: t('Tagi', 'Tags'), hide: 'lg', cell: (x) => <Tags tags={x.tags} max={2} /> },
     { id: 'source', header: t('Źródło', 'Source'), hide: 'lg', cell: (x) => <span className="text-ink-3">{x.source === 'manual' ? t('ręcznie', 'manual') : x.source}</span> },
-    { id: 'enabled', header: t('Skanowany', 'Scanned'), cell: (x) => canUpdate
+    { id: 'enabled', header: t('Włączony', 'Enabled'), cell: (x) => canUpdate
       ? <Switch checked={x.enabled} disabled={toggle.isPending} onChange={() => toggle.mutate(x)} label={(x.enabled ? t('Wyłącz cel ', 'Disable target ') : t('Włącz cel ', 'Enable target ')) + x.value} />
       : <span className="text-xs text-ink-2">{x.enabled ? t('tak', 'yes') : t('nie', 'no')}</span> },
     ...(canDelete ? [{ id: 'del', header: '', align: 'right' as const, width: 44, cell: (x: Target) => <IconButton icon="trash" label={t('Usuń cel ', 'Delete target ') + x.value} onClick={() => setConfirm({ kind: 'target', id: x.id, label: x.value })} /> }] : []),
@@ -217,13 +216,12 @@ export default function Targets() {
   return (
     <div>
       <PageHeader
-        title={t('Cele i zakresy', 'Targets and scopes')}
-        sub={t('Zakres to nazwany zbiór celów z właścicielem. Skaner nigdy nie wychodzi poza cele wpisane tutaj.', 'A scope is a named set of targets with an owner. The scanner never leaves the targets entered here.')}
+        title={t('Cele', 'Targets')}
         readOnly={!canCreate && !canUpdate}
         actions={canCreate ? <Button variant="primary" icon="plus" onClick={() => setDialog('new')}>{t('Nowy zakres', 'New scope')}</Button> : null}
       />
       {scopes.error ? <ErrorState error={scopes.error} retry={() => scopes.refetch()} /> : scopes.isPending ? <SkeletonRows rows={8} /> : list.length === 0 ? (
-        <Empty icon="targets" title={t('Nie ma jeszcze żadnego zakresu', 'There is no scope yet')} hint={t('Utwórz zakres, na przykład „Kampus główny”, i dodaj do niego sieci, które wolno skanować.', 'Create a scope, for example "Main campus", and add the networks that may be scanned.')} action={canCreate ? <Button variant="primary" icon="plus" onClick={() => setDialog('new')}>{t('Nowy zakres', 'New scope')}</Button> : undefined} />
+        <Empty icon="targets" title={t('Brak zakresów', 'No scopes yet')} hint={t('Utwórz zakres i dodaj sieci, które wolno skanować.', 'Create a scope and add the networks that may be scanned.')} action={canCreate ? <Button variant="primary" icon="plus" onClick={() => setDialog('new')}>{t('Nowy zakres', 'New scope')}</Button> : undefined} />
       ) : (
         <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[300px_minmax(0,1fr)]">
           <nav aria-label={t('Zakresy', 'Scopes')}>
@@ -250,15 +248,15 @@ export default function Targets() {
                   <div className="mt-1"><Tags tags={scope.tags} max={6} /></div>
                 </div>
                 <div className="flex gap-1.5">
-                  {canUpdate ? <Button size="sm" icon="edit" onClick={() => setDialog('edit')}>{t('Edytuj zakres', 'Edit the scope')}</Button> : null}
-                  {canDelete ? <Button size="sm" variant="danger" icon="trash" onClick={() => setConfirm({ kind: 'scope', id: scope.id, label: scope.name })}>{t('Usuń zakres', 'Delete the scope')}</Button> : null}
+                  {canUpdate ? <Button size="sm" icon="edit" onClick={() => setDialog('edit')}>{t('Edytuj zakres', 'Edit scope')}</Button> : null}
+                  {canDelete ? <Button size="sm" variant="danger" icon="trash" onClick={() => setConfirm({ kind: 'scope', id: scope.id, label: scope.name })}>{t('Usuń zakres', 'Delete scope')}</Button> : null}
                 </div>
               </div>
               {canCreate ? <AddTargets scope={scope} /> : null}
               {canCreate ? <PassivePanel scope={scope} /> : null}
-              <Panel title={t('Cele w zakresie', 'Targets in the scope')} count={targets.data?.total} flush>
+              <Panel title={t('Cele', 'Targets')} count={targets.data?.total} flush>
                 <DataTable inPanel rows={targets.data?.items} cols={cols} rowKey={(x) => x.id} loading={targets.isPending} error={targets.error} retry={() => targets.refetch()} dim={targets.isPlaceholderData}
-                  empty={<p className="p-3 text-sm text-ink-2">{t('Ten zakres nie ma jeszcze celów.', 'This scope has no target yet.')}{canCreate ? ' ' + t('Dodaj je w formularzu powyżej.', 'Add them in the form above.') : ''}</p>}
+                  empty={<p className="p-3 text-sm text-ink-2">{t('Brak celów.', 'No targets yet.')}</p>}
                   mobile={(x) => (
                     <div className="flex items-center justify-between gap-2"><span><span className="mono text-sm">{x.value}</span><span className="ml-2 text-xs text-ink-3">{kindLabel(x.kind)} · {fmtInt(x.addresses)}</span></span>{canDelete ? <IconButton icon="trash" label={t('Usuń cel ', 'Delete target ') + x.value} onClick={() => setConfirm({ kind: 'target', id: x.id, label: x.value })} /> : null}</div>
                   )} />
@@ -269,9 +267,9 @@ export default function Targets() {
         </div>
       )}
       {dialog ? <ScopeDialog scope={dialog === 'edit' ? scope : null} onClose={() => setDialog(null)} onSaved={(s) => u.set({ scope: s.id })} /> : null}
-      <Dialog open={confirm !== null} onClose={() => setConfirm(null)} width={440} title={confirm?.kind === 'scope' ? t('Usunąć zakres?', 'Delete the scope?') : t('Usunąć cel?', 'Delete the target?')}
+      <Dialog open={confirm !== null} onClose={() => setConfirm(null)} width={440} title={confirm?.kind === 'scope' ? t('Usunąć zakres?', 'Delete scope?') : t('Usunąć cel?', 'Delete target?')}
         footer={<><Button onClick={() => setConfirm(null)}>{t('Anuluj', 'Cancel')}</Button><Button variant="dangerSolid" busy={remove.isPending} onClick={() => confirm && remove.mutate(confirm)}>{t('Usuń', 'Delete')}</Button></>}>
-        <p className="text-sm"><span className="mono">{confirm?.label}</span>{confirm?.kind === 'scope' ? t(': zakres zniknie razem ze wszystkimi celami. Zebrane wyniki zostają w inwentarzu.', ': the scope goes away with all of its targets. Collected results stay in the inventory.') : t(': skaner przestanie sprawdzać te adresy. Zebrane wyniki zostają.', ': the scanner stops probing these addresses. Collected results stay.')}</p>
+        <p className="text-sm"><span className="mono">{confirm?.label}</span>{confirm?.kind === 'scope' ? t('. Zakres i jego cele zostaną usunięte. Wyniki zostają.', '. The scope and its targets are deleted. Results stay.') : t('. Czujka przestanie skanować te adresy. Wyniki zostają.', '. Czujka stops scanning these addresses. Results stay.')}</p>
       </Dialog>
     </div>
   );

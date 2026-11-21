@@ -126,7 +126,9 @@ type SignatureValidator interface {
 // RetroHunter matches a signature against stored observations without sending
 // a packet. The adapter reads them with store.EachObservation. Implemented by internal/sig.
 type RetroHunter interface {
-	RetroHunt(ctx context.Context, yaml string, latestOnly bool) (model.RetroHuntResult, error)
+	// cookieValues false blanks the stored cookie values before matching, so
+	// a caller without results:update cannot probe them (security review M1).
+	RetroHunt(ctx context.Context, yaml string, latestOnly, cookieValues bool) (model.RetroHuntResult, error)
 }
 
 // SignatureImportReport says what POST /signatures/import did with a file.

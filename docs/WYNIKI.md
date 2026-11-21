@@ -139,4 +139,4 @@ Pomiar na czystej maszynie (`docker:dind`, bez obrazów), zapis w `deploy/e2e/fr
 
 ## Instancja publiczna
 
-`https://czujka.dev` skanuje to samo laboratorium co 30 minut na serwerze z 4 vCPU i 8 GB pamięci. W nocy z 21 na 22.11 skrypt `lab/story.sh` wprowadza w laboratorium prawdziwe zmiany (hosty gasną na noc i wracają, zmieniają się wersje, otwiera się port bazy danych), więc historia w wehikule czasu pochodzi z rzeczywistych skanów.
+`https://czujka.dev` skanuje to samo laboratorium co 30 minut na serwerze z 4 vCPU i 8 GB pamięci. W nocy z 21 na 22.11 skrypt `lab/story.sh` wprowadza w laboratorium prawdziwe zmiany (hosty gasną na noc i wracają, zmieniają się wersje, otwiera się port bazy danych), więc historia na osi czasu pochodzi z rzeczywistych skanów.
