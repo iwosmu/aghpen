@@ -308,8 +308,9 @@ check "time machine: redis host up as of run 1" "$(api GET "/timeline/at/hosts?r
 check "time machine: redis service open as of run 1" "$(api GET "/timeline/at/services?run_id=$RUN1&q=$P.1.30&port=6379" | jq -r '.items[0].state')" "open"
 check "time machine: redis host silent as of run 2" "$(api GET "/timeline/at/hosts?run_id=$RUN2&q=$P.1.30" | jq -r '.items[0].up')" "false"
 checkge "time machine: scrubber lists the runs" "$(api GET /timeline | jq '.runs | length')" 2
-# Re-probing is off in a fresh installation; enable it with short steps and wait for the confirmation.
-check "re-probing is off by default" "$(api GET /settings/reprobe | jq -r .enabled)" "false"
+# Re-probing is on in a fresh installation. Set short steps and wait for the confirmation
+# (a host with fewer than 8 observations uses the young-host steps 1, 3, 10 min anyway).
+check "re-probing is on by default" "$(api GET /settings/reprobe | jq -r .enabled)" "true"
 api PUT /settings/reprobe '{"enabled":true,"backoff_minutes":[1,2,3]}' | jq -c '{enabled, backoff_minutes}'
 PLAN=$(api GET /reprobe/plan)
 echo "$PLAN" | jq -r '.probes[]? | "  plan: \(.ip) \(.kind) \(.step)/\(.steps) at \(.not_before): \(.reason)"' | head -5

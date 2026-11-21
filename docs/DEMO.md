@@ -59,14 +59,14 @@ Na slajdzie jest tylko obraz i podpis. Szczegóły mówi prowadzący; źródło 
 | --- | --- | --- |
 | 1 | Czujka | Adres milczy o trzeciej w nocy. Wyłączony na noc czy zniknął? Na to pytanie odpowiada Czujka. |
 | 2 | Czujka uczy się, kiedy każdy host zwykle odpowiada. | Każdy host ma rytm 168 godzin tygodnia; model Bayesa liczy z niego p_alive. W teście stacja robocza nie odpowiada 16 razy w weekend i alarmu nie ma; dwa braki w poniedziałek w godzinach pracy zgłaszają ją jako nieaktywną. Serwer, który zawsze odpowiadał, jest zgłaszany po 2 brakach, host losowy po medianie 5 (`docs/ALGORYTMY.md` §2.6). |
-| 3 | Cała sieć /16 w jednym przebiegu. | Planista dzieli sieć na bloki /24 i łączy puste w większe grupy, a rozmiar grupy idzie za zmierzonym tempem. W sieci lokalnej silnik najpierw robi jedno przeszukanie ARP, potem skanuje porty tylko na odpowiadających adresach. Czas przebiegu /16 na obecnym silniku wpiszemy z bramki laboratorium (`e2e/lab-gate.sh`); dawne 7 min 24 s zmierzono przed zmianą silnika. |
-| 4 | Czujka rozpoznaje usługę i podaje powody oceny. | 386 sygnatur w YAML rozpoznaje panele, CMS, urządzenia, frameworki i środowiska testowe; pewność łączy wszystkie dowody. Ocena ciekawości 0–100 zawsze pokazuje swoje powody, tu siedem powodów dla WordPressa z formularzem logowania przez HTTP. |
+| 3 | Cała sieć /16 w jednym przebiegu. | Planista dzieli sieć na bloki /24 i łączy puste w większe grupy, a rozmiar grupy idzie za zmierzonym tempem. W sieci lokalnej silnik najpierw robi jedno przeszukanie ARP, potem skanuje porty tylko na odpowiadających adresach. Czas przebiegu /16 podaje `docs/WYNIKI.md` (bramka laboratorium `e2e/lab-gate.sh`, limit 1000 pps). |
+| 4 | Czujka rozpoznaje usługę i podaje powody oceny. | 391 sygnatur w YAML rozpoznaje panele, CMS, urządzenia, frameworki i środowiska testowe; pewność łączy wszystkie dowody. Ocena ciekawości 0–100 zawsze pokazuje swoje powody, tu siedem powodów dla WordPressa z formularzem logowania przez HTTP. |
 | 5 | Gdy host milczy, Czujka sprawdza tylko ten adres. | Host, który zamilkł poza swoim rytmem, dostaje trzy krótkie sprawdzenia jednego adresu: po 10, 30 i 90 minutach, najwyżej 200 adresów na godzinę i tylko w oknie skanu. Gdy dalej milczy, Czujka zgłasza go jako zniknięty; gdy odpowie, wraca bez alarmu. |
 | 6 | Wehikuł czasu pokazuje sieć po dowolnym skanie. | Suwak cofa się przebieg po przebiegu i pokazuje hosty, usługi i znaleziska z tamtej chwili. Obok jest różnica do dziś: co zniknęło i co zmieniło produkt, wersję albo tytuł. |
 | 7 | Reguła opisuje, czego w sieci być nie może. | Reguły w YAML mówią, czego w sieci być nie może albo co musi być; Czujka sprawdza je po każdym skanie i imporcie, bez wysyłania pakietów. Pakiet startowy ma 14 reguł; ta jedna znajduje w laboratorium 11 paneli administracyjnych poza siecią zarządzania. |
 | 8 | Czujka wysyła tylko żądania GET i HEAD. | Skaner nigdy się nie loguje i nie wysyła ładunków; walidator odrzuca sygnaturę z inną metodą, treścią albo hasłem, a limity polityki zawsze wygrywają z profilem. Wywołanie stopu awaryjnego trwało 0,09 s; po stopie wyszło 5 pakietów IP, ostatni po 0,01 s, i żaden później niż po 1 s (jądro wysłało jeszcze 3 zapytania ARP). Na łączu najwięcej 641 pakietów nmapa na sekundę przy limicie 800; retro-hunt nie wysyła żadnego pakietu. |
-| 9 | Czujka startuje jednym poleceniem w dwóch kontenerach. | Produkt to binarka Go z interfejsem i nmapem oraz PostgreSQL z pg_tde; uruchamia go `docker compose` w katalogu `deploy/`. SecureCodeBox wymaga klastra Kubernetes i Helm, osobnego chartu na każdy skaner i magazynu S3. Kreator prowadzi od logowania do pierwszego skanu w 19,9 s. |
-| 10 | Czujka działa publicznie na czujka.dev. | Pełny test produktu przechodzi 100 ze 100 kontroli przez REST API na prawdziwych usługach. Instancja publiczna czujka.dev wstała w 46 s na 4 vCPU; jury ma tam konto do odczytu (dane logowania w zgłoszeniu). Precyzję i czułość na 70 hostach wpiszemy z `docs/WYNIKI.md`. |
+| 9 | Czujka startuje jednym poleceniem w dwóch kontenerach. | Produkt to binarka Go z interfejsem i nmapem oraz PostgreSQL z pg_tde; uruchamia go `docker compose up -d` w katalogu głównym repozytorium. SecureCodeBox wymaga klastra Kubernetes i Helm, osobnego chartu na każdy skaner i magazynu S3. Kreator prowadzi od logowania do pierwszego skanu w 19,9 s. |
+| 10 | Czujka działa publicznie na czujka.dev. | Pełny test produktu przechodzi 100 ze 100 kontroli przez REST API na prawdziwych usługach. Instancja publiczna czujka.dev wstała w 46 s na 4 vCPU; jury ma tam konto do odczytu (dane logowania w zgłoszeniu). Precyzja i czułość na 70 hostach: `docs/WYNIKI.md` (hosty 67 z 67, otwarte porty 154 ze 155). |
 
 Jeśli jury poprosi o konkretny przypadek: B ma gotowe zakładki przeglądarki: ręczne dodanie hosta (`Hosty` → „Dodaj host”), import pliku CSV z celami, eksport CSV, rola „Obserwator” w drugim oknie prywatnym (konto `viewer@czujka.local` utworzone w rozdziale 3).
 
@@ -119,24 +119,24 @@ CZUJKA_PORT=8081 CZUJKA_SCAN_NETWORK=czujka-lab docker compose -p czwiz \
 
 W interfejsie `czdemo` (`http://127.0.0.1:8080`):
 
-1. Przejdź kreator: zakres `10.66.0.0/16`, limit 2000 pps, harmonogram ręczny.
+1. Przejdź kreator: zakres `10.66.0.0/16`, limit 1000 pps (domyślna polityka; tak mierzy bramka w `docs/WYNIKI.md`), harmonogram ręczny.
 2. „Polityka bezpieczeństwa”: wykluczenia = adres Czujki z kroku 3, `10.66.0.1` (brama), `10.66.0.10` (skrzynka skanera); dozwolone sieci = `10.66.0.0/16`.
 3. „Administracja” → „Użytkownicy”: dodaj `viewer@czujka.local` z rolą „Obserwator”.
 4. Przebieg 1 na stanie `t0`. Gdy się skończy: `lab/scenario.sh t1` (9 s), potem przebieg 2.
 5. Profil „Co 2 minuty: hosty niestabilne” na `10.66.70.0/24` z cronem `*/2 * * * *`, włączony przez co najmniej 30 minut przed pokazem (próbki dla `flapper`, `tod-office`, `tod-night`).
-6. „Ustawienia” → „Ponowne sprawdzenia”: włączone. „Integracje” → DefectDojo: adres `http://host.docker.internal:18080` i token z `lab/defectdojo/README.md`, „Sprawdź połączenie” (tej drogi z kontenera do DefectDojo nie sprawdzono w tym zadaniu).
+6. „Ustawienia” → „Ponowne sprawdzenia”: włączone (domyślnie). „Integracje” → DefectDojo: adres `http://host.docker.internal:18080` i token z `lab/defectdojo/README.md`, „Sprawdź połączenie” (ta droga działa: `web/REPORT-LAB.md` §11).
 7. Sygnatura `lab-infokiosk` **nie** może być zainstalowana: ujęcie 8 pokazuje, że Czujka sama ją proponuje.
 
 Podgląd hostów niestabilnych na żywo: `go run ./e2e/watchunstable`.
 
-### 3.3 Czego demo potrzebuje od `lab/story.sh` (w przygotowaniu)
+### 3.3 Co demo bierze z `lab/story.sh`
 
-Skrypt `lab/story.sh` pisze zespół dokładności: zaplanowana seria prawdziwych zmian w laboratorium przez kilka godzin, z której powstaje prawdziwa historia. Demo potrzebuje od niego:
+Skrypt `lab/story.sh` wprowadza w laboratorium zaplanowaną serię prawdziwych zmian przez kilka godzin, z której powstaje prawdziwa historia (na `czujka.dev` w nocy z 21 na 22.11). Demo potrzebuje od niego:
 
 | Potrzeba | Ujęcie | Dlaczego |
 | --- | --- | --- |
 | skanów w co najmniej 8 różnych godzinach | 5 | Model nazywa rytm i nadaje `expected-offline` dopiero od 8 obserwacji (`MinObsForExpected`); mapa cieplna z jednej godziny jest pusta |
-| hosta, który milknie poza swoim rytmem | 5 | plan ponownych sprawdzeń i zmiana `host_gone` po krokach `[10, 30, 90]` min |
+| hosta, który milknie poza swoim rytmem | 5 | plan ponownych sprawdzeń i zmiana `host_gone` po krokach `[10, 30, 90]` min (host z mniej niż 8 obserwacjami: `[1, 3, 10]`) |
 | przejścia `t0` → `t1` między dwoma skanami | 4, 6, 7 | zmiany, dwa punkty na suwaku wehikułu, `shadow-adminer` dla reguły |
 | kiosków `kiosk-1` i `kiosk-2` w obu stanach | 8 | „Zaproponuj sygnaturę” potrzebuje przykładu i podobnej instancji |
 | stanu końcowego zapisanego w wolumenie bazy | wszystkie | pokaz nie może czekać godzinami: archiwum `czujka backup` (szyfrowane) przed wyjazdem, na miejscu `czujka restore` |
@@ -163,9 +163,9 @@ docker compose -f lab/defectdojo/docker-compose.yml down -v
 | 1 | Dlaczego nie nmap i skrypt? | nmap jest w środku Czujki i robi sondy. Czujka dodaje to, czego skrypt nie ma: pamięć między przebiegami, wspólny budżet pakietów dla równoległych procesów nmap, okna czasowe, role, szyfrowanie i ekran dla analityka. | `internal/scan`, `internal/analyze`, `docs/ALGORYTMY.md` |
 | 2 | Dlaczego nie SecureCodeBox? | SecureCodeBox wymaga Kubernetesa (4 ostatnie wydania), Helm, operatora, magazynu S3 i osobnego chartu na każdy skaner; nie ma własnego interfejsu. Orkiestruje wiele skanerów; Czujka robi discovery w czasie i może z nim współistnieć przez wspólny DefectDojo. | slajd 9; securecodebox.io/docs/getting-started/installation |
 | 3 | Co z IPv6? | Pojedyncze adresy IPv6 tak; zakres CIDR IPv6 jest odrzucany z komunikatem, bo przeglądanie /64 nie ma sensu. Adresy IPv6 trzeba brać ze źródeł pasywnych (DNS, strefy), co jest następnym krokiem. | `internal/targets/parse.go`, `docs/INTEGRACJE.md` §3 |
-| 4 | Co przy 10 razy większej sieci? | Liczenie adresów nie rozwija listy, plan idzie w blokach /24, zapis wsadowy. Czas rośnie liniowo z liczbą adresów przy stałym limicie pps: /16 przy 2000 pps trwał 7 min 24 s (pomiar sprzed zmiany silnika na ARP najpierw), więc /12 to szacunkowo około 2 godzin; to szacunek, nie pomiar. | slajd 3; `internal/targets`, `internal/scan/planner.go`; estymata przed startem w kreatorze |
+| 4 | Co przy 10 razy większej sieci? | Liczenie adresów nie rozwija listy, plan idzie w blokach /24, zapis wsadowy. Czas rośnie liniowo z liczbą adresów przy stałym limicie pps: /12 to 16 razy czas /16 z `docs/WYNIKI.md`. To szacunek, nie pomiar; laboratorium /16 ma 70 żywych hostów. | slajd 3; `internal/targets`, `internal/scan/planner.go`; estymata przed startem w kreatorze |
 | 5 | Jak nie zaszkodzić drukarkom i sterownikom? | Tylko GET i HEAD, najwyżej 2 żądania na sekundę na host, jedno połączenie HTTP na host, bez skryptów NSE, UDP tylko z listy niegroźnych zapytań. Do tego wykluczenia, dozwolone sieci, okna i stop awaryjny. | `docs/BEZPIECZENSTWO.md` §1 |
-| 6 | Co nie jest skończone? | Pomiar precyzji i czułości na 70 hostach jest w toku (`docs/WYNIKI.md`), a liczby pakietów z testu e2e trzeba zmierzyć ponownie, bo przechwytywanie nie widziało surowego gniazda nmap. Zakresy IPv6 nie działają, logowanie nie ma drugiego składnika. | `docs/ZGODNOSC.md`, `deploy/INTEGRATION2_REPORT.md` |
+| 6 | Co nie jest skończone? | Zakresy CIDR IPv6 nie działają, nazwy domen dają tylko IPv4, UDP nie ma wykrywania wersji, API nie ma tokenów, logowanie nie ma drugiego składnika. Pomiar skali dotyczy /16 z 70 hostami. | `docs/ZGODNOSC.md` („Najsłabsze miejsca”), README („Ograniczenia”) |
 | 7 | Jak liczycie pewność technologii? | Każdy dowód ma wagę 0–1, pewność to noisy-OR: `1 − Π(1 − wᵢ)`. Ekran usługi pokazuje liczbę razem z dowodami; poniżej 0,5 technologia nie tworzy zmian. | `docs/ALGORYTMY.md` §4; ekran usługi |
 | 8 | Po ilu skanach host jest nieaktywny? | Bez stałej liczby: host jest zgłaszany, gdy prawdopodobieństwo istnienia spadnie poniżej 0,2. Serwer stały po 2 brakach, host losowy po medianie 5, stacja w weekend wcale; profil może też wymusić stałe N. | `docs/ALGORYTMY.md` §2.4–2.6 |
 | 9 | A jeśli model myli się na początku? | Przez około dwa tygodnie model nie zna jeszcze godzin ciszy i może zgłosić stację nocą. Powrót hosta zamyka zgłoszenie zmianą `host_back`, a profil może ustawić stałą regułę braków. | `docs/ALGORYTMY.md` §2.8 |
