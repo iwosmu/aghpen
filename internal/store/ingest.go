@@ -241,16 +241,23 @@ ON CONFLICT (host_id, port, proto) DO UPDATE SET
 	name = CASE WHEN s.overrides ? 'name' OR EXCLUDED.name = '' THEN s.name ELSE EXCLUDED.name END,
 	product = CASE WHEN s.overrides ? 'product' OR EXCLUDED.product = '' THEN s.product ELSE EXCLUDED.product END,
 	version = CASE WHEN s.overrides ? 'version' OR (EXCLUDED.version = '' AND EXCLUDED.product = '') THEN s.version ELSE EXCLUDED.version END,
-	classes = CASE WHEN s.overrides ? 'classes' THEN s.classes ELSE EXCLUDED.classes END,
+	classes = CASE WHEN s.overrides ? 'classes' OR (EXCLUDED.obs_hash = '' AND cardinality(EXCLUDED.classes) = 0) THEN s.classes ELSE EXCLUDED.classes END,
 	overrides = czujka_observed(czujka_observed(czujka_observed(czujka_observed(s.overrides,
 		'name', to_jsonb(EXCLUDED.name)), 'product', to_jsonb(EXCLUDED.product)), 'version', to_jsonb(EXCLUDED.version)),
 		'classes', to_jsonb(EXCLUDED.classes)),
-	banner = EXCLUDED.banner, confidence = EXCLUDED.confidence, tls = EXCLUDED.tls, title = EXCLUDED.title,
-	http_status = EXCLUDED.http_status, url = EXCLUDED.url, technologies = EXCLUDED.technologies, tech_names = EXCLUDED.tech_names,
-	cert_not_after = EXCLUDED.cert_not_after,
+	-- obs_hash '' marks a partial result (HostResult.Interim): a field it has not described yet keeps the known value
+	banner = CASE WHEN EXCLUDED.obs_hash = '' AND EXCLUDED.banner = '' THEN s.banner ELSE EXCLUDED.banner END,
+	confidence = EXCLUDED.confidence, tls = EXCLUDED.tls OR (EXCLUDED.obs_hash = '' AND s.tls),
+	title = CASE WHEN EXCLUDED.obs_hash = '' AND EXCLUDED.http_status = 0 THEN s.title ELSE EXCLUDED.title END,
+	http_status = CASE WHEN EXCLUDED.obs_hash = '' AND EXCLUDED.http_status = 0 THEN s.http_status ELSE EXCLUDED.http_status END,
+	url = CASE WHEN EXCLUDED.obs_hash = '' AND EXCLUDED.url = '' THEN s.url ELSE EXCLUDED.url END,
+	technologies = CASE WHEN EXCLUDED.obs_hash = '' AND jsonb_array_length(EXCLUDED.technologies) = 0 THEN s.technologies ELSE EXCLUDED.technologies END,
+	tech_names = CASE WHEN EXCLUDED.obs_hash = '' AND cardinality(EXCLUDED.tech_names) = 0 THEN s.tech_names ELSE EXCLUDED.tech_names END,
+	cert_not_after = CASE WHEN EXCLUDED.obs_hash = '' AND EXCLUDED.cert_not_after IS NULL THEN s.cert_not_after ELSE EXCLUDED.cert_not_after END,
 	last_seen = GREATEST(s.last_seen, EXCLUDED.last_seen),
-	last_changed = CASE WHEN s.obs_hash <> EXCLUDED.obs_hash THEN EXCLUDED.last_seen ELSE s.last_changed END,
-	obs_hash = EXCLUDED.obs_hash,
+	-- a change is a final result that differs from the last final one; a service first stored by a partial result has obs_hash ''
+	last_changed = CASE WHEN EXCLUDED.obs_hash = '' OR s.obs_hash = '' OR s.obs_hash = EXCLUDED.obs_hash THEN s.last_changed ELSE EXCLUDED.last_seen END,
+	obs_hash = CASE WHEN EXCLUDED.obs_hash = '' THEN s.obs_hash ELSE EXCLUDED.obs_hash END,
 	last_run_id = EXCLUDED.last_run_id
 	-- note, tags, interest, group_key are not written here
 RETURNING s.id, s.host_id, s.port, s.proto`
@@ -400,6 +407,8 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 			RunID  int64 `json:"run_id"`
 			// the port scan of the host did not finish: unlisted services are unknown, not gone
 			PortsUnknown bool `json:"ports_unknown"`
+			// the services this result lists (set after the service upsert)
+			Listed []int64 `json:"listed"`
 		}
 		var present []presence
 		hostIDs := make([]int64, 0, len(order))
@@ -422,6 +431,7 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 			WasUp  bool    `json:"was_up"`
 			Bucket int     `json:"bucket"`
 			RTTMs  float64 `json:"rtt_ms"`
+			Reason string  `json:"reason"`
 		}
 		var repeatFix []repeatIn
 
@@ -442,9 +452,9 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 			}
 			hostIDs = append(hostIDs, id)
 			if p, ok := repeats[ip]; ok {
-				repeatFix = append(repeatFix, repeatIn{HostID: id, RunID: r.RunID, WasUp: p.up, Bucket: hourBucket(p.at, tx.loc), RTTMs: r.RTTMs})
+				repeatFix = append(repeatFix, repeatIn{HostID: id, RunID: r.RunID, WasUp: p.up, Bucket: hourBucket(p.at, tx.loc), RTTMs: r.RTTMs, Reason: obsReason(r)})
 			} else {
-				o := hostObsIn{HostID: id, RunID: r.RunID, At: r.ObservedAt.UTC(), Up: r.Up, RTTMs: r.RTTMs, Attempts: max(r.Attempts, 1), Reason: r.Reason,
+				o := hostObsIn{HostID: id, RunID: r.RunID, At: r.ObservedAt.UTC(), Up: r.Up, RTTMs: r.RTTMs, Attempts: max(r.Attempts, 1), Reason: obsReason(r),
 					Bucket: hourBucket(r.ObservedAt, tx.loc)}
 				if r.Up {
 					o.UpN = 1
@@ -453,7 +463,7 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 				}
 				hostObs = append(hostObs, o)
 			}
-			present = append(present, presence{id, r.Up, r.RunID, r.HasUnknownPorts()})
+			present = append(present, presence{HostID: id, Up: r.Up, RunID: r.RunID, PortsUnknown: r.HasUnknownPorts(), Listed: []int64{}})
 
 			seen := map[svcKey]bool{}
 			for i := range r.Services {
@@ -508,6 +518,9 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 				}
 				sort.Strings(in.TechNames)
 				in.ObsHash = obsHash(sv, in.Title, in.HTTPStatus, in.TLS, in.TechNames)
+				if r.Interim {
+					in.ObsHash = "" // a partial result: the service keeps its change hash and known fields (serviceUpsert)
+				}
 				svcIn = append(svcIn, in)
 				pend = append(pend, pending{key: key, res: sv, in: &svcIn[len(svcIn)-1]})
 			}
@@ -532,11 +545,15 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 		if len(repeatFix) > 0 {
 			// The host upsert counted the repeat as one more observation: undo
 			// that, and turn a stored miss of this run into an answer.
-			if _, err := tx.db.Exec(ctx, `WITH d AS (SELECT * FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, run_id bigint, was_up boolean, bucket int, rtt_ms float8)),
+			// A repeat is always an answer (a repeat without one was dropped
+			// above). Its reason replaces the stored one: the final result of a
+			// host replaces its partial result ("ports-unknown").
+			if _, err := tx.db.Exec(ctx, `WITH d AS (SELECT * FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, run_id bigint, was_up boolean, bucket int, rtt_ms float8, reason text)),
 				h AS (UPDATE hosts x SET obs_total = GREATEST(x.obs_total - 1, 1), obs_up = GREATEST(x.obs_up - CASE WHEN d.was_up THEN 1 ELSE 0 END, 0),
 					stability = GREATEST(x.obs_up - CASE WHEN d.was_up THEN 1 ELSE 0 END, 0)::float8 / GREATEST(x.obs_total - 1, 1)
 					FROM d WHERE x.id = d.host_id),
-				o AS (UPDATE host_observations x SET up = true, rtt_ms = d.rtt_ms FROM d WHERE NOT d.was_up AND x.host_id = d.host_id AND x.run_id = d.run_id)
+				o AS (UPDATE host_observations x SET up = true, rtt_ms = CASE WHEN d.was_up THEN x.rtt_ms ELSE d.rtt_ms END, reason = d.reason
+					FROM d WHERE x.host_id = d.host_id AND x.run_id = d.run_id)
 				UPDATE host_availability x SET up = x.up + 1, down = GREATEST(x.down - 1, 0) FROM d
 				WHERE NOT d.was_up AND x.host_id = d.host_id AND x.bucket = d.bucket`, js(repeatFix)); err != nil {
 				return mapErr(err)
@@ -565,6 +582,13 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 				return mapErr(err)
 			}
 		}
+		for i := range present {
+			for k, id := range svcID {
+				if k.host == present[i].HostID {
+					present[i].Listed = append(present[i].Listed, id)
+				}
+			}
+		}
 		if len(closed) > 0 {
 			if _, err := tx.db.Exec(ctx, `UPDATE services s SET state = 'gone' FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, port int, proto text)
 				WHERE s.host_id = d.host_id AND s.port = d.port AND s.proto = d.proto AND s.state <> 'gone'`, js(closed)); err != nil {
@@ -582,10 +606,19 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 			}
 		}
 		if opt.MarkMissing {
+			// A complete result lists every open service of its host: a service
+			// it does not list is gone, also one that only a partial result of
+			// this run listed.
 			if _, err := tx.db.Exec(ctx, `UPDATE services s SET state = CASE WHEN d.up THEN 'gone' ELSE 'unknown' END
-				FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, up boolean, run_id bigint, ports_unknown boolean)
-				WHERE s.host_id = d.host_id AND s.last_run_id IS DISTINCT FROM d.run_id AND NOT d.ports_unknown
+				FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, up boolean, run_id bigint, ports_unknown boolean, listed bigint[])
+				WHERE s.host_id = d.host_id AND NOT (s.id = ANY(d.listed)) AND NOT d.ports_unknown
 				AND ((d.up AND s.state IN ('open', 'filtered', 'unknown')) OR (NOT d.up AND s.state IN ('open', 'filtered')))`, js(present)); err != nil {
+				return mapErr(err)
+			}
+			// The run keeps no observation of a service its complete result
+			// does not list (one that only a partial result of the run listed).
+			if _, err := tx.db.Exec(ctx, `DELETE FROM service_observations o USING jsonb_to_recordset($1::jsonb) AS d(host_id bigint, run_id bigint, ports_unknown boolean, listed bigint[])
+				WHERE o.host_id = d.host_id AND o.run_id = d.run_id AND NOT d.ports_unknown AND NOT (o.service_id = ANY(d.listed))`, js(present)); err != nil {
 				return mapErr(err)
 			}
 		}
@@ -600,7 +633,9 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 				if !ok {
 					return fmt.Errorf("store: service %d/%s of host %d was not returned by the upsert", p.key.port, p.key.proto, p.key.host)
 				}
-				ids = append(ids, id)
+				if p.in.ObsHash != "" || len(p.res.Technologies) > 0 {
+					ids = append(ids, id) // a partial result without technologies keeps the known ones
+				}
 				clean, sec, has := splitSecrets(*p.res)
 				clean.Proto, clean.State = p.in.Proto, p.in.State
 				o := obsIn{ServiceID: id, HostID: p.key.host, RunID: p.in.RunID, At: p.in.At, State: p.in.State, Name: p.res.Name, Product: p.res.Product,
@@ -619,6 +654,12 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 					tseen[t.Name] = true
 					techs = append(techs, techIn{id, p.key.host, t.Name, t.Category, t.Version, t.Confidence, t.CPE})
 				}
+			}
+			// One observation per service and run: a later result of the run
+			// (the final result after a partial one, a retried chunk) replaces it.
+			if _, err := tx.db.Exec(ctx, `DELETE FROM service_observations o USING jsonb_to_recordset($1::jsonb) AS d(service_id bigint, run_id bigint)
+				WHERE o.service_id = d.service_id AND o.run_id = d.run_id`, js(obs)); err != nil {
+				return mapErr(err)
 			}
 			if _, err := tx.db.Exec(ctx, `INSERT INTO service_observations (service_id, host_id, run_id, at, state, name, product, version, title, http_status, tls, result, secret)
 				SELECT d.service_id, d.host_id, d.run_id, d.at, d.state, d.name, d.product, d.version, d.title, d.http_status, d.tls, d.result, d.secret
@@ -658,4 +699,14 @@ func (s *Store) refreshHostAggregates(ctx context.Context, hostIDs []int64) erro
 			FROM unnest($1::bigint[]) AS x(host_id) LEFT JOIN services s ON s.host_id = x.host_id GROUP BY x.host_id) a
 		WHERE h.id = a.host_id`, hostIDs)
 	return mapErr(err)
+}
+
+// obsReason is the reason stored with a host observation. A result whose port
+// scan did not finish (a partial result, a timed-out port scan) says so, so
+// that the run rebuilt from the store (EachRunHost) is not taken as complete.
+func obsReason(r *model.HostResult) string {
+	if r.Reason == "" && r.HasUnknownPorts() {
+		return model.ReasonPortsUnknown
+	}
+	return r.Reason
 }
