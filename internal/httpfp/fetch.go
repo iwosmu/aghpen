@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -260,13 +261,41 @@ func cleanHeaders(h http.Header) map[string][]string {
 		if len(vals) > 20 {
 			vals = vals[:20]
 		}
+		ck := http.CanonicalHeaderKey(k)
+		secret := ck == "Set-Cookie" || ck == "Set-Cookie2"
 		cp := make([]string, len(vals))
 		for i, v := range vals {
+			if secret {
+				v = MaskSetCookie(v)
+			}
 			cp[i] = truncate(strings.ToValidUTF8(v, "�"), maxHeaderValueBytes)
 		}
-		out[http.CanonicalHeaderKey(k)] = cp
+		out[ck] = cp
 	}
 	return out
+}
+
+// MaskSetCookie hides the value of a Set-Cookie header line and keeps the
+// cookie name and the attributes: "sid=abc123; Path=/; HttpOnly" becomes
+// "sid=[masked len=6]; Path=/; HttpOnly". The stored headers reach every
+// viewer and every export; the value itself travels only in the parsed
+// Cookies list (model.Cookie.Value), which the store encrypts. An empty
+// value stays empty: it carries nothing secret.
+func MaskSetCookie(line string) string {
+	pair, attrs, hasAttrs := strings.Cut(line, ";")
+	name, value, ok := strings.Cut(pair, "=")
+	if !ok {
+		return line // not a name=value pair; nothing to hide
+	}
+	v := strings.TrimSpace(value)
+	masked := strings.TrimSpace(name) + "="
+	if v != "" {
+		masked += "[masked len=" + strconv.Itoa(len(strings.Trim(v, "\""))) + "]"
+	}
+	if hasAttrs {
+		masked += ";" + attrs
+	}
+	return masked
 }
 
 // truncate cuts s to at most n bytes without splitting a UTF-8 sequence.

@@ -107,9 +107,9 @@ Permission-based. Built-in roles (not deletable) and the mapping to the brief:
 
 | Role | Brief | Permissions |
 | --- | --- | --- |
-| `admin` | Administracja | all |
-| `editor` | Dodawanie, usuwanie, modyfikacja | read + create + update + delete of targets, results, signatures; run and configure scans; export |
-| `analyst` | Modyfikacja i odczyt | read + update (targets, results, signatures); run scans; export |
+| `admin` | Administracja | all; only this role releases the emergency stop and edits the safety policy (`safety:manage`) |
+| `editor` | Dodawanie, usuwanie, modyfikacja | read + create + update + delete of targets, results, signatures; run and configure scans; export; press the emergency stop (`safety:stop`) |
+| `analyst` | Modyfikacja i odczyt | read + update (targets, results, signatures); run scans; export; press the emergency stop (`safety:stop`) |
 | `viewer` | Odczyt | read only |
 
 Admins can create custom roles from the permission list. The API enforces permissions; the UI hides what the user cannot do.

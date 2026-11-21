@@ -322,8 +322,145 @@ Eksport XML jednego przebiegu może trafić do osobnego testu typu „Nmap Scan"
 
 - DefectDojo sam zmienia wielkość liter w tytułach („Panel Administracyjny: …"), także po `PATCH`.
 - Aktualizacja to jedno żądanie `PATCH` na zmienioną obserwację, po kolei. Niezmienione obserwacje nie kosztują żądania. Pierwszy eksport idzie w paczkach po 500.
-- Klient nie zamyka pozycji sam. Pozycja znika w DefectDojo dopiero wtedy, gdy Czujka wyeksportuje ją ze statusem `resolved`.
-- Integracja była sprawdzona z wersją 3.5.202. Ścieżka dla wersji 2.x (odczyt endpointów) jest napisana, ale nie była uruchomiona na prawdziwym serwerze 2.x.
+- Integracja była sprawdzona z wersjami 3.5.202 (lokalnie, zapis i odczyt) i 3.5.201 (publiczne demo, tylko odczyt, rozdz. 4.10). Ścieżka dla wersji 2.x (odczyt endpointów) jest napisana, ale nie była uruchomiona na prawdziwym serwerze 2.x.
+- DefectDojo 3.5 nie zapisuje portu w adresie `ssh://host:22` (zostaje `ssh://host`). Import takiej pozycji do Czujki daje port 0.
+- DefectDojo 3.5 odrzuca zmianę znacznika `mitigated` (`EDITABLE_MITIGATED_DATA=false`). Klient ustawia tylko `is_mitigated` i `active`; czas zamknięcia wpisuje DefectDojo.
+
+### 4.6 Format „Generic Findings Import" w plikach
+
+`internal/interchange` czyta i zapisuje obserwacje w formacie DefectDojo „Generic Findings Import". Listę pól wzięliśmy z parsera DefectDojo 3.5.202 (`dojo/tools/generic/json_parser.py`, `csv_parser.py`, odczytane w kontenerze). Parser JSON odrzuca cały plik, gdy obiekt ma pole spoza listy dozwolonych; test `TestDojoGenericJSONOnlyAllowedKeysAndRoundTrip` pilnuje, że Czujka pisze tylko dozwolone pola.
+
+| Funkcja | Działanie |
+| --- | --- |
+| `WriteDojoGenericJSON(w, findings)` | `{"name","type","findings":[…]}` |
+| `WriteDojoGenericCSV(w, findings)` | kolumny `Date, Title, CweId, Url, Severity, Description, Mitigation, Impact, References, Active, Verified, FalsePositive, IsMitigated, Duplicate` |
+| `ToDojoGeneric(f)` | jedna obserwacja jako obiekt formatu |
+| `ImportFindings(r, FindingsOptions)` | odczyt z wykryciem formatu, wynik `[]model.Finding` i `FindingsReport` |
+| `DetectFindings(head)` | nazwa formatu po pierwszych bajtach |
+| `FlagsOf(status)`, `StatusFromDojo(flags, tag)` | mapowanie statusów w obie strony |
+
+Pola obiektu JSON, które pisze Czujka:
+
+| Pole | Wartość |
+| --- | --- |
+| `title`, `description`, `severity`, `date` | tytuł, opis z dowodami, `Info`/`Low`/`Medium`/`High`, data pierwszej obserwacji |
+| `cwe`, `mitigation`, `impact` | z tabeli według typu obserwacji (na przykład `expired-cert` → CWE-298, `database-exposed` → CWE-668, `interesting-cookie` → CWE-1004) |
+| `references` | URL usługi |
+| `active`, `verified`, `false_p`, `is_mitigated` | ze statusu (tabela w 4.8) |
+| `unique_id_from_tool`, `vuln_id_from_tool` | klucz i typ obserwacji |
+| `service` | `port/tcp` |
+| `endpoints` | `[{"protocol","host","port"}]`, host to zawsze adres IP |
+| `tags` | `czujka`, typ, tagi analityka |
+
+CSV DefectDojo nie ma kolumny na `unique_id_from_tool` ani na tagi. Klucz jedzie w opisie („Klucz: …"), skąd import Czujki go odczytuje.
+
+Odczyt przyjmuje pięć formatów:
+
+| Format (`FindingsReport.format`) | Rozpoznanie |
+| --- | --- |
+| `dojo-generic-json` | obiekt z kluczem `findings` |
+| `dojo-generic-csv` | nagłówek z kolumnami `Date`, `Title`, `Severity`, `Description` |
+| `dojo-api-json` | lista z API DefectDojo (`GET /api/v2/findings/`: `count`, `results`, opcjonalnie `prefetch`), jedna pozycja albo tablica pozycji |
+| `czujka-findings-json` | eksport Czujki `GET /api/v1/export/findings.json` (tablica `model.Finding`) |
+| `czujka-findings-csv` | eksport Czujki `GET /api/v1/export/findings.csv` (te same kolumny; znak `'` przed formułą jest zdejmowany) |
+
+Host i port obserwacji, w tej kolejności: endpoint (napis URI, obiekt `host/port/protocol`, identyfikator rozwiązany przez `prefetch=endpoints`, także `location_value` z DefectDojo 3.x), kolumna `Url`, wiersz „**Host:** … · **Port:** …" z opisu Czujki, klucz Czujki (`typ/IP/tcp-port/…`). Bez żadnego z nich wiersz jest błędny z powodem „nie można ustalić hosta …".
+
+Klucz i znacznik źródła:
+
+- Pozycja wyeksportowana kiedyś przez Czujkę (klucz w formacie Czujki) wraca z tym samym kluczem i typem. `manual = false`.
+- Pozycja innego narzędzia dostaje `type = imported`, `manual = true` (analiza po przebiegu jej nie rozwiązuje), tag `import:<źródło>` (`import:defectdojo`, `import:defectdojo-generic` albo nazwa z `FindingsOptions.Source`) i stały klucz `import/<IP>/tcp-<port>/<skrót>` z `unique_id_from_tool` albo z tytułu, IP i portu. Drugi import tego samego pliku daje te same klucze.
+- `Critical` z DefectDojo staje się `high`. CWE, wpływ, zalecenia i odnośniki są dopisywane do opisu.
+- Identyfikator DefectDojo trafia do `dojo_id`.
+
+Błędne wiersze nie przerywają importu. Powody po polsku: „brak tytułu", „nieznana waga …", „niepoprawna data …", „nie można ustalić hosta …", „powtórzona obserwacja …", „niepoprawny port …", „niepoprawny CweId …".
+
+Wywołujący (trasa API) zamienia IP na identyfikator hosta i zapisuje obserwacje przez `UpsertFindings` po kluczu.
+
+### 4.7 Status z DefectDojo do Czujki
+
+`Client.PullStatus(ctx, []LocalStatus)` czyta stan wyeksportowanych obserwacji (te z `dojo_id`) przez `GET /findings/{id}/` i zwraca `StatusPull`: propozycje zmian, konflikty, pozycje usunięte w DefectDojo. Niczego nie zapisuje. Czysta funkcja `ProposeStatusUpdates` robi porównanie i ma testy.
+
+| Flagi w DefectDojo (pierwsza pasująca reguła) | Status w Czujce |
+| --- | --- |
+| `false_p` | `false_positive` |
+| `risk_accepted` | `accepted` |
+| `out_of_scope` | `accepted` |
+| `is_mitigated` | `resolved` |
+| `active = false` | `resolved` |
+| tag `accepted` | `accepted` |
+| `active` i `verified` | `triaged` |
+| `active`, bez `verified` | `new` |
+
+Kto wygrywa:
+
+| Status w Czujce | Wynik |
+| --- | --- |
+| `new` albo `resolved` (ustawił skaner) | wygrywa DefectDojo: propozycja zmiany |
+| ustawiony przez analityka, zmiana w DefectDojo (`last_status_update`) nowsza niż edycja (`LocalStatus.ChangedAt` albo `Overrides["status"].At`) | wygrywa DefectDojo: propozycja zmiany |
+| ustawiony przez analityka, edycja nowsza albo czas edycji nieznany | wygrywa analityk: wpis w `conflicts` |
+| DefectDojo w stanie domyślnym (aktywna, niezweryfikowana) | wygrywa analityk: stan domyślny nie jest decyzją |
+
+Sprawdzone na lokalnym DefectDojo 3.5.202: po `PATCH` w DefectDojo (`false_p`, `verified`, `out_of_scope`) pull zwrócił trzy propozycje: `new → false_positive`, `new → triaged`, `new → accepted`.
+
+### 4.8 Zamykanie i ponowne otwieranie
+
+`Client.SyncLifecycle(ctx, findings, now)`:
+
+- obserwacja Czujki ze statusem `resolved` (już niewidoczna), której pozycja w DefectDojo jest otwarta: `PATCH is_mitigated = true, active = false` i notatka „Czujka: obserwacja … nie jest już widoczna (ostatnio widziana …, przebieg #…). Oznaczona jako usunięta.";
+- obserwacja znów widoczna (`new` albo `triaged`), której pozycja jest zamknięta: `PATCH is_mitigated = false, active = true` i notatka „… jest znów widoczna … Ponownie otwarta.";
+- pozycje oznaczone w DefectDojo jako fałszywy alarm, zaakceptowane albo poza zakresem nie są otwierane ponownie.
+
+Sprawdzone na lokalnej instancji: zamknięcie dało `active: False, is_mitigated: True, mitigated: 2026-11-21T13:15:56Z` i notatkę; ponowne otwarcie `active: True, is_mitigated: False` i drugą notatkę. Pierwsza próba z polem `mitigated` dostała 400 („Editing mitigated timestamp is disabled"), dlatego klient go nie wysyła.
+
+Status przy eksporcie (`FlagsOf`):
+
+| Status w Czujce | `active` | `verified` | `false_p` | `is_mitigated` |
+| --- | --- | --- | --- | --- |
+| `new` | ✓ | – | – | – |
+| `triaged` | ✓ | ✓ | – | – |
+| `accepted` | ✓ | – | – | – (tag `accepted`) |
+| `false_positive` | – | – | ✓ | – |
+| `resolved` | – | – | – | ✓ |
+
+`accepted` jedzie jako tag, bo DefectDojo akceptuje ryzyko tylko przez obiekt Risk Acceptance albo przy włączonej prostej akceptacji w produkcie.
+
+### 4.9 Produkt i engagement według zakresu, załączniki
+
+- `ScopeMapping{scope_id, product_type_name, product_name, engagement_name}`: `TargetFor(scopeIDs, maps, def)` wybiera cel dla obserwacji, `GroupByTarget` dzieli listę na grupy do osobnych eksportów. Puste nazwy biorą wartość domyślną.
+- `Client.AttachFile(ctx, "tests"|"findings", id, title, name, data)` wysyła plik przez `POST /api/v2/{tests|findings}/{id}/files/`. `AttachEvidence` dołącza do każdej wyeksportowanej obserwacji plik tekstowy z dowodami (`EvidenceText`), `AttachRunXML` dołącza nmap XML przebiegu do testu. Sprawdzone lokalnie: 4 pliki dowodów i plik XML w teście 19.
+
+### 4.10 Wersje DefectDojo
+
+Test połączenia na publicznym demo `https://demo.defectdojo.org`, tylko odczyt: jedno `POST /api-token-auth/`, potem wyłącznie `GET`.
+
+```text
+dojoprobe test (demo)   → {"ok": true, "message": "Połączono z DefectDojo 3.5.201 jako admin", "version": "3.5.201"}
+OpenAPI demo 3.5.201 / lokalnie 3.5.202: trasy klienta (user_profile, product_types, products, engagements, tests,
+  findings, findings/{id}, findings/{id}/notes, findings/{id}/files, tests/{id}/files, import-scan, reimport-scan,
+  location_findings, endpoints/{id}) mają te same metody; schematy Finding, PatchedFinding, ImportScan, Note: bez różnic
+```
+
+Pierwsze 400 pozycji na demo to obserwacje SAST bez endpointów (kod, pliki). Import Czujki odrzuca je z powodem „nie można ustalić hosta", bo nie dotyczą adresu w sieci.
+
+### 4.11 Zapis sprawdzenia na lokalnym DefectDojo 3.5.202
+
+```text
+$ dojoprobe generic -in lab/defectdojo/sample-findings.json -to json > czujka-generic.json   (i -to csv)
+$ curl -X POST /api/v2/import-scan/ -F scan_type="Generic Findings Import" -F file=@czujka-generic.json …
+  → test 19: statistics.after.total 4 (3 Info, 1 Low)
+$ … -F file=@czujka-generic.csv → test 20: 4 pozycje
+$ dojoprobe list -test 19
+  #70 Low active=true Baza Danych Dostępna Z Sieci: Redis … endpoints=[tcp://172.31.250.4:6379] key=database-exposed/172.31.250.4/tcp-6379
+$ curl /api/v2/findings/?test=19&prefetch=endpoints > dd-api.json; dojoprobe fimport -in dd-api.json
+  format dojo-api-json: 4 findings, 0 skipped
+  low new 172.31.250.4:6379 manual=false type=database-exposed key=database-exposed/172.31.250.4/tcp-6379 dojo=#70
+$ (plik innego narzędzia → DefectDojo test 21 → API) dojoprobe fimport -in dd-api-foreign.json
+  medium new 10.66.5.20:3000 manual=true type=imported key=import/10.66.5.20/tcp-3000/df60f976c8ae9a72 dojo=#75
+  high   new 10.66.5.21:0    manual=true type=imported key=import/10.66.5.21/tcp-0/0524dba464a72986 dojo=#76
+```
+
+Odpowiedzi API z tego sprawdzenia leżą w `internal/interchange/testdata/dojo/` i są danymi testów.
 
 ## 5. Lokalne laboratorium DefectDojo
 
@@ -356,3 +493,8 @@ Login, hasło i pełny opis: `lab/defectdojo/README.md`. Pliki przykładowe poch
 | `push -file obserwacje.json` | eksport obserwacji do DefectDojo |
 | `nmap -file skan.xml -title nazwa` | wysłanie nmap XML jako „Nmap Scan" |
 | `list -test id` | pozycje testu z endpointami, kluczami i tagami |
+| `generic -in obserwacje.json -to json\|csv` | zapis w formacie Generic Findings Import |
+| `fimport -in plik` | import obserwacji (Generic JSON/CSV, lista z API DefectDojo, eksport Czujki) |
+| `pull -file obserwacje.json` | propozycje statusów z DefectDojo (obserwacje z `dojo_id`) |
+| `lifecycle -file obserwacje.json` | zamknięcie rozwiązanych i ponowne otwarcie widocznych |
+| `attach -file obserwacje.json [-test id -in skan.xml]` | pliki dowodów i nmap XML |

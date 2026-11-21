@@ -225,6 +225,10 @@ type ChunkingOpts struct {
 type RetryOpts struct {
 	UnstableRetries int `json:"unstable_retries"` // extra probes for a known host that did not answer
 	BackoffMs       int `json:"backoff_ms"`
+	// DownAfterMisses is the rule for reporting inactivity: 0 lets the
+	// availability model decide (the default); N &gt; 0 reports the host
+	// inactive (host_gone) after N misses in a row, whatever the model says.
+	DownAfterMisses int `json:"down_after_misses"`
 }
 
 // Window is one allowed time window. Days use 0 = Sunday .. 6 = Saturday.
@@ -701,6 +705,7 @@ const (
 	ChangeHostGone       ChangeKind = "host_gone"     // reported inactive
 	ChangeHostBack       ChangeKind = "host_back"     // was inactive, answers again
 	ChangeHostUnstable   ChangeKind = "host_unstable" // started to flap
+	ChangeHostMissing    ChangeKind = "host_missing"  // answered in the previous run, silent now, not yet reported inactive
 	ChangeServiceNew     ChangeKind = "service_new"
 	ChangeServiceGone    ChangeKind = "service_gone"
 	ChangeServiceChanged ChangeKind = "service_changed" // product, version, banner
@@ -747,16 +752,21 @@ type Change struct {
 }
 
 type RunDiffSummary struct {
-	PrevRunID       *int64         `json:"prev_run_id"`
-	HostsNew        int            `json:"hosts_new"`
-	HostsGone       int            `json:"hosts_gone"`
-	HostsBack       int            `json:"hosts_back"`
-	HostsUnstable   int            `json:"hosts_unstable"`
-	ServicesNew     int            `json:"services_new"`
-	ServicesGone    int            `json:"services_gone"`
-	ServicesChanged int            `json:"services_changed"`
-	ByKind          map[string]int `json:"by_kind"`
-	FindingsNew     int            `json:"findings_new"`
+	PrevRunID       *int64 `json:"prev_run_id"`
+	HostsNew        int    `json:"hosts_new"`
+	HostsGone       int    `json:"hosts_gone"`
+	HostsBack       int    `json:"hosts_back"`
+	HostsUnstable   int    `json:"hosts_unstable"`
+	ServicesNew     int    `json:"services_new"`
+	ServicesGone    int    `json:"services_gone"`
+	ServicesChanged int    `json:"services_changed"`
+	// HostsMissing counts host_missing changes. ServicesUnreachable counts
+	// the open services of silent hosts that are not reported inactive yet:
+	// they are unknown in this run, not gone.
+	HostsMissing        int            `json:"hosts_missing"`
+	ServicesUnreachable int            `json:"services_unreachable"`
+	ByKind              map[string]int `json:"by_kind"`
+	FindingsNew         int            `json:"findings_new"`
 }
 
 // DiffReport is the answer of GET /diff?from=&to= for any two runs.

@@ -76,10 +76,10 @@ Porty: silnik skanuje część wspólną portów profilu i listy dozwolonej, bez
 
 | | |
 | --- | --- |
-| Włączenie | `POST /emergency-stop`, uprawnienie `safety:stop`; przycisk w górnym pasku UI |
+| Włączenie | `POST /emergency-stop`, uprawnienie `safety:stop` (role wbudowane: `admin`, `editor`, `analyst`); przycisk w górnym pasku UI. Kto może uruchomić skan, może też zatrzymać wszystkie skany. |
 | Skutek | Flaga w bazie. Menedżer przebiegów zatrzymuje wszystkie aktywne przebiegi; dostają stan `paused` z powodem `emergency_stop`. Wyniki zebrane do tej chwili zostają. |
 | Blokada | Dopóki flaga jest ustawiona, nie wystartuje nowy przebieg i nie wznowi się wstrzymany. Silnik sprawdza flagę jako pierwszy krok i nie wysyła nic. |
-| Zwolnienie | `POST /emergency-stop/release`, uprawnienie `safety:manage`. Wstrzymane przebiegi czekają na ręczne wznowienie. |
+| Zwolnienie | `POST /emergency-stop/release`, uprawnienie `safety:manage` (rola wbudowana: tylko `admin`). Wstrzymane przebiegi czekają na ręczne wznowienie. |
 | Audyt | `safety.emergency_stop`, `safety.emergency_stop_release` |
 | Testy | `TestEmergencyStop` (`internal/runner`), `TestEmergencyStopRefusesToStart` (`internal/scan`) |
 
@@ -263,7 +263,7 @@ Uprawnienia sprawdza API. Interfejs tylko ukrywa to, czego użytkownik nie może
 | `export:run` | eksport danych, wysyłka do DefectDojo | ✓ | ✓ | ✓ | – |
 | `integrations:manage` | ustawienia integracji | ✓ | – | – | – |
 | `safety:manage` | polityka bezpieczeństwa, zwolnienie blokady | ✓ | – | – | – |
-| `safety:stop` | awaryjne zatrzymanie | ✓ | – | – | – |
+| `safety:stop` | awaryjne zatrzymanie | ✓ | ✓ | ✓ | – |
 | `users:manage` | użytkownicy | ✓ | – | – | – |
 | `roles:manage` | role | ✓ | – | – | – |
 | `audit:read` | dziennik audytu | ✓ | – | – | – |

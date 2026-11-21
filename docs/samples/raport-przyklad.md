@@ -9,11 +9,11 @@ Czujka · sieć przykładowa · wygenerowano 21.11.2026 02:05
 | Czas | 21.11.2026 02:00–02:05 |
 | Porównanie z | przebieg #41 z 20.11.2026 14:00 |
 
-**Przybyło: 1 host i 5 usług. Ubyło: 1 host i 1 usługa. Powroty po nieaktywności: 1 host. Zmiany w znanych hostach i usługach: 6. Najpierw sprawdź 4 zmiany o wadze średniej lub wysokiej.**
+**Przybyło: 1 host i 5 usług. Ubyło: 1 host i 3 usługi. Bez odpowiedzi w tym przebiegu: 1 host (2 usługi bez potwierdzenia); to jeszcze nie jest zgłoszenie nieaktywności. Powroty po nieaktywności: 1 host. Zmiany w znanych hostach i usługach: 5. Najpierw sprawdź 5 zmian o wadze średniej lub wysokiej.**
 
 | zmiany do przejrzenia | nowych obserwacji | aktywnych hostów | otwarte usługi | usług WWW | zmian oczekiwanych |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| **15** (w tym 4 o wadze średniej lub wysokiej) | **11** | **58** (+2 / −1) | **143** (+5 / −1) | **36** | **9** (nie wymagają reakcji) |
+| **17** (w tym 5 o wadze średniej lub wysokiej) | **11** | **58** (+2 / −1) | **143** (+5 / −3) | **36** | **9** (nie wymagają reakcji) |
 
 ## Co nowego (7)
 
@@ -25,17 +25,19 @@ Czujka · sieć przykładowa · wygenerowano 21.11.2026 02:05
 - **niska** — Nowa usługa 10.66.3.40:631 (ipp)
 - **niska** — Nowa usługa 10.66.3.40:9100 (jetdirect)
 
-## Co zniknęło (2)
+## Co zniknęło (5)
 
-- **średnia** — Host 10.66.2.5 zgłoszony jako nieaktywny: nie odpowiada w godzinach, w których zwykle odpowiadał
+- **średnia** — Host 10.66.1.80 nie odpowiedział w tym przebiegu (w poprzednim aktywny, 2 otwarte usługi); model: p\_alive 0,27, zgłoszenie nieaktywności po kolejnym braku
+- **średnia** — Host 10.66.2.5 zgłoszony jako nieaktywny: nie odpowiada w godzinach, w których zwykle odpowiadał; model: p\_alive 0,03
 - **niska** — Usługa 10.66.1.55:3306 zniknęła (MySQL 8.0.36)
+- **niska** — Usługa 10.66.2.5:22 zniknęła (OpenSSH 9.6p1): host zgłoszony jako nieaktywny
+- **niska** — Usługa 10.66.2.5:443 zniknęła (nginx): host zgłoszony jako nieaktywny
 
-## Co się zmieniło (6)
+## Co się zmieniło (5)
 
 - **niska** — Nowy certyfikat TLS 10.66.1.10:443: www.kampus.example, ważny do 2027-02-18
 - **niska** — Zmiana wersji 10.66.1.20:80: Apache httpd 2.4.57 → Apache httpd 2.4.62
 - **niska** — Zmiana nagłówków 10.66.1.60:443: usunięto Content-Security-Policy
-- **niska** — Host 10.66.1.80 nie odpowiedział w porze, w której zwykle odpowiada; jeszcze nie jest zgłoszony jako nieaktywny
 - **informacja** — Zmiana nagłówków 10.66.1.20:80: Server: Apache/2.4.57 (Debian) → Apache/2.4.62 (Debian)
 - **informacja** — Zmiana tytułu strony 10.66.1.60:443: „Portal studenta (test)” → „Portal studenta 2.0 (test)”
 
@@ -45,41 +47,41 @@ _9 zmian oczekiwanych: hosty, które o tej porze zwykle nie odpowiadają albo od
 
 ### Panel administracyjny: Jenkins (10.66.3.17:8080)
 
-waga: **informacja** · ciekawość **89**/100 · `http://10.66.3.17:8080/` · nowa w tym przebiegu · także: narzędzie deweloperskie, nagłówki ujawniają szczegóły oprogramowania, nowa ekspozycja
+waga: **informacja** · ciekawość **85**/100 · `http://10.66.3.17:8080/` · nowa w tym przebiegu · także: narzędzie deweloperskie, nowa ekspozycja, nagłówki HTTP
 
 - `header:X-Jenkins`: 2.440.1
 - `title`: Dashboard \[Jenkins\]
 - `header:Server`: Jetty(10.0.20)
 
+### Baza danych dostępna z sieci: Redis key-value store 7.2.4 (10.66.3.90:6379)
+
+waga: **niska** · ciekawość **80**/100 · `10.66.3.90:6379` · nowa w tym przebiegu · także: nowa ekspozycja
+
+- `port:6379/tcp`: Redis key-value store 7.2.4
+
+### Przeterminowany certyfikat TLS: poczta.kampus.example (10.66.1.30:443)
+
+waga: **niska** · ciekawość **70**/100 · `https://poczta.kampus.example/`
+
+- `tls:certificate`: CN=poczta.kampus.example; wystawca=R11, Let's Encrypt; ważny do 2026-11-03; sha256=77a0d3e1b6c2f945
+
 ### Urządzenie IoT: HP LaserJet (10.66.3.40:80)
 
-waga: **informacja** · ciekawość **44**/100 · `http://10.66.3.40/` · nowa w tym przebiegu · także: nowa ekspozycja
+waga: **informacja** · ciekawość **55**/100 · `http://10.66.3.40/` · nowa w tym przebiegu · także: nowa ekspozycja
 
 - `header:Server`: HP HTTP Server; HP LaserJet Pro M404dn
 - `title`: HP LaserJet Pro M404dn
 
-### Baza danych dostępna z sieci: Redis key-value store 7.2.4 (10.66.3.90:6379)
-
-waga: **niska** · ciekawość **40**/100 · `10.66.3.90:6379` · nowa w tym przebiegu · także: nowa ekspozycja
-
-- `port:6379/tcp`: Redis key-value store 7.2.4
-
 ### Logowanie przez nieszyfrowane HTTP: Dziekanat – logowanie (10.66.1.20:80)
 
-waga: **niska** · ciekawość **35**/100 · `http://dziekanat.kampus.example/` · także: nagłówki ujawniają szczegóły oprogramowania
+waga: **niska** · ciekawość **50**/100 · `http://dziekanat.kampus.example/` · także: nagłówki HTTP
 
 - `title`: Dziekanat – logowanie
 - `header:Server`: Apache/2.4.62 (Debian)
 
-### Przeterminowany certyfikat TLS: poczta.kampus.example (10.66.1.30:443)
-
-waga: **niska** · ciekawość **30**/100 · `https://poczta.kampus.example/`
-
-- `tls:certificate`: CN=poczta.kampus.example; wystawca=R11, Let's Encrypt; ważny do 2026-11-03; sha256=77a0d3e1b6c2f945
-
 ### Środowisko testowe lub staging: Portal studenta 2.0 (test) (10.66.1.60:443)
 
-waga: **informacja** · ciekawość **20**/100 · `https://staging.kampus.example/`
+waga: **informacja** · ciekawość **45**/100 · `https://staging.kampus.example/`
 
 - `hostname`: staging.kampus.example
 - `title`: Portal studenta 2.0 (test)

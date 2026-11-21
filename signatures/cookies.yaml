@@ -59,7 +59,6 @@
   match:
     rules:
       - {type: cookie, name: rememberMe, equals: deleteMe, weight: 0.9}
-      - {type: header, name: Set-Cookie, contains: 'rememberMe=deleteMe', weight: 0.9}
 
 - id: cookie-backend-route
   name: Ciasteczko trasy do serwera zaplecza

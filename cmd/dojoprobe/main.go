@@ -6,6 +6,11 @@
 //	dojoprobe push -file f.json                  export findings (a JSON array of model.Finding)
 //	dojoprobe nmap -file scan.xml [-title T]     upload nmap XML as an "Nmap Scan" import
 //	dojoprobe list -test ID                      list the findings of a test with their endpoints
+//	dojoprobe generic -in f.json -to json|csv    write findings as DefectDojo Generic Findings Import
+//	dojoprobe fimport -in file                   import findings (Generic JSON/CSV, API list, Czujka export)
+//	dojoprobe pull -file f.json                  propose status updates from DefectDojo (findings need dojo_id)
+//	dojoprobe lifecycle -file f.json             close resolved / reopen observed findings in DefectDojo
+//	dojoprobe attach -file f.json [-test ID -in run.xml]  upload evidence files (and a run's nmap XML)
 //
 // The URL and the token come from -url / -token or DOJO_URL / DOJO_TOKEN.
 // Use it only against an instance you own (see lab/defectdojo).
@@ -58,6 +63,12 @@ func main() {
 	case "convert":
 		die(convert(firstNonEmpty(*in, *file), *to))
 		return
+	case "generic":
+		die(generic(firstNonEmpty(*in, *file), *to))
+		return
+	case "fimport":
+		die(fimport(firstNonEmpty(*in, *file)))
+		return
 	}
 	client, err := defectdojo.New(defectdojo.Config{URL: *urlFlag, APIKey: *token, VerifyTLS: !*insecure, Timeout: *timeout})
 	die(err)
@@ -93,10 +104,82 @@ func main() {
 				strings.Join(v.Endpoints, " "), v.Key, strings.Join(v.Tags, ","))
 		}
 		fmt.Printf("%d findings in test %d (%s/test/%d)\n", len(views), *testID, client.BaseURL(), *testID)
+	case "pull":
+		findings := readFindings(*file)
+		local := make([]defectdojo.LocalStatus, len(findings))
+		for i, f := range findings {
+			local[i] = defectdojo.LocalStatus{Finding: f}
+		}
+		res, err := client.PullStatus(ctx, local)
+		printJSON(res)
+		die(err)
+	case "lifecycle":
+		res, err := client.SyncLifecycle(ctx, readFindings(*file), time.Now())
+		printJSON(res)
+		die(err)
+	case "attach":
+		findings := readFindings(*file)
+		n, errs := client.AttachEvidence(ctx, findings)
+		out := map[string]any{"evidence_files": n, "errors": errs}
+		if *testID != 0 && *in != "" {
+			xml, err := os.ReadFile(*in)
+			die(err)
+			if err := client.AttachRunXML(ctx, *testID, 1, xml); err != nil {
+				out["xml_error"] = err.Error()
+			} else {
+				out["xml_attached_to_test"] = *testID
+			}
+		}
+		printJSON(out)
 	default:
 		usage()
 		os.Exit(2)
 	}
+}
+
+func readFindings(path string) []model.Finding {
+	data, err := os.ReadFile(path)
+	die(err)
+	var findings []model.Finding
+	die(json.Unmarshal(data, &findings))
+	return findings
+}
+
+// generic writes findings (a JSON array of model.Finding) as a DefectDojo
+// Generic Findings Import file.
+func generic(path, to string) error {
+	findings := readFindings(path)
+	if to == "csv" {
+		return interchange.WriteDojoGenericCSV(os.Stdout, findings)
+	}
+	return interchange.WriteDojoGenericJSON(os.Stdout, findings)
+}
+
+// fimport reads a findings file in any supported format and prints the
+// report and the findings.
+func fimport(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	findings, rep, err := interchange.ImportFindings(f, interchange.FindingsOptions{})
+	fmt.Fprintf(os.Stderr, "format %s: %d findings, %d skipped\n", rep.Format, rep.Findings, rep.Skipped)
+	for _, inv := range rep.Invalid {
+		fmt.Fprintf(os.Stderr, "  invalid line %d: %s\n", inv.Line, inv.Reason)
+	}
+	for _, x := range findings {
+		dojo := ""
+		if x.DojoID != nil {
+			dojo = fmt.Sprintf(" dojo=#%d", *x.DojoID)
+		}
+		fmt.Fprintf(os.Stderr, "  %-6s %-15s %s:%d manual=%v type=%s key=%s%s | %s\n", x.Severity, x.Status, x.IP, x.Port, x.Manual, x.Type, x.Key, dojo, clip(x.Title, 50))
+	}
+	if err != nil {
+		return err
+	}
+	printJSON(findings)
+	return nil
 }
 
 // derive imports a result file and prints the findings the analysis library derives from it.

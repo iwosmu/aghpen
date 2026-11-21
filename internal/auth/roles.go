@@ -9,7 +9,10 @@ import (
 func BuiltinRoles() []model.Role {
 	read := []model.Permission{model.PermTargetsRead, model.PermScansRead, model.PermResultsRead, model.PermSignaturesRead}
 	analyst := append(append([]model.Permission{}, read...),
-		model.PermTargetsUpdate, model.PermResultsUpdate, model.PermSignaturesUpdate, model.PermScansRun, model.PermExportRun)
+		model.PermTargetsUpdate, model.PermResultsUpdate, model.PermSignaturesUpdate, model.PermScansRun, model.PermExportRun,
+		// Anyone who may start a scan may also stop all scans at once. Releasing
+		// the stop (safety:manage) stays with the administrator.
+		model.PermEmergencyStop)
 	editor := append(append([]model.Permission{}, analyst...),
 		model.PermTargetsCreate, model.PermTargetsDelete, model.PermResultsCreate, model.PermResultsDelete,
 		model.PermSignaturesCreate, model.PermSignaturesDelete, model.PermScansConfigure)

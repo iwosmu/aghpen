@@ -73,10 +73,22 @@ p ← p · P(brak | żyje) / (p · P(brak | żyje) + (1 − p))      po każdym 
 | Warunek | Status | Znaczenie |
 | --- | --- | --- |
 | odpowiedział w ostatnim skanie | `up` | aktywny |
-| `p_alive < 0,2` | `down` | zgłoszony jako nieaktywny (zmiana `host_gone`) |
+| profil ma regułę `down_after_misses = N > 0` i host nie odpowiedział N razy z rzędu | `down` | zgłoszony jako nieaktywny z reguły profilu (zmiana `host_gone`) |
+| reguła profilu wyłączona (`0`) i `p_alive < 0,2` | `down` | zgłoszony jako nieaktywny przez model (zmiana `host_gone`) |
 | każdy brak z serii wypadł w godzinie o częstości odpowiedzi poniżej 0,25, a host ma co najmniej 8 obserwacji | `expected-offline` | przerwa zgodna z rytmem |
 | pozostałe przypadki | `unstable` | nie odpowiada, ale jeszcze nie jest zgłoszony |
 | host nigdy nie odpowiedział | `unknown` | nie ma czego zgłaszać |
+
+**Reguła profilu.** Pole `retry.down_after_misses` profilu skanu (`model.RetryOpts.DownAfterMisses`) ustala, kiedy zgłosić nieaktywność:
+
+| Wartość | Działanie |
+| --- | --- |
+| `0` (domyślnie) | decyduje model: `p_alive < 0,2` |
+| `N > 0` | host jest `down` po N brakach z rzędu i nie wcześniej, niezależnie od `p_alive` i od rytmu |
+
+Funkcje: `AssessWith(profil, strefa, AssessOptions{DownAfterMisses: N})`, `OptionsFor(profil skanu)`, `DownAfterMissesWith`. `Assess` to `AssessWith` z regułą `0`. Przy `N = 1` test dwóch przebiegów od razu daje `host_gone` i `service_gone`.
+
+**Jedna obserwacja na przebieg.** Silnik może zgłosić ten sam host dwa razy w jednym przebiegu: część adresów skanowana ponownie po wznowieniu. `Profile.Add` łączy drugą obserwację tego samego przebiegu z pierwszą. `AssessWith` woła `NormalizeProfile`, które robi to samo z danymi z bazy i odejmuje nadmiarowy wpis z histogramu. Host jest „odpowiedział", gdy odpowiedział w którejkolwiek z tych obserwacji. `MergeHostResults` łączy wyniki silnika o tym samym adresie przed zapisem, a `ObservationKey(run, ip)` daje klucz, po którym zapis może odrzucić drugą obserwację.
 
 `DownAfterMisses` odpowiada na pytanie analityka „ile jeszcze braków z rzędu, w zwykłych porach skanu, zanim host zostanie zgłoszony". Funkcja symuluje kolejne braki w odstępach równych medianie odstępów między ostatnimi skanami.
 
@@ -186,7 +198,7 @@ Wszystkie stałe są w `stability.go` i `diff.go`, każda z komentarzem. Zmiana 
 
 | Reguła | Powód |
 | --- | --- |
-| Usługa hosta, który nie odpowiedział, jest „nieznana", nie „zniknęła". | Milczący host nic nie mówi o swoich portach. |
+| Usługa hosta, który nie odpowiedział, jest „nieznana", nie „zniknęła". Liczy się ją w `services_unreachable`. Wyjątek: gdy host zostaje zgłoszony jako nieaktywny (`host_gone`), jego otwarte usługi dostają `service_gone`. | Milczący host nic nie mówi o swoich portach. |
 | Port poza zakresem nowszego skanu nie „znika". | Profil „top-100" nie widzi portu 8443 z profilu pełnego. |
 | Nagłówki zmienne są pomijane (`Date`, `ETag`, `Set-Cookie`, identyfikatory żądań i śledzenia; lista w `volatileHeaders`). | Zmieniają się przy każdym żądaniu. |
 | Ciasteczka są porównywane po nazwie i flagach, bez wartości. Liczby i ciągi szesnastkowe w nazwie są maskowane. | Wartość sesji jest zawsze inna. |
@@ -203,7 +215,9 @@ Wszystkie stałe są w `stability.go` i `diff.go`, każda z komentarzem. Zmiana 
 | `host_new` | niska | nowy adres odpowiada |
 | `host_gone` | średnia | model zgłosił host jako nieaktywny; informacja, gdy oczekiwana |
 | `host_back` | niska | zgłoszony host znów odpowiada; informacja, gdy oczekiwana |
-| `host_unstable` | niska | host przestał odpowiadać, jeszcze nie zgłoszony; informacja i `expected`, gdy host jest znany jako nieregularny |
+| `host_gone` (z regułą profilu) | średnia | N braków z rzędu przy `down_after_misses = N`; otwarte usługi dostają `service_gone` |
+| `host_missing` | średnia | host odpowiedział w poprzednim porównywalnym przebiegu, teraz nie odpowiada, model nie zgłosił go jako `down`, a rytm nie tłumaczy braku; usługi idą do `services_unreachable` |
+| `host_unstable` | niska | host bez odpowiedzi w poprzednim przebiegu (na przykład po przerwie zgodnej z rytmem) przestał odpowiadać; informacja i `expected`, gdy host jest znany jako nieregularny, także po odpowiedzi w poprzednim przebiegu |
 | `service_new` | średnia | klasa lub port wrażliwy (panel administracyjny, baza danych, zdalny dostęp, narzędzie deweloperskie, IoT); w innym przypadku niska |
 | `service_gone` | niska | |
 | `service_changed` | średnia | zmienił się produkt; niska, gdy tylko wersja |
@@ -234,6 +248,33 @@ To odpowiedź na pierwsze pytanie z opisu zadania.
 7. Gdy ten sam host przegapi skan w swoich godzinach pracy, zmiana jest zwykła i widoczna.
 
 Przykład: w raporcie `docs/samples/raport-przyklad.html` osiem stacji roboczych wyłączonych w nocy z piątku na sobotę zajmuje jeden wiersz, a serwer, który przegapił jeden skan, ma własny.
+
+### 3.4 Dwa przebiegi: host zatrzymany między nimi
+
+Jury robi co najmniej dwa przebiegi i może zatrzymać kontener między nimi. Host musi być widoczny po drugim przebiegu.
+
+| Profil | Przebieg 1 | Przebieg 2 | Zmiany po przebiegu 2 | Liczniki |
+| --- | --- | --- | --- | --- |
+| `down_after_misses = 0` (model) | host i 3 usługi | brak odpowiedzi | `host_missing` (średnia) | `hosts_missing 1`, `services_unreachable 3` |
+| `down_after_misses = 1` | host i 3 usługi | brak odpowiedzi | `host_gone` + 3 × `service_gone` | `hosts_gone 1`, `services_gone 3` |
+| `down_after_misses = 2` | host i 3 usługi | brak odpowiedzi | `host_missing`; `host_gone` po trzecim przebiegu | `hosts_missing 1` |
+
+Zdania z testu `TestTwoPassMissingHost` (`go test ./internal/analyze -run TwoPass -v`):
+
+```text
+jedna wcześniejsza obserwacja, model:
+  Host 10.66.3.17 nie odpowiedział w tym przebiegu (w poprzednim aktywny, 3 otwarte usługi); model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku
+40 obserwacji, zawsze odpowiadał, model:
+  … model: p_alive 0,26, zgłoszenie nieaktywności po kolejnym braku
+reguła N = 1:
+  Host 10.66.3.17 zgłoszony jako nieaktywny: brak odpowiedzi w 1 przebiegu z rzędu (reguła profilu: zgłoszenie po 1 braku)
+reguła N = 2:
+  … model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku, reguła profilu: 2 braki z rzędu
+```
+
+Bez reguły model zgłasza nieaktywność po drugim braku z rzędu: jeden brak nigdy nie wystarcza (`ε = 0,10`, rozdz. 2.3). Liczby `p_alive` i „po kolejnym braku" trafiają do zdania, gdy wywołujący wypełni migawkę przez `HostSnapshot.SetAssessment`. Brak, który tłumaczy rytm hosta, zostaje zmianą oczekiwaną (`host_gone` z `expected = true`), nie `host_missing`.
+
+Raport z przebiegu mówi to w zdaniu wstępnym: „Bez odpowiedzi w tym przebiegu: 1 host (2 usługi bez potwierdzenia); to jeszcze nie jest zgłoszenie nieaktywności." Wiersz zmiany stoi w sekcji „Co zniknęło".
 
 ## 4. Pewność identyfikacji technologii
 
@@ -286,12 +327,21 @@ Ocena odpowiada na pytanie „na co analityk powinien spojrzeć najpierw". Jest 
 
 Reguły dodatkowe:
 
-- Dopasowana sygnatura dodaje `round(waga × pewność)` punktów, najwyżej 40 za jedną sygnaturę.
+- Dopasowana sygnatura dodaje `round(waga × pewność)` punktów, najwyżej 40 za jedną sygnaturę i najwyżej 40 za wszystkie sygnatury usługi razem (`MaxSignatureTotal`).
+- **Słabe sygnały razem dają najwyżej 20 punktów** (`WeakSignalsCap`): `sensitive-header`, `missing-security-headers`, `interesting-cookie`, `default-page`, `cert-expiring`, `hostname-mismatch`, `remote-access` (SSH) oraz sygnatury kategorii nagłówek i ciasteczko. Cztery słabe sygnały nie robią z usługi celu numer jeden.
+- Sygnatura nagłówka albo ciasteczka, której klasy są już policzone przez powód klasy (na przykład „formularz logowania po nieszyfrowanym HTTP" przy powodzie `login-plain-http`), nie dodaje punktów drugi raz.
 - Krytyczność zakresu 4 dodaje 5 punktów, krytyczność 5 dodaje 10.
 - „Rzadka technologia": grupa najwyżej 2 usług w sieci z co najmniej 20 usługami.
 - „Certyfikat wkrótce wygaśnie": mniej niż 30 dni.
 - „Przestarzała wersja" zależy od tagów sygnatur (`outdated`, `eol`). Analiza sama nie ocenia numerów wersji.
 - Ocena hosta to najwyższa ocena jego usług, plus 5 punktów dla nowego hosta, najwyżej 100.
+
+Przykład z laboratorium: strona logowania DefectDojo pod `http://127.0.0.1:18080` (nginx, Django, ciasteczko `csrftoken`, bez CSP, tylko HTTP). Test `TestDojoLoginCalibration` na prawdziwym wyniku `fpprobe`:
+
+| | Przed kalibracją | Po kalibracji |
+| --- | --- | --- |
+| ocena usługi | 100 = sygnatura DefectDojo 40 + sygnatura „logowanie po HTTP" 40 + `login-plain-http` 25 + brak CSP 11 + ciasteczko 4, obcięte do 100 | 80 = sygnatura DefectDojo 40 + `login-plain-http` 25 + słabe sygnały 15 (brak CSP 11, ciasteczko 4) |
+| obserwacje | 5, każda z oceną 100: logowanie po HTTP, nagłówek „logowanie po HTTP", nagłówek „brak CSP", ciasteczko `csrftoken`, ciasteczko „sesja frameworka" | 3: logowanie po HTTP **50** (z dowodami obu źródeł), nagłówki HTTP **11**, ciasteczka **10** |
 
 Przykład z raportu przykładowego: nowa usługa Jenkins na porcie 8080 ma 89 punktów = panel administracyjny (30) + narzędzie deweloperskie (20) + sygnatura Jenkins (19) + nowa ekspozycja (15) + nagłówek ujawniający wersję (5).
 
@@ -327,6 +377,38 @@ Rozmiar grupy zasila regułę „rzadka technologia" w ocenie ciekawości.
 ```
 
 Ponowny skan tej samej rzeczy daje ten sam klucz. Baza aktualizuje więc obserwację zamiast tworzyć nową. Ten sam klucz jest identyfikatorem `unique_id_from_tool` w DefectDojo (patrz `docs/INTEGRACJE.md`).
+
+**Ocena ciekawości obserwacji** wynika z jej typu i dowodów, nie z oceny usługi (`FindingBaseInterest`, `findingBuilder.interest`). Dzięki temu góra listy to to, co analityk powinien otworzyć najpierw.
+
+| Typ obserwacji | Ocena | Uwagi |
+| --- | --- | --- |
+| `admin-panel` | 75 | |
+| `debug-page` | 75 | |
+| `database-exposed` | 70 | |
+| `remote-access-exposed` | 20 | telnet, rlogin: 70; RDP, VNC: 50; SSH: 20 |
+| `expired-cert` | 40 | na stronie logowania: 70 |
+| `dev-tool` | 60 | |
+| `directory-listing` | 55 | |
+| `login-plain-http` | 50 | |
+| `staging` | 45 | |
+| `iot-device` | 45 | |
+| `new-exposure` | 40 | |
+| `signature` | `round(waga × pewność)` w przedziale 10–60 | |
+| `self-signed-cert` | 25 | na stronie logowania: 40 |
+| `hostname-mismatch`, `cert-expiring` | 20 | |
+| `interesting-header` | 15 | z sygnatury: `round(waga × pewność)` w przedziale 5–25 |
+| `default-page` | 15 | |
+| `interesting-cookie` | 10 | ciasteczko sesyjne bez flag: 25; wartość JWT: 20; z sygnatury: 5–25 |
+
+Modyfikatory: krytyczność zakresu 4 dodaje 5, krytyczność 5 dodaje 10 (`FindingInput.ScopeCriticality`); usługa nowa od poprzedniego przebiegu dodaje 10. Wynik jest obcięty do 100.
+
+**Bliskie duplikaty na jednej usłudze** łączą się w jedną obserwację z kilkoma wierszami dowodów:
+
+- wszystkie obserwacje nagłówków jednej usługi → jedna `interesting-header` (klucz bez tematu, tytuł „Nagłówki HTTP: …");
+- wszystkie obserwacje ciasteczek jednej usługi → jedna `interesting-cookie` („Ciasteczka: …");
+- sygnatura nagłówka albo ciasteczka z klasą, która już dała obserwację (na przykład „formularz logowania po nieszyfrowanym HTTP" i `login-plain-http`), dopisuje swoje dowody do tej obserwacji.
+
+Połączona obserwacja ma najwyższą ocenę z części. Uwaga przy aktualizacji: obserwacje nagłówków i ciasteczek z sygnatur miały dotąd klucze z tematem (`interesting-header/<ip>/tcp-<port>/<sygnatura>`). Po zmianie powstaje jedna obserwacja z kluczem bez tematu, a stare, nietknięte przez analityka, analiza po przebiegu oznacza jako `resolved`.
 
 Obserwacje są informacyjne. Waga domyślna to „informacja". Wagę „niska" mają: logowanie przez nieszyfrowane HTTP, baza danych dostępna z sieci, strona diagnostyczna, listing katalogu, przeterminowany certyfikat oraz telnet i rlogin. Wartości ciasteczek nigdy nie trafiają do dowodów.
 
