@@ -57,20 +57,20 @@ func TestSampleContent(t *testing.T) {
 
 	for _, out := range []string{html, md} {
 		for _, want := range []string{
-			"Raport z przebiegu #42",
-			"Przybyło: 1 host i 5 usług. Ubyło: 1 host i 3 usługi.",
-			"Nie odpowiada (niepotwierdzone): 1 host, z nimi 2 usługi",
-			"Host 10.66.1.80 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 2 otwarte usługi",
+			"Raport ze skanu #42",
+			"Nowe: 1 host i 5 usług. Nieaktywne hosty: 1. Usługi, które zniknęły: 3.",
+			"Nie odpowiadają (niepotwierdzone): 1 host i 2 usługi. Czujka sprawdzi je ponownie.",
+			"Host 10.66.1.80 nie odpowiada (niepotwierdzone), miał 2 otwarte usługi",
 			"Najpierw sprawdź 5 zmian o wadze średniej lub wysokiej.",
-			"Co nowego", "Co zniknęło", "Co się zmieniło",
+			"Nowe", "Zniknęły", "Zmienione",
 			"Nowa usługa 10.66.3.17:8080 (Jetty 10.0.20)",
-			"Host 10.66.2.5 zgłoszony jako nieaktywny",
-			"9 zmian oczekiwanych",
+			"Host 10.66.2.5 nieaktywny",
+			"Zmiany zgodne ze wzorcem dostępności: 9",
 			"Panel administracyjny: Jenkins (10.66.3.17:8080)",
 			"2.440.1", // evidence of the Jenkins finding
 			"także: narzędzie deweloperskie",
 			"zwykle aktywny pn–pt 14–15",
-			"oraz 7 hostów o tym samym rytmie",
+			"oraz 7 hostów o tym samym wzorcu",
 			"GET, HEAD",
 			"14 260", // packets actually sent
 			"44,8 pakietów/s (45% limitu 100)",
@@ -87,8 +87,8 @@ func TestSampleContent(t *testing.T) {
 	}
 
 	// The reading order of the brief.
-	order := []string{"class=\"lead\"", "class=\"figures\"", "Co nowego", "Co zniknęło", "Co się zmieniło", "class=\"expected\"",
-		"Najważniejsze obserwacje", "Hosty niestabilne", "Parametry skanu", "Ruch faktycznie wysłany"}
+	order := []string{"class=\"lead\"", "class=\"figures\"", "<h2>Nowe", "<h2>Zniknęły", "<h2>Zmienione", "class=\"expected\"",
+		"Najważniejsze znaleziska", "Hosty niestabilne", "Parametry skanu", "Wysłany ruch"}
 	last := -1
 	for _, o := range order {
 		i := strings.Index(html, o)
@@ -190,10 +190,10 @@ func TestFirstRunHasNoChangeSections(t *testing.T) {
 	in := Input{Run: model.ScanRun{ID: 1, Status: model.RunCompleted, Stats: model.RunStats{HostsUp: 12, ServicesOpen: 30}}}
 	b, _ := HTML(in)
 	html := string(b)
-	if !strings.Contains(html, "To pierwszy przebieg tego profilu") || !strings.Contains(html, "brak (pierwszy przebieg)") {
+	if !strings.Contains(html, "Pierwszy skan tego profilu") || !strings.Contains(html, "brak (pierwszy skan)") {
 		t.Error("first run is not explained")
 	}
-	if strings.Contains(html, "Co nowego") || strings.Contains(html, "Nic nowego") {
+	if strings.Contains(html, "<h2>Nowe") || strings.Contains(html, "Nic nowego") {
 		t.Error("a first run has no baseline, so it must not show change sections")
 	}
 }
@@ -207,7 +207,7 @@ func TestQuietRun(t *testing.T) {
 			{Kind: model.ChangeHostBack, Severity: model.SevInfo, IP: "10.0.0.9", Expected: true, Summary: "z"},
 		}}
 	md := Markdown(in)
-	for _, want := range []string{"nie ma zmian, które wymagają uwagi", "Nic nowego.", "Nic nie zniknęło.", "3 zmiany oczekiwane", "(10.0.0.7, 10.0.0.8, 10.0.0.9)"} {
+	for _, want := range []string{"Brak zmian do przejrzenia od poprzedniego skanu.", "Nic nowego.", "Nic nie zniknęło.", "Zmiany zgodne ze wzorcem dostępności: 3", "(10.0.0.7, 10.0.0.8, 10.0.0.9)"} {
 		if !strings.Contains(md, want) {
 			t.Errorf("quiet run: %q is missing", want)
 		}
@@ -232,10 +232,10 @@ func TestLimitsCutLongLists(t *testing.T) {
 	if d.Sections[0].Rows[0].Sev != "high" {
 		t.Error("the most severe change must be first")
 	}
-	if want := "i jeszcze 25 zmian o tej samej lub niższej wadze"; !strings.HasPrefix(d.Sections[0].More, want) {
+	if want := "Pozostałe zmiany (25) są w aplikacji."; d.Sections[0].More != want {
 		t.Errorf("more = %q", d.Sections[0].More)
 	}
-	if len(d.Findings) != 2 || d.Findings[0].Interest != 29 || !strings.HasPrefix(d.FindingsMore, "i jeszcze 28 obserwacji") {
+	if len(d.Findings) != 2 || d.Findings[0].Interest != 29 || d.FindingsMore != "Pozostałe znaleziska (28) są w aplikacji." {
 		t.Errorf("findings = %d, first interest %d, more %q", len(d.Findings), d.Findings[0].Interest, d.FindingsMore)
 	}
 }
@@ -258,7 +258,7 @@ func TestFindingsOfOneServiceMakeOneBlock(t *testing.T) {
 	if f.Title != "Panel administracyjny: X" || len(f.Evidence) != 2 {
 		t.Errorf("first block = %q with %d evidence rows, want the admin panel with 2 (duplicates removed)", f.Title, len(f.Evidence))
 	}
-	if strings.Join(f.Notes, "|") != "nowa w tym przebiegu|także: nowa ekspozycja" {
+	if strings.Join(f.Notes, "|") != "nowe w tym skanie|także: nowa ekspozycja" {
 		t.Errorf("notes = %q", f.Notes)
 	}
 }
@@ -270,7 +270,7 @@ func TestResolvedAndFalsePositiveFindingsAreLeftOut(t *testing.T) {
 		{Key: "c", Title: "Otwarta", IP: "10.0.0.1", Port: 3, Status: model.FindingTriaged, Interest: 10},
 	}}
 	d := build(in)
-	if len(d.Findings) != 1 || d.Findings[0].Title != "Otwarta" || d.Findings[0].Notes[0] != "potwierdzona" {
+	if len(d.Findings) != 1 || d.Findings[0].Title != "Otwarta" || d.Findings[0].Notes[0] != "w analizie" {
 		t.Errorf("findings = %+v", d.Findings)
 	}
 }
@@ -280,7 +280,7 @@ func TestUnfinishedRunIsMarked(t *testing.T) {
 	in := Input{Run: model.ScanRun{ID: 2, Status: model.RunPaused, PauseReason: model.PauseWindowClosed,
 		Stats: model.RunStats{AddressesTotal: 2048, AddressesDone: 512}}, Summary: model.RunDiffSummary{PrevRunID: &prev}}
 	md := Markdown(in)
-	want := "Przebieg nie jest zakończony (stan: wstrzymany, okno czasowe się zamknęło). Sprawdzono 512 z 2 048 adresów, więc lista zmian jest niepełna."
+	want := "Skan niezakończony (wstrzymany, okno czasowe się zamknęło). Sprawdzono 512 z 2 048 adresów. Lista zmian jest niepełna."
 	if !strings.Contains(md, want) {
 		t.Errorf("notice is missing:\n%s", md[:400])
 	}
@@ -288,7 +288,7 @@ func TestUnfinishedRunIsMarked(t *testing.T) {
 
 func TestImportedRunSaysNoTraffic(t *testing.T) {
 	in := Input{Run: model.ScanRun{ID: 3, Status: model.RunCompleted, Trigger: "import"}}
-	if !strings.Contains(Markdown(in), "Czujka nie wysłała w nim żadnych pakietów") {
+	if !strings.Contains(Markdown(in), "Czujka nie wysłała pakietów") {
 		t.Error("an imported run must say that no packets were sent")
 	}
 }
@@ -341,12 +341,12 @@ func TestCarriedServicesAreMarked(t *testing.T) {
 			{IP: "10.0.0.5", Port: 8787, Product: "nginx", Interest: 10, Carried: true},
 		}}
 	md := Markdown(in)
-	for _, want := range []string{"10.0.0.5:8787", "nie skanowana w tym przebiegu", "bez 1 usługi nieskanowanej w tym przebiegu (stan zachowany)"} {
+	for _, want := range []string{"10.0.0.5:8787", "poza tym skanem", "bez 1 usługi poza tym skanem"} {
 		if !strings.Contains(md, want) {
 			t.Errorf("%q is missing:\n%s", want, md)
 		}
 	}
-	if strings.Count(md, "nie skanowana w tym przebiegu") != 1 {
+	if strings.Count(md, "· poza tym skanem") != 1 {
 		t.Error("only the carried row is marked")
 	}
 }

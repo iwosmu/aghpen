@@ -66,24 +66,24 @@ func TestDiffHostTransitions(t *testing.T) {
 		{"new host", nil, host("10.66.3.17", model.HostUp, model.ServiceResult{Port: 8080, Proto: "tcp", State: "open", Product: "Jenkins", Version: "2.440"}),
 			[]string{"host_new", "service_new"}, "Nowy host 10.66.3.17 (otwarte porty: 8080)", model.SevLow},
 		{"gone", ptr(host("10.0.0.2", model.HostUnstable)), host("10.0.0.2", model.HostDown),
-			[]string{"host_gone"}, "Host 10.0.0.2 zgłoszony jako nieaktywny", model.SevMedium},
+			[]string{"host_gone"}, "Host 10.0.0.2 nieaktywny, nie odpowiada w zwykłych godzinach", model.SevMedium},
 		{"still down is silent", ptr(host("10.0.0.2", model.HostDown)), host("10.0.0.2", model.HostDown), nil, "", ""},
 		{"back", ptr(host("10.0.0.2", model.HostDown)), host("10.0.0.2", model.HostUp),
-			[]string{"host_back"}, "Host 10.0.0.2 znów odpowiada po zgłoszeniu jako nieaktywny", model.SevLow},
+			[]string{"host_back"}, "Host 10.0.0.2 znów aktywny (był nieaktywny)", model.SevLow},
 		{"missing after an answer", ptr(host("10.0.0.2", model.HostUp)), host("10.0.0.2", model.HostUnstable),
-			[]string{"host_missing"}, "Host 10.0.0.2 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał", model.SevMedium},
+			[]string{"host_missing"}, "Host 10.0.0.2 nie odpowiada (niepotwierdzone)", model.SevMedium},
 		{"unstable after expected offline", ptr(host("10.0.0.2", model.HostExpectedOffline)), host("10.0.0.2", model.HostUnstable),
-			[]string{"host_unstable"}, "Host 10.0.0.2 nie odpowiedział w porze", model.SevLow},
+			[]string{"host_unstable"}, "Host 10.0.0.2 nie odpowiada w zwykłych godzinach (niepotwierdzone)", model.SevLow},
 		{"irregular host misses again", ptr(host("10.0.0.2", model.HostUp)), HostSnapshot{IP: "10.0.0.2", Status: model.HostUnstable, Stability: 0.5, Observations: 40},
-			[]string{"host_unstable(expected)"}, "Host 10.0.0.2 nie odpowiedział; odpowiada nieregularnie (w ok. 50% skanów)", model.SevInfo},
+			[]string{"host_unstable(expected)"}, "Host 10.0.0.2 niestabilny (aktywny w ok. 50% skanów)", model.SevInfo},
 		{"expected offline", ptr(host("10.0.0.2", model.HostUp)), HostSnapshot{IP: "10.0.0.2", Status: model.HostExpectedOffline, Pattern: "zwykle aktywny pn–pt 08–16"},
-			[]string{"host_gone(expected)"}, "Host 10.0.0.2 nie odpowiada, zgodnie z profilem dostępności (zwykle aktywny pn–pt 08–16)", model.SevInfo},
+			[]string{"host_gone(expected)"}, "Host 10.0.0.2 poza godzinami (zwykle aktywny pn–pt 08–16)", model.SevInfo},
 		{"expected back", ptr(host("10.0.0.2", model.HostExpectedOffline)), host("10.0.0.2", model.HostUp),
-			[]string{"host_back(expected)"}, "zgodnie z profilem", model.SevInfo},
+			[]string{"host_back(expected)"}, "Host 10.0.0.2 znów aktywny", model.SevInfo},
 		{"back after a short miss", ptr(host("10.0.0.2", model.HostUnstable, httpSvc(80, "a", 200))), host("10.0.0.2", model.HostUp, httpSvc(80, "a", 200)),
-			[]string{"host_back"}, "Host 10.0.0.2 znów odpowiada po chwilowym braku odpowiedzi", model.SevInfo},
+			[]string{"host_back"}, "Host 10.0.0.2 znów aktywny", model.SevInfo},
 		{"irregular host back is expected", ptr(host("10.0.0.2", model.HostUnstable)), HostSnapshot{IP: "10.0.0.2", Up: true, Status: model.HostUp, Stability: 0.5, Observations: 40},
-			[]string{"host_back(expected)"}, "po chwilowym braku odpowiedzi", model.SevInfo},
+			[]string{"host_back(expected)"}, "Host 10.0.0.2 znów aktywny", model.SevInfo},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -196,9 +196,9 @@ func TestDiffServiceFields(t *testing.T) {
 		{"version missing this time is not a change", func(s *model.ServiceResult) { s.Product, s.Version = "", "" }, "", ""},
 		{"tech added", func(s *model.ServiceResult) {
 			s.Technologies = append(s.Technologies, model.Technology{Name: "PHP", Version: "8.2", Confidence: 0.8})
-		}, "tech_new", "Nowa technologia na 10.0.0.9:443: PHP 8.2"},
-		{"tech removed", func(s *model.ServiceResult) { s.Technologies = s.Technologies[1:] }, "tech_gone", "Technologia WordPress 6.4 nie jest już widoczna na 10.0.0.9:443"},
-		{"tech version", func(s *model.ServiceResult) { s.Technologies[0].Version = "6.5" }, "tech_version", "Zmiana wersji WordPress na 10.0.0.9:443: 6.4 → 6.5"},
+		}, "tech_new", "Nowa technologia PHP 8.2 na 10.0.0.9:443"},
+		{"tech removed", func(s *model.ServiceResult) { s.Technologies = s.Technologies[1:] }, "tech_gone", "Technologia WordPress 6.4 zniknęła z 10.0.0.9:443"},
+		{"tech version", func(s *model.ServiceResult) { s.Technologies[0].Version = "6.5" }, "tech_version", "Zmiana wersji WordPress, 10.0.0.9:443: 6.4 → 6.5"},
 		{"weak tech guess ignored", func(s *model.ServiceResult) { s.Technologies = s.Technologies[:1] }, "", ""},
 		{"title", func(s *model.ServiceResult) { s.HTTP.Title = "Portal  v2" }, "title_changed", "Zmiana tytułu strony 10.0.0.9:443: „Portal” → „Portal v2”"},
 		{"status", func(s *model.ServiceResult) { s.HTTP.Status = 503; s.HTTP.BodySimhash = "0000ffff0000ffff" }, "status_changed", "Zmiana kodu HTTP 10.0.0.9:443: 200 → 503"},
@@ -217,8 +217,8 @@ func TestDiffServiceFields(t *testing.T) {
 			s.HTTP.Cookies = append(s.HTTP.Cookies, model.Cookie{Name: "csrftoken"})
 		}, "cookies_changed", "Zmiana ciasteczek 10.0.0.9:443: dodano csrftoken"},
 		{"cookie flags", func(s *model.ServiceResult) { s.HTTP.Cookies[0].Secure = false }, "cookies_changed", "PHPSESSID: Secure+HttpOnly → HttpOnly"},
-		{"content", func(s *model.ServiceResult) { s.HTTP.BodySimhash = "0000ffff0000ffff" }, "content_changed", "Treść strony 10.0.0.9:443 zmieniła się wyraźnie (odległość simhash 64/64)"},
-		{"class", func(s *model.ServiceResult) { s.Classes = []string{model.ClassAdminPanel} }, "class_changed", "Zmiana klasy usługi 10.0.0.9:443 (teraz: panel administracyjny)"},
+		{"content", func(s *model.ServiceResult) { s.HTTP.BodySimhash = "0000ffff0000ffff" }, "content_changed", "Zmiana treści strony 10.0.0.9:443"},
+		{"class", func(s *model.ServiceResult) { s.Classes = []string{model.ClassAdminPanel} }, "class_changed", "Zmiana klas usługi 10.0.0.9:443: dodano panel administracyjny"},
 		{"http stage failed this time", func(s *model.ServiceResult) { s.HTTP = nil; s.Technologies = nil }, "", ""},
 	}
 	for _, c := range cases {
