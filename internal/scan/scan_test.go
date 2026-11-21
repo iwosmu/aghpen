@@ -1063,26 +1063,99 @@ func TestSmallScopeGetsTheFullPortRange(t *testing.T) {
 	}
 }
 
+// The 16-host budget is claimed per host: in a group with more live hosts
+// the first 16 by address get the full range, the rest the profile's ports,
+// and the coverage the store gets says which is which.
 func TestFullRangeHostBudget(t *testing.T) {
-	hosts := map[string][]int{}
-	for i := 1; i <= 20; i++ {
-		hosts[fmt.Sprintf("10.7.0.%d", i)] = []int{80, 40000}
+	for _, n := range []int{16, 17, 40} {
+		t.Run(fmt.Sprint(n), func(t *testing.T) {
+			hosts := map[string][]int{}
+			for i := 1; i <= n; i++ {
+				hosts[fmt.Sprintf("10.7.0.%d", i)] = []int{80, 40000}
+			}
+			e := New(Deps{Prober: &fakeNet{hosts: hosts}, Logger: quiet})
+			plan := basePlan("10.7.0.0/26")
+			plan.Profile.Ports = "top-100"
+			sink := newSink()
+			out := e.Run(context.Background(), plan, sink)
+			if out.Status != model.RunCompleted {
+				t.Fatalf("outcome = %+v", out)
+			}
+			covered := min(n, fullRangeMaxHosts)
+			for i := 1; i <= n; i++ {
+				ip := fmt.Sprintf("10.7.0.%d", i)
+				h := sink.host(ip)
+				if h == nil {
+					t.Fatalf("%s missing", ip)
+				}
+				full := i <= covered // the first hosts by address
+				if got := len(h.Services) == 2; got != full {
+					t.Errorf("%s: %d services, full range %v", ip, len(h.Services), full)
+				}
+				if h.Coverage == nil || h.Coverage.Has("tcp", 40000) != full || !h.Coverage.Has("tcp", 80) {
+					t.Errorf("%s: coverage %+v, full range %v", ip, h.Coverage, full)
+				}
+			}
+			p := out.Stats.Passes
+			if len(p) != 2 || p[1].State != model.PassDone || p[1].Hosts != covered || p[1].HostsSkipped != n-covered {
+				t.Errorf("passes = %+v", p)
+			}
+			want := 0
+			if n > covered {
+				want = 1
+			}
+			if len(out.Stats.Notes) != want || (want == 1 && !strings.Contains(out.Stats.Notes[0], fmt.Sprintf("objął 16 z %d", n))) {
+				t.Errorf("notes = %q", out.Stats.Notes)
+			}
+		})
 	}
-	netw := &fakeNet{hosts: hosts}
-	e := New(Deps{Prober: netw, Logger: quiet})
-	plan := basePlan("10.7.0.0/27")
-	plan.Profile.Ports = "top-100"
-	sink := newSink()
-	out := e.Run(context.Background(), plan, sink)
-	if out.Status != model.RunCompleted {
-		t.Fatalf("outcome = %+v", out)
+}
+
+// Two groups share the budget in group order, whichever reaches the claim
+// first: the same hosts get the full range in every run.
+func TestFullRangeBudgetAcrossGroups(t *testing.T) {
+	r := &run{fullPlanned: true, stats: newStatsKeeper(nil, time.Now), log: quiet}
+	r.fullLeft.Store(fullRangeMaxHosts)
+	mk := func(third, n int) ([]probe.Host, map[string]*probe.Host) {
+		var hs []probe.Host
+		sc := map[string]*probe.Host{}
+		for i := n; i >= 1; i-- { // reverse order: the claim sorts by address
+			ip := fmt.Sprintf("10.7.%d.%d", third, i)
+			hs = append(hs, probe.Host{IP: ip, Up: true})
+			sc[ip] = &probe.Host{IP: ip, Responded: true}
+		}
+		return hs, sc
 	}
-	if h := sink.host("10.7.0.3"); h == nil || len(h.Services) != 1 {
-		t.Errorf("20 live hosts are over the budget of %d: host %+v", fullRangeMaxHosts, h)
+	h1, s1 := mk(0, 10)
+	h2, s2 := mk(1, 10)
+	got2 := make(chan map[string]bool)
+	go func() { got2 <- r.claimFullRange(context.Background(), &group{id: 2}, h2, s2) }()
+	select {
+	case <-got2:
+		t.Fatal("group 2 claimed before group 1")
+	case <-time.After(50 * time.Millisecond):
 	}
-	p := out.Stats.Passes
-	if len(p) != 2 || p[1].State != model.PassSkipped {
-		t.Errorf("passes = %+v", p)
+	c1 := r.claimFullRange(context.Background(), &group{id: 1}, h1, s1)
+	c2 := <-got2
+	if len(c1) != 10 || len(c2) != 6 {
+		t.Fatalf("group 1: %d hosts, group 2: %d", len(c1), len(c2))
+	}
+	for i := 1; i <= 6; i++ {
+		if !c2[fmt.Sprintf("10.7.1.%d", i)] {
+			t.Errorf("group 2 must cover its first 6 hosts by address: %v", c2)
+		}
+	}
+	// a third group finds the budget empty; a group that never claims
+	// (no live host) does not hold the next one
+	r.fullPass(3)
+	h4, s4 := mk(4, 3)
+	if c4 := r.claimFullRange(context.Background(), &group{id: 4}, h4, s4); len(c4) != 0 {
+		t.Errorf("group 4 = %v", c4)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if c := r.claimFullRange(ctx, &group{id: 9}, h4, s4); c != nil {
+		t.Errorf("a cancelled wait claims %v", c)
 	}
 }
 

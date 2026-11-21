@@ -98,7 +98,13 @@ type run struct {
 	// hosts discovery found.
 	portAnswered atomic.Int64
 	// fullLeft is the host budget of the full-range pass (fullRangePlanned).
-	fullLeft    atomic.Int64
+	fullLeft atomic.Int64
+	// full-range claims go in group order (claimFullRange): fullNext is the
+	// highest group id allowed to claim, fullPassed the groups done with it
+	fullMu      sync.Mutex
+	fullNext    int
+	fullPassed  map[int]bool
+	fullWake    chan struct{}
 	fullPlanned bool
 
 	e        *Engine
@@ -440,6 +446,7 @@ type groupStats struct {
 }
 
 func (r *run) runGroup(ctx context.Context, g *group, want int) {
+	defer r.fullPass(g.id) // a group that never claims must not hold the later ones
 	defer func() {
 		r.mu.Lock()
 		r.running--
