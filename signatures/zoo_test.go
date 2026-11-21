@@ -151,3 +151,32 @@ func TestZooMonitoring(t *testing.T) {
 	pg.HTTP.Paths = []model.PathProbe{{Path: "/api/v1/status", Status: 200, Excerpt: zooFixture(t, "pushgateway-1.11-status.json")}}
 	check(t, eng, pg, want{"pushgateway", "Prometheus Pushgateway", "1.11.5", model.ClassDevTool})
 }
+
+func TestZooJava(t *testing.T) {
+	eng, err := sig.NewBuiltinEngine()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := "http://localhost"
+
+	// quay.io/wildfly/wildfly:42.0.0.Final: welcome page on 8080 and the HAL console on the management port 9990.
+	wf := httpSvc(28080, "", "", zooPage(t, 200, "wildfly-42-welcome.html", "Welcome to WildFly", b+":28080/"))
+	check(t, eng, wf, want{"wildfly-default-page", "WildFly / JBoss", "", model.ClassDefaultPage})
+	hal := httpSvc(9990, "", "", zooPage(t, 200, "wildfly-42-hal-console.html", "HAL Management Console", b+":9990/console/index.html"))
+	check(t, eng, hal, want{"wildfly-hal-console", "WildFly / JBoss", "", model.ClassAdminPanel})
+
+	// solr:9.11.0 admin UI.
+	solr := httpSvc(8983, "Jetty", "", zooPage(t, 200, "solr-9.11-admin.html", "Solr Admin", b+":8983/solr/"))
+	check(t, eng, solr, want{"solr", "Apache Solr", "9.11.0", model.ClassAdminPanel})
+
+	// metabase/metabase:v0.65.6.3 before its first setup. The SPA answers every path with its page and echoes the
+	// path into it (<meta name="uri" content="/_profiler/">): that is not a Symfony profiler.
+	mb := httpSvc(13000, "", "", zooPage(t, 200, "metabase-0.65-setup.html", "Metabase", b+":13000/"))
+	mb.HTTP.Cookies = []model.Cookie{{Name: "metabase.DEVICE"}}
+	prof := zooFixture(t, "metabase-0.65-profiler-path.html")
+	mb.HTTP.Paths = []model.PathProbe{{Path: "/_profiler/", Status: 200, Title: "Metabase", Length: len(prof), Excerpt: prof}}
+	check(t, eng, mb, want{"metabase-setup", "Metabase", "0.65.6.3", model.ClassInstallPage})
+	check(t, eng, mb, want{"metabase", "Metabase", "0.65.6.3", ""})
+	noMatch(t, eng, mb, "symfony-profiler")
+	noClass(t, eng, mb, model.ClassStaging)
+}
