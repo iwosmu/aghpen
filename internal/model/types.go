@@ -295,6 +295,11 @@ type ScanEstimate struct {
 	BasedOnHistory   bool    `json:"based_on_history"` // true when earlier runs gave a measured speed
 	ExpectedLiveRate float64 `json:"expected_live_rate"`
 	DiscoveryMode    string  `json:"discovery_mode"` // fast | balanced | thorough: the mode the numbers assume
+	// The low end of the range for a scope the inventory does not know yet
+	// (1 % of the addresses live instead of 5 %). Equal to EstPackets and
+	// EstDurationSec when the inventory knows hosts in the scope.
+	EstPacketsLow     int64 `json:"est_packets_low"`
+	EstDurationLowSec int64 `json:"est_duration_low_sec"`
 }
 
 // ---------- Scan runs ----------

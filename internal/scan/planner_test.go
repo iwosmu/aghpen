@@ -338,3 +338,31 @@ func TestStatsKeeper(t *testing.T) {
 		t.Errorf("eta when done = %d", s.ETASec)
 	}
 }
+
+func TestEstimateRangeAndARP(t *testing.T) {
+	e := New(Deps{Prober: &fakeNet{}, Logger: quiet})
+	plan := basePlan("10.66.0.0/16")
+	plan.Profile.Ports = "top-1000"
+	plan.Profile.Discovery = model.DiscoveryOpts{ICMPEcho: true, TCPSynPorts: []int{80, 443}, ARP: true}
+	est := e.Estimate(plan)
+	if est.EstPacketsLow <= 0 || est.EstPacketsLow >= est.EstPackets || est.EstDurationLowSec >= est.EstDurationSec {
+		t.Errorf("a new scope needs a range: %+v", est)
+	}
+	saved := localNetsFn
+	localNetsFn = func() []targets.Range { return targets.Build([]string{"10.66.0.0/16"}).V4.Ranges() }
+	defer func() { localNetsFn = saved }()
+	arp := e.Estimate(plan)
+	if arp.EstPackets >= est.EstPackets {
+		t.Errorf("ARP-only discovery must cost less: %d vs %d", arp.EstPackets, est.EstPackets)
+	}
+	// the inventory knows the scope: one number, no range
+	for i := 0; i < 67; i++ {
+		plan.Hints = append(plan.Hints, model.HostHint{IP: targets.IPString(0x0A420100 + uint32(i))})
+	}
+	k := e.Estimate(plan)
+	if k.EstPacketsLow != k.EstPackets || k.EstDurationLowSec != k.EstDurationSec || k.EstPackets >= arp.EstPacketsLow {
+		t.Errorf("known scope = %+v", k)
+	}
+	t.Logf("lab /16, top-1000: new scope %d-%d packets, %d-%d s; known scope (67 hosts) %d packets, %d s",
+		arp.EstPacketsLow, arp.EstPackets, arp.EstDurationLowSec, arp.EstDurationSec, k.EstPackets, k.EstDurationSec)
+}
