@@ -47,6 +47,8 @@ export interface Scope {
 export interface Target {
   id: number; scope_id: number; kind: TargetKind; value: string; note: string; tags: string[];
   enabled: boolean; source: string; addresses: number; created_at: string; created_by: number | null;
+  /** the address a loopback target (localhost, 127.0.0.1) is scanned as, e.g. the docker host; absent = scanned as written */
+  maps_to?: string;
 }
 
 export interface InvalidLine { line: number; value: string; reason: string }
@@ -112,6 +114,13 @@ export interface RunStats {
   current_pps_basis?: 'measured' | 'pace' | '';
   /** engine sanity checks that failed: the run ended, but its result is not complete (Polish text) */
   warnings?: string[]; ports_unknown?: number;
+  /** port passes of a staged run (top ports, then the full range); absent = one pass */
+  passes?: RunPass[];
+}
+
+export interface RunPass {
+  name: 'top_ports' | 'full_range' | 'dense' | string; state: 'pending' | 'running' | 'done' | 'skipped' | string;
+  hosts: number; ports_total: number; ports_done: number;
 }
 
 export interface RunDiffSummary {
@@ -120,6 +129,14 @@ export interface RunDiffSummary {
   /** Silent hosts that are not reported inactive yet, and their open services. */
   hosts_missing?: number; services_unreachable?: number; by_kind: Record<string, number> | null;
   findings_new: number;
+  /** services open again after a gone run (service_returned), services that answer slower (response_slower) */
+  services_returned?: number; responses_slower?: number;
+}
+
+/** GET /services/{id}/response-times: one point per run, oldest first; ms null = HTTP did not answer. */
+export interface ResponseTimes {
+  service_id: number; rule: { baseline_n: number; slow_factor: number; slow_min_ms: number };
+  points: { run_id: number; at: string; ms: number | null; baseline_ms: number | null; slow: boolean }[];
 }
 
 export interface ScanRun {
@@ -208,6 +225,8 @@ export interface Service {
   interest_why: InterestReason[] | null; group_key: string; group_size: number; note: string; tags: string[] | null;
   first_seen: string; last_seen: string; last_changed: string | null; overrides: Record<string, Override> | null;
   latest?: ServiceObservation | null;
+  /** latest HTTP response time (ms); null: not HTTP or no answer. Optional: older servers do not send it. */
+  response_ms?: number | null; response_slow?: boolean;
 }
 export interface ServiceObservation { id: number; service_id: number; run_id: number; at: string; result: ServiceResult }
 export interface ServiceGroup {
@@ -218,7 +237,8 @@ export interface ServiceGroup {
 export type ChangeKind =
   | 'host_new' | 'host_gone' | 'host_back' | 'host_unstable' | 'host_missing' | 'service_new' | 'service_gone' | 'service_changed'
   | 'tech_new' | 'tech_gone' | 'tech_version' | 'title_changed' | 'status_changed' | 'cert_changed'
-  | 'headers_changed' | 'cookies_changed' | 'content_changed' | 'redirect_changed' | 'class_changed';
+  | 'headers_changed' | 'cookies_changed' | 'content_changed' | 'redirect_changed' | 'class_changed'
+  | 'service_returned' | 'response_slower' | 'response_recovered';
 
 export type Severity = 'info' | 'low' | 'medium' | 'high';
 
@@ -301,6 +321,8 @@ export interface ProbeInfo { prober: string; mode: 'nmap-raw' | 'nmap-connect' |
 export interface Health {
   status: string; version: string; db: string; tde: string; tde_detail?: string; field_encryption?: boolean;
   engine?: boolean; probe?: ProbeInfo;
+  /** the docker host a loopback target maps to; '' = no mapping (loopback is this machine); absent = older server */
+  host_gateway?: string;
 }
 
 // Passive sources (internal/passive). Nothing is sent to a scope address.

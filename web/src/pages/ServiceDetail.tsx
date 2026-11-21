@@ -12,6 +12,9 @@ import { InlineText, OverrideNote } from '../ui/edit';
 import { useCan } from '../session';
 import { SuggestButton } from './Suggest';
 import { ServiceHistoryPanel } from './TimeMachine';
+import { ServiceStory, ResponseTimeChart } from '../ui/ServiceStory';
+import { serviceName, isSelf } from '../lib/serviceName';
+import { SelfTag } from '../ui/serviceBits';
 
 function Flag({ on, label, bad }: { on: boolean; label: string; bad?: boolean }) {
   return (
@@ -204,12 +207,14 @@ export default function ServiceDetail() {
       <PageHeader
         back={{ to: '/services', label: t('Usługi', 'Services') }}
         title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono">{s.ip}:{s.port}</span><span className="text-base font-normal"><ServiceStateMark state={s.state} /></span></span>}
-        sub={<><Link to={'/hosts/' + s.host_id} className="link">{t('host', 'host')} <span className="mono">{s.hostname || s.ip}</span></Link> · {s.name}{s.tls ? ' · TLS' : ''}{s.url ? <> · <a className="link mono inline-flex items-center gap-1" href={s.url} target="_blank" rel="noreferrer noopener">{s.url}<Icon name="external" size={11} /></a></> : null}</>}
+        sub={<><Link to={'/hosts/' + s.host_id} className="link">{t('host', 'host')} <span className="mono">{s.hostname || s.ip}</span></Link> · {serviceName(s)}{isSelf(s) ? <SelfTag /> : null}{s.tls ? ' · TLS' : ''}{s.url ? <> · <a className="link mono inline-flex items-center gap-1" href={s.url} target="_blank" rel="noreferrer noopener">{s.url}<Icon name="external" size={11} /></a></> : null}</>}
         readOnly={!canEdit}
         actions={<span className="flex items-center gap-3 text-sm text-ink-2">{canSuggest ? <SuggestButton serviceId={s.id} /> : null}<span className="flex items-center gap-2">{t('Ciekawość', 'Interest')} <InterestScore value={s.interest} /></span></span>}
       />
       <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
         <div className="min-w-0 space-y-4">
+          <ServiceStory s={s} />
+          {r?.http || s.name === 'http' || s.name === 'https' ? <ResponseTimeChart serviceId={s.id} /> : null}
           <Panel title={t('Identyfikacja', 'Identification')} actions={<span className="flex items-center gap-2 text-ink-2">{t('pewność', 'confidence')} <Confidence value={s.confidence} width={48} /></span>}>
             <dl>
               <KV k={t('Usługa', 'Service')}>

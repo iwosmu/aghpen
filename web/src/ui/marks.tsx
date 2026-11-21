@@ -6,7 +6,7 @@ import type { ChangeKind, ChunkStatus, FindingStatus, HostStatus, InterestReason
 // State marks. Every state is a drawn glyph plus a colour plus a word, so
 // colour is never the only signal.
 export type Tone = 'new' | 'gone' | 'changed' | 'unstable' | 'expected' | 'neutral' | 'accent' | 'danger';
-export type GlyphName = 'plus' | 'minus' | 'delta' | 'wave' | 'dashring' | 'dot' | 'ring' | 'check' | 'x' | 'pause' | 'run' | 'half' | 'back' | 'hatch';
+export type GlyphName = 'plus' | 'minus' | 'delta' | 'wave' | 'dashring' | 'dot' | 'ring' | 'check' | 'x' | 'pause' | 'run' | 'half' | 'back' | 'hatch' | 'returned' | 'slow';
 
 const TONE_VAR: Record<Tone, string> = {
   new: 'var(--st-new)', gone: 'var(--st-gone)', changed: 'var(--st-changed)', unstable: 'var(--st-unstable)',
@@ -33,6 +33,10 @@ export function Glyph({ name, tone = 'neutral', size = 14, pulse }: { name: Glyp
     case 'run': body = <path d="M4 2.500v9l7.500-4.500Z" fill={c} />; break;
     case 'back': body = <path d="M11.500 10V5.500H3.500M6 3 3.500 5.500 6 8" {...s} strokeWidth={1.8} />; break;
     case 'hatch': body = <path d="M2 12 12 2M2 7.500 7.500 2M6.500 12 12 6.500" {...s} strokeWidth={1.4} />; break;
+    // a circular arrow: the same service is open again
+    case 'returned': body = <><path d="M11.300 7.400A4.300 4.300 0 1 1 9.600 3.600" {...s} strokeWidth={1.7} strokeLinecap="butt" /><path d="M8.300 1.600 11.200 3.300 9.200 6" {...s} strokeWidth={1.7} /></>; break;
+    // a clock: the response time moved
+    case 'slow': body = <><circle cx="7" cy="7" r="4.900" {...s} strokeWidth={1.6} /><path d="M7 4v3.300l2.300 1.400" {...s} strokeWidth={1.6} strokeLinecap="butt" /></>; break;
   }
   return (
     <svg viewBox="0 0 14 14" width={size} height={size} aria-hidden="true" style={{ flex: 'none', animation: pulse ? 'pulse-ring 1.6s ease-in-out infinite' : undefined }}>
@@ -59,6 +63,9 @@ export function changeKindInfo(kind: ChangeKind | string): { tone: Tone; glyph: 
     case 'tech_new': return { tone: 'new', glyph: 'plus', label: t('nowa technologia', 'new technology'), group: 'new' };
     case 'host_gone': return { tone: 'gone', glyph: 'minus', label: t('host nieaktywny', 'host inactive'), group: 'gone' };
     case 'service_gone': return { tone: 'gone', glyph: 'minus', label: t('usługa zniknęła', 'service gone'), group: 'gone' };
+    case 'service_returned': return { tone: 'new', glyph: 'returned', label: t('usługa wróciła', 'service is back'), group: 'new' };
+    case 'response_slower': return { tone: 'changed', glyph: 'slow', label: t('odpowiada wolniej', 'responds slower'), group: 'changed' };
+    case 'response_recovered': return { tone: 'new', glyph: 'slow', label: t('czas odpowiedzi wrócił do normy', 'response time back to normal'), group: 'changed' };
     case 'tech_gone': return { tone: 'gone', glyph: 'minus', label: t('technologia zniknęła', 'technology gone'), group: 'gone' };
     case 'host_unstable': return { tone: 'unstable', glyph: 'wave', label: t('host niestabilny', 'host unstable'), group: 'unstable' };
     // Silent in this run, answered in the previous one; not reported inactive yet. Its services are unknown, not gone.
@@ -78,7 +85,8 @@ export function changeKindInfo(kind: ChangeKind | string): { tone: Tone; glyph: 
 }
 
 export const CHANGE_KINDS: ChangeKind[] = [
-  'host_new', 'host_gone', 'host_missing', 'host_back', 'host_unstable', 'service_new', 'service_gone', 'service_changed', 'tech_new',
+  'host_new', 'host_gone', 'host_missing', 'host_back', 'host_unstable', 'service_new', 'service_gone', 'service_returned', 'service_changed',
+  'response_slower', 'response_recovered', 'tech_new',
   'tech_gone', 'tech_version', 'title_changed', 'status_changed', 'cert_changed', 'headers_changed', 'cookies_changed',
   'content_changed', 'redirect_changed', 'class_changed',
 ];

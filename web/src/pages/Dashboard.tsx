@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router';
 import { SETUP_DONE_KEY } from './Setup';
 import { useItem, usePage } from '../api/hooks';
-import type { Change, Dashboard as Dash, RunMap, ScanProfile, ScanRun, Scope } from '../api/types';
+import type { Change, Dashboard as Dash, Page, RunMap, ScanProfile, ScanRun, Scope, Service } from '../api/types';
 import { t, plural, getLang } from '../i18n';
 import { cx, fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtSigned } from '../lib/format';
 import { useLiveRun, useNow } from '../lib/hooks';
@@ -12,6 +12,10 @@ import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, type GlyphName, t
 import { AddressMap } from '../viz/AddressMap';
 import { BarList, PacketCount, ProgressBar, RateGauge, TrendRows } from '../viz/charts';
 import { useSession } from '../session';
+import { RunStory } from '../ui/RunStory';
+import { RunPasses } from '../ui/RunPasses';
+import { SMALL_RUN } from './RunDetail';
+import { serviceName } from '../lib/serviceName';
 import { ReprobePanel } from './Reprobe';
 import { ATTENTION_INTEREST, adminPanelNames, adminPanelServiceNames, changeParts, isFullRun, lastFullPair, partialRunPhrase } from '../lib/headline';
 
@@ -59,13 +63,15 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   const unreachable = s?.services_unreachable ?? 0;
   const added = s ? s.hosts_new + s.services_new : 0;
   const gone = s ? s.hosts_gone + s.services_gone : 0;
-  const quiet = s ? added + gone + changed + s.hosts_unstable + missing === 0 : true;
+  const returned = s?.services_returned ?? 0;
+  const slower = s?.responses_slower ?? 0;
+  const quiet = s ? added + gone + changed + s.hosts_unstable + missing + returned + slower === 0 : true;
   const open = (d.top_findings ?? []).filter((f) => f.status === 'new' || f.status === 'triaged');
   const important = open.filter((f) => f.severity === 'high' || f.interest >= ATTENTION_INTEREST);
   const panels = adminPanelNames(open);
   const attention = h.admin_panels > 0 || h.findings_high > 0 || important.length > 0;
   const named = (panels.length ? panels : adminPanelServiceNames(d.top_services ?? [])).slice(0, 2);
-  const parts = s ? changeParts({ added, gone, changed, missing, unstable: s.hosts_unstable }, getLang(), plural) : [];
+  const parts = s ? changeParts({ added, gone, changed, missing, unstable: s.hosts_unstable, returned, slower }, getLang(), plural) : [];
   const headline = baseline
     ? t('Pierwszy obraz sieci: ' + fmtInt(h.hosts_up) + ' ' + plural(h.hosts_up, ['aktywny host', 'aktywne hosty', 'aktywnych hostów'], ['', '']) + ', ' + fmtInt(h.services_open) + ' ' + plural(h.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['', '']) + '.',
       'First picture of the network: ' + fmtInt(h.hosts_up) + ' hosts up, ' + fmtInt(h.services_open) + ' open services.')
@@ -108,12 +114,15 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
           {t('Ostatnio', 'Last')}: {partialRunPhrase(partial)} (<Link to={'/runs/' + partial.id} className="num link">#{partial.id}</Link>, {fmtRelative(partial.finished_at)}); {t('przebieg częściowy, bez porównania.', 'a partial run, not compared.')}
         </p>
       ) : null}
+      {s && !baseline ? <RunStory runId={run.id} className="mt-3 space-y-1" testId="handover-story" /> : null}
       {s && !baseline ? (
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-0.5 border-t border-rule pt-2.5">
           <Count n={s.hosts_new} glyph="plus" tone="new" label={plural(s.hosts_new, ['nowy host', 'nowe hosty', 'nowych hostów'], ['new host', 'new hosts'])} to={'/changes?run_id=' + run.id + '&kind=host_new'} />
           <Count n={s.services_new} glyph="plus" tone="new" label={plural(s.services_new, ['nowa usługa', 'nowe usługi', 'nowych usług'], ['new service', 'new services'])} to={'/changes?run_id=' + run.id + '&kind=service_new'} />
           <Count n={s.hosts_gone} glyph="minus" tone="gone" label={plural(s.hosts_gone, ['host nieaktywny', 'hosty nieaktywne', 'hostów nieaktywnych'], ['host inactive', 'hosts inactive'])} to={'/changes?run_id=' + run.id + '&kind=host_gone&expected=false'} />
           <Count n={s.services_gone} glyph="minus" tone="gone" label={plural(s.services_gone, ['usługa zniknęła', 'usługi zniknęły', 'usług zniknęło'], ['service gone', 'services gone'])} to={'/changes?run_id=' + run.id + '&kind=service_gone&expected=false'} />
+          {s.services_returned ? <Count n={s.services_returned} glyph="returned" tone="new" label={plural(s.services_returned, ['usługa wróciła', 'usługi wróciły', 'usług wróciło'], ['service back', 'services back'])} to={'/changes?run_id=' + run.id + '&kind=service_returned'} /> : null}
+          {s.responses_slower ? <Count n={s.responses_slower} glyph="slow" tone="changed" label={plural(s.responses_slower, ['wolniejsza odpowiedź', 'wolniejsze odpowiedzi', 'wolniejszych odpowiedzi'], ['slower response', 'slower responses'])} to={'/changes?run_id=' + run.id + '&kind=response_slower'} /> : null}
           <Count n={changed} glyph="delta" tone="changed" label={plural(changed, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes'])} to={'/changes?run_id=' + run.id} />
           <Count n={s.hosts_unstable} glyph="wave" tone="unstable" label={plural(s.hosts_unstable, ['host niestabilny', 'hosty niestabilne', 'hostów niestabilnych'], ['unstable host', 'unstable hosts'])} to={'/hosts?status=unstable'} />
           <Count n={missing} glyph="half" tone="expected" label={plural(missing, ['host bez odpowiedzi', 'hosty bez odpowiedzi', 'hostów bez odpowiedzi'], ['host missing', 'hosts missing'])} to={'/changes?run_id=' + run.id + '&kind=host_missing'} />
@@ -163,6 +172,22 @@ function Inventory({ d, pair }: { d: Dash; pair?: { full?: ScanRun; prev?: ScanR
   );
 }
 
+/** The open ports a one-machine run has found so far (polled), instead of the address map. */
+function LivePorts({ runId }: { runId: number }) {
+  const q = useItem<Page<Service>>('/services', { run_id: runId, limit: 500 }, { refetchInterval: 3000 });
+  const items = [...(q.data?.items ?? [])].sort((a, b) => a.port - b.port);
+  return (
+    <div data-testid="live-ports">
+      <p className="text-xs text-ink-3">{t('Otwarte porty do tej pory', 'Open ports so far')} <span className="num text-ink-2">{items.length}</span></p>
+      {items.length ? (
+        <ul className="mt-1.5 flex flex-wrap gap-1">
+          {items.slice(0, 40).map((s) => <li key={s.id}><Link to={'/services/' + s.id} className="mono inline-block border border-rule-strong px-1.5 py-0.5 text-xs hover:border-accent" title={serviceName(s)}>{s.port}</Link></li>)}
+        </ul>
+      ) : <p className="mt-1.5 text-xs text-ink-2">{t('Czekam na pierwsze odpowiedzi…', 'Waiting for the first answers…')}</p>}
+    </div>
+  );
+}
+
 function ActiveRun({ initial, d }: { initial: ScanRun; d: Dash }) {
   const { can } = useSession();
   const live = useLiveRun(initial.id);
@@ -183,6 +208,7 @@ function ActiveRun({ initial, d }: { initial: ScanRun; d: Dash }) {
             <span className="text-xs text-ink-2">{run.status === 'analyzing' ? t('analiza zmian…', 'analysing changes…') : <>{t('pozostało', 'remaining')} <span className="num text-ink">{fmtDuration(s.eta_sec)}</span></>}</span>
           </div>
           <div className="mt-1.5"><ProgressBar value={s.addresses_done} max={s.addresses_total} active={(map.data?.blocks ?? []).filter((b) => b.status === 'running').reduce((a, b) => a + b.size, 0)} label={t('Postęp skanu', 'Scan progress')} /></div>
+          <RunPasses passes={s.passes} className="mt-1.5" />
           <div className="mt-1 flex justify-between text-2xs text-ink-3">
             <span className="num">{fmtInt(s.addresses_done)} / {fmtInt(s.addresses_total)}</span>
             <span>{t('podgrupy', 'chunks')} <span className="num text-ink-2">{s.chunks_done}/{s.chunks_total}</span></span>
@@ -196,7 +222,7 @@ function ActiveRun({ initial, d }: { initial: ScanRun; d: Dash }) {
         </div>
         <RateGauge current={s.current_pps} cap={Math.min(profile.data?.rate.max_pps ?? d.safety.max_pps, d.safety.max_pps)} policyCap={d.safety.max_pps} basis={s.current_pps_basis} />
         <div className="min-w-[150px] max-w-[320px]">
-          {map.data ? <AddressMap blocks={map.data.blocks} compact /> : <div className="skeleton h-[104px] w-[220px]" />}
+          {s.addresses_total > 0 && s.addresses_total <= SMALL_RUN ? <LivePorts runId={run.id} /> : map.data ? <AddressMap blocks={map.data.blocks} compact /> : <div className="skeleton h-[104px] w-[220px]" />}
         </div>
       </div>
     </Panel>
@@ -419,7 +445,7 @@ export default function Dashboard() {
             {(d.top_services ?? []).slice(0, 7).map((s) => (
               <Row key={s.id} to={'/services/' + s.id}>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm text-ink">{s.title || s.product || s.name}</span>
+                  <span className="block truncate text-sm text-ink">{s.title || s.product || serviceName(s)}</span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
                     <span className="mono">{s.hostname || s.ip}:{s.port}</span>
                     <ClassChips classes={s.classes} max={2} />

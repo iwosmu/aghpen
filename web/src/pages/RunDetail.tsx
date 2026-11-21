@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useAction, useItem } from '../api/hooks';
 import { patch, post } from '../api/client';
-import type { Chunk, MapBlock, RunMap, SafetyPolicy, ScanProfile, ScanRun } from '../api/types';
+import type { Chunk, MapBlock, Page, RunMap, SafetyPolicy, ScanProfile, ScanRun, Service } from '../api/types';
+import { serviceName, isSelf } from '../lib/serviceName';
+import { ServiceStateMark } from '../ui/marks';
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtTime } from '../lib/format';
 import { useLiveRun } from '../lib/hooks';
@@ -13,6 +15,64 @@ import { ChunkStatusMark, Glyph, RunStatusMark } from '../ui/marks';
 import { AddressMap } from '../viz/AddressMap';
 import { PacketCount, ProgressBar, RateGauge } from '../viz/charts';
 import { useCan } from '../session';
+import { RunStory } from '../ui/RunStory';
+import { RunPasses } from '../ui/RunPasses';
+import { ResponseCell, SelfTag } from '../ui/serviceBits';
+
+/** A run over this many addresses or fewer is a "one machine" run: the page shows its services instead of the address map. */
+export const SMALL_RUN = 4;
+
+/** The services of one run, as they arrive (polled while the run is live). */
+function RunServices({ run, live }: { run: ScanRun; live: boolean }) {
+  const q = useItem<Page<Service>>('/services', { run_id: run.id, limit: 500 }, { refetchInterval: live ? 3000 : false });
+  // Open services first, then the ones that are gone now; by address and port.
+  const items = [...(q.data?.items ?? [])].sort((a, b) => Number(a.state !== 'open') - Number(b.state !== 'open') || a.ip.localeCompare(b.ip, undefined, { numeric: true }) || a.port - b.port);
+  const hosts = [...new Set(items.map((s) => s.host_id))];
+  const anyTime = items.some((s) => s.response_ms !== undefined);
+  return (
+    <Panel title={t('Usługi znalezione w tym przebiegu', 'Services found in this run')} count={q.data?.total} flush
+      actions={hosts.length === 1 ? <Link to={'/hosts/' + hosts[0]} className="link">{t('Host', 'Host')} <span className="mono">{items[0].ip}</span></Link> : undefined}>
+      {q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : !q.data ? <SkeletonRows rows={5} /> : items.length === 0 ? (
+        <p className="p-3 text-sm text-ink-2" data-testid="run-services-empty">{live ? t('Czekam na pierwsze otwarte porty…', 'Waiting for the first open ports…') : t('Ten przebieg nie znalazł otwartej usługi.', 'This run found no open service.')}</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" data-testid="run-services">
+            <thead><tr className="border-b border-rule-strong text-left text-xs text-ink-3">
+              {hosts.length > 1 ? <th className="h-[30px] px-3 font-medium">IP</th> : null}
+              <th className="h-[30px] px-3 font-medium">{t('Port', 'Port')}</th>
+              <th className="px-3 font-medium" title={t('Stan usługi dziś, po najnowszym skanie', 'The state of the service today, after the latest scan')}>{t('Stan dziś', 'State now')}</th>
+              <th className="px-3 font-medium">{t('Usługa', 'Service')}</th>
+              <th className="px-3 font-medium">{t('Produkt', 'Product')}</th>
+              <th className="hidden px-3 font-medium md:table-cell">{t('Tytuł strony', 'Page title')}</th>
+              {anyTime ? <th className="px-3 text-right font-medium">{t('Czas odpowiedzi', 'Response time')}</th> : null}
+            </tr></thead>
+            <tbody>
+              {items.map((s, i) => (
+                <tr key={s.id} className="border-b border-rule last:border-b-0" style={live && i === items.length - 1 ? { animation: 'rise-in 240ms var(--ease-out-expo)' } : undefined}>
+                  {hosts.length > 1 ? <td className="mono h-[30px] whitespace-nowrap px-3">{s.ip}</td> : null}
+                  <td className="h-[30px] whitespace-nowrap px-3"><Link to={'/services/' + s.id} className="mono link">{s.port}/{s.proto}</Link></td>
+                  <td className="whitespace-nowrap px-3"><ServiceStateMark state={s.state} /></td>
+                  <td className="whitespace-nowrap px-3">{serviceName(s)}{isSelf(s) ? <SelfTag /> : null}</td>
+                  <td className="whitespace-nowrap px-3 text-ink-2">{[s.product, s.version].filter(Boolean).join(' ') || '–'}</td>
+                  <td className="hidden max-w-[320px] truncate px-3 text-ink-2 md:table-cell">{s.title || '–'}</td>
+                  {anyTime ? <td className="whitespace-nowrap px-3 text-right"><ResponseCell s={s} /></td> : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/** "Bez zmian względem poprzedniego przebiegu." when the summary has no change at all. */
+function NoStory({ run }: { run: ScanRun }) {
+  const s = run.summary;
+  if (!s) return null;
+  const n = s.hosts_new + s.hosts_gone + s.hosts_back + s.services_new + s.services_gone + s.services_changed + (s.services_returned ?? 0) + (s.responses_slower ?? 0) + (s.hosts_missing ?? 0);
+  return n === 0 ? <p className="text-base text-ink-2" data-testid="run-story-none">{t('Bez zmian względem poprzedniego przebiegu.', 'No change since the previous run.')}</p> : null;
+}
 
 function Fact({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
   return (
@@ -92,6 +152,7 @@ export default function RunDetail() {
     if (print && w) w.addEventListener('load', () => w.print(), { once: true });
   };
   const reportReady = ['completed', 'cancelled', 'failed', 'paused'].includes(run.status);
+  const small = s.addresses_total > 0 && s.addresses_total <= SMALL_RUN;
 
   return (
     <div>
@@ -147,6 +208,13 @@ export default function RunDetail() {
           </div>
         ) : null}
 
+        {run.status === 'completed' && run.summary?.prev_run_id ? (
+          <section className="border border-rule bg-panel px-3 py-2.5" data-testid="run-story-panel">
+            <h2 className="mb-1 text-xs text-ink-3">{t('Względem przebiegu', 'Compared with run')} <Link to={'/runs/' + run.summary.prev_run_id} className="num link">#{run.summary.prev_run_id}</Link> · <Link to={'/changes/compare?from=' + run.summary.prev_run_id + '&to=' + run.id} className="link">{t('porównanie', 'comparison')}</Link></h2>
+            <RunStory runId={run.id} />
+            <NoStory run={run} />
+          </section>
+        ) : null}
         {s.warnings && s.warnings.length > 0 ? (
           <div role="alert" data-testid="run-warnings" className="flex items-start gap-2 border border-danger/60 bg-st-gone-wash px-3 py-2 text-sm">
             <Icon name="alert" className="mt-0.5 text-danger" />
@@ -160,19 +228,24 @@ export default function RunDetail() {
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <section className="border border-rule bg-panel p-3">
             <div className="flex items-baseline justify-between gap-3">
-              <span><span className="num text-xl font-semibold">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów sprawdzonych', 'of addresses probed')}</span></span>
+              {small && isLive ? (
+                <span><span className="num text-xl font-semibold">{fmtInt(s.services_open)}</span> <span className="text-sm text-ink-2">{plural(s.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['open service', 'open services'])} {t('do tej pory', 'so far')}</span></span>
+              ) : (
+                <span><span className="num text-xl font-semibold">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów sprawdzonych', 'of addresses probed')}</span></span>
+              )}
               <span className="num text-sm text-ink-2">{fmtInt(s.addresses_done)} / {fmtInt(s.addresses_total)}</span>
             </div>
             <div className="mt-2"><ProgressBar value={s.addresses_done} max={s.addresses_total} active={isLive ? runningAddrs : 0} label={t('Postęp skanu', 'Scan progress')} /></div>
+            <RunPasses passes={s.passes} className="mt-1.5" />
             {run.status === 'running' && runningChunks > 0 ? (
               <p className="mt-1.5 flex items-center gap-2 text-xs text-ink-2" data-testid="run-phase">
                 <span className="bar-active inline-block h-1.5 w-4" aria-hidden="true" />
-                {phaseText(s, runningChunks, runningAddrs)}
+                {small ? smallPhaseText(s) : phaseText(s, runningChunks, runningAddrs)}
               </p>
             ) : null}
             <dl className="mt-3 grid grid-cols-2 gap-y-3 sm:grid-cols-4">
               <Fact label={run.status === 'completed' ? t('Czas trwania', 'Duration') : t('Czas aktywny', 'Active time')}><span className="num">{fmtDuration(s.elapsed_sec)}</span></Fact>
-              <Fact label={t('Pozostało (ETA)', 'Remaining (ETA)')}><span className="num">{isLive || run.status === 'paused' ? (run.status === 'analyzing' ? t('analiza', 'analysing') : fmtDuration(s.eta_sec)) : '–'}</span></Fact>
+              <Fact label={t('Pozostało (ETA)', 'Remaining (ETA)')}><span className="num">{isLive || run.status === 'paused' ? (run.status === 'analyzing' ? t('analiza', 'analysing') : s.eta_sec > 0 ? fmtDuration(s.eta_sec) : '–') : '–'}</span></Fact>
               <Fact label={t('Podgrupy', 'Chunks')}><span className="num">{s.chunks_done} / {s.chunks_total}</span></Fact>
               <Fact label={t('Aktywne hosty', 'Hosts up')}><span className="num">{fmtInt(s.hosts_up)}</span></Fact>
               <Fact label={t('Otwarte usługi', 'Open services')}><span className="num">{fmtInt(s.services_open)}</span> <span className="text-xs font-normal text-ink-3">({fmtInt(s.http_services)} WWW)</span></Fact>
@@ -188,7 +261,8 @@ export default function RunDetail() {
           </section>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-2">
+        {small ? <RunServices run={run} live={isLive} /> : null}
+        {small ? null : <div className="grid gap-4 xl:grid-cols-2">
           <Panel title={t('Mapa przestrzeni adresowej', 'Address-space map')} count={(map.data?.blocks.length ?? 0) + ' × /24'}>
             {map.error ? <ErrorState error={map.error} retry={() => map.refetch()} /> : !map.data ? <div className="skeleton h-[260px]" /> : (
               <AddressMap
@@ -238,10 +312,10 @@ export default function RunDetail() {
               </div>
             )}
           </Panel>
-        </div>
+        </div>}
 
         <div className="grid gap-4 xl:grid-cols-2">
-          {isLive || recent.length > 0 ? (
+          {!small && (isLive || recent.length > 0) ? (
             <Panel title={t('Ostatnio wykryte hosty', 'Hosts just found')} flush>
               {recent.length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Czekam na pierwsze odpowiedzi z bieżących podgrup…', 'Waiting for the first answers from the running chunks…')}</p> : (
                 <ul>
@@ -260,7 +334,7 @@ export default function RunDetail() {
             <Panel title={t('Zmiany wykryte przez ten przebieg', 'Changes found by this run')} actions={<Link className="link" to={'/changes?run_id=' + run.id}>{t('Lista zmian', 'Change list')}</Link>}>
               <dl className="grid grid-cols-2 gap-x-6 sm:grid-cols-3">
                 {([
-                  ['plus', 'new', t('nowe hosty', 'new hosts'), run.summary.hosts_new], ['plus', 'new', t('nowe usługi', 'new services'), run.summary.services_new], ['back', 'new', t('hosty wróciły', 'hosts back'), run.summary.hosts_back],
+                  ['plus', 'new', t('nowe hosty', 'new hosts'), run.summary.hosts_new], ['plus', 'new', t('nowe usługi', 'new services'), run.summary.services_new], ['back', 'new', t('hosty wróciły', 'hosts back'), run.summary.hosts_back], ['returned', 'new', t('usługi wróciły', 'services back'), run.summary.services_returned ?? 0], ['slow', 'changed', t('wolniejsze odpowiedzi', 'slower responses'), run.summary.responses_slower ?? 0],
                   ['minus', 'gone', t('hosty nieaktywne', 'hosts inactive'), run.summary.hosts_gone], ['minus', 'gone', t('usługi zniknęły', 'services gone'), run.summary.services_gone], ['wave', 'unstable', t('hosty niestabilne', 'hosts unstable'), run.summary.hosts_unstable],
                   ['delta', 'changed', t('zmienione usługi', 'changed services'), run.summary.services_changed], ['dot', 'accent', t('nowe znaleziska', 'new findings'), run.summary.findings_new],
                   ['ring', 'changed', t('hosty bez odpowiedzi', 'hosts missing'), run.summary.hosts_missing ?? 0], ['ring', 'expected', t('usługi nieosiągalne', 'services unreachable'), run.summary.services_unreachable ?? 0],
@@ -311,6 +385,13 @@ function RunNote({ run, canEdit }: { run: ScanRun; canEdit: boolean }) {
       </Dialog>
     </div>
   );
+}
+
+/** The phase of a one-machine scan in words. */
+export function smallPhaseText(s: ScanRun['stats']): string {
+  if (s.http_requests > 0) return t('Rozpoznawanie usług WWW: ' + s.services_open + ' ' + plural(s.services_open, ['otwarty port', 'otwarte porty', 'otwartych portów'], ['', '']) + ' do tej pory.', 'Identifying web services: ' + s.services_open + ' open ' + (s.services_open === 1 ? 'port' : 'ports') + ' so far.');
+  if (s.services_open > 0) return t('Rozpoznawanie usług na ' + s.services_open + ' ' + plural(s.services_open, ['otwartym porcie', 'otwartych portach', 'otwartych portach'], ['', '']) + '.', 'Identifying the services on ' + s.services_open + ' open ' + (s.services_open === 1 ? 'port' : 'ports') + '.');
+  return t('Skanowanie portów: wyniki pojawią się poniżej, gdy tylko porty odpowiedzą.', 'Scanning ports: results appear below as soon as ports answer.');
 }
 
 /** The phase of a running scan in words, from what the counters show so far. */

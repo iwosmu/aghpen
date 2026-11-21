@@ -11,7 +11,7 @@ import { useUrlState } from '../lib/hooks';
 import { Button, Empty, LinkButton, PageHeader, Select } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 import { DataTable, FilterBar, FilterField, Pager, SearchField, type Col } from '../ui/table';
-import { CHANGE_KINDS, ChangeMark, SEVERITIES, Sev, changeKindInfo, severityLabel } from '../ui/marks';
+import { CHANGE_KINDS, ChangeMark, Glyph, SEVERITIES, Sev, changeKindInfo, severityLabel } from '../ui/marks';
 import { ExportButtons, useDraft } from '../ui/edit';
 import { useCan } from '../session';
 
@@ -73,6 +73,18 @@ export default function Changes() {
         readOnly={!canAck}
         actions={<><ExportButtons kind="changes" query={filters} /><LinkButton to="/changes/compare" icon="compare">{t('Porównaj dwa skany', 'Compare two runs')}</LinkButton></>}
       />
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-rule px-4 py-2 sm:px-6" role="group" aria-label={t('Szybkie filtry', 'Quick filters')} data-testid="change-quick">
+        {(['service_gone', 'service_returned', 'service_new', 'response_slower', 'response_recovered'] as const).map((k) => {
+          const i = changeKindInfo(k);
+          const on = u.get('kind') === k;
+          return (
+            <button key={k} type="button" aria-pressed={on} onClick={() => u.set({ kind: on ? null : k })}
+              className={cx('inline-flex h-[26px] items-center gap-1.5 border px-2 text-xs', on ? 'border-accent bg-accent-wash text-ink' : 'border-rule-strong text-ink-2 hover:border-accent hover:text-ink')}>
+              <Glyph name={i.glyph} tone={i.tone} size={12} />{i.label}
+            </button>
+          );
+        })}
+      </div>
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
         <SearchField value={text} onChange={setText} placeholder={t('adres albo opis', 'address or text')} />
         <FilterField label={t('Skan', 'Run')} width={150}>
