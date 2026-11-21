@@ -11,7 +11,7 @@ E2E_SKIP_BUILD=1 ./e2e/full/run.sh  # bez przebudowy obrazu
 ./e2e/full/lab.sh down              # ręczne sprzątanie laboratorium
 ```
 
-Wymagania: Docker, `curl`, `jq`, `bc`. Pakiety mierzy kontener pomocniczy `tcpdump` (obraz `czfull-tcpdump`, budowany lokalnie z Alpine), który dzieli przestrzeń sieciową z kontenerem Czujki. Czas: około 12–15 minut (najdłużej trwa test okna skanowania, które celowo zamyka się w trakcie skanu).
+Wymagania: Docker, `curl`, `jq`, `bc`. Pakiety mierzy kontener pomocniczy `tcpdump` (obraz `czfull-tcpdump`, budowany lokalnie z Alpine), który dzieli przestrzeń sieciową z kontenerem Czujki. Czas: około 10–15 minut (najdłużej trwa test okna skanowania, które celowo zamyka się w trakcie skanu).
 Skrypt sprząta po sobie: usuwa stos `czfull-e2e` z wolumenami i wszystkie kontenery `czfull-lab-*` oraz sieć `czfull-net`. Można go uruchamiać wielokrotnie.
 
 Zmienne: `E2E_PROJECT` (domyślnie `czfull-e2e`), `E2E_PORT` (`18492`, tylko `127.0.0.1`).
