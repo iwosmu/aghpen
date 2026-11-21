@@ -181,11 +181,16 @@ func (r *run) udpStage(ctx context.Context, g *group, up []probe.Host, rate int,
 		return nil
 	}
 	byIP := map[string][]probe.Port{}
+	gaveUp := map[string]bool{}
 	for _, h := range res.Hosts {
 		byIP[h.IP] = h.Ports
+		gaveUp[h.IP] = h.TimedOut
 	}
 	for i := range up {
 		up[i].Ports = append(up[i].Ports, byIP[up[i].IP]...)
+		if !gaveUp[up[i].IP] {
+			r.udpCovered.Store(up[i].IP, true) // the UDP ports count as scanned on this host
+		}
 	}
 	return nil
 }
@@ -524,6 +529,19 @@ func toService(p probe.Port) model.ServiceResult {
 func (r *run) buildHost(ctx context.Context, h probe.Host, attempts int) model.HostResult {
 	res := r.newHostResult(h, attempts)
 	r.httpHost(ctx, &res, nil)
+	// a port that answered HTTP is named by the page when nmap only guessed
+	// its name from the port table (same rule as quickMerge)
+	guess := map[int]bool{}
+	for _, p := range h.Ports {
+		if p.Method == "table" && (p.Proto == "" || p.Proto == "tcp") {
+			guess[p.Port] = true
+		}
+	}
+	for i := range res.Services {
+		if s := &res.Services[i]; s.Proto == "tcp" && s.HTTP != nil && guess[s.Port] {
+			s.Name = ""
+		}
+	}
 	r.finishHost(&res)
 	return res
 }
@@ -806,21 +824,113 @@ func (r *run) densePass(ctx context.Context, g *group, scanned map[string]*probe
 		scanned[h.IP] = &cp
 		added += len(h.Ports)
 	}
+	for _, ip := range finished(res) {
+		r.cover(ip, rest)
+	}
 	r.log.Info("wide port pass for dense hosts", "group", g.id, "hosts", len(dense), "ports", rest.Count(), "new_open", added)
 	return nil
 }
 
+// finished lists the hosts that a port scan reported up and did not give
+// up on: only those had every port of the pass scanned. A host missing from
+// nmap's output was not seen by the pass.
+func finished(res *probe.Result) []string {
+	var ips []string
+	if res == nil {
+		return nil
+	}
+	for _, h := range res.Hosts {
+		if !h.TimedOut {
+			ips = append(ips, h.IP)
+		}
+	}
+	return ips
+}
+
+// cover records that a finished pass scanned the ports of extra on host ip.
+func (r *run) cover(ip string, extra *probe.PortSet) {
+	set := &probe.PortSet{}
+	if v, ok := r.covered.Load(ip); ok {
+		*set = *v.(*probe.PortSet)
+	}
+	for _, p := range extra.List() {
+		set.Add(p)
+	}
+	r.covered.Store(ip, set)
+}
+
+// coverage is what the run scanned on host ip: the profile's ports, the
+// ports of a dense or full-range pass that finished for the host, and the
+// UDP ports of the UDP stage. Nil when the port list is unknown.
+func (r *run) coverage(ip string) *model.PortCoverage {
+	if r.ports == nil {
+		return nil
+	}
+	set := *r.ports
+	if v, ok := r.covered.Load(ip); ok {
+		for _, p := range v.(*probe.PortSet).List() {
+			set.Add(p)
+		}
+	}
+	c := &model.PortCoverage{TCP: portRanges(&set), UDP: []model.PortRange{}}
+	var udp []int
+	if _, ok := r.udpCovered.Load(ip); ok { // the UDP stage ran and finished for this host
+		udp = append(udp, r.udpPorts...)
+	}
+	sort.Ints(udp)
+	for _, p := range udp {
+		if n := len(c.UDP); n > 0 && c.UDP[n-1].Hi == p-1 {
+			c.UDP[n-1].Hi = p
+		} else {
+			c.UDP = append(c.UDP, model.PortRange{Lo: p, Hi: p})
+		}
+	}
+	return c
+}
+
+// portRanges turns a port set into sorted inclusive ranges.
+func portRanges(s *probe.PortSet) []model.PortRange {
+	out := []model.PortRange{}
+	for p := 1; p <= 65535; p++ {
+		if !s.Has(p) {
+			continue
+		}
+		if n := len(out); n > 0 && out[n-1].Hi == p-1 {
+			out[n-1].Hi = p
+		} else {
+			out = append(out, model.PortRange{Lo: p, Hi: p})
+		}
+	}
+	return out
+}
+
 // A small run (few open TCP ports in the group) takes the quick path:
-// version detection runs per port, in parallel with the HTTP stage, and a
-// port that answered HTTP stops its version detection. nmap's -sV is slow on
+// version detection runs per port, in parallel with the HTTP stage, and
+// partial results go to the store while it runs. Every port's version
+// detection runs to its end (bounded by quickServiceTimeout), so the final
+// result has nmap's product and version and does not depend on timing. nmap's -sV is slow on
 // HTTP servers that ignore its non-HTTP probes: Gitea on port 3000 took 42 s
 // for one port (probes listing port 3000 first, 5 s wait each), while the
 // HTTP collector reads it in under a second. Measured on one host with 7
 // ports: 68 s before, mostly -sV (43 s) and then the HTTP stage (24 s).
 const (
-	quickMaxPairs       = 32               // open TCP ports in a group, all hosts together
-	quickServiceTimeout = 30 * time.Second // bound for one port's version detection
-	quickMaxProcs       = 8                // nmap processes at one time on the quick path
+	quickMaxPairs = 32 // open TCP ports in a group, all hosts together
+	// bound for one port's version detection: the general path's bound, so
+	// the result does not depend on the path (Gitea needs 42 s, Prometheus
+	// 66 s: nmap matches it only with its late FourOhFourRequest probe)
+	quickServiceTimeout = serviceHostTimeout
+	quickMaxProcs       = 8 // nmap processes at one time on the quick path
+)
+
+// amqpHello reads an AMQP broker's product and version (a variable for tests).
+var amqpHello = probe.AMQPHello
+
+// amqpWait is how long nmap gets to name an AMQP port first.
+var amqpWait = 3 * time.Second
+
+const (
+	amqpTimeout = 3 * time.Second
+	amqpPackets = 10 // handshake, header, Connection.Start, close
 )
 
 // quickStoreEvery is the pace of partial results of a host being described
@@ -904,7 +1014,7 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 			continue
 		}
 		port := p.Port
-		pctx, cancel := context.WithTimeout(ctx, quickServiceTimeout)
+		qctx, cancel := context.WithCancel(ctx)
 		cancels[port] = cancel
 		svwg.Add(1)
 		go func() {
@@ -912,10 +1022,15 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 			defer cancel()
 			select {
 			case procs <- struct{}{}:
-			case <-pctx.Done():
+			case <-qctx.Done():
 				return
 			}
 			defer func() { <-procs }()
+			// the bound starts when the port's process starts, not while it
+			// waits for a slot: a queued port must not time out unscanned
+			// (the gate's second run named two ports differently that way)
+			pctx, pcancel := context.WithTimeout(qctx, quickServiceTimeout)
+			defer pcancel()
 			t0 := r.e.now()
 			sv, err := r.prober.ServiceScan(pctx, probe.ServiceRequest{
 				Hosts: []probe.HostPorts{{IP: h.IP, Ports: []int{port}}}, Intensity: r.plan.Profile.VersionIntensity,
@@ -983,22 +1098,87 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 		}()
 	}
 
+	// AMQP: the broker names its product and version right after the
+	// client's protocol header; nmap reaches its AMQP probe only after 22 s.
+	// Sent only to an open port that is AMQP's (5672, or a port nmap's port
+	// table names amqp) and that version detection has not named after
+	// amqpWait. Never to other unknown ports (docs/BEZPIECZENSTWO.md).
+	for _, p := range h.Ports {
+		if (p.Proto != "" && p.Proto != "tcp") || p.State != "open" || !(strings.EqualFold(p.Name, "amqp") || p.Port == 5672) {
+			continue
+		}
+		port := p.Port
+		svwg.Add(1)
+		go func() {
+			defer svwg.Done()
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(amqpWait):
+			}
+			mu.Lock()
+			named := detected[port].Product != ""
+			mu.Unlock()
+			if named {
+				return
+			}
+			t0 := r.e.now()
+			product, version, err := amqpHello(ctx, h.IP, port, amqpTimeout)
+			r.account(gs, &probe.Result{Packets: amqpPackets, PacketsExact: false}, t0)
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			detected[port], changed = probe.Port{Port: port, Proto: "tcp", State: "open", Name: "amqp", Product: product, Version: version, Confidence: 1}, true
+			mu.Unlock()
+			if c := cancels[port]; c != nil {
+				c() // nmap's answer would be the same, 20 s later
+			}
+		}()
+	}
+
+	// The HTTP answer does not stop the port's version detection: nmap's
+	// product and version are part of the result (the lab gate lost 17 of
+	// 32 service versions when it did, and Gitea's "Go" came and went with
+	// the timing). Partial results show the services early instead.
 	r.httpHost(ctx, &res, func(svc *model.ServiceResult) {
 		mu.Lock()
 		described[svc.Port], changed = *svc, true
 		mu.Unlock()
-		if svc.HTTP != nil {
-			if c := cancels[svc.Port]; c != nil {
-				c()
-			}
-		}
 	})
 	svwg.Wait()
 	close(stop)
 	pwg.Wait()
 	res = quickMerge(res, detected)
+	r.retryHTTP(ctx, &res, detected)
 	r.finishHost(&res)
 	return res
+}
+
+// retryHTTP runs the HTTP stage again on ports that nmap names HTTP but
+// that gave our GET no answer while nmap's version detection ran on them.
+// A server with one worker (Gunicorn's sync worker) serves one connection at
+// a time; nmap's -sV holds an idle connection for seconds and the GET timed
+// out behind it (the lab's Flask app on 5000 lost its technology that way).
+func (r *run) retryHTTP(ctx context.Context, res *model.HostResult, detected map[int]probe.Port) {
+	retry := model.HostResult{IP: res.IP, Hostnames: res.Hostnames}
+	var idx []int
+	for i, s := range res.Services {
+		d, ok := detected[s.Port]
+		if s.Proto == "tcp" && s.State == "open" && s.HTTP == nil && ok && strings.Contains(strings.ToLower(d.Name), "http") {
+			retry.Services = append(retry.Services, s)
+			idx = append(idx, i)
+		}
+	}
+	if len(idx) == 0 || ctx.Err() != nil {
+		return
+	}
+	r.httpHost(ctx, &retry, nil)
+	for j, i := range idx {
+		if s := retry.Services[j]; s.HTTP != nil {
+			res.Services[i].HTTP, res.Services[i].TLS, res.Services[i].Tunnel = s.HTTP, s.TLS, s.Tunnel
+		}
+	}
 }
 
 // quickMerge returns a copy of res with the version-detection answers in
@@ -1008,15 +1188,15 @@ func quickMerge(res model.HostResult, detected map[int]probe.Port) model.HostRes
 	for i := range res.Services {
 		s := &res.Services[i]
 		d, ok := detected[s.Port]
-		if !ok && s.Proto == "tcp" && s.HTTP != nil {
-			// version detection was stopped by the HTTP answer: the name so
-			// far is the port table's guess (3000 is "ppp"), the page is a fact
+		if (!ok || d.Method == "table") && s.Proto == "tcp" && s.HTTP != nil {
+			// no probe matched: the name so far is the port table's guess
+			// (3000 is "ppp", 50000 "ibm-db2"), the page is a fact
 			s.Name = ""
 		}
 		if !ok || s.Proto != "tcp" {
 			continue
 		}
-		if d.Name != "" {
+		if d.Name != "" && !(d.Method == "table" && s.HTTP != nil) {
 			s.Name = d.Name
 		}
 		s.Product, s.Version, s.ExtraInfo, s.Banner, s.Confidence = d.Product, d.Version, d.ExtraInfo, d.Banner, d.Confidence
@@ -1074,6 +1254,7 @@ func (r *run) claimFullRange(hosts []probe.Host, scanned map[string]*probe.Host)
 		left := r.fullLeft.Load()
 		if left < n {
 			r.log.Info("full port range skipped: too many live hosts", "hosts", n, "budget_left", left)
+			r.stats.passSkipHosts(model.PassFullRange, int(n))
 			return false
 		}
 		if r.fullLeft.CompareAndSwap(left, left-n) {
@@ -1084,6 +1265,7 @@ func (r *run) claimFullRange(hosts []probe.Host, scanned map[string]*probe.Host)
 
 // fullScan is the outcome of the full-range port scan.
 type fullScan struct {
+	rest  *probe.PortSet // the ports of the pass
 	res   *probe.Result
 	err   error
 	ports int
@@ -1114,7 +1296,7 @@ func (r *run) fullRangeScan(ctx context.Context, g *group, up []probe.Host, rate
 	endPass()
 	end()
 	r.account(gs, ps, t0)
-	return fullScan{res: ps, err: err, ports: rest.Count(), start: t0}
+	return fullScan{rest: rest, res: ps, err: err, ports: rest.Count(), start: t0}
 }
 
 // fullRangeFinish describes the new open ports of the full-range scan and
@@ -1143,6 +1325,13 @@ func (r *run) fullRangeFinish(ctx context.Context, g *group, up []probe.Host, re
 		}
 		r.stats.warn("Pełny zakres portów nie został przeskanowany (błąd nmap). Usługi spoza listy portów profilu są w tym przebiegu nieznane.")
 		return nil
+	}
+	if fs.rest != nil {
+		for _, ip := range finished(ps) {
+			if _, ok := byIP[ip]; ok {
+				r.cover(ip, fs.rest) // every port of 1-65535 the policy allows was scanned on this host
+			}
+		}
 	}
 	var more []probe.Host
 	for _, h := range ps.Hosts {

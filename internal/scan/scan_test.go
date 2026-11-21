@@ -913,7 +913,7 @@ func (s slowSV) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*pro
 				select {
 				case <-ctx.Done():
 					return nil, context.Cause(ctx)
-				case <-time.After(20 * time.Second):
+				case <-time.After(time.Second):
 				}
 			}
 		}
@@ -921,7 +921,7 @@ func (s slowSV) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*pro
 	return s.fakeNet.ServiceScan(ctx, req)
 }
 
-func TestQuickPathHTTPStopsSlowVersionDetection(t *testing.T) {
+func TestQuickPathKeepsSlowVersionDetection(t *testing.T) {
 	netw := slowSV{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 80, 8080}}}}
 	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
 	plan := basePlan("10.7.0.5")
@@ -933,8 +933,8 @@ func TestQuickPathHTTPStopsSlowVersionDetection(t *testing.T) {
 	if out.Status != model.RunCompleted {
 		t.Fatalf("outcome = %+v", out)
 	}
-	if d := time.Since(start); d > 10*time.Second {
-		t.Errorf("run took %v: the HTTP answer must stop version detection on port 80", d)
+	if d := time.Since(start); d < time.Second {
+		t.Errorf("run took %v: version detection must run to its end", d)
 	}
 	h := sink.host("10.7.0.5")
 	if h == nil || len(h.Services) != 3 {
@@ -946,8 +946,8 @@ func TestQuickPathHTTPStopsSlowVersionDetection(t *testing.T) {
 			if s.Name != "ssh" || s.Product != "OpenSSH" || s.HTTP != nil {
 				t.Errorf("ssh = %+v", s)
 			}
-		case 80, 8080: // 8080: the port table says "unknown" here (nmap says "ppp" for 3000), the page says http
-			if s.Name != "http" || s.HTTP == nil {
+		case 80, 8080: // the HTTP answer and nmap's product and version, both kept
+			if s.Name != "http" || s.HTTP == nil || s.Product != "nginx" || s.Version != "1.27.0" {
 				t.Errorf("http = %+v", s)
 			}
 		}
@@ -1157,5 +1157,168 @@ func TestExplicitFullRangeGoesTopPortsFirst(t *testing.T) {
 	}
 	if p := out.Stats.Passes; len(p) != 2 || p[1].PortsTotal != 64535 {
 		t.Errorf("passes = %+v", p)
+	}
+}
+
+// flakyFP fails the first GET to port 8080, like a one-worker server busy
+// with nmap's idle -sV connection.
+type flakyFP struct {
+	fakeFP
+	mu    sync.Mutex
+	tries int
+}
+
+func (f *flakyFP) Fingerprint(ctx context.Context, req model.FingerprintRequest) (*model.HTTPFingerprint, *model.TLSInfo, error) {
+	if req.Port == 8080 {
+		f.mu.Lock()
+		f.tries++
+		first := f.tries == 1
+		f.mu.Unlock()
+		if first {
+			return nil, nil, errors.New("timeout")
+		}
+	}
+	return f.fakeFP.Fingerprint(ctx, req)
+}
+
+func TestQuickPathRetriesHTTPAfterVersionDetection(t *testing.T) {
+	netw := &fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 8080}}}
+	fp := &flakyFP{}
+	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: fp, Signatures: fakeSig{}})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	plan.Policy.MaxPerHostRPS = 100
+	sink := newSink()
+	if out := e.Run(context.Background(), plan, sink); out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	h := sink.host("10.7.0.5")
+	if h == nil || h.Services[1].Port != 8080 || h.Services[1].HTTP == nil || fp.tries != 2 {
+		t.Fatalf("host = %+v, tries = %d", h, fp.tries)
+	}
+}
+
+// slowAMQP is a network whose version detection on 5672 takes long, like
+// nmap on RabbitMQ (22 s).
+type slowAMQP struct{ *fakeNet }
+
+func (s slowAMQP) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*probe.Result, error) {
+	if req.Hosts[0].Ports[0] == 5672 {
+		select {
+		case <-ctx.Done():
+			return nil, context.Cause(ctx)
+		case <-time.After(20 * time.Second):
+		}
+	}
+	return s.fakeNet.ServiceScan(ctx, req)
+}
+
+func TestQuickPathReadsTheAMQPVersion(t *testing.T) {
+	defer func(f func(context.Context, string, int, time.Duration) (string, string, error)) { amqpHello = f }(amqpHello)
+	defer func(d time.Duration) { amqpWait = d }(amqpWait)
+	amqpWait = 10 * time.Millisecond
+	var sent []int
+	amqpHello = func(_ context.Context, ip string, port int, _ time.Duration) (string, string, error) {
+		sent = append(sent, port)
+		return "RabbitMQ", "4.3.8", nil
+	}
+	netw := slowAMQP{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 5672}}}}
+	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.Ports = "22,5672"
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	start := time.Now()
+	sink := newSink()
+	if out := e.Run(context.Background(), plan, sink); out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	if d := time.Since(start); d > 10*time.Second {
+		t.Errorf("run took %v: the AMQP answer must stop nmap's -sV", d)
+	}
+	h := sink.host("10.7.0.5")
+	if h == nil || h.Services[1].Name != "amqp" || h.Services[1].Product != "RabbitMQ" || h.Services[1].Version != "4.3.8" {
+		t.Fatalf("host = %+v", h)
+	}
+	if len(sent) != 1 || sent[0] != 5672 {
+		t.Errorf("AMQP header sent to %v: only the AMQP port may get it", sent)
+	}
+}
+
+// Two runs of the same unchanged services must give the same service data,
+// however long version detection takes compared with the HTTP stage.
+func TestQuickPathResultDoesNotDependOnTiming(t *testing.T) {
+	scan := func(p probe.Prober) []model.ServiceResult {
+		e := New(Deps{Prober: p, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
+		plan := basePlan("10.7.0.5")
+		plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+		plan.Policy.MaxPerHostRPS = 100
+		sink := newSink()
+		if out := e.Run(context.Background(), plan, sink); out.Status != model.RunCompleted {
+			t.Fatalf("outcome = %+v", out)
+		}
+		return sink.host("10.7.0.5").Services
+	}
+	hosts := map[string][]int{"10.7.0.5": {22, 80, 8080}}
+	fast := scan(&fakeNet{hosts: hosts})
+	slow := scan(slowSV{&fakeNet{hosts: hosts}})
+	if len(fast) != len(slow) {
+		t.Fatalf("fast %d services, slow %d", len(fast), len(slow))
+	}
+	for i := range fast {
+		f, s := fast[i], slow[i]
+		if f.Port != s.Port || f.Name != s.Name || f.Product != s.Product || f.Version != s.Version ||
+			strings.Join(f.CPE, ",") != strings.Join(s.CPE, ",") || len(f.Technologies) != len(s.Technologies) {
+			t.Errorf("port %d: fast %+v\nslow %+v", f.Port, f, s)
+		}
+	}
+}
+
+func TestFullRangeBudgetLeavesANote(t *testing.T) {
+	k := newStatsKeeper(nil, time.Now)
+	k.addPass(model.PassTopPorts)
+	k.passBegin(model.PassFullRange, 16, 16*64535, 900)()
+	k.passSkipHosts(model.PassFullRange, 7)
+	k.finishPasses(true)
+	s := k.snapshot()
+	if len(s.Notes) != 1 || !strings.Contains(s.Notes[0], "objął 16 z 23") || len(s.Warnings) != 0 {
+		t.Fatalf("notes %q warnings %q", s.Notes, s.Warnings)
+	}
+	if p := s.Passes[1]; p.Hosts != 16 || p.HostsSkipped != 7 {
+		t.Errorf("pass = %+v", p)
+	}
+}
+
+// tableGuess is a network whose version detection matched no probe on 8080:
+// nmap then reports the port table's name with method "table".
+type tableGuess struct{ *fakeNet }
+
+func (n tableGuess) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*probe.Result, error) {
+	res, err := n.fakeNet.ServiceScan(ctx, req)
+	if err != nil {
+		return res, err
+	}
+	for i := range res.Hosts {
+		for j, p := range res.Hosts[i].Ports {
+			if p.Port == 8080 {
+				res.Hosts[i].Ports[j] = probe.Port{Port: 8080, Proto: "tcp", State: "open", Name: "ibm-db2", Method: "table"}
+			}
+		}
+	}
+	return res, nil
+}
+
+func TestPortTableGuessGivesWayToTheHTTPAnswer(t *testing.T) {
+	netw := tableGuess{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 8080}}}}
+	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	plan.Policy.MaxPerHostRPS = 100
+	sink := newSink()
+	if out := e.Run(context.Background(), plan, sink); out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	h := sink.host("10.7.0.5")
+	if h == nil || h.Services[1].Port != 8080 || h.Services[1].Name != "http" || h.Services[0].Name != "ssh" {
+		t.Fatalf("services = %+v", h.Services)
 	}
 }

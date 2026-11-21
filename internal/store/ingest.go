@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -409,6 +410,11 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 			PortsUnknown bool `json:"ports_unknown"`
 			// the services this result lists (set after the service upsert)
 			Listed []int64 `json:"listed"`
+			// Covered: the result says which ports it scanned (HostResult.Coverage);
+			// unlisted services are then marked by coverage (markByCoverage), not here
+			Covered bool `json:"covered"`
+			cover   *model.PortCoverage
+			at      time.Time
 		}
 		var present []presence
 		hostIDs := make([]int64, 0, len(order))
@@ -463,11 +469,15 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 				}
 				hostObs = append(hostObs, o)
 			}
-			present = append(present, presence{HostID: id, Up: r.Up, RunID: r.RunID, PortsUnknown: r.HasUnknownPorts(), Listed: []int64{}})
+			present = append(present, presence{HostID: id, Up: r.Up, RunID: r.RunID, PortsUnknown: r.HasUnknownPorts(), Listed: []int64{},
+				Covered: r.Up && !r.HasUnknownPorts() && r.Coverage != nil, cover: r.Coverage, at: r.ObservedAt.UTC()})
 
 			seen := map[svcKey]bool{}
 			for i := range r.Services {
 				sv := &r.Services[i]
+				if sv.Carried {
+					continue // an exported copy of an earlier observation (re-import): not observed now
+				}
 				proto := strings.ToLower(sv.Proto)
 				if proto == "" {
 					proto = "tcp"
@@ -610,8 +620,8 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 			// it does not list is gone, also one that only a partial result of
 			// this run listed.
 			if _, err := tx.db.Exec(ctx, `UPDATE services s SET state = CASE WHEN d.up THEN 'gone' ELSE 'unknown' END
-				FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, up boolean, run_id bigint, ports_unknown boolean, listed bigint[])
-				WHERE s.host_id = d.host_id AND NOT (s.id = ANY(d.listed)) AND NOT d.ports_unknown
+				FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, up boolean, run_id bigint, ports_unknown boolean, listed bigint[], covered boolean)
+				WHERE s.host_id = d.host_id AND NOT (s.id = ANY(d.listed)) AND NOT d.ports_unknown AND NOT d.covered
 				AND ((d.up AND s.state IN ('open', 'filtered', 'unknown')) OR (NOT d.up AND s.state IN ('open', 'filtered')))`, js(present)); err != nil {
 				return mapErr(err)
 			}
@@ -620,6 +630,15 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 			if _, err := tx.db.Exec(ctx, `DELETE FROM service_observations o USING jsonb_to_recordset($1::jsonb) AS d(host_id bigint, run_id bigint, ports_unknown boolean, listed bigint[])
 				WHERE o.host_id = d.host_id AND o.run_id = d.run_id AND NOT d.ports_unknown AND NOT (o.service_id = ANY(d.listed))`, js(present)); err != nil {
 				return mapErr(err)
+			}
+			var covered []coveredHost
+			for _, p := range present {
+				if p.Covered {
+					covered = append(covered, coveredHost{hostID: p.HostID, runID: p.RunID, at: p.at, listed: p.Listed, cover: p.cover})
+				}
+			}
+			if err := markByCoverage(ctx, tx.db, covered); err != nil {
+				return err
 			}
 		}
 
@@ -709,4 +728,84 @@ func obsReason(r *model.HostResult) string {
 		return model.ReasonPortsUnknown
 	}
 	return r.Reason
+}
+
+// coveredHost is a complete result of an answering host that says which
+// ports it scanned (HostResult.Coverage).
+type coveredHost struct {
+	hostID, runID int64
+	at            time.Time
+	listed        []int64
+	cover         *model.PortCoverage
+}
+
+// markByCoverage handles the services that a complete result does not list.
+// A service on a port the run scanned is gone. A service on a port the run
+// did not scan keeps its state, and an open or filtered one gets a copy of
+// its last observation in this run, marked carried: the run's view still
+// shows it, the next run compares against it, and nothing is reported (no
+// state change without a change of the analysis). The copy has no secret
+// part: the encrypted fields are bound to their own run.
+func markByCoverage(ctx context.Context, db querier, hosts []coveredHost) error {
+	if len(hosts) == 0 {
+		return nil
+	}
+	byHost := make(map[int64]*coveredHost, len(hosts))
+	ids := make([]int64, 0, len(hosts))
+	for i := range hosts {
+		byHost[hosts[i].hostID] = &hosts[i]
+		ids = append(ids, hosts[i].hostID)
+	}
+	rows, err := db.Query(ctx, `SELECT id, host_id, port, proto, state FROM services
+		WHERE host_id = ANY($1) AND state IN ('open', 'filtered', 'unknown')`, ids)
+	if err != nil {
+		return mapErr(err)
+	}
+	type carry struct {
+		ServiceID int64     `json:"service_id"`
+		RunID     int64     `json:"run_id"`
+		At        time.Time `json:"at"`
+	}
+	var gone []int64
+	var carried []carry
+	for rows.Next() {
+		var id, hostID int64
+		var port int
+		var proto, state string
+		if err := rows.Scan(&id, &hostID, &port, &proto, &state); err != nil {
+			rows.Close()
+			return mapErr(err)
+		}
+		h := byHost[hostID]
+		if h == nil || slices.Contains(h.listed, id) {
+			continue
+		}
+		switch {
+		case h.cover.Has(proto, port):
+			gone = append(gone, id)
+		case state != "unknown":
+			carried = append(carried, carry{ServiceID: id, RunID: h.runID, At: h.at})
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return mapErr(err)
+	}
+	if len(gone) > 0 {
+		if _, err := db.Exec(ctx, `UPDATE services SET state = 'gone' WHERE id = ANY($1) AND state <> 'gone'`, gone); err != nil {
+			return mapErr(err)
+		}
+	}
+	if len(carried) > 0 {
+		if _, err := db.Exec(ctx, `INSERT INTO service_observations (service_id, host_id, run_id, at, state, name, product, version, title, http_status, tls, result, secret)
+			SELECT DISTINCT ON (o.service_id) o.service_id, o.host_id, d.run_id, d.at, o.state, o.name, o.product, o.version, o.title, o.http_status, o.tls,
+				o.result || '{"carried": true}'::jsonb, ''
+			FROM jsonb_to_recordset($1::jsonb) AS d(service_id bigint, run_id bigint, at timestamptz)
+			JOIN service_observations o ON o.service_id = d.service_id AND o.run_id <> d.run_id
+			WHERE NOT EXISTS (SELECT 1 FROM service_observations x WHERE x.service_id = d.service_id AND x.run_id = d.run_id)
+			ORDER BY o.service_id, o.at DESC, o.id DESC`, js(carried)); err != nil {
+			return mapErr(err)
+		}
+	}
+	return nil
 }

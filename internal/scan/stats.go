@@ -1,6 +1,8 @@
 package scan
 
 import (
+	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -101,11 +103,28 @@ func (k *statsKeeper) passState(name, state string) {
 	}
 }
 
+// passSkipHosts counts live hosts that a pass did not cover.
+func (k *statsKeeper) passSkipHosts(name string, n int) {
+	k.mu.Lock()
+	k.passLocked(name).st.HostsSkipped += n
+	k.mu.Unlock()
+}
+
 // finishPasses closes the passes when the run ends: a completed run has
-// every pass done or skipped.
+// every pass done or skipped. A full-range pass that left live hosts out
+// adds a note, so that the difference in coverage is visible.
 func (k *statsKeeper) finishPasses(completed bool) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
+	for _, p := range k.passes {
+		if p.st.Name == model.PassFullRange && p.st.HostsSkipped > 0 {
+			note := fmt.Sprintf("pełny zakres portów (1-65535) objął %d z %d aktywnych hostów; pozostałe: porty z profilu",
+				p.st.Hosts, p.st.Hosts+p.st.HostsSkipped)
+			if !slices.Contains(k.s.Notes, note) {
+				k.s.Notes = append(k.s.Notes, note)
+			}
+		}
+	}
 	if !completed {
 		return
 	}

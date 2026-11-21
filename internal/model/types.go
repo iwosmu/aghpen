@@ -386,6 +386,9 @@ type RunStats struct {
 	// Warnings are the engine's sanity checks that failed: the run ended,
 	// but its result is not complete. The API and the UI show them.
 	Warnings []string `json:"warnings,omitempty"`
+	// Notes are facts about the run's coverage that the UI shows; unlike
+	// Warnings they are not failed checks (Polish text).
+	Notes []string `json:"notes,omitempty"`
 	// Passes lists the port passes of a run in execution order, only when
 	// the run has more than one (a small scope gets top ports, then the
 	// full range; the /16 gets a dense pass for hosts with many open ports).
@@ -482,6 +485,41 @@ type HostResult struct {
 	// (the engine's quick path). The final result of the same run replaces
 	// it. The store keeps the service's change hash and its known fields.
 	Interim bool `json:"interim,omitempty"`
+	// Coverage: the ports the scan covered on this host (the profile's list,
+	// plus the dense or full-range pass when it finished for the host). A
+	// service of the host outside it keeps its state and is not reported
+	// gone. Nil: unknown (imports, older engines): every unlisted service of
+	// an answering host counts as gone. Engine to store only, not serialized.
+	Coverage *PortCoverage `json:"-"`
+}
+
+// PortRange is an inclusive range of ports.
+type PortRange struct {
+	Lo int `json:"lo"`
+	Hi int `json:"hi"`
+}
+
+// PortCoverage is the set of ports one run scanned on one host.
+type PortCoverage struct {
+	TCP []PortRange `json:"tcp"`
+	UDP []PortRange `json:"udp"`
+}
+
+// Has reports whether the port was scanned. A nil coverage covers every port.
+func (c *PortCoverage) Has(proto string, port int) bool {
+	if c == nil {
+		return true
+	}
+	rs := c.TCP
+	if proto == "udp" {
+		rs = c.UDP
+	}
+	for _, r := range rs {
+		if port >= r.Lo && port <= r.Hi {
+			return true
+		}
+	}
+	return false
 }
 
 // VendorForMAC returns the vendor to show for a MAC address. A locally
@@ -509,6 +547,9 @@ type PassStat struct {
 	Hosts      int    `json:"hosts"`
 	PortsTotal int64  `json:"ports_total"`
 	PortsDone  int64  `json:"ports_done"`
+	// HostsSkipped: live hosts the pass did not cover (full_range: over the
+	// run's host budget; they got only the profile's ports).
+	HostsSkipped int `json:"hosts_skipped,omitempty"`
 }
 
 // Port pass names and states (RunStats.Passes).
@@ -543,6 +584,9 @@ type ScriptResult struct {
 }
 
 type ServiceResult struct {
+	// Carried: not scanned in this run (outside the run's coverage of the
+	// host); the store copied the last observation and kept the state.
+	Carried      bool             `json:"carried,omitempty"`
 	Port         int              `json:"port"`
 	Proto        string           `json:"proto"` // tcp | udp
 	State        string           `json:"state"` // open | closed | filtered
@@ -822,6 +866,10 @@ type Service struct {
 	// slow against the service's own baseline (analyze.ResponseSeries).
 	ResponseMs   *int `json:"response_ms"`
 	ResponseSlow bool `json:"response_slow"`
+	// Carried is set only in a list for one run (run_id): the run did not
+	// scan this port on the host (outside its coverage), so the service's
+	// state and data come from an earlier run.
+	Carried bool `json:"carried,omitempty"`
 }
 
 type InterestReason struct {

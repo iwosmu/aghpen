@@ -13,18 +13,26 @@
 #   GATE_RAW_TOL=0.05   nmap's own packets: no second over cap x (1 + tol)
 #   GATE_ALL_TOL=0.10 GATE_ALL_SECONDS=3   all packets (with the kernel's TCP of HTTP
 #                       and version detection): at most this many seconds over cap x (1 + tol)
+#   GATE_VERSIONS=0.90 GATE_TITLES=0.98   share right: service versions, page titles
+#   GATE_STABLE=1   scan t0 a second time: the second run must report no
+#                   tech_gone, tech_new, tech_version or service_changed change
+#                   (the lab did not change; unstable hosts excused). GATE_STABLE=0 skips it.
 # The run must end "completed" with no engine warning, and the Docker host's
 # neighbour table must not overflow during the run (table_fulls unchanged).
 set -uo pipefail
 cd "$(dirname "$0")/.."
 OUT=${GATE_OUT:-e2e/out/gate-$(date +%Y%m%d-%H%M%S)}
 H=${GATE_HOSTS:-0.97}; P=${GATE_PORTS:-0.75}; T=${GATE_TECH:-0.90}
+V=${GATE_VERSIONS:-0.90}; TT=${GATE_TITLES:-0.98}; STABLE=${GATE_STABLE:-1}
 RT=${GATE_RAW_TOL:-0.05}; AT=${GATE_ALL_TOL:-0.10}; AS=${GATE_ALL_SECONDS:-3}
 NB0=$(e2e/neigh-check.sh -json) || { echo "gate: the neighbour table is nearly full ($NB0); fix the host first"; exit 3; }
-LR_NAME=gate LR_STATES=t0 LR_OUT="$OUT" e2e/lab-run.sh > "$OUT.log" 2>&1
+STATES=t0; [ "$STABLE" = 1 ] && STATES="t0 t0"
+LR_NAME=gate LR_STATES="$STATES" LR_OUT="$OUT" e2e/lab-run.sh > "$OUT.log" 2>&1
 RC=$?
 [ -f "$OUT/score-t0.json" ] && [ -f "$OUT/pps-t0.json" ] && [ -f "$OUT/run-t0.json" ] || { echo "gate: the run did not finish (exit $RC), see $OUT.log"; tail -5 "$OUT.log"; exit 1; }
-NB1=$(cat "$OUT/neigh-t0.json")
+LAST=t0; [ "$STABLE" = 1 ] && LAST=t0-2
+[ -f "$OUT/neigh-$LAST.json" ] && [ -f "$OUT/changes-$LAST.json" ] || { echo "gate: run $LAST did not finish, see $OUT.log"; exit 1; }
+NB1=$(cat "$OUT/neigh-$LAST.json")
 FAIL=0
 row() { # name value limit ok
   printf '%-44s %-22s %-22s %s\n' "$1" "$2" "$3" "$([ "$4" = 1 ] && echo ok || echo FAIL)"
@@ -38,6 +46,18 @@ for m in "hosts $H" "ports $P" "technologies $T"; do
   set -- $m; read -r R TP N <<< "$(rec "$1")"
   row "recall: $1" "$(printf '%.3f (%d/%d)' "$R" "$TP" "$N")" ">= $2" "$(ge "$R" "$2")"
 done
+acc() { jq -r --arg n "$1" '.accuracies[] | select(.name == $n) | "\(.share) \(.right) \(.total)"' "$OUT/score-t0.json"; }
+for m in "service versions|$V" "page titles|$TT"; do
+  IFS='|' read -r NM LIM <<< "$m"; read -r R TP N <<< "$(acc "$NM")"
+  row "share right: $NM" "$(printf '%.3f (%d/%d)' "$R" "$TP" "$N")" ">= $LIM" "$(ge "$R" "$LIM")"
+done
+if [ "$STABLE" = 1 ]; then
+  UNST=$(jq -c '[.unstable[]?.ip]' "$OUT/score-t0.json")
+  FLAPS=$(jq -r --argjson u "$UNST" '[.items[]? | select(.kind == "tech_gone" or .kind == "tech_new" or .kind == "tech_version" or .kind == "service_changed") | select(.ip as $i | $u | index($i) | not)]' "$OUT/changes-t0-2.json")
+  NF=$(echo "$FLAPS" | jq length); NALL=$(jq '.items | length' "$OUT/changes-t0-2.json")
+  row "stability: t0 twice, changes in run 2" "$NF of $NALL changes" "0 tech/version" "$([ "$NF" = 0 ] && echo 1 || echo 0)"
+  echo "$FLAPS" | jq -r '.[] | "  \(.kind) \(.ip):\(.port) \(.summary)"' | head -20
+fi
 ST=$(jq -r .status "$OUT/run-t0.json"); W=$(jq -r '.stats.warnings // [] | length' "$OUT/run-t0.json")
 row "run status" "$ST" "completed" "$([ "$ST" = completed ] && echo 1 || echo 0)"
 row "engine warnings" "$W" "0" "$([ "$W" = 0 ] && echo 1 || echo 0)"

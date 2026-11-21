@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -436,6 +437,11 @@ func TestRetroHuntScale(t *testing.T) {
 
 	hunt := "id: rzadki\nname: RzadkiSystem\nbody: {regex: 'Powered by RzadkiSystem ([0-9.]+)', weight: 0.9, version_group: 1}\n"
 	var before, after runtime.MemStats
+	// HeapInuse also holds garbage that the collector has not freed yet, so
+	// with the default GOGC the peak depended on GC timing and the check
+	// failed about one run in three. A low GOGC during the hunt keeps the
+	// garbage small: the peak then measures what the stream keeps alive.
+	defer debug.SetGCPercent(debug.SetGCPercent(10))
 	runtime.GC()
 	runtime.ReadMemStats(&before)
 	peak := uint64(0)

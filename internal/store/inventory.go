@@ -305,14 +305,33 @@ func (s *Store) postService(v *model.Service) error {
 	return err
 }
 
+// serviceColsFor adds "carried" for a list of one run: the run's
+// observation of the service is a carried copy (the run did not scan it).
+func serviceColsFor(f ServiceFilter) string {
+	if f.RunID == 0 {
+		return serviceCols
+	}
+	return serviceCols + fmt.Sprintf(`, EXISTS (SELECT 1 FROM service_observations co WHERE co.service_id = s.id AND co.run_id = %d
+		AND COALESCE((co.result->>'carried')::boolean, false)) AS carried`, f.RunID)
+}
+
+// CountCarried returns how many services run runID did not scan and carried
+// over from an earlier run (their state is kept).
+func (s *Store) CountCarried(ctx context.Context, runID int64) (int, error) {
+	var n int
+	err := s.db.QueryRow(ctx, `SELECT count(DISTINCT service_id) FROM service_observations
+		WHERE run_id = $1 AND COALESCE((result->>'carried')::boolean, false)`, runID).Scan(&n)
+	return n, mapErr(err)
+}
+
 // ListServices returns a page of services.
 func (s *Store) ListServices(ctx context.Context, f ServiceFilter) (model.Page[model.Service], error) {
-	return listPage[model.Service](ctx, s.db, serviceCols, "services s", f.where(), orderBy(f.Sort, serviceSort, serviceLiveInterest+" DESC, s.interest DESC", "s.ip, s.port"), f.ListOpts, s.postService)
+	return listPage[model.Service](ctx, s.db, serviceColsFor(f), "services s", f.where(), orderBy(f.Sort, serviceSort, serviceLiveInterest+" DESC, s.interest DESC", "s.ip, s.port"), f.ListOpts, s.postService)
 }
 
 // EachService streams every service that matches the filter.
 func (s *Store) EachService(ctx context.Context, f ServiceFilter, fn func(*model.Service) error) error {
-	return streamAll[model.Service](ctx, s.db, serviceCols, "services s", f.where(), orderBy(f.Sort, serviceSort, "s.ip ASC", "s.port, s.id"), s.postService, fn)
+	return streamAll[model.Service](ctx, s.db, serviceColsFor(f), "services s", f.where(), orderBy(f.Sort, serviceSort, "s.ip ASC", "s.port, s.id"), s.postService, fn)
 }
 
 // GetService returns one service; withLatest also loads its newest observation.

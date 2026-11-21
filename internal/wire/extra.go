@@ -106,6 +106,9 @@ func (r Reporter) Input(ctx context.Context, runID int64) (report.Input, error) 
 		return in, err
 	}
 	in.Services = sp.Items
+	if in.Carried, err = r.st.CountCarried(ctx, runID); err != nil {
+		return in, err
+	}
 	hp, err := r.st.ListHosts(ctx, store.HostFilter{Status: []string{"unstable", "expected-offline", "down"}, ListOpts: store.ListOpts{Limit: 200}})
 	if err != nil {
 		return in, err

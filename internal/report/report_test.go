@@ -329,3 +329,24 @@ func TestTimesUseTheGivenZone(t *testing.T) {
 		t.Errorf("times are not in Europe/Warsaw:\n%s", md[:300])
 	}
 }
+
+// A service the run did not scan (carried) never looks freshly observed:
+// its row says so, and the open-services figure names how many are left out.
+func TestCarriedServicesAreMarked(t *testing.T) {
+	prev := int64(7)
+	in := Input{Run: model.ScanRun{ID: 8, Status: model.RunCompleted, Stats: model.RunStats{HostsUp: 1, ServicesOpen: 1}},
+		Summary: model.RunDiffSummary{PrevRunID: &prev, ByKind: map[string]int{}}, Carried: 1,
+		Services: []model.Service{
+			{IP: "10.0.0.5", Port: 80, Product: "nginx", Interest: 20},
+			{IP: "10.0.0.5", Port: 8787, Product: "nginx", Interest: 10, Carried: true},
+		}}
+	md := Markdown(in)
+	for _, want := range []string{"10.0.0.5:8787", "nie skanowana w tym przebiegu", "bez 1 usługi nieskanowanej w tym przebiegu (stan zachowany)"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("%q is missing:\n%s", want, md)
+		}
+	}
+	if strings.Count(md, "nie skanowana w tym przebiegu") != 1 {
+		t.Error("only the carried row is marked")
+	}
+}

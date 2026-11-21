@@ -205,6 +205,9 @@ func (c *collector) add(v map[Field]string) error {
 			svc.Confidence = f
 		}
 	}
+	if s := get(FCarried); s != "" {
+		svc.Carried, _ = parseBool(s)
+	}
 	tlsOn := false
 	if s := get(FTLS); s != "" {
 		tlsOn, _ = parseBool(s)
