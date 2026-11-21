@@ -1,0 +1,206 @@
+{
+  "name": "hdr-leaky",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "Apache/2.2.15 (CentOS)",
+            "headers": [
+              {
+                "name": "X-Powered-By",
+                "value": "PHP/5.4.16"
+              },
+              {
+                "name": "X-Debug-Mode",
+                "value": "enabled"
+              },
+              {
+                "name": "X-Backend-Server",
+                "value": "app-node-03.internal.uczelnia.example"
+              },
+              {
+                "name": "Via",
+                "value": "1.1 varnish (Varnish/6.0)"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "PHPSESSID",
+                "value": "q8r2k1m5n7p3s9t4v6w0x2y4z6"
+              },
+              {
+                "name": "lang",
+                "value": "pl",
+                "max_age": 31536000
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>System Obsługi Zgłoszeń</title>\n</head>\n<body>\n<h1>System Obsługi Zgłoszeń</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n<p class=\"footer\">HelpDesk 3.1</p>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 8000,
+          "kind": "http",
+          "site": {
+            "server": "Apache/2.2.15 (CentOS)",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Status serwera (stary)</title>\n</head>\n<body>\n<pre>uptime: 412 days</pre>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "Apache/2.2.15 (CentOS)",
+            "headers": [
+              {
+                "name": "X-Powered-By",
+                "value": "PHP/7.4.33"
+              },
+              {
+                "name": "X-Debug-Mode",
+                "value": "enabled"
+              },
+              {
+                "name": "X-Backend-Server",
+                "value": "app-node-03.internal.uczelnia.example"
+              },
+              {
+                "name": "Via",
+                "value": "1.1 varnish (Varnish/6.0)"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "PHPSESSID",
+                "value": "q8r2k1m5n7p3s9t4v6w0x2y4z6",
+                "http_only": true
+              },
+              {
+                "name": "lang",
+                "value": "pl",
+                "max_age": 31536000
+              },
+              {
+                "name": "tracking_id",
+                "value": "u-551-20261121",
+                "max_age": 31536000
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>System Obsługi Zgłoszeń</title>\n</head>\n<body>\n<h1>System Obsługi Zgłoszeń</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n<p class=\"footer\">HelpDesk 3.1</p>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 8081,
+          "kind": "http",
+          "site": {
+            "server": "nginx/1.26.2",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Konsola diagnostyczna</title>\n</head>\n<body>\n<h1>Konsola diagnostyczna</h1><pre>queue: 0\nworkers: 4</pre>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "Apache/2.2.15 (CentOS)",
+            "headers": [
+              {
+                "name": "X-Powered-By",
+                "value": "PHP/7.4.33"
+              },
+              {
+                "name": "X-Debug-Mode",
+                "value": "enabled"
+              },
+              {
+                "name": "X-Backend-Server",
+                "value": "app-node-03.internal.uczelnia.example"
+              },
+              {
+                "name": "Via",
+                "value": "1.1 varnish (Varnish/6.0)"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "PHPSESSID",
+                "value": "q8r2k1m5n7p3s9t4v6w0x2y4z6",
+                "http_only": true
+              },
+              {
+                "name": "lang",
+                "value": "pl",
+                "max_age": 31536000
+              },
+              {
+                "name": "tracking_id",
+                "value": "u-551-20261121",
+                "max_age": 31536000
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>System Obsługi Zgłoszeń</title>\n</head>\n<body>\n<h1>System Obsługi Zgłoszeń</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n<p class=\"footer\">HelpDesk 3.1</p>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 8081,
+          "kind": "http",
+          "site": {
+            "server": "nginx/1.26.2",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Konsola diagnostyczna</title>\n</head>\n<body>\n<h1>Konsola diagnostyczna</h1><pre>queue: 0\nworkers: 4</pre>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

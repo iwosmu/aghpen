@@ -1,0 +1,150 @@
+{
+  "name": "dev-api",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 8080,
+          "kind": "http",
+          "site": {
+            "server": "nginx/1.22.1",
+            "headers": [
+              {
+                "name": "X-Powered-By",
+                "value": "PHP/8.2.12"
+              },
+              {
+                "name": "X-Debug-Token",
+                "value": "4f2a1c"
+              },
+              {
+                "name": "X-Debug-Token-Link",
+                "value": "http://10.66.40.11:8080/_profiler/4f2a1c"
+              },
+              {
+                "name": "X-Robots-Tag",
+                "value": "noindex"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "content_type": "application/json",
+                "body": "{\"service\":\"oceny-api\",\"env\":\"dev\",\"debug\":true,\"version\":\"0.9.3-SNAPSHOT\"}\n"
+              },
+              {
+                "path": "/_profiler/4f2a1c",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Symfony Profiler</title>\n</head>\n<body>\n<div id=\"sfwdt\">Symfony Profiler</div>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 8080,
+          "kind": "http",
+          "site": {
+            "server": "nginx/1.22.1",
+            "headers": [
+              {
+                "name": "X-Powered-By",
+                "value": "PHP/8.2.12"
+              },
+              {
+                "name": "X-Debug-Token",
+                "value": "4f2a1c"
+              },
+              {
+                "name": "X-Debug-Token-Link",
+                "value": "http://10.66.40.11:8080/_profiler/4f2a1c"
+              },
+              {
+                "name": "X-Robots-Tag",
+                "value": "noindex"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "content_type": "application/json",
+                "body": "{\"service\":\"oceny-api\",\"env\":\"dev\",\"debug\":true,\"version\":\"0.9.3-SNAPSHOT\"}\n"
+              },
+              {
+                "path": "/_profiler/4f2a1c",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Symfony Profiler</title>\n</head>\n<body>\n<div id=\"sfwdt\">Symfony Profiler</div>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 8080,
+          "kind": "http",
+          "site": {
+            "server": "nginx/1.22.1",
+            "headers": [
+              {
+                "name": "X-Powered-By",
+                "value": "PHP/8.2.12"
+              },
+              {
+                "name": "X-Debug-Token",
+                "value": "4f2a1c"
+              },
+              {
+                "name": "X-Debug-Token-Link",
+                "value": "http://10.66.40.11:8080/_profiler/4f2a1c"
+              },
+              {
+                "name": "X-Robots-Tag",
+                "value": "noindex"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Credentials",
+                "value": "true"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "status": 503,
+                "content_type": "application/json",
+                "body": "{\"service\":\"oceny-api\",\"env\":\"dev\",\"status\":\"maintenance\"}\n"
+              },
+              {
+                "path": "/_profiler/4f2a1c",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Symfony Profiler</title>\n</head>\n<body>\n<div id=\"sfwdt\">Symfony Profiler</div>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

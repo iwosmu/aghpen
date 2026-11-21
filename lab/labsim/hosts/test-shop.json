@@ -1,0 +1,59 @@
+{
+  "name": "test-shop",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "Apache/2.4.57 (Debian)",
+            "routes": [
+              {
+                "path": "*",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>401 Unauthorized</title>\n</head>\n<body>\n<h1>Unauthorized</h1><p>This server could not verify that you are authorized to access the document requested.</p>\n</body>\n</html>\n",
+                "basic_realm": "TEST environment - authorized staff only"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "Apache/2.4.57 (Debian)",
+            "routes": [
+              {
+                "path": "*",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>401 Unauthorized</title>\n</head>\n<body>\n<h1>Unauthorized</h1><p>This server could not verify that you are authorized to access the document requested.</p>\n</body>\n</html>\n",
+                "basic_realm": "TEST environment - authorized staff only"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "Apache/2.4.57 (Debian)",
+            "routes": [
+              {
+                "path": "*",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>401 Unauthorized</title>\n</head>\n<body>\n<h1>Unauthorized</h1><p>This server could not verify that you are authorized to access the document requested.</p>\n</body>\n</html>\n",
+                "basic_realm": "TEST environment - authorized staff only"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

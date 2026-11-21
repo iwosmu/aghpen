@@ -57,6 +57,8 @@ services:
     volumes:
       - czujka-keys:/var/lib/czujka
     networks: [internal, scan]
+    # A DefectDojo that runs on the docker host (lab/defectdojo) is reachable as http://host.docker.internal:<port>.
+    extra_hosts: ["host.docker.internal:host-gateway"]
     # Non-root user (see the Dockerfile) with exactly the two capabilities nmap needs.
     cap_drop: [ALL]
     cap_add: [NET_RAW, NET_ADMIN]

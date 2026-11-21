@@ -1,0 +1,59 @@
+{
+  "name": "slow",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Archiwum (wolny serwer)</title>\n</head>\n<body>\n<p>Ten serwer odpowiada po 4 sekundach.</p>\n</body>\n</html>\n"
+              }
+            ],
+            "delay_ms": 4000
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Archiwum (wolny serwer)</title>\n</head>\n<body>\n<p>Ten serwer odpowiada po 4 sekundach.</p>\n</body>\n</html>\n"
+              }
+            ],
+            "delay_ms": 4000
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Archiwum (wolny serwer)</title>\n</head>\n<body>\n<p>Ten serwer odpowiada po 4 sekundach.</p>\n</body>\n</html>\n"
+              }
+            ],
+            "delay_ms": 4000
+          }
+        }
+      ]
+    }
+  }
+}

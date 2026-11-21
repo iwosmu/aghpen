@@ -1,0 +1,22 @@
+{
+  "technologies": {
+    "Example CMS": {
+      "cats": [1],
+      "description": "Example CMS is a content management system.",
+      "headers": {"X-Generator": "Example CMS(?: ([\\d.]+))?\\;version:\\1"},
+      "cookies": {"examplecms_session": ""},
+      "meta": {"generator": "^Example CMS ([\\d.]+)\\;version:\\1"},
+      "html": ["<link[^>]+/examplecms/assets/", "<!-- Example CMS -->\\;confidence:50"],
+      "scriptSrc": "examplecms(?:\\.min)?\\.js",
+      "implies": ["PHP\\;confidence:80", "MySQL"],
+      "icon": "ExampleCMS.svg",
+      "website": "https://example.org",
+      "cpe": "cpe:2.3:a:example:cms:*:*:*:*:*:*:*:*",
+      "js": {"ExampleCMS.version": "([\\d.]+)\\;version:\\1"}
+    },
+    "BrowserOnly": {
+      "cats": [59],
+      "js": {"BrowserOnly": ""}
+    }
+  }
+}

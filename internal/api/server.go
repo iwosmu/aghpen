@@ -151,6 +151,7 @@ func (s *Server) routes() http.Handler {
 		r.With(can(model.PermSignaturesRead)).Post("/signatures/retrohunt", s.retroHunt)
 
 		r.With(can(model.PermResultsCreate)).Post("/import/results", s.importResults)
+		r.With(can(model.PermExportRun)).Post("/runs/{id}/export/defectdojo", s.exportRunDojo)
 		r.With(can(model.PermExportRun)).Get("/export/runs/{file}", s.exportRun)
 		r.With(can(model.PermExportRun)).Get("/export/{file}", s.export)
 
@@ -574,14 +575,15 @@ var actionWords = map[string]bool{"pause": true, "resume": true, "cancel": true,
 
 // namedActions are the routes whose audit action does not follow the generic rule.
 var namedActions = map[string][2]string{
-	"POST /api/v1/runs":                       {"run.start", "run"},
-	"PUT /api/v1/settings/safety":             {"safety.update", "safety"},
-	"POST /api/v1/emergency-stop":             {"safety.emergency_stop", "safety"},
-	"POST /api/v1/emergency-stop/release":     {"safety.emergency_stop_release", "safety"},
-	"PUT /api/v1/settings/defectdojo":         {"integration.defectdojo.update", "integration"},
-	"POST /api/v1/settings/defectdojo/test":   {"integration.defectdojo.test", "integration"},
-	"POST /api/v1/findings/export/defectdojo": {"finding.export.defectdojo", "finding"},
-	"POST /api/v1/import/results":             {"result.import", "result"},
+	"POST /api/v1/runs":                        {"run.start", "run"},
+	"PUT /api/v1/settings/safety":              {"safety.update", "safety"},
+	"POST /api/v1/emergency-stop":              {"safety.emergency_stop", "safety"},
+	"POST /api/v1/emergency-stop/release":      {"safety.emergency_stop_release", "safety"},
+	"PUT /api/v1/settings/defectdojo":          {"integration.defectdojo.update", "integration"},
+	"POST /api/v1/settings/defectdojo/test":    {"integration.defectdojo.test", "integration"},
+	"POST /api/v1/findings/export/defectdojo":  {"finding.export.defectdojo", "finding"},
+	"POST /api/v1/runs/{id}/export/defectdojo": {"run.export.defectdojo", "run"},
+	"POST /api/v1/import/results":              {"result.import", "result"},
 }
 
 // defaultAction names the audit action from the route: PATCH /hosts/{id} is "host.update".

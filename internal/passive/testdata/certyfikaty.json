@@ -1,0 +1,5 @@
+[
+ {"issuer_ca_id":295815,"issuer_name":"C=US, O=Let's Encrypt, CN=R11","common_name":"www.kampus.example","name_value":"www.kampus.example\nkampus.example","id":15000000001,"entry_timestamp":"2026-11-20T09:12:44.561","not_before":"2026-11-20T08:14:03","not_after":"2027-02-18T08:14:02","serial_number":"04a1b2c3d4e5f60718293a4b5c6d7e8f9012","result_count":2},
+ {"issuer_ca_id":295815,"issuer_name":"C=US, O=Let's Encrypt, CN=R11","common_name":"*.lab.kampus.example","name_value":"*.lab.kampus.example\nlab.kampus.example","id":15000000002,"entry_timestamp":"2026-10-02T11:00:00.1","not_before":"2026-10-02T10:01:00","not_after":"2026-12-31T10:00:59","serial_number":"03ffee","result_count":2},
+ {"issuer_ca_id":1,"issuer_name":"CN=Wewnetrzne CA","common_name":"stary-portal.kampus.example","name_value":"stary-portal.kampus.example\nportal.inna-uczelnia.example","id":15000000003,"entry_timestamp":"2024-01-05T00:00:00","not_before":"2024-01-05T00:00:00","not_after":"2025-01-05T00:00:00","serial_number":"0a"}
+]

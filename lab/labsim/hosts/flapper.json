@@ -1,0 +1,61 @@
+{
+  "name": "flapper",
+  "avail": {
+    "kind": "flap",
+    "seed": "czujka-flapper",
+    "slot_sec": 60
+  },
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Stacja pomiarowa</title>\n</head>\n<body>\n<h1>Stacja pomiarowa</h1><p>Łącze radiowe, niestabilne.</p>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Stacja pomiarowa</title>\n</head>\n<body>\n<h1>Stacja pomiarowa</h1><p>Łącze radiowe, niestabilne.</p>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Stacja pomiarowa</title>\n</head>\n<body>\n<h1>Stacja pomiarowa</h1><p>Łącze radiowe, niestabilne.</p>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

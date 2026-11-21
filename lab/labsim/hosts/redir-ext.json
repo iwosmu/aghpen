@@ -1,0 +1,62 @@
+{
+  "name": "redir-ext",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "status": 302,
+                "location": "http://10.66.50.10/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"http://10.66.50.10/\">http://10.66.50.10/</a>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "status": 302,
+                "location": "http://10.66.50.10/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"http://10.66.50.10/\">http://10.66.50.10/</a>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "status": 302,
+                "location": "http://10.66.50.20/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"http://10.66.50.20/\">http://10.66.50.20/</a>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

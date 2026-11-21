@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -462,12 +463,13 @@ func (s *Server) importResults(w http.ResponseWriter, r *http.Request) {
 		notWired(w, "the run manager")
 		return
 	}
-	format, hosts, invalidLines, err := s.d.Importer.ParseResults(name, data)
+	hosts, rep, err := s.d.Importer.ParseResults(r.Context(), name, data)
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, "validation", "the file could not be read: "+err.Error())
 		return
 	}
-	rep := model.ImportReport{Format: format, Invalid: invalidLines, Skipped: len(invalidLines)}
+	format := rep.Format
+	rep.RunID, rep.Hosts, rep.Services = nil, 0, 0
 	if rep.Invalid == nil {
 		rep.Invalid = []model.InvalidLine{}
 	}
@@ -739,24 +741,32 @@ func (s *Server) exportRun(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if format == "xml" {
-		if s.d.Exporter == nil {
-			notWired(w, "the nmap XML exporter (internal/interchange)")
-			return
-		}
-		var hosts []model.HostResult
-		if err := s.st.EachRunResult(r.Context(), id, func(h *model.HostResult) error {
-			clean(h)
-			hosts = append(hosts, *h)
-			return nil
-		}); err != nil {
+	if s.d.Exporter == nil && format == "xml" {
+		notWired(w, "the nmap XML exporter (internal/interchange)")
+		return
+	}
+	if s.d.Exporter != nil {
+		// The exchange formats: nmap XML, Czujka JSON (lossless HostResult records) and CSV. They import again.
+		ctype := map[string]string{"xml": "application/xml; charset=utf-8", "json": "application/json; charset=utf-8", "csv": "text/csv; charset=utf-8"}[format]
+		w.Header().Set("Content-Type", ctype)
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="czujka-run-%d.%s"`, id, format))
+		out, err := s.d.Exporter.RunWriter(w, format, run)
+		if err != nil {
 			s.fail(w, r, err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="czujka-run-%d.xml"`, id))
-		if err := s.d.Exporter.NmapXML(w, run, hosts); err != nil {
-			s.log.Error("nmap XML export failed", "run", id, "err", err)
+		n := 0
+		err = s.st.EachRunResult(r.Context(), id, func(h *model.HostResult) error {
+			clean(h)
+			n++
+			return out.WriteHost(*h)
+		})
+		if cerr := out.Close(); err == nil {
+			err = cerr
+		}
+		auditSet(r, "", "", nil, map[string]any{"hosts": n})
+		if err != nil {
+			s.log.Error("run export failed", "run", id, "format", format, "err", err)
 		}
 		return
 	}
@@ -791,6 +801,69 @@ func (s *Server) exportRun(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.log.Error("run export failed", "run", id, "err", err)
 	}
+}
+
+// exportRunDojo uploads the nmap XML of one run to DefectDojo as an "Nmap
+// Scan" import. A second upload of the same run re-imports into the same test.
+func (s *Server) exportRunDojo(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	run, err := s.st.GetRun(r.Context(), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if s.d.Dojo == nil || s.d.Exporter == nil {
+		notWired(w, "the DefectDojo client and the nmap XML exporter")
+		return
+	}
+	settings, err := s.st.GetDefectDojo(r.Context(), true)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if !settings.Enabled || settings.URL == "" || settings.APIKey == "" {
+		writeErr(w, http.StatusConflict, "conflict", "DefectDojo is not configured: set the URL and the API key and enable the integration")
+		return
+	}
+	var buf bytes.Buffer
+	out, err := s.d.Exporter.RunWriter(&buf, "xml", run)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	hosts := 0
+	err = s.st.EachRunResult(r.Context(), id, func(h *model.HostResult) error {
+		for i := range h.Services {
+			redactCookies(&h.Services[i]) // raw cookie values never leave Czujka
+		}
+		hosts++
+		return out.WriteHost(*h)
+	})
+	if cerr := out.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if hosts == 0 {
+		writeErr(w, http.StatusConflict, "conflict", "the run has no results to export")
+		return
+	}
+	at := run.CreatedAt
+	if run.FinishedAt != nil {
+		at = *run.FinishedAt
+	}
+	up, err := s.d.Dojo.UploadNmap(r.Context(), settings, fmt.Sprintf("Czujka run %d", id), &buf, at)
+	auditSet(r, "", "", nil, map[string]any{"hosts": hosts, "test_id": up.TestID, "reimport": up.Reimport, "created": up.Created})
+	if err != nil {
+		writeErrDetails(w, http.StatusBadGateway, "internal", "DefectDojo upload failed: "+err.Error(), up)
+		return
+	}
+	writeJSON(w, http.StatusOK, up)
 }
 
 // ---------- web UI ----------

@@ -139,6 +139,8 @@ func (s *Sig) Model() model.Signature {
 func Parse(src string) ([]*Sig, model.SignatureValidation) {
 	p := &parser{}
 	nodes := p.splitDocuments(src)
+	trimmed := strings.TrimSpace(src)
+	jsonText := strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[")
 	var out []*Sig
 	pathSet := map[string]bool{}
 	ids := map[string]bool{}
@@ -148,7 +150,14 @@ func Parse(src string) ([]*Sig, model.SignatureValidation) {
 			prefix = fmt.Sprintf("[%d]", i)
 		}
 		before := p.errorCount()
-		d := p.parseDef(n, prefix)
+		var d *Def
+		// A converted signature is stored as canonical Czujka YAML.
+		foreign := p.origin[n] != "" || jsonText
+		if isNuclei(n) {
+			d, foreign = p.convertNuclei(n, prefix), true
+		} else {
+			d = p.parseDef(n, prefix)
+		}
 		s := p.compile(d, prefix)
 		if d != nil && d.ID != "" {
 			if ids[d.ID] {
@@ -162,10 +171,15 @@ func Parse(src string) ([]*Sig, model.SignatureValidation) {
 		if s == nil || p.errorCount() != before {
 			continue
 		}
-		if len(nodes) == 1 {
+		switch {
+		case foreign:
+			s.YAML = s.Def.YAML()
+		case len(nodes) == 1:
 			s.YAML = src
-		} else if b, err := yaml.Marshal(n); err == nil {
-			s.YAML = string(b)
+		default:
+			if b, err := yaml.Marshal(n); err == nil {
+				s.YAML = string(b)
+			}
 		}
 		for _, path := range s.paths {
 			pathSet[path] = true
@@ -385,7 +399,9 @@ func (e *Engine) ExtraPaths() []string {
 // PathsFor returns the extra paths worth fetching for one service whose root
 // page is already known, best first, at most limit (0: no limit). Paths of
 // signatures that the root page already supports come first, so a small
-// per-host budget is spent where it confirms or dates a technology.
+// per-host budget is spent where it confirms or dates a technology. Paths of
+// custom signatures come next: the analyst asked for them, so the budget
+// must not go to the generic paths of the built-in library first.
 func (e *Engine) PathsFor(svc *model.ServiceResult, limit int) []string {
 	st := e.cur.Load()
 	if svc == nil {
@@ -399,6 +415,11 @@ func (e *Engine) PathsFor(svc *model.ServiceResult, limit int) []string {
 	for _, s := range st.enabled {
 		if len(s.paths) == 0 {
 			continue
+		}
+		if !s.Builtin {
+			for _, path := range s.paths {
+				score[path] += 5
+			}
 		}
 		support := 0.0
 		for _, r := range s.rules {

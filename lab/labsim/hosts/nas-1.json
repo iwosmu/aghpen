@@ -1,0 +1,263 @@
+{
+  "name": "nas-1",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "status": 302,
+                "location": "http://10.66.30.30:5000/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"http://10.66.30.30:5000/\">http://10.66.30.30:5000/</a>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 5000,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "headers": [
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              },
+              {
+                "name": "X-XSS-Protection",
+                "value": "1; mode=block"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!DOCTYPE html>\n<html class=\"img-no-display\"><head>\n<meta charset=\"utf-8\">\n<title>nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation</title>\n<meta name=\"application-name\" content=\"nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation\" />\n<meta name=\"description\" content=\"DiskStation provides a full-featured network attached storage (NAS) solution.\" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"webman/resources/css/desktop.css?v=1556629596\" />\n<script type=\"text/javascript\" src=\"webapi/entry.cgi?api=SYNO.Core.Desktop.SessionData&version=1&method=getjs&SynoToken=&v=1556629596\"></script>\n</head>\n<body>\n<div id=\"sds-login-dialog\"><form id=\"login-form\"><input type=\"text\" name=\"username\"><input type=\"password\" name=\"passwd\"></form></div>\n<div id=\"sds-login-footer\">Synology DSM 6.2</div>\n</body></html>\n"
+              },
+              {
+                "path": "/webman/index.cgi",
+                "body": "<!DOCTYPE html>\n<html class=\"img-no-display\"><head>\n<meta charset=\"utf-8\">\n<title>nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation</title>\n<meta name=\"application-name\" content=\"nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation\" />\n<meta name=\"description\" content=\"DiskStation provides a full-featured network attached storage (NAS) solution.\" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"webman/resources/css/desktop.css?v=1556629596\" />\n<script type=\"text/javascript\" src=\"webapi/entry.cgi?api=SYNO.Core.Desktop.SessionData&version=1&method=getjs&SynoToken=&v=1556629596\"></script>\n</head>\n<body>\n<div id=\"sds-login-dialog\"><form id=\"login-form\"><input type=\"text\" name=\"username\"><input type=\"password\" name=\"passwd\"></form></div>\n<div id=\"sds-login-footer\">Synology DSM 6.2</div>\n</body></html>\n"
+              }
+            ],
+            "favicon_seed": "synology-dsm"
+          }
+        },
+        {
+          "port": 5001,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "synology.com",
+            "org": "Synology Inc.",
+            "sans": [
+              "synology.com"
+            ],
+            "not_before_days": -1200,
+            "not_after_days": 6000,
+            "key": "rsa2048"
+          },
+          "site": {
+            "server": "nginx",
+            "headers": [
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              },
+              {
+                "name": "X-XSS-Protection",
+                "value": "1; mode=block"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!DOCTYPE html>\n<html class=\"img-no-display\"><head>\n<meta charset=\"utf-8\">\n<title>nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation</title>\n<meta name=\"application-name\" content=\"nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation\" />\n<meta name=\"description\" content=\"DiskStation provides a full-featured network attached storage (NAS) solution.\" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"webman/resources/css/desktop.css?v=1556629596\" />\n<script type=\"text/javascript\" src=\"webapi/entry.cgi?api=SYNO.Core.Desktop.SessionData&version=1&method=getjs&SynoToken=&v=1556629596\"></script>\n</head>\n<body>\n<div id=\"sds-login-dialog\"><form id=\"login-form\"><input type=\"text\" name=\"username\"><input type=\"password\" name=\"passwd\"></form></div>\n<div id=\"sds-login-footer\">Synology DSM 6.2</div>\n</body></html>\n"
+              },
+              {
+                "path": "/webman/index.cgi",
+                "body": "<!DOCTYPE html>\n<html class=\"img-no-display\"><head>\n<meta charset=\"utf-8\">\n<title>nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation</title>\n<meta name=\"application-name\" content=\"nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation\" />\n<meta name=\"description\" content=\"DiskStation provides a full-featured network attached storage (NAS) solution.\" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"webman/resources/css/desktop.css?v=1556629596\" />\n<script type=\"text/javascript\" src=\"webapi/entry.cgi?api=SYNO.Core.Desktop.SessionData&version=1&method=getjs&SynoToken=&v=1556629596\"></script>\n</head>\n<body>\n<div id=\"sds-login-dialog\"><form id=\"login-form\"><input type=\"text\" name=\"username\"><input type=\"password\" name=\"passwd\"></form></div>\n<div id=\"sds-login-footer\">Synology DSM 6.2</div>\n</body></html>\n"
+              }
+            ],
+            "favicon_seed": "synology-dsm"
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "status": 302,
+                "location": "http://10.66.30.30:5000/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"http://10.66.30.30:5000/\">http://10.66.30.30:5000/</a>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 5000,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "headers": [
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              },
+              {
+                "name": "X-XSS-Protection",
+                "value": "1; mode=block"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!DOCTYPE html>\n<html class=\"img-no-display\"><head>\n<meta charset=\"utf-8\">\n<title>nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation</title>\n<meta name=\"application-name\" content=\"nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation\" />\n<meta name=\"description\" content=\"DiskStation provides a full-featured network attached storage (NAS) solution.\" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"webman/resources/css/desktop.css?v=1556629596\" />\n<script type=\"text/javascript\" src=\"webapi/entry.cgi?api=SYNO.Core.Desktop.SessionData&version=1&method=getjs&SynoToken=&v=1556629596\"></script>\n</head>\n<body>\n<div id=\"sds-login-dialog\"><form id=\"login-form\"><input type=\"text\" name=\"username\"><input type=\"password\" name=\"passwd\"></form></div>\n<div id=\"sds-login-footer\">Synology DSM 6.2</div>\n</body></html>\n"
+              },
+              {
+                "path": "/webman/index.cgi",
+                "body": "<!DOCTYPE html>\n<html class=\"img-no-display\"><head>\n<meta charset=\"utf-8\">\n<title>nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation</title>\n<meta name=\"application-name\" content=\"nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation\" />\n<meta name=\"description\" content=\"DiskStation provides a full-featured network attached storage (NAS) solution.\" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"webman/resources/css/desktop.css?v=1556629596\" />\n<script type=\"text/javascript\" src=\"webapi/entry.cgi?api=SYNO.Core.Desktop.SessionData&version=1&method=getjs&SynoToken=&v=1556629596\"></script>\n</head>\n<body>\n<div id=\"sds-login-dialog\"><form id=\"login-form\"><input type=\"text\" name=\"username\"><input type=\"password\" name=\"passwd\"></form></div>\n<div id=\"sds-login-footer\">Synology DSM 6.2</div>\n</body></html>\n"
+              }
+            ],
+            "favicon_seed": "synology-dsm"
+          }
+        },
+        {
+          "port": 5001,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "synology.com",
+            "org": "Synology Inc.",
+            "sans": [
+              "synology.com"
+            ],
+            "not_before_days": -1200,
+            "not_after_days": 6000,
+            "key": "rsa2048"
+          },
+          "site": {
+            "server": "nginx",
+            "headers": [
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              },
+              {
+                "name": "X-XSS-Protection",
+                "value": "1; mode=block"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!DOCTYPE html>\n<html class=\"img-no-display\"><head>\n<meta charset=\"utf-8\">\n<title>nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation</title>\n<meta name=\"application-name\" content=\"nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation\" />\n<meta name=\"description\" content=\"DiskStation provides a full-featured network attached storage (NAS) solution.\" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"webman/resources/css/desktop.css?v=1556629596\" />\n<script type=\"text/javascript\" src=\"webapi/entry.cgi?api=SYNO.Core.Desktop.SessionData&version=1&method=getjs&SynoToken=&v=1556629596\"></script>\n</head>\n<body>\n<div id=\"sds-login-dialog\"><form id=\"login-form\"><input type=\"text\" name=\"username\"><input type=\"password\" name=\"passwd\"></form></div>\n<div id=\"sds-login-footer\">Synology DSM 6.2</div>\n</body></html>\n"
+              },
+              {
+                "path": "/webman/index.cgi",
+                "body": "<!DOCTYPE html>\n<html class=\"img-no-display\"><head>\n<meta charset=\"utf-8\">\n<title>nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation</title>\n<meta name=\"application-name\" content=\"nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation\" />\n<meta name=\"description\" content=\"DiskStation provides a full-featured network attached storage (NAS) solution.\" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"webman/resources/css/desktop.css?v=1556629596\" />\n<script type=\"text/javascript\" src=\"webapi/entry.cgi?api=SYNO.Core.Desktop.SessionData&version=1&method=getjs&SynoToken=&v=1556629596\"></script>\n</head>\n<body>\n<div id=\"sds-login-dialog\"><form id=\"login-form\"><input type=\"text\" name=\"username\"><input type=\"password\" name=\"passwd\"></form></div>\n<div id=\"sds-login-footer\">Synology DSM 6.2</div>\n</body></html>\n"
+              }
+            ],
+            "favicon_seed": "synology-dsm"
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "status": 302,
+                "location": "http://10.66.30.30:5000/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"http://10.66.30.30:5000/\">http://10.66.30.30:5000/</a>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 5000,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "headers": [
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              },
+              {
+                "name": "X-XSS-Protection",
+                "value": "1; mode=block"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!DOCTYPE html>\n<html class=\"img-no-display\"><head>\n<meta charset=\"utf-8\">\n<title>nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation</title>\n<meta name=\"application-name\" content=\"nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation\" />\n<meta name=\"description\" content=\"DiskStation provides a full-featured network attached storage (NAS) solution.\" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"webman/resources/css/desktop.css?v=1556629596\" />\n<script type=\"text/javascript\" src=\"webapi/entry.cgi?api=SYNO.Core.Desktop.SessionData&version=1&method=getjs&SynoToken=&v=1556629596\"></script>\n</head>\n<body>\n<div id=\"sds-login-dialog\"><form id=\"login-form\"><input type=\"text\" name=\"username\"><input type=\"password\" name=\"passwd\"></form></div>\n<div id=\"sds-login-footer\">Synology DSM 6.2</div>\n</body></html>\n"
+              },
+              {
+                "path": "/webman/index.cgi",
+                "body": "<!DOCTYPE html>\n<html class=\"img-no-display\"><head>\n<meta charset=\"utf-8\">\n<title>nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation</title>\n<meta name=\"application-name\" content=\"nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation\" />\n<meta name=\"description\" content=\"DiskStation provides a full-featured network attached storage (NAS) solution.\" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"webman/resources/css/desktop.css?v=1556629596\" />\n<script type=\"text/javascript\" src=\"webapi/entry.cgi?api=SYNO.Core.Desktop.SessionData&version=1&method=getjs&SynoToken=&v=1556629596\"></script>\n</head>\n<body>\n<div id=\"sds-login-dialog\"><form id=\"login-form\"><input type=\"text\" name=\"username\"><input type=\"password\" name=\"passwd\"></form></div>\n<div id=\"sds-login-footer\">Synology DSM 6.2</div>\n</body></html>\n"
+              }
+            ],
+            "favicon_seed": "synology-dsm"
+          }
+        },
+        {
+          "port": 5001,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "synology.com",
+            "org": "Synology Inc.",
+            "sans": [
+              "synology.com"
+            ],
+            "not_before_days": -1200,
+            "not_after_days": 6000,
+            "key": "rsa2048"
+          },
+          "site": {
+            "server": "nginx",
+            "headers": [
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              },
+              {
+                "name": "X-XSS-Protection",
+                "value": "1; mode=block"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!DOCTYPE html>\n<html class=\"img-no-display\"><head>\n<meta charset=\"utf-8\">\n<title>nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation</title>\n<meta name=\"application-name\" content=\"nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation\" />\n<meta name=\"description\" content=\"DiskStation provides a full-featured network attached storage (NAS) solution.\" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"webman/resources/css/desktop.css?v=1556629596\" />\n<script type=\"text/javascript\" src=\"webapi/entry.cgi?api=SYNO.Core.Desktop.SessionData&version=1&method=getjs&SynoToken=&v=1556629596\"></script>\n</head>\n<body>\n<div id=\"sds-login-dialog\"><form id=\"login-form\"><input type=\"text\" name=\"username\"><input type=\"password\" name=\"passwd\"></form></div>\n<div id=\"sds-login-footer\">Synology DSM 6.2</div>\n</body></html>\n"
+              },
+              {
+                "path": "/webman/index.cgi",
+                "body": "<!DOCTYPE html>\n<html class=\"img-no-display\"><head>\n<meta charset=\"utf-8\">\n<title>nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation</title>\n<meta name=\"application-name\" content=\"nas-wimiip&nbsp;-&nbsp;Synology&nbsp;DiskStation\" />\n<meta name=\"description\" content=\"DiskStation provides a full-featured network attached storage (NAS) solution.\" />\n<link rel=\"stylesheet\" type=\"text/css\" href=\"webman/resources/css/desktop.css?v=1556629596\" />\n<script type=\"text/javascript\" src=\"webapi/entry.cgi?api=SYNO.Core.Desktop.SessionData&version=1&method=getjs&SynoToken=&v=1556629596\"></script>\n</head>\n<body>\n<div id=\"sds-login-dialog\"><form id=\"login-form\"><input type=\"text\" name=\"username\"><input type=\"password\" name=\"passwd\"></form></div>\n<div id=\"sds-login-footer\">Synology DSM 6.2</div>\n</body></html>\n"
+              }
+            ],
+            "favicon_seed": "synology-dsm"
+          }
+        }
+      ]
+    }
+  }
+}

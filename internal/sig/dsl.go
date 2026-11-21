@@ -59,6 +59,17 @@ var typeAliases = map[string]string{
 	"generator": TypeMeta, "icon": TypeFavicon, "favicon_hash": TypeFavicon, "request": TypePath,
 	"status_code": TypeStatus, "code": TypeStatus, "nmap": TypeService, "cert": TypeTLS, "certificate": TypeTLS,
 	"ssl": TypeTLS, "location": TypeRedirect, "host": TypeHostname, "final_url": TypeURL,
+	"endpoint": TypePath, "uri": TypePath, "mmh3": TypeFavicon, "favicon_mmh3": TypeFavicon, "icon_hash": TypeFavicon,
+	"text": TypeBody, "keyword": TypeBody, "keywords": TypeBody, "banners": TypeBanner,
+}
+
+// partTypes maps the "part" of a foreign matcher to a rule type.
+var partTypes = map[string]string{
+	"body": TypeBody, "html": TypeBody, "content": TypeBody, "response": TypeBody, "all": TypeBody, "raw": TypeBody, "data": TypeBody,
+	"header": TypeHeader, "headers": TypeHeader, "all_headers": TypeHeader, "response_headers": TypeHeader,
+	"title": TypeTitle, "cookie": TypeCookie, "cookies": TypeCookie, "banner": TypeBanner, "url": TypeURL,
+	"status": TypeStatus, "status_code": TypeStatus, "favicon": TypeFavicon, "meta": TypeMeta, "tls": TypeTLS, "cert": TypeTLS,
+	"hostname": TypeHostname, "redirect": TypeRedirect, "service": TypeService,
 }
 
 func canonType(t string) (string, bool) {
@@ -141,6 +152,8 @@ type RuleDef struct {
 // parser collects issues while it walks the YAML tree.
 type parser struct {
 	issues []model.SignatureIssue
+	origin map[*yaml.Node]string // nodes made from a foreign container, for example "keyed"
+	wapp   bool                  // the signature being parsed follows Wappalyzer conventions
 }
 
 func (p *parser) add(level string, safety bool, path string, n *yaml.Node, format string, args ...any) {
@@ -358,11 +371,7 @@ func (p *parser) splitDocuments(src string) []*yaml.Node {
 		case yaml.SequenceNode:
 			out = append(out, root.Content...)
 		case yaml.MappingNode:
-			if list := mappingValue(root, "signatures"); list != nil && list.Kind == yaml.SequenceNode {
-				out = append(out, list.Content...)
-			} else {
-				out = append(out, root)
-			}
+			out = append(out, p.unwrap(root)...)
 		default:
 			if !isNull(root) {
 				p.errf("", root, "sygnatura musi być mapą YAML (klucz: wartość)")
@@ -388,7 +397,7 @@ func mappingValue(n *yaml.Node, key string) *yaml.Node {
 	return nil
 }
 
-var topLevelKeys = []string{"references", "reference", "refs", "severity", "license", "created", "updated", "version_note"}
+var topLevelKeys = []string{"references", "reference", "refs", "license", "created", "updated", "version_note", "metadata", "classification", "remediation", "impact"}
 
 // parseDef reads one signature mapping. prefix is the YAML path prefix
 // ("" for a single signature, "[3]" inside a list).
@@ -401,16 +410,36 @@ func (p *parser) parseDef(n *yaml.Node, prefix string) *Def {
 	}
 	at := func(k string) string { return join(prefix, k) }
 	d := &Def{node: n, MinConfidence: DefaultMinConfidence}
+	p.wapp = p.origin[n] == "keyed" || m.has("cats", "scriptsrc", "script_src")
+	defer func() { p.wapp = false }()
 
-	if v, k := m.get("id", "slug"); v != nil {
+	if v, k := m.get("id", "slug", "identifier", "sid", "template_id"); v != nil {
 		d.ID = strings.TrimSpace(p.str(v, at(k)))
 	}
-	if v, k := m.get("name"); v != nil {
+	if v, k := m.get("name", "label", "app", "software", "product"); v != nil {
 		d.Name = strings.TrimSpace(p.str(v, at(k)))
+	}
+	if d.ID == "" && d.Name == "" {
+		// "technology: WordPress" alone names the signature.
+		if v := m.vals["technology"]; v != nil && v.Kind == yaml.ScalarNode && v.Tag != "!!bool" {
+			d.Name = strings.TrimSpace(v.Value)
+		}
+	}
+	if d.ID != "" && !validSlug(d.ID) {
+		// Foreign formats use free-form ids ("WordPress Login", "CVE_2020_1"): make a slug of it.
+		if s := slugify(d.ID); s != "" {
+			p.warnf(at("id"), n, "id „%s” zmieniono na „%s” (dozwolone: małe litery, cyfry, „-”, „_”, „.”)", clip(d.ID, 60), s)
+			if d.Name == "" {
+				d.Name = d.ID
+			}
+			d.ID = s
+		}
 	}
 	if d.ID == "" && d.Name != "" {
 		d.ID = slugify(d.Name)
-		p.warnf(at("id"), n, "brak pola id; przyjęto „%s” na podstawie nazwy", d.ID)
+		if p.origin[n] != "keyed" { // in a map keyed by name the key is the id: nothing to report
+			p.warnf(at("id"), n, "brak pola id; przyjęto „%s” na podstawie nazwy", d.ID)
+		}
 	}
 	if d.Name == "" && d.ID != "" {
 		d.Name = d.ID
@@ -425,7 +454,7 @@ func (p *parser) parseDef(n *yaml.Node, prefix string) *Def {
 		p.errf(at("name"), n, "nazwa jest za długa (limit 120 znaków)")
 	}
 
-	if v, k := m.get("category"); v != nil {
+	if v, k := m.get("category", "cat", "group", "kind"); v != nil {
 		d.Category = normKey(p.str(v, at(k)))
 		d.Category = strings.ReplaceAll(d.Category, "_", "-")
 	}
@@ -435,11 +464,11 @@ func (p *parser) parseDef(n *yaml.Node, prefix string) *Def {
 		p.warnf(at("category"), n, "nieznana kategoria „%s”; przyjęto „other”. Dozwolone: %s", d.Category, strings.Join(sortedKeys(validCategories), ", "))
 		d.Category = model.CatOther
 	}
-	if v, k := m.get("description", "desc", "info"); v != nil {
+	if v, k := m.get("description", "desc", "summary", "details", "comment", "notes"); v != nil {
 		d.Description = strings.TrimSpace(p.str(v, at(k)))
 	}
-	if v, k := m.get("author"); v != nil {
-		d.Author = p.str(v, at(k))
+	if v, k := m.get("author", "authors"); v != nil {
+		d.Author = strings.Join(cleanList(p.strList(v, at(k))), ", ")
 	}
 	if v, k := m.get("cpe"); v != nil {
 		d.CPE = strings.TrimSpace(p.str(v, at(k)))
@@ -447,8 +476,8 @@ func (p *parser) parseDef(n *yaml.Node, prefix string) *Def {
 			p.warnf(at(k), v, "cpe powinno zaczynać się od „cpe:”")
 		}
 	}
-	if v, k := m.get("tags"); v != nil {
-		d.Tags = cleanList(p.strList(v, at(k)))
+	if v, k := m.get("tags", "labels"); v != nil {
+		d.Tags = splitCommas(p.strList(v, at(k)))
 	}
 	if v, k := m.get("implies"); v != nil {
 		d.Implies = cleanList(p.strList(v, at(k)))
@@ -475,6 +504,9 @@ func (p *parser) parseDef(n *yaml.Node, prefix string) *Def {
 			}
 		}
 	}
+	if v, k := m.get("severity", "risk"); v != nil && d.Interest == 0 {
+		d.Interest = severityInterest(p.str(v, at(k)))
+	}
 	if v, k := m.get("technology", "tech"); v != nil {
 		if v.Kind == yaml.ScalarNode && v.Tag == "!!bool" {
 			b, _ := p.boolean(v, at(k))
@@ -499,7 +531,7 @@ func (p *parser) parseDef(n *yaml.Node, prefix string) *Def {
 	}
 
 	// Rules: match.rules, match as a list, top-level rules, and the short form.
-	if v, k := m.get("match", "matchers", "rules"); v != nil {
+	if v, k := m.get("match", "matchers", "rules", "detect", "detection", "checks", "conditions", "fingerprint", "fingerprints", "patterns", "indicators"); v != nil {
 		switch v.Kind {
 		case yaml.SequenceNode:
 			d.Rules = append(d.Rules, p.parseRuleList(v, at(k), "")...)
@@ -518,6 +550,23 @@ func (p *parser) parseDef(n *yaml.Node, prefix string) *Def {
 		}
 	}
 	p.parseMatchOptions(m, prefix, d)
+
+	// A signature with a rule list and one top-level path ("path: /login",
+	// "endpoint: /login") asks its body, title, status and header rules of
+	// that path, not of the root page.
+	basePath, listed := "", len(d.Rules)
+	if listed > 0 {
+		for _, k := range []string{"path", "endpoint", "uri", "url"} {
+			if v := m.vals[k]; v != nil && v.Kind == yaml.ScalarNode && strings.HasPrefix(strings.TrimSpace(v.Value), "/") {
+				m.used[k] = true
+				basePath = strings.TrimSpace(v.Value)
+				break
+			}
+		}
+	}
+	if p.wapp {
+		p.wappalyzer(m, prefix, d)
+	}
 	for _, k := range m.keys {
 		if m.used[k] {
 			continue
@@ -530,20 +579,106 @@ func (p *parser) parseDef(n *yaml.Node, prefix string) *Def {
 		d.Rules = append(d.Rules, p.parseShort(m.vals[k], at(k), typ, k)...)
 	}
 
-	if v, k := m.get("version", "versions"); v != nil {
-		d.Version = p.parseRuleList(v, at(k), "")
-		for i := range d.Version {
-			if d.Version[i].VersionGroup == 0 {
-				d.Version[i].VersionGroup = 1
-			}
-		}
+	if v, k := m.get("version", "versions", "version_regex", "version_pattern", "version_extract"); v != nil {
+		d.Version = p.parseVersion(v, at(k))
+	}
+	if basePath != "" && basePath != "/" {
+		rebase(d.Rules[:listed], basePath)
+		rebase(d.Version, basePath)
+	}
+	if p.wapp {
+		wappRules(d)
 	}
 	p.unknownKeys(m, prefix)
 	return d
 }
 
+// parseVersion reads the version field: a list of rules, one rule, or just a
+// pattern (or a list of patterns) whose first group is the version.
+func (p *parser) parseVersion(v *yaml.Node, path string) []RuleDef {
+	var out []RuleDef
+	pattern := func(n *yaml.Node, ypath string) {
+		pat := strings.TrimSpace(n.Value)
+		if !strings.Contains(pat, "(") {
+			return // "version: 1.2" is the version of the signature itself, not a pattern
+		}
+		// The pattern may be in the page or in a header line.
+		out = append(out, RuleDef{Type: TypeBody, Regex: []string{pat}, ypath: ypath, line: n.Line},
+			RuleDef{Type: TypeHeader, Regex: []string{pat}, ypath: ypath, line: n.Line})
+	}
+	switch v.Kind {
+	case yaml.ScalarNode:
+		pattern(v, path)
+	case yaml.MappingNode:
+		if r, ok := p.parseRule(v, path, ""); ok {
+			out = append(out, r)
+		}
+	case yaml.SequenceNode:
+		for i, it := range v.Content {
+			it = deref(it)
+			ip := fmt.Sprintf("%s[%d]", path, i)
+			if it.Kind == yaml.ScalarNode {
+				pattern(it, ip)
+			} else if r, ok := p.parseRule(it, ip, ""); ok {
+				out = append(out, r)
+			}
+		}
+	}
+	for i := range out {
+		if out[i].VersionGroup == 0 {
+			out[i].VersionGroup = 1
+		}
+	}
+	return out
+}
+
+// rebase turns root-page rules into rules about one extra path.
+func rebase(rules []RuleDef, path string) {
+	for i := range rules {
+		r := &rules[i]
+		if r.Path != "" {
+			continue
+		}
+		switch r.Type {
+		case TypeBody:
+			r.Type, r.Path = TypePath, path
+		case TypeTitle:
+			r.Type, r.Path, r.Field = TypePath, path, "title"
+		case TypeStatus:
+			r.Type, r.Path = TypePath, path
+		case TypeHeader:
+			r.Type, r.Path, r.Field = TypePath, path, "header"
+		}
+	}
+}
+
+func splitCommas(in []string) []string {
+	var out []string
+	for _, s := range in {
+		out = append(out, strings.Split(s, ",")...)
+	}
+	return cleanList(out)
+}
+
+// severityInterest maps a severity word of a foreign format to the interest weight.
+func severityInterest(s string) int {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "critical":
+		return 90
+	case "high":
+		return 75
+	case "medium", "moderate":
+		return 50
+	case "low":
+		return 25
+	case "info", "informational", "unknown", "none":
+		return 10
+	}
+	return 0
+}
+
 func (p *parser) parseMatchOptions(m *ymap, path string, d *Def) {
-	if v, k := m.get("condition", "mode", "operator"); v != nil {
+	if v, k := m.get("condition", "mode", "operator", "matchers_condition", "match_condition", "logic"); v != nil {
 		switch strings.ToLower(strings.TrimSpace(p.str(v, join(path, k)))) {
 		case "any", "or", "":
 			d.All = false
@@ -746,6 +881,9 @@ func (p *parser) shortScalar(n *yaml.Node, path, typ string) (RuleDef, bool) {
 	case TypeFavicon:
 		if i, err := strconv.ParseInt(v, 10, 32); err == nil {
 			r.MMH3 = []int32{int32(i)}
+		} else if strings.Contains(v, ".") {
+			p.warnf(path, n, "„%s” to nazwa pliku, nie skrót ikony; pole pominięto (podaj mmh3 albo sha256)", clip(v, 60))
+			return r, false
 		} else {
 			r.SHA256 = []string{v}
 		}
@@ -781,21 +919,68 @@ func (p *parser) parseRule(n *yaml.Node, path, typ string) (RuleDef, bool) {
 	}
 	at := func(k string) string { return join(path, k) }
 
-	if v, k := m.get("type"); v != nil {
-		t, ok := canonType(p.str(v, at(k)))
-		if !ok {
-			p.errf(at(k), v, "nieznany typ reguły „%s”. Dozwolone: %s", v.Value, strings.Join(sortedKeys(defaultWeights), ", "))
-			return r, false
+	// kind says how a foreign "value" or "pattern" field is read. Foreign
+	// formats often put the matcher kind in "type" and the target in "part":
+	// {type: word, part: header, words: [...]}.
+	kind := ""
+	if v, k := m.get("type", "matcher", "kind"); v != nil {
+		raw := normKey(p.str(v, at(k)))
+		switch raw {
+		case "word", "words", "keyword", "keywords", "string", "strings", "contains", "substring", "text", "literal":
+			kind = "contains"
+		case "regex", "regexp", "regexes", "pattern", "re":
+			kind = "regex"
+		case "equals", "exact", "eq":
+			kind = "equals"
+		default:
+			t, ok := canonType(raw)
+			if !ok {
+				p.errf(at(k), v, "nieznany typ reguły „%s”. Dozwolone: %s", v.Value, strings.Join(sortedKeys(defaultWeights), ", "))
+				return r, false
+			}
+			typ = t
 		}
-		typ = t
 	}
+	if v, k := m.get("field", "part", "in", "where", "target", "scope"); v != nil {
+		part := normKey(p.str(v, at(k)))
+		if t, ok := partTypes[part]; ok && typ == "" {
+			typ = t
+		} else {
+			r.Field = part
+		}
+	}
+	scalar := func(k string) bool { v := m.vals[k]; return v != nil && v.Kind == yaml.ScalarNode }
+	urlPath := scalar("url") && strings.HasPrefix(strings.TrimSpace(m.vals["url"].Value), "/")
+	textKeys := []string{"contains", "contains_all", "word", "words", "text", "keyword", "keywords", "string", "strings", "substring",
+		"regex", "regexp", "regexes", "value_regex", "matches", "re", "equals", "is", "eq", "exact", "pattern", "patterns", "value", "values", "match"}
 	if typ == "" {
-		// A rule without a type that names a path is a path rule; one that names a header is a header rule.
+		// A rule without a type: the fields it has tell what it is about.
 		switch {
-		case m.has("path"):
+		case m.has("path", "endpoint", "uri") || urlPath:
 			typ = TypePath
-		case m.has("mmh3", "sha256"):
+		case m.has("mmh3", "sha256", "favicon_hash", "favicon", "favicon_mmh3", "icon_hash"):
 			typ = TypeFavicon
+		case m.has("header", "header_name") || scalar("headers"):
+			typ = TypeHeader
+		case m.has("cookie", "cookie_name") || scalar("cookies"):
+			typ = TypeCookie
+		case scalar("meta"):
+			typ = TypeMeta
+		case scalar("title"):
+			typ = TypeTitle
+			r.Contains = []string{m.vals["title"].Value}
+			m.used["title"] = true
+		case scalar("banner"):
+			typ = TypeBanner
+			r.Contains = []string{m.vals["banner"].Value}
+			m.used["banner"] = true
+		case m.has(textKeys...):
+			typ = TypeBody
+			if kind == "" {
+				p.warnf(at("type"), n, "reguła nie ma pola type; przyjęto body (treść strony)")
+			}
+		case m.has("status", "status_code", "code"):
+			typ = TypeStatus
 		default:
 			p.errf(at("type"), n, "reguła nie ma pola type")
 			return r, false
@@ -803,32 +988,77 @@ func (p *parser) parseRule(n *yaml.Node, path, typ string) (RuleDef, bool) {
 	}
 	r.Type = typ
 
-	if v, k := m.get("name", "header", "cookie", "key"); v != nil {
-		r.Name = strings.TrimSpace(p.str(v, at(k)))
+	for _, k := range []string{"name", "header", "cookie", "key", "header_name", "cookie_name", "headers", "cookies", "meta"} {
+		if scalar(k) {
+			m.used[k] = true
+			r.Name = strings.TrimSpace(m.vals[k].Value)
+			break
+		}
 	}
 	if v, k := m.get("name_regex"); v != nil {
 		r.NameRegex = p.str(v, at(k))
 	}
-	if v, k := m.get("field", "part", "in"); v != nil {
-		r.Field = normKey(p.str(v, at(k)))
-	}
-	if v, k := m.get("path"); v != nil {
+	if v, k := m.get("path", "endpoint", "uri"); v != nil {
 		r.Path = strings.TrimSpace(p.str(v, at(k)))
+	} else if urlPath {
+		m.used["url"] = true
+		r.Path = strings.TrimSpace(m.vals["url"].Value)
 	}
 	if v, k := m.get("status", "status_code", "code"); v != nil {
 		r.Status = p.intList(v, at(k))
 	}
-	if v, k := m.get("contains", "word", "words", "text"); v != nil {
-		r.Contains = p.strList(v, at(k))
+	if v, k := m.get("contains", "word", "words", "text", "keyword", "keywords", "string", "strings", "substring"); v != nil {
+		r.Contains = append(r.Contains, p.strList(v, at(k))...)
 	}
 	if v, k := m.get("contains_all"); v != nil {
 		r.ContainsAll = p.strList(v, at(k))
 	}
-	if v, k := m.get("regex", "pattern", "value_regex", "matches", "re"); v != nil {
+	if v, k := m.get("regex", "regexp", "regexes", "value_regex", "matches", "re"); v != nil {
 		r.Regex = p.strList(v, at(k))
 	}
-	if v, k := m.get("equals", "value", "is", "eq"); v != nil {
+	if v, k := m.get("equals", "is", "eq", "exact"); v != nil {
 		r.Equals = p.strList(v, at(k))
+	}
+	// "pattern" and "value" mean what the matcher kind says; without a kind a
+	// pattern is a regular expression and a value is a text to find.
+	for _, k := range []string{"pattern", "patterns", "value", "values", "match"} {
+		v := m.vals[k]
+		if v == nil || m.used[k] {
+			continue
+		}
+		m.used[k] = true
+		vals := p.strList(v, at(k))
+		isPattern := k == "pattern" || k == "patterns"
+		switch {
+		case typ == TypeFavicon:
+			for _, s := range vals {
+				if i, err := strconv.ParseInt(strings.TrimSpace(s), 10, 32); err == nil {
+					r.MMH3 = append(r.MMH3, int32(i))
+				} else {
+					r.SHA256 = append(r.SHA256, s)
+				}
+			}
+		case typ == TypeStatus:
+			r.Status = append(r.Status, p.intList(v, at(k))...)
+		case kind == "regex" || kind == "" && isPattern:
+			r.Regex = append(r.Regex, vals...)
+		case kind == "equals":
+			r.Equals = append(r.Equals, vals...)
+		default:
+			r.Contains = append(r.Contains, vals...)
+		}
+	}
+	if v, k := m.get("condition", "operator"); v != nil {
+		switch strings.ToLower(strings.TrimSpace(p.str(v, at(k)))) {
+		case "and", "all":
+			// Every text of the list must be there.
+			r.ContainsAll, r.Contains = append(r.ContainsAll, r.Contains...), nil
+		}
+	}
+	if v, k := m.get("case_insensitive", "nocase", "ignore_case"); v != nil {
+		if b, ok := p.boolean(v, at(k)); ok {
+			r.CaseSensitive = !b
+		}
 	}
 	if v, k := m.get("exists", "present"); v != nil {
 		b, ok := p.boolean(v, at(k))
@@ -843,7 +1073,7 @@ func (p *parser) parseRule(n *yaml.Node, path, typ string) (RuleDef, bool) {
 			r.Absent = true
 		}
 	}
-	if v, k := m.get("mmh3", "hash"); v != nil {
+	if v, k := m.get("mmh3", "hash", "favicon_hash", "favicon", "favicon_mmh3", "icon_hash"); v != nil {
 		for _, s := range p.strList(v, at(k)) {
 			i, err := strconv.ParseInt(strings.TrimSpace(s), 10, 32)
 			if err != nil {
@@ -881,6 +1111,9 @@ func (p *parser) parseRule(n *yaml.Node, path, typ string) (RuleDef, bool) {
 	}
 	if v, k := m.get("weight", "confidence", "score"); v != nil {
 		if f, ok := p.number(v, at(k)); ok {
+			if f > 1 && f <= 100 && f == float64(int(f)) {
+				f /= 100 // a confidence given in percent: 80 means 0.8
+			}
 			if f <= 0 || f > 1 {
 				p.errf(at(k), v, "weight musi być liczbą większą od 0 i nie większą niż 1")
 			} else {

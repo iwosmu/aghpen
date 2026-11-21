@@ -1,0 +1,70 @@
+{
+  "name": "news-site",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx/1.26.2",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Aktualności Koła Naukowego</title>\n</head>\n<body>\n<h1>Aktualności</h1><article><h2>Spotkanie organizacyjne</h2><p>Zapraszamy w czwartek o 18:00.</p></article>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx/1.26.2",
+            "cookies": [
+              {
+                "name": "admin_session",
+                "value": "c1d2e3f4a5b6",
+                "http_only": true
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Panel administracyjny — logowanie</title>\n</head>\n<body>\n<h1>Panel administracyjny</h1>\n<form method=\"get\" action=\"/admin/login\"><input name=\"admin_user\"><input type=\"password\" name=\"admin_pass\"><button>Zaloguj do panelu</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx/1.26.2",
+            "cookies": [
+              {
+                "name": "admin_session",
+                "value": "c1d2e3f4a5b6",
+                "http_only": true
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Panel administracyjny — logowanie</title>\n</head>\n<body>\n<h1>Panel administracyjny</h1>\n<form method=\"get\" action=\"/admin/login\"><input name=\"admin_user\"><input type=\"password\" name=\"admin_pass\"><button>Zaloguj do panelu</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

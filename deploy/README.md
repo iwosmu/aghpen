@@ -76,4 +76,27 @@ make dev                # baza w dockerze (127.0.0.1:55432) + czujka na 127.0.0.
 make test               # gofmt, build, vet, testy jednostkowe
 make test-integration   # wszystkie testy na prawdziwym PostgreSQL z pg_tde
 make bench              # ingest 10 000 hostów x 3 usługi + czasy API
+make e2e-core           # przepływ end-to-end bez silnika skanowania (patrz niżej)
 ```
+
+## Test end-to-end rdzenia (`make e2e-core`)
+
+Skrypt `deploy/e2e-core.sh` używa prawdziwych składników: stosu produktu (PostgreSQL z `pg_tde` + `czujka`),
+prawdziwego pliku nmap XML (`lab/defectdojo/sample-nmap.xml`) i lokalnego DefectDojo z `lab/defectdojo`.
+Nie uruchamia żadnego skanu.
+
+```sh
+docker compose -f lab/defectdojo/docker-compose.yml up -d   # raz, start trwa około minuty
+make e2e-core
+```
+
+Kroki: start stosu od zera, logowanie, dane startowe (polityka bezpieczeństwa i jeden profil), zakres,
+import pliku, edycje analityka, import zmienionego pliku (`deploy/e2e/modify-nmap.pl`), zmiany, znaleziska,
+powody oceny, `GET /diff`, trwałość edycji, eksport znalezisk do DefectDojo (dwa razy: utworzenie, potem
+aktualizacja bez duplikatów), wysłanie nmap XML przebiegu, eksporty JSON, CSV i XML z ponownym importem,
+eksport automatyczny po przebiegu. Skrypt kończy się kodem 1, gdy którykolwiek test nie przejdzie.
+
+- Stos testowy: projekt `czujka-e2e` (`E2E_PROJECT`), port `127.0.0.1:18090` (`E2E_PORT`). Skrypt usuwa go po zakończeniu razem z wolumenami
+  oraz usuwa z DefectDojo dwa produkty, które utworzył. `E2E_KEEP=1` zostawia wszystko do wglądu.
+- Kontener `czujka` widzi DefectDojo z hosta pod adresem `http://host.docker.internal:18080` (`extra_hosts` w `docker-compose.yml`).
+- Zapis prawdziwego przebiegu: `deploy/e2e/transcript.txt`.
