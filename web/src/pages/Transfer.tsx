@@ -21,7 +21,7 @@ function ExportRow({ kind, title, filter, runs }: { kind: Kind; title: string; f
     try {
       const q: Query = value ? { [filter.key]: value } : {};
       const size = await download('/export/' + kind + '.' + fmt + qs(q), 'czujka-' + kind + '.' + fmt);
-      toast(t('Pobrano czujka-' + kind + '.' + fmt + ' (' + fmtBytes(size) + ')', 'Downloaded czujka-' + kind + '.' + fmt + ' (' + fmtBytes(size) + ')'));
+      toast(t('Pobrano plik czujka-' + kind + '.' + fmt + ' (' + fmtBytes(size) + ')', 'Downloaded czujka-' + kind + '.' + fmt + ' (' + fmtBytes(size) + ')'));
     } catch (e) { toastError(e); }
     setBusy('');
   };
@@ -57,7 +57,7 @@ function FindingsImport() {
       <InlineError error={imp.error} />
       {rep ? (
         <div className="border border-rule p-3" data-testid="findings-import-report">
-          <p className="flex items-center gap-2 text-sm font-medium"><Glyph name={rep.skipped ? 'delta' : 'check'} tone={rep.skipped ? 'changed' : 'new'} />{t('Wczytano ' + fmtInt(rep.findings) + ' znalezisk', 'Read ' + fmtInt(rep.findings) + ' findings')}</p>
+          <p className="flex items-center gap-2 text-sm font-medium"><Glyph name={rep.skipped ? 'delta' : 'check'} tone={rep.skipped ? 'changed' : 'new'} />{t('Zaimportowane znaleziska: ' + fmtInt(rep.findings), 'Findings imported: ' + fmtInt(rep.findings))}</p>
           <dl className="mt-2">
             <KV k={t('Rozpoznany format', 'Detected format')} mono>{rep.format}</KV>
             <KV k={t('Nowe', 'New')}><span className="num">{fmtInt(rep.created)}</span></KV>

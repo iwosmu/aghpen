@@ -18,7 +18,7 @@ function ResultView({ res, scope, onDone }: { res: PassiveResult; scope: Scope; 
   const [picked, setPicked] = useState<Set<string>>(() => new Set(cands.map((c) => c.value)));
   const confirm = useAction((list: PassiveCandidate[]) => post<TargetPreview>('/passive/confirm', { scope_id: scope.id, candidates: list.map((c) => ({ value: c.value, sources: c.sources, note: c.reason })) }), {
     invalidate: ['/scopes', '/targets'],
-    success: (r) => t('Dodano ' + r.valid.length + ' ' + plural(r.valid.length, ['cel', 'cele', 'celów'], ['', '']) + ' do zakresu „' + scope.name + '”.', 'Added ' + r.valid.length + ' targets to the scope "' + scope.name + '".'),
+    success: (r) => t('Dodano ' + r.valid.length + ' ' + plural(r.valid.length, ['cel', 'cele', 'celów'], ['', '']) + ' do zakresu „' + scope.name + '”.', 'Targets added to the scope "' + scope.name + '": ' + r.valid.length + '.'),
     onSuccess: onDone,
   });
   const toggle = (v: string, on: boolean) => { const n = new Set(picked); if (on) n.add(v); else n.delete(v); setPicked(n); };

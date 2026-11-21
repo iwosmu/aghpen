@@ -73,7 +73,7 @@ function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: nu
           </table>
           {q.data.total > items.length ? (
             <p className="border-t border-rule px-3 py-2 text-sm" data-testid="run-services-more">
-              <span className="text-ink-2">{t('Pokazano ' + items.length + ' z ' + fmtInt(q.data.total) + ', najciekawsze najpierw.', 'Showing ' + items.length + ' of ' + fmtInt(q.data.total) + ', most interesting first.')}</span>{' '}
+              <span className="text-ink-2">{t('Pokazano ' + items.length + ' z ' + fmtInt(q.data.total) + '.', 'Showing ' + items.length + ' of ' + fmtInt(q.data.total) + '.')}</span>{' '}
               <Link to={'/services?run_id=' + run.id + '&state=all'} className="link">{t('Wszystkie usługi', 'All services')}</Link>
             </p>
           ) : null}
@@ -280,7 +280,7 @@ export default function RunDetail() {
           <section className="card p-4 sm:p-5">
             <h2 className="mb-3 text-sm font-semibold">{t('Tempo skanowania', 'Scan rate')}</h2>
             {policyCap ? <RateGauge current={isLive ? s.current_pps : 0} cap={cap} policyCap={policyCap} basis={isLive ? s.current_pps_basis : undefined} /> : <div className="skeleton h-12" />}
-            <p className="mt-2 text-xs text-ink-2">{t('Średnio', 'Average')} <span className="num text-ink">{fmtInt(s.avg_pps)}</span> pps. {profile.data && profile.data.rate.max_pps > policyCap ? t('Profil prosi o ' + fmtInt(profile.data.rate.max_pps) + ' pps, polityka bezpieczeństwa obcina do ' + fmtInt(policyCap) + '.', 'The profile asks for ' + fmtInt(profile.data.rate.max_pps) + ' pps, the safety policy cuts it to ' + fmtInt(policyCap) + '.') : null}</p>
+            <p className="mt-2 text-xs text-ink-2">{t('Średnio', 'Average')} <span className="num text-ink">{fmtInt(s.avg_pps)}</span> pps. {profile.data && profile.data.rate.max_pps > policyCap ? t('Polityka bezpieczeństwa ogranicza tempo do ' + fmtInt(policyCap) + ' pps.', 'The safety policy limits the rate to ' + fmtInt(policyCap) + ' pps.') : null}</p>
           </section>
         </div>
 
@@ -375,7 +375,7 @@ export default function RunDetail() {
       </div>
 
       <Dialog
-        open={confirmCancel} onClose={() => setConfirmCancel(false)} title={t('Anulować skan #' + run.id + '?', 'Cancel run #' + run.id + '?')} width={440}
+        open={confirmCancel} onClose={() => setConfirmCancel(false)} title={t('Anulować skan #' + run.id + '?', 'Cancel scan #' + run.id + '?')} width={440}
         footer={<><Button onClick={() => setConfirmCancel(false)}>{t('Wróć', 'Back')}</Button><Button variant="dangerSolid" busy={act.isPending} onClick={() => act.mutate('cancel', { onSuccess: () => setConfirmCancel(false) })}>{t('Anuluj skan', 'Cancel scan')}</Button></>}
       >
         <p className="text-sm">{t('Wyniki z gotowych podgrup zostają. Anulowanego skanu nie da się wznowić.', 'Results of finished chunks stay. A cancelled scan cannot be resumed.')}</p>
@@ -399,7 +399,7 @@ function RunNote({ run, canEdit }: { run: ScanRun; canEdit: boolean }) {
       {run.label ? <span className="border border-rule-strong px-1.5 py-0.5 text-xs font-medium">{run.label}</span> : null}
       {run.note ? <p className="max-w-[90ch] whitespace-pre-wrap text-ink-2">{run.note}</p> : null}
       {canEdit ? <button type="button" className="link text-xs" onClick={() => { setLabel(run.label ?? ''); setNote(run.note ?? ''); setOpen(true); }}>{has ? t('Zmień notatkę', 'Edit note') : t('Dodaj notatkę lub etykietę', 'Add note or label')}</button> : null}
-      <Dialog open={open} onClose={() => setOpen(false)} width={520} title={t('Notatka do przebiegu #' + run.id, 'Note on run #' + run.id)}
+      <Dialog open={open} onClose={() => setOpen(false)} width={520} title={t('Notatka do skanu #' + run.id, 'Note on scan #' + run.id)}
         footer={<><Button onClick={() => setOpen(false)}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="check" busy={save.isPending} disabled={label.length > 100 || note.length > 4000} onClick={() => save.mutate(undefined)}>{t('Zapisz', 'Save')}</Button></>}>
         <div className="space-y-3">
           <Field label={t('Etykieta', 'Label')} hint={t('do 100 znaków', 'up to 100 characters')}><input className="field" value={label} maxLength={100} onChange={(e) => setLabel(e.target.value.replace(/\n/g, ' '))} data-testid="run-label" /></Field>

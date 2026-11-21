@@ -62,7 +62,7 @@ function UsersTab() {
     ) },
     { id: 'role', header: t('Rola', 'Role'), width: 220, cell: (x) => x.id === me ? <span>{roleLabel(x.role_slug, x.role_name)}</span> : <Select label={t('Rola użytkownika ', 'Role of ') + x.email} value={String(x.role_id)} onChange={(v) => update.mutate({ id: x.id, body: { role_id: Number(v) } })} options={(roles.data ?? []).map((r) => ({ value: String(r.id), label: roleLabel(r.slug, r.name) }))} /> },
     { id: 'login', header: t('Ostatnie logowanie', 'Last login'), hide: 'md', cell: (x) => <span className="num text-ink-2" title={fmtDateTime(x.last_login_at)}>{x.last_login_at ? fmtRelative(x.last_login_at) : t('nigdy', 'never')}</span> },
-    { id: 'state', header: t('Konto włączone', 'Account enabled'), cell: (x) => <Switch checked={!x.disabled} disabled={x.id === me || update.isPending} onChange={(v) => update.mutate({ id: x.id, body: { disabled: !v } })} label={t('Konto aktywne: ', 'Account active: ') + x.email} /> },
+    { id: 'state', header: t('Konto włączone', 'Account enabled'), cell: (x) => <Switch checked={!x.disabled} disabled={x.id === me || update.isPending} onChange={(v) => update.mutate({ id: x.id, body: { disabled: !v } })} label={t('Konto włączone: ', 'Account enabled: ') + x.email} /> },
     { id: 'del', header: '', align: 'right', width: 44, cell: (x) => x.id === me ? null : <IconButton icon="trash" label={t('Usuń użytkownika ', 'Delete user ') + x.email} onClick={() => setConfirm(x)} /> },
   ];
   return (
@@ -328,7 +328,7 @@ function WebhookPanel() {
           {test ? (
             <span className="inline-flex items-start gap-2 text-sm" role="status" data-testid="webhook-test">
               <span className="mt-0.5"><Glyph name={test.ok ? 'check' : 'x'} tone={test.ok ? 'new' : 'gone'} /></span>
-              <span>{test.ok ? t('Odbiornik przyjął test: ', 'The receiver took the test: ') : t('Test nieudany: ', 'The test failed: ')}<span className="mono">{test.status ? 'HTTP ' + test.status : t('brak odpowiedzi', 'no response')} · {fmtInt(test.ms)} ms</span>{test.error ? <span className="block text-xs text-ink-2">{test.error}</span> : null}</span>
+              <span>{test.ok ? t('Test dostarczony: ', 'Test delivered: ') : t('Test nieudany: ', 'Test failed: ')}<span className="mono">{test.status ? 'HTTP ' + test.status : t('brak odpowiedzi', 'no response')} · {fmtInt(test.ms)} ms</span>{test.error ? <span className="block text-xs text-ink-2">{test.error}</span> : null}</span>
             </span>
           ) : null}
         </div>
@@ -426,8 +426,8 @@ function DojoTab() {
           <InlineError error={pullRun.error ?? syncRun.error} />
           {pull ? (
             <div className="mt-2 border border-rule p-2 text-sm" data-testid="dojo-pull-result">
-              <p>{t('Sprawdzono ' + fmtInt(pull.checked) + ' znalezisk: ' + (pull.updates ?? []).length + ' ' + plural((pull.updates ?? []).length, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes']) + ' do przyjęcia, ' + count(pull.conflicts) + ' ' + plural(count(pull.conflicts), ['konflikt', 'konflikty', 'konfliktów'], ['conflict', 'conflicts']) + ', ' + count(pull.missing) + ' brakujących w DefectDojo.', 'Checked ' + fmtInt(pull.checked) + ' findings: ' + (pull.updates ?? []).length + ' changes to take, ' + count(pull.conflicts) + ' conflicts, ' + count(pull.missing) + ' missing in DefectDojo.')}{pull.applied ? ' ' + t('Zastosowano: ' + pull.applied + '.', 'Applied: ' + pull.applied + '.') : ''}</p>
-              {pull.linked ? <p className="mt-1 flex items-center gap-1.5 text-xs text-ink" data-testid="dojo-pull-linked"><Icon name="link" size={12} className="text-ink-2" />{t('Połączono ' + pull.linked + ' ' + plural(pull.linked, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']) + ' wysłane w niepotwierdzonym eksporcie (po kluczu, bez duplikatów).', 'Linked ' + pull.linked + ' findings sent by an unconfirmed export (by key, without duplicates).')}</p> : null}
+              <p>{t('Sprawdzone znaleziska: ' + fmtInt(pull.checked) + '. Zmiany do przyjęcia: ' + (pull.updates ?? []).length + '. Konflikty: ' + count(pull.conflicts) + '. Brak w DefectDojo: ' + count(pull.missing) + '.', 'Findings checked: ' + fmtInt(pull.checked) + '. Changes to apply: ' + (pull.updates ?? []).length + '. Conflicts: ' + count(pull.conflicts) + '. Missing in DefectDojo: ' + count(pull.missing) + '.')}{pull.applied ? ' ' + t('Zastosowano: ' + pull.applied + '.', 'Applied: ' + pull.applied + '.') : ''}</p>
+              {pull.linked ? <p className="mt-1 flex items-center gap-1.5 text-xs text-ink" data-testid="dojo-pull-linked"><Icon name="link" size={12} className="text-ink-2" />{t('Połączone znaleziska z niepotwierdzonego eksportu: ' + pull.linked + '.', 'Findings linked from an unconfirmed export: ' + pull.linked + '.')}</p> : null}
               {(pull.updates ?? []).length ? (
                 <ul className="mt-2 max-h-[220px] overflow-auto border-t border-rule">
                   {(pull.updates ?? []).map((x) => (

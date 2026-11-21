@@ -159,8 +159,8 @@ function FindingGroupList({ q, active, onOpen }: { q: ReturnType<typeof usePage<
         })}
       </ul>
       <p className="px-4 py-2 text-xs text-ink-3 sm:px-6">
-        {t(groups.length + ' ' + plural(groups.length, ['rodzaj', 'rodzaje', 'rodzajów'], ['', '']) + ', ' + shown + ' ' + plural(shown, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']), groups.length + ' kinds, ' + shown + ' findings')}
-        {q.data.total > shown ? t('; pokazano ' + shown + ' z ' + q.data.total + ' (zawęź filtry)', '; showing ' + shown + ' of ' + q.data.total + ' (narrow the filters)') : ''}.
+        {t(groups.length + ' ' + plural(groups.length, ['rodzaj', 'rodzaje', 'rodzajów'], ['', '']) + ', ' + shown + ' ' + plural(shown, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']), groups.length + ' ' + (groups.length === 1 ? 'type' : 'types') + ', ' + shown + ' ' + (shown === 1 ? 'finding' : 'findings'))}
+        {q.data.total > shown ? t('; pokazano ' + shown + ' z ' + q.data.total, '; showing ' + shown + ' of ' + q.data.total) : ''}.
       </p>
     </div>
   );
@@ -281,8 +281,8 @@ export default function Findings() {
       <Dialog open={confirmAll} onClose={() => setConfirmAll(false)} width={460} title={t('Eksportować pasujące znaleziska?', 'Export matching findings?')}
         footer={<><Button onClick={() => setConfirmAll(false)}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="upload" busy={exportAll.isPending} onClick={() => exportAll.mutate(undefined)} data-testid="dojo-export-filtered-go">{t('Eksportuj', 'Export')} {q.data?.total ?? 0}</Button></>}>
         <p className="text-sm">{active
-          ? t('Do DefectDojo trafi ' + total + ' ' + plural(q.data?.total ?? 0, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']) + ' pasujących do bieżących filtrów. Te, które już tam są, zostaną zaktualizowane, nie zdublowane.', total + ' findings that match the current filters go to DefectDojo. Those already there are updated, not duplicated.')
-          : t('Do DefectDojo trafią wszystkie znaleziska (' + total + '). Te, które już tam są, zostaną zaktualizowane, nie zdublowane.', 'All findings (' + total + ') go to DefectDojo. Those already there are updated, not duplicated.')}</p>
+          ? t('Do DefectDojo: ' + total + ' (pasujące do filtrów). Istniejące zostaną zaktualizowane.', total + ' matching findings go to DefectDojo. Existing ones are updated.')
+          : t('Do DefectDojo: wszystkie znaleziska (' + total + '). Istniejące zostaną zaktualizowane.', 'All findings (' + total + ') go to DefectDojo. Existing ones are updated.')}</p>
         <div className="mt-3"><InlineError error={exportAll.error} /></div>
         {exportAll.error && !(exportAll.error instanceof ApiError && exportAll.error.code === 'dojo_unconfirmed') ? <p className="mt-2 text-xs text-ink-2" data-testid="dojo-export-retry-hint">{t('Część znalezisk mogła już trafić do DefectDojo. Ponów eksport, duplikaty nie powstaną.', 'Some findings may already be in DefectDojo. Repeat the export. No duplicates are created.')}</p> : null}
       </Dialog>

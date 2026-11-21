@@ -51,7 +51,7 @@ export default function Changes() {
   const [text, setText] = useDraft(u.get('q'), (v) => u.set({ q: v }));
   const ackMany = useAction((ids: number[]) => post<{ acked: number }>('/changes/ack', { ids }), {
     invalidate: ['/changes', '/dashboard'], onSuccess: () => setSelected(new Set()),
-    success: (r) => t('Potwierdzono zmian: ' + r.acked, 'Acknowledged changes: ' + r.acked),
+    success: (r) => t('Przejrzane zmiany: ' + r.acked, 'Changes reviewed: ' + r.acked),
   });
   const ackOne = useAction((id: number) => post('/changes/' + id + '/ack'), { invalidate: ['/changes', '/dashboard'] });
   const active = FILTERS.filter((k) => u.get(k)).length;

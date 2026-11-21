@@ -120,7 +120,7 @@ function HttpPanel({ h, tls }: { h: HTTPFingerprint; tls: boolean }) {
 }
 
 function TlsPanel({ c }: { c: TLSInfo }) {
-  const state: [ReactNode, 'gone' | 'changed' | 'new'] = c.expired ? [t('wygasł ' + Math.abs(c.days_left) + ' dni temu', 'expired ' + Math.abs(c.days_left) + ' days ago'), 'gone'] : c.days_left <= 14 ? [t('wygasa za ' + c.days_left + ' dni', 'expires in ' + c.days_left + ' days'), 'changed'] : [t('ważny jeszcze ' + c.days_left + ' dni', 'valid for ' + c.days_left + ' more days'), 'new'];
+  const state: [ReactNode, 'gone' | 'changed' | 'new'] = c.expired ? [t('wygasł ' + Math.abs(c.days_left) + ' ' + plural(Math.abs(c.days_left), ['dzień', 'dni', 'dni'], ['day', 'days']) + ' temu', 'expired ' + Math.abs(c.days_left) + ' ' + plural(Math.abs(c.days_left), ['dzień', 'dni', 'dni'], ['day', 'days']) + ' ago'), 'gone'] : c.days_left <= 14 ? [t('wygasa za ' + c.days_left + ' ' + plural(c.days_left, ['dzień', 'dni', 'dni'], ['day', 'days']), 'expires in ' + c.days_left + ' ' + plural(c.days_left, ['dzień', 'dni', 'dni'], ['day', 'days'])), 'changed'] : [t('ważny jeszcze ' + c.days_left + ' ' + plural(c.days_left, ['dzień', 'dni', 'dni'], ['day', 'days']), 'valid for ' + c.days_left + ' more ' + plural(c.days_left, ['dzień', 'dni', 'dni'], ['day', 'days'])), 'new'];
   return (
     <div>
       <div className="mb-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">

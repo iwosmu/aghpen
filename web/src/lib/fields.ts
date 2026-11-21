@@ -11,7 +11,7 @@ export function fieldLabel(field: string, context: 'change' | 'service' = 'chang
     name: ['usługa', 'service'], product: ['produkt', 'product'], version: ['wersja', 'version'], banner: ['baner', 'banner'],
     title: ['tytuł strony', 'page title'], certificate: ['certyfikat', 'certificate'], headers: ['nagłówki HTTP', 'HTTP headers'],
     technologies: ['technologie', 'technologies'], classes: ['klasy', 'classes'], hostnames: ['nazwy hosta', 'host names'],
-    os_guess: ['system', 'operating system'], mac: ['adres MAC', 'MAC address'],
+    os_guess: ['system', 'OS'], mac: ['adres MAC', 'MAC address'],
     response_ms: ['czas odpowiedzi', 'response time'], 'http.response_ms': ['czas odpowiedzi', 'response time'],
     'http.title': ['tytuł strony', 'page title'], 'http.status': ['kod HTTP', 'HTTP status'], 'http.headers': ['nagłówki HTTP', 'HTTP headers'],
     'http.cookies': ['ciasteczka', 'cookies'], 'http.body_simhash': ['treść strony (odcisk)', 'page content (fingerprint)'],

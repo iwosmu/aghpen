@@ -41,7 +41,7 @@ export function changeParts(c: { added: number; gone: number; changed: number; m
   add(c.recovered ?? 0, ['usługa znów szybka', 'usługi znów szybkie', 'usług znów szybkich'], ['service fast again', 'services fast again']);
   add(c.changed, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes']);
   add(c.confirmedGone ?? 0, ['host nieaktywny', 'hosty nieaktywne', 'hostów nieaktywnych'], ['host down', 'hosts down']);
-  add(c.missing, ['host nie odpowiada (niepotwierdzone)', 'hosty nie odpowiadają (niepotwierdzone)', 'hostów nie odpowiada (niepotwierdzone)'], ['host not answering (unconfirmed)', 'hosts not answering (unconfirmed)']);
+  add(c.missing, ['host nie odpowiada (niepotwierdzone)', 'hosty nie odpowiadają (niepotwierdzone)', 'hostów nie odpowiada (niepotwierdzone)'], ['host not responding (unconfirmed)', 'hosts not responding (unconfirmed)']);
   add(c.unstable, ['host niestabilny', 'hosty niestabilne', 'hostów niestabilnych'], ['unstable host', 'unstable hosts']);
   return parts;
 }

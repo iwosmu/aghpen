@@ -27,7 +27,7 @@ export function OperatorLockNote({ networks }: { networks: string[] | null | und
   return (
     <p className="flex items-start gap-1.5 text-xs text-ink-2" data-testid="lock-note">
       <Icon name="lock" size={13} className="mt-px flex-none text-ink-3" />
-      <span>{t('Zablokowane przez operatora wdrożenia: skanowanie tylko w ', 'Locked by the deployment operator: scanning only inside ')}<span className="mono text-ink">{networks.join(', ')}</span>{t('.', '.')}</span>
+      <span>{t('Operator ograniczył skanowanie do ', 'The operator limits scanning to ')}<span className="mono text-ink">{networks.join(', ')}</span>{t('.', '.')}</span>
     </p>
   );
 }
@@ -72,11 +72,11 @@ export function PreviewReport({ p, pending }: { p: TargetPreview; pending?: bool
         {cell(p.excluded, plural(p.excluded, ['adres wykluczony polityką', 'adresy wykluczone polityką', 'adresów wykluczonych polityką'], ['address excluded by the policy', 'addresses excluded by the policy']), 'dashring', 'changed')}
       </div>
       <div className="mt-2"><LoopbackNote targets={p.valid} /></div>
-      <p className="mt-2 border-t border-rule pt-2 text-sm">{t('Do zakresu trafi ', 'The scope gains ')}<span className="num text-base font-semibold">{fmtInt(p.address_count)}</span> {plural(p.address_count, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}.</p>
+      <p className="mt-2 border-t border-rule pt-2 text-sm">{t('Nowe adresy w zakresie: ', 'New addresses in the scope: ')}<span className="num text-base font-semibold">{fmtInt(p.address_count)}</span></p>
       {locked ? (
         <p className="mt-2 flex items-start gap-1.5 border-t border-rule pt-2 text-sm text-ink" data-testid="preview-lock">
           <Icon name="lock" size={14} className="mt-0.5 flex-none text-ink-2" />
-          <span><span className="num font-semibold">{fmtInt(locked)}</span> {plural(locked, ['wpis leży', 'wpisy leżą', 'wpisów leży'], ['entry lies', 'entries lie'])} {t('poza blokadą operatora', 'outside the operator lock')}: {plural(locked, ['nie trafi', 'nie trafią', 'nie trafi'], ['it stays out of the scope', 'they stay out of the scope'])}{t(' do zakresu. Tej granicy nie poszerzy żaden użytkownik.', '.')}</span>
+          <span><span className="num font-semibold">{fmtInt(locked)}</span> {plural(locked, ['wpis leży', 'wpisy leżą', 'wpisów leży'], ['entry lies', 'entries lie'])} {t('poza blokadą operatora', 'outside the operator lock')}: {plural(locked, ['nie trafi', 'nie trafią', 'nie trafi'], ['it stays out of the scope', 'they stay out of the scope'])}{t(' do zakresu.', '.')}</span>
         </p>
       ) : null}
       {p.invalid.length ? (

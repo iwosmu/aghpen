@@ -98,7 +98,7 @@ export default function Hosts() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title={t('Hosty', 'Hosts')}
-        sub={inf.data ? <><span className="num text-ink">{fmtInt(total)}</span> {plural(total, ['host', 'hosty', 'hostów'], ['host', 'hosts'])}{active ? t(' po filtrach', ' after filters') : u.get('status') ? '' : t(' w inwentarzu bez nieaktywnych (filtr „Stan”)', ' in the inventory, inactive ones hidden (filter "Status")')}</> : t('Wczytywanie…', 'Loading…')}
+        sub={inf.data ? <><span className="num text-ink">{fmtInt(total)}</span> {plural(total, ['host', 'hosty', 'hostów'], ['host', 'hosts'])}{active ? t(' po filtrach', ' after filters') : u.get('status') ? '' : t(', bez nieaktywnych', ', down hosts hidden')}</> : t('Wczytywanie…', 'Loading…')}
         readOnly={!canEdit}
         actions={<>{canCreate ? <Button icon="plus" onClick={() => setManual(true)} data-testid="host-manual">{t('Dodaj host', 'Add host')}</Button> : null}<ExportButtons kind="hosts" query={query} /></>}
       />
@@ -207,7 +207,7 @@ function ManualHostDialog({ onClose }: { onClose: () => void }) {
         <p className="text-sm text-ink-2">{t('Dla urządzeń, których skaner nie widzi. Usług, których nie wpiszesz, Czujka nie uzna za zniknięte.', 'For devices the scanner cannot see. Services you do not enter are not marked gone.')}</p>
         <Field label={t('Adres IP', 'IP address')} error={ip && !ipOk ? t('błędny adres IPv4', 'invalid IPv4 address') : undefined}><input className="field mono" autoFocus value={ip} onChange={(e) => setIp(e.target.value)} placeholder="10.66.20.15" data-testid="host-manual-ip" /></Field>
         <Field label={t('Nazwy hosta', 'Host names')} hint={t('oddzielone spacją lub przecinkiem', 'separated by a space or a comma')}><input className="field mono" value={names} onChange={(e) => setNames(e.target.value)} placeholder="drukarka-b1.example.edu" /></Field>
-        <Field label={t('Usługi', 'Services')} hint={t('jedna w wierszu: port[/proto] nazwa produkt wersja, np. 443/tcp https nginx 1.24', 'one per line: port[/proto] name product version, for example 443/tcp https nginx 1.24')} error={parsed.bad.length ? t('Nie rozumiem: ', 'Cannot read: ') + parsed.bad.join(', ') : undefined}>
+        <Field label={t('Usługi', 'Services')} hint={t('jedna w wierszu: port[/proto] nazwa produkt wersja, np. 443/tcp https nginx 1.24', 'one per line: port[/proto] name product version, for example 443/tcp https nginx 1.24')} error={parsed.bad.length ? t('Błędny wiersz: ', 'Invalid line: ') + parsed.bad.join(', ') : undefined}>
           <textarea className="field mono" rows={4} value={svc} onChange={(e) => setSvc(e.target.value)} placeholder={'22/tcp ssh OpenSSH 9.6\n443/tcp https nginx 1.24'} data-testid="host-manual-services" />
         </Field>
         <InlineError error={add.error} />

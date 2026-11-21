@@ -107,7 +107,7 @@ export default function Compare() {
               {d.summary.hosts_missing ? (
                 <span className="mt-1 flex items-start gap-1.5 text-ink-2" data-testid="compare-missing">
                   <Glyph name="half" tone="expected" />
-                  <span><span className="num text-ink">{d.summary.hosts_missing}</span> {plural(d.summary.hosts_missing, ['host nie odpowiada', 'hosty nie odpowiadają', 'hostów nie odpowiada'], ['host is not responding', 'hosts are not responding'])}{t(' (niepotwierdzone: Czujka sprawdzi ponownie)', ' (unconfirmed: Czujka checks again)')}.</span>
+                  <span><span className="num text-ink">{d.summary.hosts_missing}</span> {plural(d.summary.hosts_missing, ['host nie odpowiada', 'hosty nie odpowiadają', 'hostów nie odpowiada'], ['host is not responding', 'hosts are not responding'])}{t(' (niepotwierdzone)', ' (unconfirmed)')}.</span>
                 </span>
               ) : null}
             </div>

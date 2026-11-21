@@ -63,8 +63,8 @@ export function MissingHostLines({ changes, names }: { changes: Change[]; names?
         const head = state === 'unconfirmed'
           ? t('nie odpowiada (niepotwierdzone)', 'is not responding (unconfirmed)')
           : state === 'gone'
-            ? t('zniknął (potwierdzone ' + fmtTime(v!.at) + ')', 'is gone (confirmed ' + fmtTime(v!.at) + ')')
-            : t('znów odpowiada (' + fmtTime(v!.at) + ')', 'answers again (' + fmtTime(v!.at) + ')');
+            ? t('nieaktywny (potwierdzone ' + fmtTime(v!.at) + ')', 'is down (confirmed ' + fmtTime(v!.at) + ')')
+            : t('znów odpowiada (' + fmtTime(v!.at) + ')', 'responds again (' + fmtTime(v!.at) + ')');
         return (
           <li key={m.id} className="flex items-start gap-2 text-base" data-testid="missing-host" data-state={state}>
             <span className="mt-[5px]">{state === 'unconfirmed' ? <Glyph name="half" tone="changed" /> : state === 'gone' ? <Glyph name="minus" tone="gone" /> : <Glyph name="back" tone="new" />}</span>

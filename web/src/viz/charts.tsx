@@ -115,7 +115,7 @@ export function ProgressBar({ value, max, label, active = 0 }: { value: number; 
 export function PacketCount({ sent, estimated }: { sent: number; estimated?: number }) {
   if (!estimated) return <span className="num">{fmtInt(sent)}</span>;
   return (
-    <span className="num" title={t('W tym około ' + fmtInt(estimated) + ' pakietów szacowanych: etap nmap nie podał dokładnej liczby.', 'About ' + fmtInt(estimated) + ' of these packets are estimated: an nmap stage gave no exact count.')} data-testid="packets-estimated">
+    <span className="num" title={t('W tym około ' + fmtInt(estimated) + ' pakietów to szacunek.', 'About ' + fmtInt(estimated) + ' of these packets are an estimate.')} data-testid="packets-estimated">
       <span className="text-ink-3">≈ </span>{fmtInt(sent)}
     </span>
   );
@@ -142,8 +142,8 @@ export function RateGauge({ current, cap, policyCap, unit = 'pps', basis }: { cu
       {over ? (
         <p role="alert" className="mt-2 border-l-2 border-danger pl-2 text-xs text-ink" data-testid="rate-over-cap">
           {pace
-            ? t('Tempo zadane przekracza limit skanu o ' + Math.round((current / cap - 1) * 100) + '%. To nie jest normalny stan: sprawdź profil i przebieg albo użyj stopu awaryjnego.', 'The set pace is ' + Math.round((current / cap - 1) * 100) + '% above the run cap. This is not a normal state: check the profile and the run or use the emergency stop.')
-            : t('Zmierzone tempo przekracza limit skanu o ' + Math.round((current / cap - 1) * 100) + '%. To nie jest normalny stan: sprawdź przebieg albo użyj stopu awaryjnego.', 'The measured rate is ' + Math.round((current / cap - 1) * 100) + '% above the run cap. This is not a normal state: check the run or use the emergency stop.')}
+            ? t('Tempo zadane przekracza limit skanu o ' + Math.round((current / cap - 1) * 100) + '%. Sprawdź profil i skan albo użyj stopu awaryjnego.', 'The set rate is ' + Math.round((current / cap - 1) * 100) + '% above the scan limit. Check the profile and the scan or use the emergency stop.')
+            : t('Zmierzone tempo przekracza limit skanu o ' + Math.round((current / cap - 1) * 100) + '%. Sprawdź skan albo użyj stopu awaryjnego.', 'The measured rate is ' + Math.round((current / cap - 1) * 100) + '% above the scan limit. Check the scan or use the emergency stop.')}
         </p>
       ) : null}
     </div>

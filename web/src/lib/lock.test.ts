@@ -8,19 +8,19 @@ describe('operator lock helpers', () => {
   });
   it('translates the 422 for a policy network', () => {
     const m = 'validation: allowed_networks: 10.0.0.0/8 lies outside the operator lock (CZUJKA_ALLOWED_NETWORKS: 10.66.0.0/16); only the operator can widen it';
-    expect(lockMessage(m, 'pl')).toMatch(/^Sieć 10\.0\.0\.0\/8 leży poza blokadą operatora wdrożenia \(10\.66\.0\.0\/16\)/);
+    expect(lockMessage(m, 'pl')).toMatch(/^Sieć 10\.0\.0\.0\/8 leży poza blokadą operatora \(10\.66\.0\.0\/16\)/);
     expect(isLockRefusal(m)).toBe(true);
   });
   it('translates the 422 for an ad-hoc run and keeps the per-address reasons', () => {
     const m = 'invalid: every target lies outside the allowed networks of the safety policy or the operator lock (CZUJKA_ALLOWED_NETWORKS: 10.66.0.0/16); 192.168.1.10: poza sieciami';
-    expect(lockMessage(m, 'pl')).toBe('Żaden adres nie leży w dozwolonych sieciach i w blokadzie operatora wdrożenia (10.66.0.0/16). 192.168.1.10: poza sieciami');
+    expect(lockMessage(m, 'pl')).toBe('Żaden adres nie leży w dozwolonych sieciach (10.66.0.0/16). 192.168.1.10: poza sieciami');
   });
   it('translates the Polish server texts in both languages', () => {
     const n = 'validation: allowed_networks: sieć 10.0.0.0/8 leży poza blokadą operatora (CZUJKA_ALLOWED_NETWORKS: 10.66.0.0/16); poszerzyć ją może tylko operator wdrożenia';
-    expect(lockMessage(n, 'pl')).toMatch(/^Sieć 10\.0\.0\.0\/8 leży poza blokadą operatora wdrożenia \(10\.66\.0\.0\/16\)/);
-    expect(lockMessage(n, 'en')).toMatch(/^The network 10\.0\.0\.0\/8 lies outside the deployment operator lock \(10\.66\.0\.0\/16\)/);
+    expect(lockMessage(n, 'pl')).toMatch(/^Sieć 10\.0\.0\.0\/8 leży poza blokadą operatora \(10\.66\.0\.0\/16\)/);
+    expect(lockMessage(n, 'en')).toMatch(/^The network 10\.0\.0\.0\/8 is outside the operator lock \(10\.66\.0\.0\/16\)/);
     const a = 'invalid: każdy cel leży poza dozwolonymi sieciami polityki bezpieczeństwa albo blokadą operatora (CZUJKA_ALLOWED_NETWORKS: 10.66.0.0/16); 192.168.1.10: poza sieciami';
-    expect(lockMessage(a, 'en')).toBe('No address lies inside the allowed networks and the deployment operator lock (10.66.0.0/16). 192.168.1.10: poza sieciami');
+    expect(lockMessage(a, 'en')).toBe('No address is inside the allowed networks (10.66.0.0/16). 192.168.1.10: poza sieciami');
     expect(lockMessage(a, 'pl')).toMatch(/^Żaden adres nie leży/);
     expect(isLockRefusal(n)).toBe(true);
   });

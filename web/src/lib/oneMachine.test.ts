@@ -87,7 +87,7 @@ describe('partialText', () => {
   it('says the result is not final while the full range runs', () => {
     setLang('pl');
     const s = stats([{ name: 'top_ports', state: 'done', hosts: 1, ports_total: 1000, ports_done: 1000 }, { name: 'full_range', state: 'running', hosts: 1, ports_total: 64535, ports_done: 20651 }]);
-    expect(partialText({ status: 'running', stats: s })).toBe('Skan trwa: sprawdzono najczęstsze porty, pełny zakres 1-65535 w toku (32%). Wynik nie jest jeszcze ostateczny; zmiany i zniknięte usługi pokażą się po końcu skanu.');
+    expect(partialText({ status: 'running', stats: s })).toBe('Skan trwa: sprawdzono najczęstsze porty, pełny zakres 1-65535 w toku (32%).');
     setLang('en');
     expect(partialText({ status: 'running', stats: s })).toContain('Scan in progress: top ports checked, full range 1-65535 running (32%)');
     setLang('pl');

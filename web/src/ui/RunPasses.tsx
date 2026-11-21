@@ -33,8 +33,8 @@ export function partialText(run: Pick<ScanRun, 'status' | 'stats'>): string | nu
   const cur = rest[0];
   const pct = cur.state === 'running' && cur.ports_total > 0 ? ' (' + fmtPct(Math.min(1, cur.ports_done / cur.ports_total)) + ')' : '';
   const doneText = done.filter((p) => p.state === 'done').map(passLabel).join(t(' i ', ' and '));
-  return t('Skan trwa: sprawdzono ' + doneText + ', ' + passLabel(cur) + ' w toku' + pct + '. Wynik nie jest jeszcze ostateczny; zmiany i zniknięte usługi pokażą się po końcu skanu.',
-    'Scan in progress: ' + doneText + ' checked, ' + passLabel(cur) + ' running' + pct + '. The result is not final yet; changes and gone services show when the scan ends.');
+  return t('Skan trwa: sprawdzono ' + doneText + ', ' + passLabel(cur) + ' w toku' + pct + '.',
+    'Scan in progress: ' + doneText + ' checked, ' + passLabel(cur) + ' running' + pct + '.');
 }
 
 export function PartialNote({ run, className }: { run: Pick<ScanRun, 'status' | 'stats'>; className?: string }) {

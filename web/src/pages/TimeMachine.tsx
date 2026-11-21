@@ -377,7 +377,7 @@ export function ServiceHistoryPanel({ serviceId }: { serviceId: number }) {
   return (
     <Panel title={title} count={h.observations} flush>
       <div data-testid="service-fields">
-        {(h.changed ?? []).length === 0 ? <p className="px-3 py-3 text-sm text-ink-2 sm:px-4">{t('Żadne pole nie zmieniło się przez ' + h.observations + ' obserwacji.', 'No field changed over ' + h.observations + ' observations.')}</p> : (
+        {(h.changed ?? []).length === 0 ? <p className="px-3 py-3 text-sm text-ink-2 sm:px-4">{t('Bez zmian w ' + h.observations + ' ' + plural(h.observations, ['obserwacji', 'obserwacjach', 'obserwacjach'], ['observation', 'observations']) + '.', 'No changes in ' + h.observations + ' ' + (h.observations === 1 ? 'observation' : 'observations') + '.')}</p> : (
           <ul>
             {(h.changed ?? []).map((f: FieldHistory) => (
               <li key={f.field} className="border-b border-rule px-3 py-2 sm:px-4">

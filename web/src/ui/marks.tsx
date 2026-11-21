@@ -180,7 +180,7 @@ export function Sev({ level, compact }: { level: Severity | string; compact?: bo
   const n = SEV_LEVEL[level] ?? 1;
   const color = n === 4 ? 'var(--st-gone)' : n === 3 ? 'var(--st-changed)' : n === 2 ? 'var(--accent)' : 'var(--ink-3)';
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap" title={t('Ważność: ', 'Severity: ') + severityLabel(level)}>
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap" title={t('Waga: ', 'Severity: ') + severityLabel(level)}>
       <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" style={{ flex: 'none' }}>
         {[0, 1, 2, 3].map((i) => (
           <rect key={i} x={1 + i * 3.2} y={10.5 - i * 2.6} width="2.200" height={2.5 + i * 2.6} fill={i < n ? color : 'var(--rule-strong)'} />

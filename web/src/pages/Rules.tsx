@@ -103,7 +103,7 @@ export default function Rules() {
   const rule = sel === 'new' ? null : items.find((r) => String(r.id) === sel || (bySlug && r.slug === bySlug)) ?? items[0] ?? null;
   const one = useItem<ExposureRule>('/rules/' + rule?.id, undefined, { enabled: Boolean(rule) });
   const toggle = useAction((r: ExposureRule) => patch('/rules/' + r.id, { enabled: !r.enabled }), { invalidate: ['/rules', '/findings'], silent: true });
-  const evaluate = useAction(() => post<{ violations: number; took_ms: number }>('/rules/evaluate'), { invalidate: ['/rules', '/findings'], success: (r) => t('Sprawdzono reguły: ' + r.violations + ' naruszeń (' + r.took_ms + ' ms)', 'Rules checked: ' + r.violations + ' violations (' + r.took_ms + ' ms)') });
+  const evaluate = useAction(() => post<{ violations: number; took_ms: number }>('/rules/evaluate'), { invalidate: ['/rules', '/findings'], success: (r) => t('Naruszenia: ' + r.violations, 'Violations: ' + r.violations) });
   const header = <PageHeader title={t('Reguły ekspozycji', 'Exposure rules')}    actions={<>{canEvaluate && items.length ? <Button icon="refresh" busy={evaluate.isPending} onClick={() => evaluate.mutate(undefined)}>{t('Sprawdź teraz', 'Check now')}</Button> : null}{canCreate ? <Button variant="primary" icon="plus" onClick={() => u.set({ rule: 'new', slug: null })}>{t('Nowa reguła', 'New rule')}</Button> : null}</>} />;
   if (q.error) return <div>{header}<div className="p-4 sm:p-6">{routeMissing(q.error) ? <Unavailable /> : <ErrorState error={q.error} retry={() => q.refetch()} />}</div></div>;
   if (!q.data) return <div>{header}<SkeletonRows rows={8} /></div>;

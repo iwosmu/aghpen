@@ -53,7 +53,7 @@ export function StartRunDialog({ open, onClose, profileId }: { open: boolean; on
         <span className="label mb-1 block">{t('Profil skanu', 'Scan profile')}</span>
         <Select value={chosen} onChange={setPid} options={items.map((p) => ({ value: String(p.id), label: p.name + ((p.scope_ids ?? []).length === 0 ? t(' (bez zakresu)', ' (no scope)') : '') }))} />
       </label>
-      {noScope ? <p className="mt-3 text-sm text-ink-2">{t('Ten profil nie ma przypisanego zakresu, więc nie ma czego skanować. ', 'This profile has no scope, so there is nothing to scan. ')}<Link to={'/profiles/' + chosen} className="link">{t('Przypisz zakres', 'Assign a scope')}</Link>.</p> : chosen ? <div className="mt-4"><p className="label mb-1.5">{t('Budżet ruchu', 'Traffic budget')}</p><EstimateBox profileId={Number(chosen)} /></div> : null}
+      {noScope ? <p className="mt-3 text-sm text-ink-2">{t('Ten profil nie ma zakresu. ', 'This profile has no scope. ')}<Link to={'/profiles/' + chosen} className="link">{t('Przypisz zakres', 'Assign a scope')}</Link>.</p> : chosen ? <div className="mt-4"><p className="label mb-1.5">{t('Budżet ruchu', 'Traffic budget')}</p><EstimateBox profileId={Number(chosen)} /></div> : null}
       <div className="mt-3"><InlineError error={start.error} /></div>
     </Dialog>
   );

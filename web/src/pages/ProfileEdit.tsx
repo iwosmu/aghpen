@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAction, useItem, usePage } from '../api/hooks';
 import { del, patch, post } from '../api/client';
 import type { DiscoveryMode, Health, SafetyPolicy, ScanEstimate, ScanProfile, Scope } from '../api/types';
-import { t } from '../i18n';
+import { plural, t } from '../i18n';
 import { cx, fmtCompact, fmtDuration, fmtInt, fmtPct } from '../lib/format';
 import { Button, Check, Dialog, ErrorState, Field, InlineError, PageHeader, SkeletonRows } from '../ui/kit';
 import { Icon } from '../ui/Icon';
@@ -63,7 +63,7 @@ export function EstimateBox({ profileId, stale }: { profileId: number; stale?: b
         ))}
       </dl>
       <FullRangeNote e={e} ports={profile.data?.ports ?? ''} />
-      {capped ? <p className="flex items-start gap-1.5 border-t border-rule px-3 py-2 text-xs text-ink-2"><Icon name="shield" size={14} className="mt-px text-st-new" />{t('Profil prosi o ' + fmtInt(asked) + ' pps. Polityka bezpieczeństwa ogranicza tempo do ' + fmtInt(e.effective_pps) + ' pps.', 'The profile asks for ' + fmtInt(asked) + ' pps. The safety policy holds the rate at ' + fmtInt(e.effective_pps) + ' pps.')}</p> : null}
+      {capped ? <p className="flex items-start gap-1.5 border-t border-rule px-3 py-2 text-xs text-ink-2"><Icon name="shield" size={14} className="mt-px text-st-new" />{t('Profil prosi o ' + fmtInt(asked) + ' pps. Polityka bezpieczeństwa ogranicza tempo do ' + fmtInt(e.effective_pps) + ' pps.', 'The profile asks for ' + fmtInt(asked) + ' pps. The safety policy limits the rate to ' + fmtInt(e.effective_pps) + ' pps.')}</p> : null}
       {stale ? <p className="border-t border-rule px-3 py-2 text-xs text-ink-3">{t('Budżet dotyczy zapisanego profilu. Zapisz zmiany.', 'The budget describes the saved profile. Save the changes.')}</p> : null}
     </div>
   );
@@ -83,7 +83,7 @@ function FullRangeNote({ e, ports }: { e: ScanEstimate; ports: string }) {
   const maxAddr = e.full_range_max_addresses;
   if (maxHosts <= 0) {
     if (maxAddr && e.addresses > maxAddr && rankedPorts(ports)) {
-      return <p className="border-t border-rule px-3 py-2 text-xs text-ink-2" data-testid="full-range-note">{t('Pełny zakres portów 1-65535 nie obejmie tego zakresu: ma ' + fmtInt(e.addresses) + ' adresów, a działa do ' + fmtInt(maxAddr) + '. Skan sprawdzi tylko porty z listy.', 'The full port range 1-65535 does not apply here: the scope has ' + fmtInt(e.addresses) + ' addresses and it works up to ' + fmtInt(maxAddr) + '. The scan checks only the listed ports.')}</p>;
+      return <p className="border-t border-rule px-3 py-2 text-xs text-ink-2" data-testid="full-range-note">{t('Zakres ma ' + fmtInt(e.addresses) + ' ' + plural(e.addresses, ['adres', 'adresy', 'adresów'], ['', '']) + ', więcej niż ' + fmtInt(maxAddr) + '. Skan sprawdzi tylko porty z listy.', 'The scope has ' + fmtInt(e.addresses) + ' addresses, more than ' + fmtInt(maxAddr) + '. The scan checks only the listed ports.')}</p>;
     }
     return null;
   }
@@ -181,7 +181,7 @@ export default function ProfileEdit() {
   const up = (fn: (d: ScanProfile) => void) => { const next = structuredClone(p); fn(next); setP(next); setDirty(true); };
   const policyCap = safety.data?.max_pps ?? 0;
   const mode = p.schedule.interval_minutes > 0 ? 'interval' : 'cron';
-  const invalid = !p.name.trim() ? t('Podaj nazwę profilu.', 'Enter a profile name.') : p.scope_ids.length === 0 ? t('Wybierz co najmniej jeden zakres.', 'Choose at least one scope.') : !p.ports.trim() ? t('Podaj porty.', 'Enter the ports.') : p.chunking.min_size > p.chunking.max_size ? t('Najmniejsza podgrupa jest większa od największej.', 'The smallest chunk is larger than the largest.') : policyCap && p.rate.max_pps > policyCap ? t('Tempo ' + fmtInt(p.rate.max_pps) + ' pps przekracza limit polityki bezpieczeństwa (' + fmtInt(policyCap) + ' pps).', 'The rate of ' + fmtInt(p.rate.max_pps) + ' pps is above the safety policy cap (' + fmtInt(policyCap) + ' pps).') : '';
+  const invalid = !p.name.trim() ? t('Podaj nazwę profilu.', 'Enter a profile name.') : p.scope_ids.length === 0 ? t('Wybierz co najmniej jeden zakres.', 'Choose at least one scope.') : !p.ports.trim() ? t('Podaj porty.', 'Enter the ports.') : p.chunking.min_size > p.chunking.max_size ? t('Najmniejsza podgrupa jest większa od największej.', 'The smallest chunk is larger than the largest.') : policyCap && p.rate.max_pps > policyCap ? t('Tempo ' + fmtInt(p.rate.max_pps) + ' pps przekracza limit polityki bezpieczeństwa (' + fmtInt(policyCap) + ' pps).', 'The rate of ' + fmtInt(p.rate.max_pps) + ' pps is above the safety policy limit (' + fmtInt(policyCap) + ' pps).') : '';
 
   return (
     <div>
@@ -240,7 +240,7 @@ export default function ProfileEdit() {
                 );
               })}
             </div>
-            {p.discovery.mode === 'fast' && p.rate.max_pps > 1000 ? <p className="mt-1.5 flex items-start gap-1.5 text-xs text-st-changed"><Glyph name="delta" tone="changed" size={12} />{t('Tryb szybki przy ' + fmtInt(p.rate.max_pps) + ' pps: przy tak wysokim tempie część hostów może nie odpowiedzieć na jedyną próbę. Dla pierwszego skanu sieci wybierz tryb zrównoważony.', 'Fast mode at ' + fmtInt(p.rate.max_pps) + ' pps: at a rate this high some hosts may not answer the single probe. For the first scan of a network choose balanced.')}</p> : null}
+            {p.discovery.mode === 'fast' && p.rate.max_pps > 1000 ? <p className="mt-1.5 flex items-start gap-1.5 text-xs text-st-changed"><Glyph name="delta" tone="changed" size={12} />{t('Przy ' + fmtInt(p.rate.max_pps) + ' pps część hostów może nie odpowiedzieć na jedyną próbę.', 'At ' + fmtInt(p.rate.max_pps) + ' pps some hosts may not respond to the single probe.')}</p> : null}
           </div>
           <div className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
             <Check checked={p.discovery.icmp_echo} disabled={ro} onChange={(v) => up((d) => { d.discovery.icmp_echo = v; })} label="ICMP echo" />
@@ -283,9 +283,9 @@ export default function ProfileEdit() {
           </div>
         </Section>
 
-        <Section title={t('Tempo', 'Rate')} hint={policyCap ? t('Twardy limit polityki bezpieczeństwa: ' + fmtInt(policyCap) + ' pps. Profil nie może go przekroczyć.', 'Hard cap of the safety policy: ' + fmtInt(policyCap) + ' pps. A profile cannot go above it.') : undefined}>
+        <Section title={t('Tempo', 'Rate')} hint={policyCap ? t('Limit polityki bezpieczeństwa: ' + fmtInt(policyCap) + ' pps.', 'Safety policy limit: ' + fmtInt(policyCap) + ' pps.') : undefined}>
           <div className="grid gap-3 sm:grid-cols-3">
-            <Field label={t('Pakiety na sekundę', 'Packets per second')} hint={policyCap && p.rate.max_pps > policyCap ? <span className="text-danger">{t('powyżej limitu polityki: ' + fmtInt(policyCap) + ' pps', 'above the policy cap: ' + fmtInt(policyCap) + ' pps')}</span> : undefined}><Num value={p.rate.max_pps} min={1} suffix="pps" onChange={(v) => up((d) => { d.rate.max_pps = v; })} /></Field>
+            <Field label={t('Pakiety na sekundę', 'Packets per second')} hint={policyCap && p.rate.max_pps > policyCap ? <span className="text-danger">{t('powyżej limitu polityki: ' + fmtInt(policyCap) + ' pps', 'above the policy limit: ' + fmtInt(policyCap) + ' pps')}</span> : undefined}><Num value={p.rate.max_pps} min={1} suffix="pps" onChange={(v) => up((d) => { d.rate.max_pps = v; })} /></Field>
             <Field label={t('Równoległe podgrupy', 'Parallel chunks')}><Num value={p.rate.max_parallel_chunks} min={1} max={32} onChange={(v) => up((d) => { d.rate.max_parallel_chunks = v; })} /></Field>
             <Field label={t('Równoległe hosty (usługi, HTTP)', 'Parallel hosts (services, HTTP)')}><Num value={p.rate.max_parallel_hosts} min={1} onChange={(v) => up((d) => { d.rate.max_parallel_hosts = v; })} /></Field>
             <Field label={t('Żądania HTTP na sekundę', 'HTTP requests per second')}><Num value={p.rate.http_rps} min={0.1} step={0.5} suffix="rps" onChange={(v) => up((d) => { d.rate.http_rps = v; })} /></Field>

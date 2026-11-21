@@ -23,7 +23,7 @@ function FewObservations({ a, n }: { a: AvailabilityProfile; n: number }) {
   const recent = [...(a.recent ?? [])].slice(0, MIN_OBS).reverse();
   return (
     <div data-testid="few-observations">
-      <p className="text-sm text-ink">{t('Model zna ten host dopiero z ' + n + ' ' + plural(n, ['obserwacji', 'obserwacji', 'obserwacji'], ['', '']) + '.', 'The model knows this host from only ' + n + ' ' + (n === 1 ? 'observation' : 'observations') + '.')}</p>
+      <p className="text-sm text-ink">{t('Za mało obserwacji: ' + n + ' z ' + MIN_OBS + '.', 'Too few observations: ' + n + ' of ' + MIN_OBS + '.')}</p>
       <ol className="mt-3 grid grid-cols-8 gap-1.5" data-testid="probe-strip">
         {recent.map((o, i) => {
           const label = fmtDateTime(o.at) + ': ' + (o.up ? t('odpowiedź', 'response') : t('brak odpowiedzi', 'no response'));
@@ -66,7 +66,7 @@ function ModelOutput({ h, a, compact }: { h: Host; a: AvailabilityProfile; compa
           <dt className="num text-lg font-semibold">{h.consecutive_misses}</dt>
           <dd className="text-sm text-ink-2">
             {plural(h.consecutive_misses, ['brak z rzędu teraz', 'braki z rzędu teraz', 'braków z rzędu teraz'], ['miss in a row now', 'misses in a row now'])}
-            {h.status !== 'down' && h.consecutive_misses > 0 ? <span className="text-ink-3"> · {t('jeszcze ' + left + ' do „nieaktywny”', left + ' more to "inactive"')}</span> : null}
+            {h.status !== 'down' && h.consecutive_misses > 0 ? <span className="text-ink-3"> · {t('jeszcze ' + left + ' do „nieaktywny”', left + ' more to "down"')}</span> : null}
           </dd>
         </div>
       </dl>

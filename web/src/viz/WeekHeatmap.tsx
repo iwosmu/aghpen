@@ -25,7 +25,7 @@ export function WeekHeatmap({ buckets, nowIndex }: { buckets: AvailBucket[]; now
         <div className="font-medium text-ink">{label}</div>
         {n === 0
           ? <div className="text-ink-3">{t('brak prób w tej godzinie', 'no probes in this hour')}</div>
-          : <div className="text-ink-2"><span className="num text-ink">{fmtPct(b.up / n)}</span> · {t('odpowiedź w ' + b.up + ' z ' + n + ' prób', 'answered ' + b.up + ' of ' + n + ' probes')}</div>}
+          : <div className="text-ink-2"><span className="num text-ink">{fmtPct(b.up / n)}</span> · {t('odpowiedź w ' + b.up + ' z ' + n + ' prób', 'responded ' + b.up + ' of ' + n + ' probes')}</div>}
       </div>
     );
   };

@@ -163,7 +163,7 @@ function ActiveRunStrip() {
   const cap = Math.min(profile.data?.rate.max_pps ?? policyCap, policyCap || Infinity) || policyCap;
   const over = overCap(run.stats.current_pps, cap);
   const pace = run.stats.current_pps_basis === 'pace';
-  const tip = (over ? t('Tempo powyżej limitu skanu ' + fmtInt(cap) + ' pps. ', 'Rate above the run cap of ' + fmtInt(cap) + ' pps. ') : '') + (pace ? paceTip() : '');
+  const tip = (over ? t('Tempo powyżej limitu skanu ' + fmtInt(cap) + ' pps. ', 'Rate above the scan limit of ' + fmtInt(cap) + ' pps. ') : '') + (pace ? paceTip() : '');
   return (
     <Link to={'/runs/' + run.id} className="hidden min-w-0 items-center gap-2 text-xs text-ink-2 hover:text-ink md:inline-flex">
       <Glyph name="run" tone="accent" pulse size={12} />
@@ -248,7 +248,7 @@ function SafetyChip({ policy }: { policy: SafetyPolicy | undefined }) {
   if (!policy) return null;
   const op = policy.operator_networks ?? [];
   const title = t('Polityka bezpieczeństwa', 'Safety policy')
-    + (op.length ? '. ' + t('Blokada operatora wdrożenia: skanowanie tylko w ' + op.join(', ') + '. Żaden użytkownik, także administrator, nie może jej poszerzyć.', 'Deployment operator lock: scanning only inside ' + op.join(', ') + '. No user, an administrator included, can widen it.') : '');
+    + (op.length ? '. ' + t('Operator ograniczył skanowanie do ' + op.join(', ') + '.', 'The operator limits scanning to ' + op.join(', ') + '.') : '');
   return (
     <Link
       to="/admin?tab=safety" className="hidden items-center gap-1.5 text-xs text-ink-2 hover:text-ink lg:inline-flex"

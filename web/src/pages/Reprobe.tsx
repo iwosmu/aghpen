@@ -72,7 +72,7 @@ export function ReprobePanel({ hostId, limit = 8 }: { hostId?: number; limit?: n
             ))}
           </ul>
         ) : null}
-        {probes.length > limit ? <p className="mt-1 text-xs text-ink-3">{t('i ' + (probes.length - limit) + ' kolejnych', 'and ' + (probes.length - limit) + ' more')}</p> : null}
+        {probes.length > limit ? <p className="mt-1 text-xs text-ink-3">{t('i jeszcze ' + (probes.length - limit), 'and ' + (probes.length - limit) + ' more')}</p> : null}
         {skipped.length ? (
           <details className="mt-2 text-xs text-ink-2">
             <summary className="cursor-pointer text-ink-3">{t('Pominięte: ' + skipped.length, 'Skipped: ' + skipped.length)}</summary>
