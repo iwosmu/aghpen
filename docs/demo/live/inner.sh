@@ -7,6 +7,7 @@ J=/work/lab/jury
 E=/work/e2e/jury
 JAR=/tmp/live.jar
 UIURL=${LIVE_UI:-http://127.0.0.1:18730}
+DOJO_TOKEN=c2a1b0f4d7e84c5aa3f29b6e0d1c7f58a4e3b2d1 # public lab constant, lab/defectdojo/README.md
 TEMPLATE_PORTS=21,80,81,443,2223,3001,5673,6379,8080,8081,8085,8086,8088,8089,8090,8474,8787,8888,15432,15673,21000-21010
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 say() { printf '\n  %s\n' "$*"; }
@@ -133,6 +134,14 @@ c4() { # a new exposure and its rules
     scan "$P"; ready; say "Next: live.sh 4 expose, then 'Uruchom skan' on 'Porty szablonu' (about 50 s)" ;;
   expose) stack vulnerable; stack proxy proxy-base; wait_ports 21 8088 8089 8090 8085 8086 8474; wait_http 8088 / ; wait_http 8085 /wp-admin/install.php
     log "vulnerable and modern-proxy are up beside modern. Start the scan now." ;;
+  dojo) # the lab DefectDojo inside this machine (public lab token, lab/defectdojo/README.md)
+    DOJO_PORT=18090 docker compose -f /work/lab/defectdojo/docker-compose.yml up -d --wait >/dev/null 2>&1 || true
+    docker network connect czujka-dojo_default czujka-czujka-1 2>/dev/null || true
+    local i; for i in $(seq 1 90); do curl -fs -o /dev/null -H "Authorization: Token $DOJO_TOKEN" http://127.0.0.1:18090/api/v2/users/ && break; sleep 2; done
+    login
+    api PUT /settings/defectdojo "$(jq -nc --arg k "$DOJO_TOKEN" '{enabled:true,url:"http://nginx:8080",api_key:$k,verify_tls:false}')" >/dev/null
+    log "DefectDojo: $(api POST /settings/defectdojo/test '{}' | jq -c .)"
+    log "DefectDojo UI: inside the machine only (127.0.0.1:18090). In Czujka: Znaleziska -> Wszystkie do DefectDojo." ;;
   esac
 }
 c5() { # roles

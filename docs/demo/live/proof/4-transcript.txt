@@ -1,0 +1,42 @@
+$ docs/demo/live/live.sh 4
+[23:25:32] scan: run 1 completed in 28 s (6 services)
+[23:25:32] READY in 60 s. Open http://127.0.0.1:18730, log in as admin@czujka.local (password: live.sh pass).
+
+  Next: live.sh 4 expose, then 'Uruchom skan' on 'Porty szablonu' (about 50 s)
+$ docs/demo/live/live.sh 4 expose
+[23:26:02] vulnerable and modern-proxy are up beside modern. Start the scan now.
+$ docs/demo/live/live.sh run "Porty szablonu"   (= Uruchom skan)
+[23:27:31] scan: run 2 completed in 89 s (25 services)
+    service_new: Nowa usługa 172.18.0.1:21010 (tcpwrapped)
+    service_new: Nowa usługa 172.18.0.1:21009 (tcpwrapped)
+    service_new: Nowa usługa 172.18.0.1:21008 (tcpwrapped)
+    service_new: Nowa usługa 172.18.0.1:21007 (tcpwrapped)
+    service_new: Nowa usługa 172.18.0.1:21006 (tcpwrapped)
+    service_new: Nowa usługa 172.18.0.1:21005 (tcpwrapped)
+    service_new: Nowa usługa 172.18.0.1:21004 (tcpwrapped)
+    service_new: Nowa usługa 172.18.0.1:21003 (tcpwrapped)
+    service_new: Nowa usługa 172.18.0.1:21002 (tcpwrapped)
+    service_new: Nowa usługa 172.18.0.1:21001 (tcpwrapped)
+    service_new: Nowa usługa 172.18.0.1:21000 (tcpwrapped)
+    service_new: Nowa usługa 172.18.0.1:8474 (Golang net/http server)
+    service_new: Nowa usługa 172.18.0.1:8090 (Apache httpd 2.4.25)
+    service_new: Nowa usługa 172.18.0.1:8089 (http)
+    service_new: Nowa usługa 172.18.0.1:8088 (Apache httpd 2.4.10)
+    service_new: Nowa usługa 172.18.0.1:8086 (Golang net/http server)
+    service_new: Nowa usługa 172.18.0.1:8085 (Apache httpd 2.4.71)
+    service_new: Nowa usługa 172.18.0.1:2375 (Docker 28.5.2)
+    service_new: Nowa usługa 172.18.0.1:21 (ftp)
+
+Reguły ekspozycji po skanie (naruszenia):
+  Niedokończona instalacja aplikacji     3
+  API sterujące bez uwierzytelniania     3
+  Panel administracyjny poza siecią zarządzania  8
+
+$ docs/demo/live/live.sh 4 dojo   (65 s)
+[23:28:54] DefectDojo: {"message":"Połączono z DefectDojo 3.5.202 jako admin","ok":true,"version":"3.5.202"}
+[23:28:54] DefectDojo UI: inside the machine only (127.0.0.1:18090). In Czujka: Znaleziska -> Wszystkie do DefectDojo.
+
+UI: Znaleziska -> Wszystkie do DefectDojo -> Eksportuj
+  POST /findings/export/defectdojo 200
+  "Eksport zakończony. Nowe w DefectDojo 75, Zaktualizowane 0, Nieudane 0"
+DefectDojo API /api/v2/findings/: count 75

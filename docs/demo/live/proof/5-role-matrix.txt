@@ -12,4 +12,6 @@ eksport                    403     200     200     200
 import wyników             403     403     400     400     
 użytkownicy                403     403     403     200     
 polityka bezpieczeństwa    403     403     403     200     
-stop awaryjny              403     403     403     200     
+zwolnienie stopu awar.     403     403     403     200
+
+(Stop awaryjny sam w sobie: analityk, edytor i administrator, uprawnienie safety:stop. Zwolnienie stopu: tylko administrator, safety:manage.)
