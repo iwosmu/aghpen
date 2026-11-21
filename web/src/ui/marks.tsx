@@ -270,7 +270,7 @@ export function InterestBreakdown({ value, reasons }: { value: number; reasons: 
   return (
     <div data-testid="interest-breakdown">
       <div className="flex items-baseline gap-2">
-        <span className="font-display text-[56px] leading-[0.9] tracking-[-0.01em] text-ink">{value}</span>
+        <span className="font-display text-[44px] leading-[0.95] text-ink">{value}</span>
         <span className="num text-sm text-ink-3">/ 100</span>
       </div>
       {segs.length ? (

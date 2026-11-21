@@ -78,7 +78,7 @@ export function PageHeader({ title, sub, actions, readOnly, back }: { title: Rea
             <Icon name="chevronLeft" size={12} />{back.label}
           </Link>
         ) : null}
-        <h1 className="font-display text-[30px] font-normal leading-[1.05] tracking-[-0.005em] text-ink sm:text-[36px]">{title}</h1>
+        <h1 className="font-display text-[24px] leading-[1.15] text-ink sm:text-[28px]">{title}</h1>
         {sub ? <p className="mt-0.5 max-w-[80ch] text-sm text-ink-2">{sub}</p> : null}
         {readOnly ? <ReadOnlyNote /> : null}
       </div>

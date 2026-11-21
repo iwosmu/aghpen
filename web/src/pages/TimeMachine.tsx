@@ -89,7 +89,7 @@ function Count({ label, value, now, tone }: { label: string; value: number; now?
   return (
     <div className="flex min-w-0 flex-col-reverse">
       <dt className="mt-1.5 text-xs text-ink-3">{label}{d ? <span className="num ml-1.5 text-ink-2" title={t('zmiana do dziś', 'change to today')}>{d > 0 ? '+' : ''}{fmtInt(d)} {t('dziś', 'today')}</span> : null}</dt>
-      <dd className={cx('font-display text-[40px] leading-none tracking-[-0.01em] text-ink sm:text-[48px]', tone)}>{fmtInt(value)}</dd>
+      <dd className={cx('font-display text-[32px] leading-none text-ink sm:text-[38px]', tone)}>{fmtInt(value)}</dd>
     </div>
   );
 }

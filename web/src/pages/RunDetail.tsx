@@ -90,7 +90,7 @@ function NoStory({ run }: { run: ScanRun }) {
   const s = run.summary;
   if (!s) return null;
   const n = s.hosts_new + s.hosts_gone + s.hosts_back + s.services_new + s.services_gone + s.services_changed + (s.services_returned ?? 0) + (s.responses_slower ?? 0) + (s.hosts_missing ?? 0);
-  return n === 0 ? <p className="font-display text-[28px] leading-tight text-ink sm:text-[32px]" data-testid="run-story-none">{t('Bez zmian.', 'No changes.')}</p> : null;
+  return n === 0 ? <p className="font-display text-[22px] leading-tight text-ink sm:text-[26px]" data-testid="run-story-none">{t('Bez zmian.', 'No changes.')}</p> : null;
 }
 
 function Fact({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
@@ -252,9 +252,9 @@ export default function RunDetail() {
           <section className="card p-4 sm:p-5">
             <div className="flex items-baseline justify-between gap-3">
               {small && isLive ? (
-                <span><span className="font-display text-[44px] leading-none">{fmtInt(s.services_open)}</span> <span className="text-sm text-ink-2">{plural(s.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['open service', 'open services'])} {t('do tej pory', 'so far')}</span></span>
+                <span><span className="font-display text-[36px] leading-none">{fmtInt(s.services_open)}</span> <span className="text-sm text-ink-2">{plural(s.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['open service', 'open services'])} {t('do tej pory', 'so far')}</span></span>
               ) : (
-                <span><span className="font-display text-[44px] leading-none">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów', 'of addresses')}</span></span>
+                <span><span className="font-display text-[36px] leading-none">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów', 'of addresses')}</span></span>
               )}
               <span className="num text-sm text-ink-2">{fmtInt(s.addresses_done)} / {fmtInt(s.addresses_total)}</span>
             </div>
