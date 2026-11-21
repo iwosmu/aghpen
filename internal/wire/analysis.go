@@ -39,6 +39,11 @@ type Analysis struct {
 	log  *slog.Logger
 	Auto AutoExporter // optional
 
+	// Notify sends the alert webhook after every analysis; optional.
+	Notify interface {
+		NotifyRun(ctx context.Context, runID int64)
+	}
+
 	// SelfPort is the port the docker host publishes Czujka's UI on. On the
 	// docker host (targets.HostGateway) the service on it is Czujka itself:
 	// tagged, no findings.
@@ -480,6 +485,9 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 	}
 	if a.Auto != nil {
 		a.Auto.AutoExport(ctx, runID)
+	}
+	if a.Notify != nil {
+		a.Notify.NotifyRun(ctx, runID)
 	}
 	return &sum, nil
 }

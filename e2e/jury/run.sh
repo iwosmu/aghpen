@@ -128,7 +128,7 @@ scan() { # label [profile] -> sets RUN, SV, FN, CH
   [ -s "$fs" ] && FIRSTSVC=$(( $(cat "$fs") - t0 ))
   kill "$sse" 2>/dev/null; wait "$sse" 2>/dev/null
   local r; r=$(api GET "/runs/$RUN")
-  log "$1: run $RUN $st in $RUNSECS s (first service after ${FIRSTSVC:-?} s): $(echo "$r" | jq -c '{hosts: .stats.hosts_up, services: .stats.services_open, packets: .stats.packets_sent, warnings: (.warnings // [] | length)}')"
+  log "$1: run $RUN $st in $RUNSECS s (first service after ${FIRSTSVC:-?} s): $(echo "$r" | jq -c '{hosts: .stats.hosts_up, services: .stats.services_open, packets: .stats.packets_sent, warnings: (.warnings // [] | length), passes: (.stats.passes // [] | map("\(.name) \(.state) \(.ports_done)/\(.ports_total)"))}')"
   SV=$(api GET "/services?limit=500"); FN=$(api GET "/findings?limit=2000"); CH=$(api GET "/changes?run_id=$RUN&limit=500")
   RUNSTATUS=$st
 }
@@ -284,7 +284,7 @@ if want proxy; then
       # Through Traefik the timeout toxic gives HTTP 502 after about 1.5 s (curl from the docker host).
       ST=$(status_of 8085)
       { [ "${ST:-0}" -ge 500 ] || [ "${RT:-0}" -ge 1000 ] || echo "$CH" | jq -e '[.items[] | select(.port == 8085 and .kind == "response_slower")] | length > 0' >/dev/null; } && ok=1 || ok=0
-      row scenario 8085 http "timeout 1 s: failing or slow answer recorded" engine $ok "http status ${ST:-none}, response_ms ${RT:-none}"
+      row scenario 8085 http "timeout 1 s: failing or slow answer recorded" "" $ok "http status ${ST:-none}, response_ms ${RT:-none}"
     fi
   done
   compose proxy proxy-base -- down -v >/dev/null 2>&1

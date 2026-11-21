@@ -1053,6 +1053,23 @@ type RetroHuntResult struct {
 
 // ---------- Integrations ----------
 
+// WebhookSettings configure the alert webhook: one POST with a JSON summary
+// to the operator's own endpoint after every analysed run.
+type WebhookSettings struct {
+	Enabled bool `json:"enabled"`
+	// URL is the endpoint (http or https). Stored encrypted: Slack and
+	// Mattermost URLs carry their token in the path.
+	URL string `json:"url"`
+	// MinSeverity: a run sends the POST only when a change or a new finding
+	// has at least this severity (info, low, medium, high; default medium).
+	MinSeverity Severity `json:"min_severity"`
+	Secret      string   `json:"secret,omitempty"` // write-only HMAC-SHA256 key; GET returns SecretSet
+	SecretSet   bool     `json:"secret_set"`
+	// UIURL is the public address of Czujka for the links in the message.
+	// Empty: the address the settings were saved from.
+	UIURL string `json:"ui_url"`
+}
+
 type DefectDojoSettings struct {
 	Enabled         bool   `json:"enabled"`
 	URL             string `json:"url"`

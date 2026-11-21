@@ -35,8 +35,8 @@ proxy	8085	sig	wordpress-installer
 proxy	8085	class	install-page
 proxy	8085	finding	Niedokończona instalacja aplikacji
 proxy	8086	open	-		Traefik v3.1 dashboard and API with api.insecure=true
-proxy	8086	tech	Traefik	engine	same cause as the row below: the HTTPS answer is a 404 everywhere
-proxy	8086	sig	traefik-api-insecure	engine	the port also answers TLS (Traefik default cert, every path 404); the collector tries only HTTPS
+proxy	8086	tech	Traefik
+proxy	8086	sig	traefik-api-insecure
 proxy	8474	open	-		Toxiproxy 2.12.0 control API, no authentication
 proxy	8474	tech	Toxiproxy@2.12.0
 proxy	8474	sig	toxiproxy-api
@@ -65,7 +65,7 @@ vulnerable	8090	finding	Środowisko testowe albo narzędzie deweloperskie
 custom-network	8888	open	-		httpbin 0.9.2 (gunicorn 19.9.0)
 custom-network	8888	tech	httpbin@0.9.2
 custom-network	8888	finding	Środowisko testowe albo narzędzie deweloperskie
-custom-network	8888	name	http	engine	nmap says tcpwrapped although the HTTP collector reads the page
+custom-network	8888	name	http
 custom-network	15432	open	-		PostgreSQL 16 on a non-standard port
 custom-network	15432	tech	PostgreSQL
 custom-network	15432	finding	Port bazy danych otwarty na sieć skanowaną
@@ -79,7 +79,7 @@ custom-network	15673	finding	Panel administracyjny poza siecią zarządzania
 custom-network	3001	open	-		Gitea 28.4.0, installer not finished
 custom-network	3001	tech	Gitea@28.4.0
 custom-network	3001	sig	gitea-installer
-custom-network	3001	finding	Niedokończona instalacja aplikacji	accuracy	the gitea-installer signature (signatures/panels.yaml) has no install-page class yet
+custom-network	3001	finding	Niedokończona instalacja aplikacji
 custom-network	2223	open	-		Gitea SSH (OpenSSH 10.3)
 custom-network	2223	tech	OpenSSH
 custom-network	8787	open	-		nginx (alpine) default page
