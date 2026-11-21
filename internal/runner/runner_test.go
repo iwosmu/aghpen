@@ -47,13 +47,14 @@ type fakeEngine struct {
 	release  chan struct{}
 	outcome  *model.RunOutcome
 	started  chan struct{}
+	blocked  chan struct{} // gets a value when Run waits at blockAt
 	runCount atomic.Int32
 	// cancelledAt is when the engine saw its context cancelled (unix nanoseconds).
 	cancelledAt atomic.Int64
 }
 
 func newFake() *fakeEngine {
-	return &fakeEngine{blockAt: -1, release: make(chan struct{}), started: make(chan struct{}, 16)}
+	return &fakeEngine{blockAt: -1, release: make(chan struct{}), started: make(chan struct{}, 16), blocked: make(chan struct{}, 16)}
 }
 
 func (f *fakeEngine) Estimate(plan model.ScanPlan) model.ScanEstimate {
@@ -80,6 +81,7 @@ func (f *fakeEngine) Run(ctx context.Context, plan model.ScanPlan, sink model.Re
 	f.started <- struct{}{}
 	for _, c := range chunks {
 		if c.Seq == blockAt {
+			f.blocked <- struct{}{}
 			select {
 			case <-f.release:
 			case <-ctx.Done():
@@ -310,6 +312,7 @@ func TestEmergencyStop(t *testing.T) {
 	run, _ := e.m.Start(ctx, e.p.ID, nil, "manual")
 	<-e.eng.started
 	waitStatus(t, e.st, run.ID, model.RunRunning)
+	<-e.eng.blocked // the engine waits at its block point: a cancel reaches it at once
 	t0 := time.Now()
 	policy, err := e.m.EmergencyStop(ctx)
 	total := time.Since(t0)
