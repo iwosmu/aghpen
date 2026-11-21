@@ -264,7 +264,7 @@ W produkcie retro-hunt czyta obserwacje strumieniowo z bazy (`sigwire.RetroHunt`
 | `headers.yaml` | 22 | wersje w nagłówkach, nagłówki debugowania, wyciek serwera zaplecza i adresów prywatnych, błędy CORS, logowanie po HTTP, brak CSP/HSTS na stronie logowania |
 | `cookies.yaml` | 12 | sesja bez `Secure`/`HttpOnly`, JWT w ciasteczku, BIG-IP, Shiro `rememberMe`, ciasteczka load balancerów i WAF |
 | `services.yaml` | 37 | usługi inne niż HTTP: OpenSSH, Dropbear, Telnet, FTP, SMTP, bazy danych, RDP, VNC, SMB, LDAP, MQTT, protokoły przemysłowe, JDWP |
-| `labtools.yaml` | 7 | narzędzia z szablonu organizatorów: Adminer, DVWA, httpbin, Nginx Proxy Manager, Toxiproxy, panel i API Traefika, instalator WordPressa |
+| `labtools.yaml` | 7 | narzędzia z szablonu organizatorów: API Toxiproxy, niezabezpieczone API Traefika, strona domyślna Nginx Proxy Managera, DVWA, httpbin, instalator WordPressa, Redis bez hasła |
 
 Skróty ikon (`mmh3`) w bibliotece pochodzą wyłącznie z prawdziwych instancji uruchomionych w laboratorium (tabela w rozdziale 11). Biblioteka nie zawiera skrótów spisanych z pamięci ani z internetu.
 
