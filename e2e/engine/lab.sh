@@ -66,6 +66,7 @@ apps() {
   app phpmyadmin 10.76.0.30 -e PMA_HOST=10.76.0.10 phpmyadmin:5
   app tomcat     10.76.0.40 tomcat:10.1-jdk17
   app https      10.76.0.50 -e ROLE=https -e PORT=8443 "$IMG"
+  app udp        10.76.0.70 -e ROLE=udp "$IMG"
   app nginx-odd  10.76.0.60 nginx:alpine sh -c "sed -i 's/listen  *80;/listen 8181;/' /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"
   echo "waiting for the applications..."
   wait_http() { # container url

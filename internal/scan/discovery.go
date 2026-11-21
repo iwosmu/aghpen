@@ -136,9 +136,11 @@ func (r *run) onLink(g *group) bool {
 func (r *run) discover(ctx context.Context, g *group, tgts []string, rate int, gs *groupStats) ([]probe.Host, error) {
 	pass := func(tg []string, o model.DiscoveryOpts, retries int) ([]probe.Host, error) {
 		t0 := r.e.now()
+		end := r.stats.begin(rate)
 		res, err := r.prober.Discover(ctx, probe.DiscoverRequest{
 			Targets: tg, Opts: o, MaxRate: rate, MaxRetries: retries, HostTimeout: discoveryHostTimeout, IPv6: g.v6,
 		})
+		end()
 		r.account(gs, res, t0)
 		if err != nil {
 			return nil, fmt.Errorf("host discovery: %w", err)

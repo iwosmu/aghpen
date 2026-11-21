@@ -205,6 +205,15 @@ type HTTPOpts struct {
 	Favicon        bool `json:"favicon"`
 }
 
+// UDPOpts switches the optional UDP scan on. It is off by default. The
+// engine probes only a short allow-list of UDP services with the harmless
+// protocol queries of nmap (DNS 53, NTP 123, NetBIOS name service 137,
+// SNMP 161, IKE 500, SSDP 1900, mDNS 5353). It needs nmap with raw sockets.
+type UDPOpts struct {
+	Enabled bool   `json:"enabled"`
+	Ports   string `json:"ports"` // subset of the allow-list, nmap spec; empty: the whole allow-list
+}
+
 type RateLimits struct {
 	MaxPPS             int     `json:"max_pps"`
 	MaxParallelChunks  int     `json:"max_parallel_chunks"`
@@ -257,6 +266,7 @@ type ScanProfile struct {
 	ServiceDetection bool          `json:"service_detection"`
 	VersionIntensity int           `json:"version_intensity"` // 0..9, nmap --version-intensity
 	HTTP             HTTPOpts      `json:"http"`
+	UDP              UDPOpts       `json:"udp"`
 	Rate             RateLimits    `json:"rate"`
 	Chunking         ChunkingOpts  `json:"chunking"`
 	Retry            RetryOpts     `json:"retry"`
