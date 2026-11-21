@@ -332,8 +332,23 @@
   classes: [iot]
   match:
     rules:
-      - {type: service, field: name, regex: '^(?:mqtt|secure-mqtt)$', weight: 0.8}
+      - {type: service, field: name, regex: '^(?:mqtt|secure-mqtt)$|(?i)^mosquitto version', weight: 0.8}
       - {type: service, field: product, regex: 'Mosquitto|MQTT', weight: 0.9}
+
+- id: mosquitto
+  name: Mosquitto
+  category: other
+  description: Broker MQTT Eclipse Mosquitto. nmap 7.97 zgłasza go jako nazwę usługi „mosquitto version X” bez pola produktu.
+  tags: [iot, kolejki]
+  interest: 40
+  classes: [iot]
+  cpe: cpe:2.3:a:eclipse:mosquitto
+  match:
+    rules:
+      - {type: service, field: name, regex: '(?i)^mosquitto version ([0-9]+\.[0-9]+(?:\.[0-9]+)?)', weight: 0.95, version_group: 1}
+      - {type: service, field: product, regex: '(?i)^(?:eclipse )?mosquitto', weight: 0.9}
+  version:
+    - {type: service, field: version, regex: '^([0-9]+\.[0-9]+(?:\.[0-9]+)?)'}
 
 - id: rtsp
   name: RTSP (strumień wideo)
