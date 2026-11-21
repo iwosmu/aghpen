@@ -47,7 +47,7 @@ test-integration: dev-db
 	CZUJKA_TEST_DB_URL='$(DEV_DB_URL)' CZUJKA_TEST_REQUIRE_TDE=1 go test -count=1 ./...
 
 bench: dev-db
-	CZUJKA_TEST_DB_URL='$(DEV_DB_URL)' CZUJKA_BENCH=1 go test -count=1 -run TestIngestBenchmark -v ./internal/store/
+	CZUJKA_TEST_DB_URL='$(DEV_DB_URL)' CZUJKA_BENCH=1 go test -count=1 -run 'TestIngestBenchmark|TestHTTPBenchmark' -v ./internal/store/ ./internal/api/
 
 web:
 	@if [ -f web/package.json ]; then cd web && npm install && npm run build; else echo "web/ is not present: skipping the UI build"; fi

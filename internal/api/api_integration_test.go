@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -672,5 +673,60 @@ func TestSecurityHeadersAndUI(t *testing.T) {
 	e2 := setup(t, nil)
 	if resp, body := (&client{e: e2}).raw("GET", "/", nil, nil); resp.StatusCode != 200 || !strings.Contains(string(body), "nie jest zbudowany") {
 		t.Errorf("no UI page: %d %s", resp.StatusCode, body)
+	}
+}
+
+// TestHTTPBenchmark measures the API over real HTTP after an ingest of 10 000 hosts with 3 services each.
+// Run it with CZUJKA_BENCH=1 (make bench).
+func TestHTTPBenchmark(t *testing.T) {
+	if os.Getenv("CZUJKA_BENCH") == "" {
+		t.Skip("set CZUJKA_BENCH=1 to run the benchmark")
+	}
+	e := setup(t, nil)
+	admin := e.login("admin@example.org", adminPW)
+	ctx := context.Background()
+	run, err := e.st.CreateRun(ctx, model.ScanRun{Status: model.RunCompleted})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const n = 10000
+	hosts := make([]model.HostResult, 0, n)
+	for i := 0; i < n; i++ {
+		hosts = append(hosts, model.HostResult{RunID: run.ID, IP: fmt.Sprintf("10.100.%d.%d", i/250, i%250+1), Up: true, Reason: "syn-ack", Services: []model.ServiceResult{
+			{Port: 22, Proto: "tcp", State: "open", Name: "ssh", Product: "OpenSSH", Version: "9.6"},
+			{Port: 80, Proto: "tcp", State: "open", Name: "http", Product: "nginx", Version: "1.26.2", HTTP: &model.HTTPFingerprint{Status: 200, Title: fmt.Sprintf("Serwis %d", i)}},
+			{Port: 443, Proto: "tcp", State: "open", Name: "https", Product: "nginx", Version: "1.26.2", Tunnel: "ssl"},
+		}})
+	}
+	start := time.Now()
+	if err := e.st.IngestHosts(ctx, hosts, store.SinkOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("ingest: %d hosts x 3 services in %s", n, time.Since(start).Round(time.Millisecond))
+	for _, path := range []string{"/api/v1/hosts", "/api/v1/hosts?limit=200&sort=-interest", "/api/v1/hosts?port=443&cidr=10.100.8.0/22&sort=ip", "/api/v1/hosts?q=10.100.39",
+		"/api/v1/services?limit=50", "/api/v1/services?port=443&name=https&limit=100", "/api/v1/dashboard", "/api/v1/export/hosts.csv", "/api/v1/export/services.json"} {
+		var times []time.Duration
+		size := 0
+		for i := 0; i < 11; i++ {
+			t0 := time.Now()
+			resp, raw := admin.raw("GET", path, nil, nil)
+			if resp.StatusCode != 200 {
+				t.Fatalf("%s: %d %s", path, resp.StatusCode, raw)
+			}
+			if i > 0 { // the first request warms the connection
+				times = append(times, time.Since(t0))
+			}
+			size = len(raw)
+		}
+		slices.Sort(times)
+		t.Logf("GET %-52s median %7.1f ms  min %7.1f  max %7.1f  body %d bytes", path, float64(times[len(times)/2].Microseconds())/1000,
+			float64(times[0].Microseconds())/1000, float64(times[len(times)-1].Microseconds())/1000, size)
+	}
+	var page model.Page[model.Host]
+	admin.want(200, "GET", "/api/v1/hosts", nil, &page)
+	var dash model.Dashboard
+	admin.want(200, "GET", "/api/v1/dashboard", nil, &dash)
+	if page.Total != n || dash.Headline.HostsUp != n || dash.Headline.ServicesOpen != 3*n {
+		t.Fatalf("totals: hosts=%d dashboard=%+v", page.Total, dash.Headline)
 	}
 }
