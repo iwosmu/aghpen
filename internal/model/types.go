@@ -348,14 +348,22 @@ type RunStats struct {
 	HostsUp        int     `json:"hosts_up"`
 	ServicesOpen   int     `json:"services_open"`
 	HTTPServices   int     `json:"http_services"`
-	PacketsSent    int64   `json:"packets_sent"` // estimate from nmap stats plus native probes
+	PacketsSent    int64   `json:"packets_sent"` // probe packets: nmap's own count of raw packets (ARP included) plus native probes; the kernel TCP of HTTP and version detection is not in it (limited by http_rps and the HTTP reserve of the cap)
 	HTTPRequests   int64   `json:"http_requests"`
-	CurrentPPS     float64 `json:"current_pps"`
-	AvgPPS         float64 `json:"avg_pps"`
-	ElapsedSec     int64   `json:"elapsed_sec"` // active time only, pauses excluded
-	ETASec         int64   `json:"eta_sec"`
-	Retried        int     `json:"retried"` // unstable hosts probed again
-	Errors         int     `json:"errors"`
+	CurrentPPS     float64 `json:"current_pps"` // see CurrentPPSBasis
+	// PacketsEstimated is the part of PacketsSent that is an estimate (a
+	// stage whose nmap output had no packet count), not a count.
+	PacketsEstimated int64 `json:"packets_estimated"`
+	// CurrentPPSBasis says what CurrentPPS is: "measured" (only finished
+	// stages with nmap's exact counts in the window) or "pace" (it includes
+	// the pinned --min-rate/--max-rate pace of nmap processes still running,
+	// or estimated counts). The UI must not present "pace" as a measurement.
+	CurrentPPSBasis string  `json:"current_pps_basis,omitempty"`
+	AvgPPS          float64 `json:"avg_pps"`
+	ElapsedSec      int64   `json:"elapsed_sec"` // active time only, pauses excluded
+	ETASec          int64   `json:"eta_sec"`
+	Retried         int     `json:"retried"` // unstable hosts probed again
+	Errors          int     `json:"errors"`
 }
 
 type ScanRun struct {

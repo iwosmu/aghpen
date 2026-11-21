@@ -91,7 +91,8 @@ api PUT /settings/safety "$POL" | jq -c '{max_pps, max_http_rps, max_per_host_rp
 SCOPE=$(api GET "/scopes?limit=100" | jq -r '[.items[] | select(.name == "Laboratorium (lab-run)")][0].id // empty')
 if [ -z "$SCOPE" ]; then
   SCOPE=$(api POST /scopes '{"name":"Laboratorium (lab-run)","description":"sieć czujka-lab 10.66.0.0/16 i nazwy z lab/ground-truth/targets-domains.txt","criticality":3}' | jq -r .id)
-  TEXT=$(cat lab/ground-truth/targets-cidr.txt lab/ground-truth/targets-domains.txt)
+  # LR_SCOPE replaces the targets (for example "10.66.0.0/20" for a short rate check)
+  if [ -n "${LR_SCOPE:-}" ]; then TEXT=$LR_SCOPE; else TEXT=$(cat lab/ground-truth/targets-cidr.txt lab/ground-truth/targets-domains.txt); fi
   api POST /scopes/$SCOPE/targets "$(jq -nc --arg t "$TEXT" '{text: $t}')" | jq -c '{saved: (.valid | length), address_count, excluded, invalid: (.invalid | length)}' | tee -a "$OUT/run.log"
 fi
 if ! api GET "/signatures?q=lab-infokiosk" | jq -e '.items | length > 0' >/dev/null; then

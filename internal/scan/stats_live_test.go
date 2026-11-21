@@ -22,7 +22,7 @@ func TestCurrentPPSDuringALongStage(t *testing.T) {
 	}
 	// the first stage ends: its exact count replaces the estimate
 	end()
-	k.addStage(2880, now.Add(-12*time.Second), now) // 240 per second, measured
+	k.addStage(2880, true, now.Add(-12*time.Second), now) // 240 per second, measured
 	if s := k.snapshot(); s.CurrentPPS != 490 || s.PacketsSent != 2880 {
 		t.Errorf("one ended, one running: %+v", s)
 	}

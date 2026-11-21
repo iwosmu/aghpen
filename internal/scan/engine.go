@@ -182,7 +182,7 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 		e: e, log: log, plan: plan, sink: sink, sinkCtx: context.WithoutCancel(ctx),
 		prober: e.Prober(), ports: ports, disc: disc, lim: lim,
 		mode: discoveryMode(plan.Profile.Discovery.Mode), local: localNetsFn(),
-		budget:    NewBudget(lim.PPS),
+		budget:    NewBudget(lim.ProbePPS()),
 		httpLim:   probe.NewLimiter(lim.HTTPRPS, 1), // no burst: the cap holds in every second
 		hostSem:   make(chan struct{}, lim.ParallelHosts),
 		hostnames: exp.Hostnames,
@@ -358,7 +358,7 @@ func (r *run) claim() (*group, int) {
 	// equal share of the packet budget; the last lone group may use all of it
 	rate := r.budget.Share(r.lim.ParallelChunks)
 	if len(rest) == 0 && r.running == 0 {
-		rate = r.lim.PPS
+		rate = r.lim.ProbePPS()
 	}
 	if we := r.plan.WindowEnd; we != nil {
 		left := we.Sub(r.e.now())
@@ -641,7 +641,7 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 	probes := discoveryProbes(disc, privileged)
 	// ARP-only discovery (see discover): one frame per address and two
 	// retries for the silent ones, plus the confirmation sweep of live blocks.
-	arpOnly := disc.ARP && privileged && !disc.SkipDiscovery && e.scopeOnLink(plan)
+	arpOnly := privileged && !disc.SkipDiscovery && e.scopeOnLink(plan)
 	// Share of /24 blocks that get the second pass: the blocks the inventory
 	// knows hosts in, or a guess for a new scope.
 	liveBlocks := liveBlockGuess

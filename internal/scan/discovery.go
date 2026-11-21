@@ -137,7 +137,15 @@ func (r *run) onLink(g *group) bool {
 // each /24 block where a host answered or a hint exists, in fast mode only
 // the hinted hosts.
 func (r *run) discover(ctx context.Context, g *group, tgts []string, rate int, gs *groupStats) ([]probe.Host, error) {
-	arpOnly := r.disc.ARP && r.prober.Privileged() && r.onLink(g) // ARP answers for the whole segment in one pass
+	// On a directly connected network discovery is one paced ARP sweep, even
+	// when the profile turns ARP off: nmap must resolve the MAC of every
+	// address before any IP probe can leave, and IP probes to silent on-link
+	// addresses make the kernel resolve them as well. Those incomplete
+	// neighbour entries filled the host's neighbour table (gc_thresh3 = 1024
+	// is global, not per network namespace) on the public instance: "neighbor
+	// table overflow", and the host lost its own DNS. IP probes go only to
+	// addresses that answered ARP.
+	arpOnly := r.prober.Privileged() && r.onLink(g)
 	pass := func(tg []string, o model.DiscoveryOpts, retries int) ([]probe.Host, error) {
 		t0 := r.e.now()
 		end := r.stats.begin(rate)

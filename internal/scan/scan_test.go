@@ -709,8 +709,23 @@ func TestParallelismAndBudget(t *testing.T) {
 	if netw.maxInflight != 3 {
 		t.Errorf("parallel workers = %d, want 3", netw.maxInflight)
 	}
-	if netw.maxRate != 600 {
-		t.Errorf("rate in flight = %d, want exactly the 600 pps budget (3 x 200)", netw.maxRate)
+	// the 600 pps cap minus the HTTP reserve (default 10 rps x 8 packets)
+	want := EffectiveLimits(plan.Profile, plan.Policy).ProbePPS()
+	if want != 520 || netw.maxRate > want || netw.maxRate < want-3 {
+		t.Errorf("rate in flight = %d, want the probe budget %d (600 pps cap minus the HTTP reserve)", netw.maxRate, want)
+	}
+}
+
+func TestHTTPReserve(t *testing.T) {
+	for _, c := range []struct {
+		pps     int
+		httpRPS float64
+		probe   int
+	}{{1000, 20, 840}, {200, 20, 150}, {2000, 50, 1600}, {2, 10, 2}} {
+		l := Limits{PPS: c.pps, HTTPRPS: c.httpRPS}
+		if got := l.ProbePPS(); got != c.probe {
+			t.Errorf("cap %d, http %v rps: probe budget %d, want %d", c.pps, c.httpRPS, got, c.probe)
+		}
 	}
 }
 

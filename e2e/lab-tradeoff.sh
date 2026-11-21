@@ -19,10 +19,6 @@ vi2|{"version_intensity":2}
 noudp|{"udp":{"enabled":false}}
 cap800|{"rate":{"max_pps":800,"max_parallel_chunks":4}}
 pps300|{"rate":{"max_pps":300,"max_parallel_chunks":2}}
-noarp-fast|{"discovery":{"arp":false,"mode":"fast"},"ports":"22,80,443,8080","service_detection":false,"http":{"enabled":false},"udp":{"enabled":false}}
-noarp-balanced|{"discovery":{"arp":false,"mode":"balanced"},"ports":"22,80,443,8080","service_detection":false,"http":{"enabled":false},"udp":{"enabled":false}}
-noarp-thorough|{"discovery":{"arp":false,"mode":"thorough"},"ports":"22,80,443,8080","service_detection":false,"http":{"enabled":false},"udp":{"enabled":false}}
-arp-discovery|{"ports":"22,80,443,8080","service_detection":false,"http":{"enabled":false},"udp":{"enabled":false}}
 '
 if [ "${TO_BUILD:-1}" = 1 ]; then
   docker compose -p czacc -f deploy/docker-compose.yml build czujka >"$OUT/build.log" 2>&1 || { tail -20 "$OUT/build.log"; exit 1; }

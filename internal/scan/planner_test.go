@@ -313,7 +313,7 @@ func TestStatsKeeper(t *testing.T) {
 	k.update(func(s *model.RunStats) { s.AddressesTotal = 1000 })
 	t0 := now
 	now = now.Add(4 * time.Second)
-	k.addStage(1200, t0, now) // 300 pps for 4 s
+	k.addStage(1200, true, t0, now) // 300 pps for 4 s
 	k.update(func(s *model.RunStats) { s.AddressesDone += 200 })
 	s := k.snapshot()
 	if s.PacketsSent != 3200 || s.ElapsedSec != 24 || s.HostsUp != 3 {

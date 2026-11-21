@@ -97,9 +97,18 @@ func Sent(line, src string) bool {
 	return strings.HasPrefix(line, "IP "+src+".") || strings.HasPrefix(line, "IP "+src+" >")
 }
 
+// dupWindow: inside a container's network namespace tcpdump reports every
+// frame that nmap injects through its packet socket (the ARP requests)
+// twice, about 2 µs apart (measured: nmap 2048 raw packets, interface
+// tx_packets +2048, the target saw one request, the capture 4096). An
+// identical line within this window is the same frame; real retransmissions
+// are about 100 ms apart.
+const dupWindow = 0.001
+
 // Bin counts the lines of r that src sent, per second and class.
 func Bin(r io.Reader, src string) (map[int64]map[string]int, error) {
 	bins := map[int64]map[string]int{}
+	last := map[string]float64{}
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 64*1024), 1024*1024)
 	for sc.Scan() {
@@ -112,8 +121,16 @@ func Bin(r io.Reader, src string) (map[int64]map[string]int, error) {
 		if err != nil {
 			continue
 		}
-		if !Sent(line[sp+1:], src) {
+		body := line[sp+1:]
+		if !Sent(body, src) {
 			continue
+		}
+		if prev, ok := last[body]; ok && ts-prev < dupWindow {
+			continue
+		}
+		last[body] = ts
+		if len(last) > 100000 {
+			clear(last)
 		}
 		sec := int64(ts)
 		if bins[sec] == nil {
