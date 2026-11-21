@@ -15,8 +15,8 @@ Numery zrzutów (`40`, `47` …) to pliki w `web/screenshots/lab/`. „Krok N”
 
 | Status | Znaczenie | Wierszy |
 | --- | --- | --- |
-| **udowodnione** | Działa w produkcie. Dowód z działającego produktu: zapis testu e2e, raport z laboratorium, zrzut na prawdziwych danych albo test integracyjny przez REST API na PostgreSQL z `pg_tde`. | 74 |
-| **gotowe** | Działa w produkcie i ma testy, ale brak zapisu przebiegu na prawdziwych danych albo dowód jest do powtórzenia. | 13 |
+| **udowodnione** | Działa w produkcie. Dowód z działającego produktu: zapis testu e2e, raport z laboratorium, zrzut na prawdziwych danych albo test integracyjny przez REST API na PostgreSQL z `pg_tde`. | 75 |
+| **gotowe** | Działa w produkcie i ma testy, ale brak zapisu przebiegu na prawdziwych danych albo dowód jest do powtórzenia. | 12 |
 | **częściowe** | Działa tylko część wymagania albo brakuje pomiaru, o który pyta wymaganie. | 9 |
 | **brak** | Nie ma tego w kodzie. | 0 |
 
@@ -131,8 +131,8 @@ Razem 96 wierszy.
 | --- | --- | --- | --- |
 | Repozytorium kodu źródłowego | to repozytorium; `go build ./...` przechodzi | `README.md` | **udowodnione** |
 | Dokumentacja techniczna | spis w `docs/DOKUMENTACJA.md`; wdrożenie, bezpieczeństwo, algorytmy, sygnatury, reguły, integracje, API | `docs/` | **gotowe** |
-| Prezentacja do 10 slajdów | 10 slajdów, PDF i HTML, zrzuty z laboratorium. 2 miejsca czekają na pomiary (`DO UZUPEŁNIENIA`): pakiety po stopie awaryjnym, precyzja i czułość. | `docs/slides/czujka.pdf` | **częściowe** |
-| Działające demo, lokalnie lub w środowisku testowym | Stos startuje jednym poleceniem; laboratorium 70 hostów lokalnie; publiczna instancja `https://czujka.dev` z laboratorium i zaplanowanym skanem. Scenariusz i lista ujęć: `docs/DEMO.md`. Nagranie jeszcze nie powstało. | `docs/DEMO.md`; `https://czujka.dev` | **gotowe** |
+| Prezentacja do 10 slajdów | 10 slajdów, PDF i HTML. Każdy slajd to jeden obraz z podpisem: tytuł do 8 słów i najwyżej 12 słów poza nim; `docs/slides/build.mjs` pilnuje limitu i wypisuje liczbę słów. Szczegóły są w notatkach do slajdów (`docs/DEMO.md` rozdz. 2). 2 miejsca czekają na pomiary (`DO UZUPEŁNIENIA`): pakiety po stopie awaryjnym, precyzja. | `docs/slides/czujka.pdf` | **częściowe** |
+| Działające demo, lokalnie lub w środowisku testowym | Stos startuje jednym poleceniem; laboratorium 70 hostów lokalnie; publiczna instancja `https://czujka.dev` z laboratorium i zaplanowanym skanem. Film 2:09 nagrany skryptem z prawdziwego interfejsu (`docs/demo/record.mjs`): kreator na świeżej instalacji, skan /16 na żywo (fragment w ×8, oznaczony), porównanie dwóch skanów, host niestabilny, wehikuł czasu, reguła, sygnatura z przykładu, stop awaryjny. Pierwsza wersja z lokalnego stosu (21.11.2026); wersja końcowa 22.11 rano na danych z nocy, tym samym poleceniem. Głos lektora nagrywa się osobno (`docs/demo/lektor.txt`). | `docs/demo/czujka-demo.mp4`; `docs/DEMO.md`; `https://czujka.dev` | **udowodnione** |
 | Technologie bezpłatne i open-source | Go, PostgreSQL (Percona z `pg_tde`), nmap, chi, pgx, React, Vite. Bez płatnych API. | `go.mod`, `web/package.json` | **udowodnione** |
 | Język o niskim zużyciu zasobów | Go; obraz 107 MB (`docker images`, 2026-11-21); najwyżej 99,9 MiB pamięci kontenera w czasie skanów | `e2e/full/transcript.txt` krok 18 | **udowodnione** |
 
