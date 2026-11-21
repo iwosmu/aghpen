@@ -24,7 +24,7 @@ TARGET=${JURY_TARGET:-host.docker.internal}
 GUARD=${JURY_GUARD:-1}
 # The default profile ("Ten komputer" copies it) must cover every template port: a miss is a FAIL.
 PORTS=21,80,81,443,2223,3001,5673,6379,8080,8081,8085,8086,8088,8089,8090,8474,8787,8888,15432,15673,21000-21010
-ONLY=${JURY_ONLY:-quickstart custom-network modern version vulnerable proxy}
+ONLY=${JURY_ONLY:-quickstart custom-network modern version vulnerable proxy host-gone}
 JAR=$(mktemp); CSRF=
 PASSES=0; FAILS=0; GAPS=0; CLOSED=0
 TABLE=()
@@ -123,7 +123,16 @@ scan() { # label [profile] -> sets RUN, SV, FN, CH
       esac
     done ) &
   local sse=$!
-  while :; do st=$(api GET "/runs/$RUN" | jq -r .status); case $st in completed|failed|cancelled) break ;; esac; sleep 3; done
+  # Seconds until each port first shows in the run's results (partial results are stored while the run goes on).
+  unset PSEEN; declare -gA PSEEN
+  local pp
+  while :; do
+    st=$(api GET "/runs/$RUN" | jq -r .status)
+    for pp in $(api GET "/services?run_id=$RUN&limit=500" | jq -r '.items[]? | select(.proto == "tcp") | .port'); do
+      [ -n "${PSEEN[$pp]:-}" ] || PSEEN[$pp]=$(( $(date +%s) - t0 ))
+    done
+    case $st in completed|failed|cancelled) break ;; esac; sleep 2
+  done
   RUNSECS=$(( $(date +%s) - t0 )); FIRSTSVC=
   [ -s "$fs" ] && FIRSTSVC=$(( $(cat "$fs") - t0 ))
   kill "$sse" 2>/dev/null; wait "$sse" 2>/dev/null
@@ -174,10 +183,14 @@ juror() { # stack: what a juror sees with the default profile on target $TARGET
   open=$(echo "$SV" | jq -r '.items[] | select(.proto == "tcp" and .state == "open") | .port' | sort -u)
   miss=$(comm -23 <(echo "$pub") <(echo "$open") | tr '\n' ' ')
   extra=$(comm -13 <(echo "$pub") <(echo "$open") | tr '\n' ' ')
-  local npub nfound; npub=$(echo "$pub" | grep -c .); nfound=$(comm -12 <(echo "$pub") <(echo "$open") | grep -c .)
+  local npub nfound last=0 lastp= q; npub=$(echo "$pub" | grep -c .); nfound=$(comm -12 <(echo "$pub") <(echo "$open") | grep -c .)
+  for q in $pub; do
+    if [ -z "${PSEEN[$q]:-}" ]; then last="?"; lastp=$q; break; fi
+    [ "${PSEEN[$q]}" -gt "$last" ] && { last=${PSEEN[$q]}; lastp=$q; }
+  done
   [ -z "${miss// /}" ] && ok=1 || ok=0
   row "juror:$1" all open "every published port, default profile" "" $ok "$nfound/$npub found${miss:+; missing: $miss}${extra:+; other open ports: $extra}"
-  JUROR+=("$(printf '%s\t%s/%s\t%s\t%s\t%s' "$1" "$nfound" "$npub" "${FIRSTSVC:-?}" "$RUNSECS" "$RUN")")
+  JUROR+=("$(printf '%s\t%s/%s\t%s\t%s\t%s\t%s' "$1" "$nfound" "$npub" "${FIRSTSVC:-?}" "$last (port $lastp)" "$RUNSECS" "$RUN")")
 }
 truth() { # stack
   # awk keeps empty columns (read with a tab IFS would merge them); \x1f is not whitespace.
@@ -290,6 +303,52 @@ if want proxy; then
   compose proxy proxy-base -- down -v >/dev/null 2>&1
 fi
 
+if want host-gone && [ "$GUARD" = 0 ]; then
+  echo; echo "=== a host disappears: a second target, a container on its own docker network in the jury machine ==="
+  # The one-machine template never vanishes as a whole, so this stage adds one host: nginx at $HIP. Czujka joins that
+  # network; dind.sh puts $HIP/32 into the operator lock. Expected: the scan after the stop reports host_missing and
+  # service_unreachable; the re-probe of a young host (1 minute after the miss) then reports host_gone and service_gone
+  # without another scan.
+  HN=czjury-hostnet; HIP=${JURY_HOST_IP:-172.31.250.10}
+  docker network create --subnet "${HIP%.*}.0/24" "$HN" >/dev/null 2>&1 || true
+  docker rm -f czjury-host >/dev/null 2>&1 || true
+  docker run -d --name czjury-host --network "$HN" --ip "$HIP" nginx:alpine >/dev/null
+  docker network connect "$HN" czujka-czujka-1 2>/dev/null || true
+  S2=$(api POST /scopes '{"name":"Szablon jury (e2e): drugi host","criticality":3}' | jq -r .id)
+  api POST "/scopes/$S2/targets" "$(jq -nc --arg t "$HIP" '{text:$t}')" | jq -c '{valid: [.valid[].value], invalid}'
+  P2=$(api GET "/profiles/$PROF" | jq -c --argjson s "$S2" 'del(.id, .created_at, .updated_at, .next_run_at, .last_run_id) | .name = "Szablon jury (e2e): drugi host" | .scope_ids = [$s] | .ports = "80"' \
+    | { read -r body; api POST /profiles "$body"; } | jq -r .id)
+  scan "second host up" "$P2"
+  s=$(echo "$SV" | jq -c --arg ip "$HIP" '[.items[] | select(.port == 80 and ((.ip // .host_ip // "") == $ip))][0] // {}')
+  [ "$(echo "$s" | jq -r '.state // ""')" = open ] && ok=1 || ok=0
+  row host-gone 80 open "second host: nginx on $HIP:80" "" $ok "state=$(echo "$s" | jq -r '.state // "none"')"
+  docker stop czjury-host >/dev/null
+  scan "second host stopped" "$P2"; RUN2=$RUN; T2=$(date +%s)
+  hit() { echo "$1" | jq -r --arg k "$2" --arg ip "$HIP" '[.items[] | select(.kind == $k and ((.summary // "") | contains($ip)))][0] | if . == null then "" else "run \(.run_id) \(.kind): \(.summary)" end'; }
+  for k in host_missing service_unreachable; do
+    c=$(hit "$CH" "$k"); [ -n "$c" ] && ok=1 || ok=0
+    row host-gone 80 change "stopped: $k in the scan after the stop" "" $ok "${c:-kinds in run $RUN2: $(echo "$CH" | jq -r '[.items[].kind] | unique | join(",")')}"
+  done
+  # No other scan from here: only Czujka's own re-probes may run.
+  GH= GS= waited=0
+  while [ $waited -le "${JURY_GONE_WAIT:-240}" ]; do
+    C=$(api GET "/changes?limit=500" | jq -c --argjson r "$RUN2" '{items: [.items[] | select(.run_id > $r)]}')
+    [ -n "$GH" ] || { c=$(hit "$C" host_gone); [ -n "$c" ] && GH="$c after $(( $(date +%s) - T2 )) s"; }
+    [ -n "$GS" ] || { c=$(hit "$C" service_gone); [ -n "$c" ] && GS="$c after $(( $(date +%s) - T2 )) s"; }
+    [ -n "$GH" ] && [ -n "$GS" ] && break
+    sleep 5; waited=$(( $(date +%s) - T2 ))
+  done
+  REPROBES=$(api GET "/runs?limit=20" | jq -r --argjson r "$RUN2" '[.items[] | select(.id > $r) | "\(.id) \(.trigger) \(.status)"] | join("; ")')
+  log "runs after the stop (no scan started by this script): ${REPROBES:-none}"
+  for pair in "host_gone:$GH" "service_gone:$GS"; do
+    k=${pair%%:*}; v=${pair#*:}; secs=$(echo "$v" | grep -oE 'after [0-9]+ s' | grep -oE '[0-9]+')
+    # Young host: confirmation re-probe 1 minute after the miss, plus the planner tick and the probe run itself.
+    [ -n "$v" ] && [ "${secs:-999}" -le "${JURY_GONE_MAX:-150}" ] && ok=1 || ok=0
+    row host-gone 80 change "without another scan: $k within ${JURY_GONE_MAX:-150} s" "" $ok "${v:-none within ${JURY_GONE_WAIT:-240} s}"
+  done
+  docker rm -f czjury-host >/dev/null 2>&1; docker network disconnect "$HN" czujka-czujka-1 >/dev/null 2>&1; docker network rm "$HN" >/dev/null 2>&1
+fi
+
 all_down
 echo
 echo "=== Summary ==="
@@ -297,8 +356,8 @@ printf '%s\n' "${TABLE[@]}" | awk -F'\t' '{print $1}' | sed 's/ (.*//' | sort | 
 echo "PASS: $PASSES  FAIL: $FAILS  GAP: $GAPS  GAP CLOSED: $CLOSED"
 if [ ${#JUROR[@]} -gt 0 ]; then
   echo "Default profile on target $TARGET (the juror flow), per stack:"
-  printf '  %-16s %-14s %-20s %-18s %s\n' stack "published found" "first service (s)" "run finished (s)" run
-  printf '%s\n' "${JUROR[@]}" | while IFS=$'\t' read -r a b c d e; do printf '  %-16s %-14s %-20s %-18s %s\n' "$a" "$b" "$c" "$d" "$e"; done
+  printf '  %-16s %-16s %-18s %-24s %-17s %s\n' stack "published found" "first service (s)" "last template port (s)" "run finished (s)" run
+  printf '%s\n' "${JUROR[@]}" | while IFS=$'\t' read -r a b c d e f; do printf '  %-16s %-16s %-18s %-24s %-17s %s\n' "$a" "$b" "$c" "$d" "$e" "$f"; done
 fi
 rm -f "$JAR" "$JAR.pol" "$JAR".first.*
 [ "$FAILS" -eq 0 ] && echo "JURY TEMPLATE OK" || exit 1
