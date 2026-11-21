@@ -342,6 +342,22 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 		r.stats.update(func(s *model.RunStats) { s.PortsUnknown += len(t) })
 		r.stats.warn("Skan portów nie skończył się dla części hostów (limit czasu nmap). Ich usługi w tym przebiegu są nieznane, nie zniknęły.")
 	}
+	// A host that discovery found up and that gave the port scan no answer
+	// at all, even after the retry (no open and no closed port: the probes
+	// or the answers were lost, e.g. neighbour resolution under load), has
+	// unknown ports: no port state is evidence that its services are gone.
+	lost := 0
+	for _, h := range hosts {
+		if p := scanned[h.IP]; h.Up && !unknown[h.IP] && (p == nil || (!p.Responded && len(p.Ports) == 0)) {
+			unknown[h.IP] = true
+			lost++
+		}
+	}
+	if lost > 0 {
+		r.stats.update(func(s *model.RunStats) { s.PortsUnknown += lost })
+		r.stats.warn("Skan portów nie dostał żadnej odpowiedzi od części aktywnych hostów. Ich usługi w tym przebiegu są nieznane, nie zniknęły.")
+		r.log.Warn("port scan got no answer from hosts that discovery found up", "group", g.id, "hosts", lost, "of", len(hosts))
+	}
 	var answered int64
 	for _, h := range hosts {
 		if p := scanned[h.IP]; p != nil && (p.Responded || len(p.Ports) > 0) {

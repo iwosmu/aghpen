@@ -1653,3 +1653,27 @@ func TestDeepPassOnlyForLargerRankedScopes(t *testing.T) {
 		t.Errorf("explicit list: deep %d, packets %d vs %d", est2.DeepMaxHosts, est2.EstPackets, est.EstPackets)
 	}
 }
+
+// A host that discovery found up but that gives the port scan no answer at
+// all, also on the retry, is reported with unknown ports and a run warning:
+// never as a host whose ports are all closed (the store would mark its
+// services gone).
+func TestSilentPortScanIsUnknownNotClosed(t *testing.T) {
+	netw := &fakeNet{hosts: map[string][]int{"10.7.0.5": {80, 443}, "10.7.0.6": {80}}, portMiss: map[string]int{"10.7.0.5": 9}}
+	e := New(Deps{Prober: netw, Logger: quiet})
+	sink := newSink()
+	out := e.Run(context.Background(), basePlan("10.7.0.0/28"), sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	h := sink.host("10.7.0.5")
+	if h == nil || !h.Up || !h.PortsUnknown || h.Coverage != nil || len(h.Services) != 0 {
+		t.Fatalf("silent host = %+v", h)
+	}
+	if ok := sink.host("10.7.0.6"); ok == nil || ok.PortsUnknown || ok.Coverage == nil || len(ok.Services) != 1 {
+		t.Errorf("answering host = %+v", ok)
+	}
+	if out.Stats.PortsUnknown != 1 || !slices.ContainsFunc(out.Stats.Warnings, func(w string) bool { return strings.Contains(w, "żadnej odpowiedzi") }) {
+		t.Errorf("stats: ports_unknown %d, warnings %q", out.Stats.PortsUnknown, out.Stats.Warnings)
+	}
+}
