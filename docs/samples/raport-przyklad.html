@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raport z przebiegu #42 · Czujka · sieć przykładowa</title>
+<style>
+:root{--ink:#14181d;--soft:#47525e;--rule:#cdd3da;--wash:#f2f4f6;--high:#9b1c1c;--medium:#8f4e00;--low:#14506e;--info:#47525e}
+*{box-sizing:border-box}
+html{background:#e7eaee}
+body{margin:0;font:400 10pt/1.45 "Inter","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;color:var(--ink);font-variant-numeric:tabular-nums;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-size-adjust:100%}
+::selection{background:#cfe1ec}
+.sheet{background:#fff;max-width:210mm;margin:8mm auto;padding:15mm 15mm 13mm}
+h1,h2,h3,p,ol,ul,dl,dd,table{margin:0;padding:0}
+h1{font-size:21pt;line-height:1.15;font-weight:700;letter-spacing:-.015em;text-wrap:balance}
+h2{font-size:12pt;line-height:1.25;font-weight:700;margin:6mm 0 1.8mm;break-after:avoid;text-wrap:balance}
+h2 .n{font-weight:400;color:var(--soft);margin-left:.4em}
+code,.mono{font-family:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace;font-size:.92em}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:8mm;padding-bottom:3.5mm;border-bottom:1.5pt solid var(--ink)}
+.brand{text-align:right;color:var(--soft);font-size:8.5pt;white-space:nowrap}
+.brand b{display:block;color:var(--ink);font-size:10pt}
+.meta{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.5fr) auto minmax(0,1.1fr);gap:1mm 7mm;padding:2.5mm 0;border-bottom:.5pt solid var(--rule)}
+.meta div:nth-child(3) dd{white-space:nowrap}
+.meta dt{font-size:8pt;color:var(--soft)}
+.meta dd{font-weight:600}
+.notice{margin-top:4mm;padding:2.5mm 3.5mm;background:var(--wash);border:.5pt solid var(--medium);color:var(--medium);font-weight:600}
+.lead{font-size:13pt;line-height:1.4;font-weight:500;margin-top:4.5mm;max-width:68ch;text-wrap:pretty}
+.figures{display:grid;grid-template-columns:repeat(6,1fr);margin-top:4.5mm;border-top:.5pt solid var(--rule);border-bottom:.5pt solid var(--rule)}
+.fig{padding:2.5mm 3mm 2.5mm 0}
+.fig+.fig{padding-left:3mm;border-left:.5pt solid var(--rule)}
+.fig b{display:block;font-size:18pt;line-height:1.1;font-weight:700;letter-spacing:-.01em}
+.fig span{display:block;font-size:8.5pt;line-height:1.25;margin-top:.8mm}
+.fig small{display:block;font-size:7.5pt;line-height:1.25;color:var(--soft);margin-top:.6mm}
+.chg{break-inside:avoid}
+.changes{list-style:none}
+.changes li{display:grid;grid-template-columns:21mm 1fr;gap:0 2mm;padding:1mm 0;border-top:.5pt solid var(--rule);break-inside:avoid}
+.changes li:last-child{border-bottom:.5pt solid var(--rule)}
+.sev{font-size:8pt;font-weight:700;line-height:1.75;white-space:nowrap}
+.sev::before{content:"";display:inline-block;width:2mm;height:2mm;margin-right:1.4mm;background:currentColor;vertical-align:-.1mm}
+.sev-high{color:var(--high)}.sev-medium{color:var(--medium)}.sev-low{color:var(--low)}
+.sev-info{color:var(--info)}.sev-info::before{background:none;box-shadow:inset 0 0 0 .5pt currentColor}
+.more,.none,.expected{color:var(--soft);font-size:9pt;margin-top:1.5mm}
+.none{margin-top:0}
+.expected{margin-top:4mm;padding:2.2mm 3.5mm;background:var(--wash);color:var(--ink)}
+.finding{padding:1.6mm 0;border-top:.5pt solid var(--rule);break-inside:avoid}
+.finding:last-of-type{border-bottom:.5pt solid var(--rule)}
+.finding header{display:grid;grid-template-columns:21mm 1fr auto;gap:0 2mm;align-items:baseline}
+.finding h3{font-size:10pt;font-weight:700;line-height:1.35}
+.score{font-size:8.5pt;color:var(--soft);white-space:nowrap}
+.score b{color:var(--ink);font-size:10pt}
+.finding .where{margin-left:23mm;font-size:9pt;color:var(--soft);overflow-wrap:anywhere}
+.finding .where .mono{color:var(--ink)}
+.ev{list-style:none;margin:.6mm 0 0 23mm;font-size:8.5pt;line-height:1.4}
+.ev li{display:grid;grid-template-columns:40mm 1fr;gap:0 2mm;overflow-wrap:anywhere}
+.ev code{color:var(--soft)}
+table{width:100%;border-collapse:collapse;font-size:9pt}
+th{text-align:left;font-size:8pt;font-weight:600;color:var(--soft);padding:0 2mm 1mm 0;border-bottom:.75pt solid var(--ink);vertical-align:bottom}
+td{padding:1.1mm 2mm 1.1mm 0;border-bottom:.5pt solid var(--rule);vertical-align:top;overflow-wrap:anywhere}
+th:last-child,td:last-child{padding-right:0}
+tr{break-inside:avoid}
+thead{display:table-header-group}
+.r{text-align:right}
+td.r,td.mono{white-space:nowrap}
+td small{display:block;color:var(--soft);font-size:8.5pt}
+.cols{display:grid;grid-template-columns:1.25fr 1fr;gap:0 9mm;break-inside:avoid}
+.kv th{width:42%;font-size:9pt;font-weight:400;color:var(--soft);border-bottom:.5pt solid var(--rule);padding:1.1mm 2mm 1.1mm 0;vertical-align:top}
+.kv tr:first-child th,.kv tr:first-child td{border-top:.75pt solid var(--ink)}
+.safety{margin-top:2.5mm;font-size:9pt;max-width:75ch}
+.foot{margin-top:4mm;padding-top:2mm;border-top:.5pt solid var(--rule);color:var(--soft);font-size:8pt}
+@page{size:A4;margin:12mm 15mm}
+@media print{html{background:#fff}.sheet{max-width:none;margin:0;padding:0}}
+@media screen and (max-width:720px){
+.sheet{margin:0;padding:6mm 4.5mm}
+h1{font-size:17pt}
+.head{flex-direction:column;align-items:flex-start;gap:2mm}
+.brand{text-align:left;white-space:normal}.brand b{display:inline;margin-right:.5em}
+.meta{grid-template-columns:1fr 1fr}.meta div:nth-child(3) dd{white-space:normal}
+.lead{font-size:12pt}
+.figures{grid-template-columns:repeat(2,1fr);border-bottom:0}
+.fig,.fig+.fig{padding:2.5mm 2mm 2.5mm 0;border-left:0;border-bottom:.5pt solid var(--rule)}
+.changes li,.finding header{grid-template-columns:1fr}
+.finding .where,.ev{margin-left:0}
+.ev li{grid-template-columns:1fr}
+.cols{grid-template-columns:1fr}
+.scroll{overflow-x:auto}
+.scroll table{min-width:150mm}
+td.mono{white-space:normal}
+}
+</style>
+</head>
+<body>
+<main class="sheet">
+<div class="head">
+<h1>Raport z przebiegu #42</h1>
+<p class="brand"><b>Czujka · sieć przykładowa</b>wygenerowano 21.11.2026 02:05</p>
+</div>
+<dl class="meta"><div><dt>Profil</dt><dd>Kampus – co 12 godzin (z harmonogramu)</dd></div><div><dt>Zakres</dt><dd>Kampus – sieć laboratoryjna · 1 024 adresy</dd></div><div><dt>Czas</dt><dd>21.11.2026 02:00–02:05</dd></div><div><dt>Porównanie z</dt><dd>przebieg #41 z 20.11.2026 14:00</dd></div></dl>
+
+<p class="lead">Przybyło: 1 host i 5 usług. Ubyło: 1 host i 1 usługa. Powroty po nieaktywności: 1 host. Zmiany w znanych hostach i usługach: 6. Najpierw sprawdź 4 zmiany o wadze średniej lub wysokiej.</p>
+<div class="figures"><div class="fig"><b>15</b><span>zmiany do przejrzenia</span><small>w tym 4 o wadze średniej lub wysokiej</small></div><div class="fig"><b>11</b><span>nowych obserwacji</span></div><div class="fig"><b>58</b><span>aktywnych hostów</span><small>&#43;2 / −1</small></div><div class="fig"><b>143</b><span>otwarte usługi</span><small>&#43;5 / −1</small></div><div class="fig"><b>36</b><span>usług WWW</span></div><div class="fig"><b>9</b><span>zmian oczekiwanych</span><small>nie wymagają reakcji</small></div></div>
+<section class="chg">
+<h2>Co nowego<span class="n">7</span></h2>
+<ol class="changes">
+<li><span class="sev sev-medium">średnia</span><span>Nowa usługa 10.66.3.17:8080 (Jetty 10.0.20)</span></li>
+<li><span class="sev sev-medium">średnia</span><span>Nowa usługa 10.66.3.40:80 (HP LaserJet http config)</span></li>
+<li><span class="sev sev-medium">średnia</span><span>Nowa usługa 10.66.3.90:6379 (Redis key-value store 7.2.4)</span></li>
+<li><span class="sev sev-low">niska</span><span>Host 10.66.2.9 znów odpowiada po zgłoszeniu jako nieaktywny</span></li>
+<li><span class="sev sev-low">niska</span><span>Nowy host 10.66.3.40 (otwarte porty: 80, 631, 9100)</span></li>
+<li><span class="sev sev-low">niska</span><span>Nowa usługa 10.66.3.40:631 (ipp)</span></li>
+<li><span class="sev sev-low">niska</span><span>Nowa usługa 10.66.3.40:9100 (jetdirect)</span></li>
+</ol>
+
+</section>
+<section class="chg">
+<h2>Co zniknęło<span class="n">2</span></h2>
+<ol class="changes">
+<li><span class="sev sev-medium">średnia</span><span>Host 10.66.2.5 zgłoszony jako nieaktywny: nie odpowiada w godzinach, w których zwykle odpowiadał</span></li>
+<li><span class="sev sev-low">niska</span><span>Usługa 10.66.1.55:3306 zniknęła (MySQL 8.0.36)</span></li>
+</ol>
+
+</section>
+<section class="chg">
+<h2>Co się zmieniło<span class="n">6</span></h2>
+<ol class="changes">
+<li><span class="sev sev-low">niska</span><span>Nowy certyfikat TLS 10.66.1.10:443: www.kampus.example, ważny do 2027-02-18</span></li>
+<li><span class="sev sev-low">niska</span><span>Zmiana wersji 10.66.1.20:80: Apache httpd 2.4.57 → Apache httpd 2.4.62</span></li>
+<li><span class="sev sev-low">niska</span><span>Zmiana nagłówków 10.66.1.60:443: usunięto Content-Security-Policy</span></li>
+<li><span class="sev sev-low">niska</span><span>Host 10.66.1.80 nie odpowiedział w porze, w której zwykle odpowiada; jeszcze nie jest zgłoszony jako nieaktywny</span></li>
+<li><span class="sev sev-info">informacja</span><span>Zmiana nagłówków 10.66.1.20:80: Server: Apache/2.4.57 (Debian) → Apache/2.4.62 (Debian)</span></li>
+<li><span class="sev sev-info">informacja</span><span>Zmiana tytułu strony 10.66.1.60:443: „Portal studenta (test)” → „Portal studenta 2.0 (test)”</span></li>
+</ol>
+
+</section>
+<p class="expected">9 zmian oczekiwanych: hosty, które o tej porze zwykle nie odpowiadają albo odpowiadają nieregularnie (10.66.2.31, 10.66.2.32, 10.66.2.33, 10.66.2.34 i 5 innych). Model dostępności je wyjaśnia, więc nie są liczone powyżej.</p>
+<section>
+<h2>Najważniejsze obserwacje</h2>
+<article class="finding">
+<header><span class="sev sev-info">informacja</span><h3>Panel administracyjny: Jenkins (10.66.3.17:8080)</h3><span class="score">ciekawość <b>89</b>/100</span></header>
+<p class="where"><span class="mono">http://10.66.3.17:8080/</span> · nowa w tym przebiegu · także: narzędzie deweloperskie, nagłówki ujawniają szczegóły oprogramowania, nowa ekspozycja</p>
+<ul class="ev"><li><code>header:X-Jenkins</code><span>2.440.1</span></li><li><code>title</code><span>Dashboard [Jenkins]</span></li><li><code>header:Server</code><span>Jetty(10.0.20)</span></li></ul>
+</article>
+<article class="finding">
+<header><span class="sev sev-info">informacja</span><h3>Urządzenie IoT: HP LaserJet (10.66.3.40:80)</h3><span class="score">ciekawość <b>44</b>/100</span></header>
+<p class="where"><span class="mono">http://10.66.3.40/</span> · nowa w tym przebiegu · także: nowa ekspozycja</p>
+<ul class="ev"><li><code>header:Server</code><span>HP HTTP Server; HP LaserJet Pro M404dn</span></li><li><code>title</code><span>HP LaserJet Pro M404dn</span></li></ul>
+</article>
+<article class="finding">
+<header><span class="sev sev-low">niska</span><h3>Baza danych dostępna z sieci: Redis key-value store 7.2.4 (10.66.3.90:6379)</h3><span class="score">ciekawość <b>40</b>/100</span></header>
+<p class="where"><span class="mono">10.66.3.90:6379</span> · nowa w tym przebiegu · także: nowa ekspozycja</p>
+<ul class="ev"><li><code>port:6379/tcp</code><span>Redis key-value store 7.2.4</span></li></ul>
+</article>
+<article class="finding">
+<header><span class="sev sev-low">niska</span><h3>Logowanie przez nieszyfrowane HTTP: Dziekanat – logowanie (10.66.1.20:80)</h3><span class="score">ciekawość <b>35</b>/100</span></header>
+<p class="where"><span class="mono">http://dziekanat.kampus.example/</span> · także: nagłówki ujawniają szczegóły oprogramowania</p>
+<ul class="ev"><li><code>title</code><span>Dziekanat – logowanie</span></li><li><code>header:Server</code><span>Apache/2.4.62 (Debian)</span></li></ul>
+</article>
+<article class="finding">
+<header><span class="sev sev-low">niska</span><h3>Przeterminowany certyfikat TLS: poczta.kampus.example (10.66.1.30:443)</h3><span class="score">ciekawość <b>30</b>/100</span></header>
+<p class="where"><span class="mono">https://poczta.kampus.example/</span></p>
+<ul class="ev"><li><code>tls:certificate</code><span>CN=poczta.kampus.example; wystawca=R11, Let&#39;s Encrypt; ważny do 2026-11-03; sha256=77a0d3e1b6c2f945</span></li></ul>
+</article>
+<article class="finding">
+<header><span class="sev sev-info">informacja</span><h3>Środowisko testowe lub staging: Portal studenta 2.0 (test) (10.66.1.60:443)</h3><span class="score">ciekawość <b>20</b>/100</span></header>
+<p class="where"><span class="mono">https://staging.kampus.example/</span></p>
+<ul class="ev"><li><code>hostname</code><span>staging.kampus.example</span></li><li><code>title</code><span>Portal studenta 2.0 (test)</span></li></ul>
+</article>
+<p class="more">i jeszcze 7 obserwacji o niższym priorytecie; pełna lista jest w aplikacji.</p>
+</section>
+<section>
+<h2>Najciekawsze usługi</h2>
+<div class="scroll"><table>
+<thead><tr><th>Adres</th><th>Usługa</th><th>Dlaczego</th><th class="r">Ciekawość</th></tr></thead>
+<tbody>
+<tr><td class="mono">10.66.3.17:8080</td><td>ci.kampus.example · Jetty 10.0.20 · „Dashboard [Jenkins]”</td><td>Panel administracyjny dostępny z sieci (&#43;30)<br>Narzędzie deweloperskie (CI, repozytorium, monitoring) (&#43;20)<br>i 3 inne powody</td><td class="r"><b>89</b></td></tr>
+<tr><td class="mono">10.66.3.40:80</td><td>HP LaserJet http config · „HP LaserJet Pro M404dn”</td><td>Urządzenie IoT (&#43;20)<br>Nowa ekspozycja od ostatniego skanu (&#43;15)<br>i 1 inny powód</td><td class="r"><b>44</b></td></tr>
+<tr><td class="mono">10.66.3.90:6379</td><td>cache-01.kampus.example · Redis key-value store 7.2.4</td><td>Baza danych dostępna z sieci: Redis key-value store 7.2.4 (&#43;25)<br>Nowa ekspozycja od ostatniego skanu (&#43;15)</td><td class="r"><b>40</b></td></tr>
+<tr><td class="mono">10.66.1.20:80</td><td>dziekanat.kampus.example · Apache httpd 2.4.62 · „Dziekanat – logowanie”</td><td>Strona logowania bez szyfrowania (HTTP) (&#43;25)<br>Strona logowania bez nagłówków bezpieczeństwa: brak Content-Security-Policy / X… (&#43;5)<br>i 1 inny powód</td><td class="r"><b>35</b></td></tr>
+<tr><td class="mono">10.66.1.30:443</td><td>poczta.kampus.example · nginx · „Poczta – logowanie”</td><td>Przeterminowany certyfikat TLS: ważny do 2026-11-03 (&#43;15)<br>Strona logowania (&#43;10)<br>i 1 inny powód</td><td class="r"><b>30</b></td></tr>
+</tbody></table></div>
+</section>
+<section>
+<h2>Hosty niestabilne i nieaktywne</h2>
+<div class="scroll"><table>
+<thead><tr><th>Host</th><th>Stan</th><th>Zwykły rytm</th><th class="r">Szansa, że nadal istnieje</th><th class="r">Odpowiada w</th><th class="r">Braki z rzędu</th></tr></thead>
+<tbody>
+<tr><td><span class="mono">10.66.2.5</span><small>git.kampus.example</small></td><td>nieaktywny</td><td>odpowiada stale (96% skanów)</td><td class="r">4%</td><td class="r">96% skanów</td><td class="r">2</td></tr>
+<tr><td><span class="mono">10.66.1.80</span><small>pliki.kampus.example</small></td><td>niestabilny</td><td>odpowiada stale (98% skanów)</td><td class="r">27%</td><td class="r">98% skanów</td><td class="r">1</td></tr>
+<tr><td><span class="mono">10.66.2.77</span></td><td>niestabilny</td><td>odpowiada w ok. 50% skanów, bez wzorca dobowego</td><td class="r">58%</td><td class="r">51% skanów</td><td class="r">1</td></tr>
+<tr><td><span class="mono">10.66.2.31</span><small>oraz 7 hostów o tym samym rytmie</small></td><td>przerwa zgodna z rytmem</td><td>zwykle aktywny pn–pt 14–15</td><td class="r">76%</td><td class="r">38% skanów</td><td class="r">1</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="cols">
+<div>
+<h2>Parametry skanu</h2>
+<table class="kv"><tr><th scope="row">Porty</th><td>top-100</td></tr><tr><th scope="row">Wykrywanie hostów</th><td>ICMP echo, TCP SYN na porty 22, 80, 443, ARP w sieci lokalnej</td></tr><tr><th scope="row">Rozpoznawanie usług</th><td>tak, intensywność 5 z 9</td></tr><tr><th scope="row">Zbieranie HTTP i TLS</th><td>tak; dodatkowe ścieżki sygnatur (najwyżej 8 na usługę); do 3 przekierowań</td></tr><tr><th scope="row">Limity profilu</th><td>do 100 pakietów/s, do 10 żądań HTTP/s, 2 połączenia naraz na host</td></tr><tr><th scope="row">Polityka bezpieczeństwa</th><td>do 300 pakietów/s, do 20 żądań HTTP/s, do 2/s na jeden host</td></tr><tr><th scope="row">Metody HTTP</th><td>GET, HEAD</td></tr><tr><th scope="row">Porty zabronione</th><td>9100-9103</td></tr><tr><th scope="row">Wykluczenia</th><td>10.66.0.1, 10.66.0.128/28</td></tr><tr><th scope="row">User-Agent</th><td>Czujka/1.0 (&#43;https://czujka.kampus.example/o-skanerze)</td></tr></table>
+</div>
+<div>
+<h2>Ruch faktycznie wysłany</h2>
+<table class="kv"><tr><th scope="row">Sprawdzone adresy</th><td>1 024 z 1 024</td></tr><tr><th scope="row">Wysłane pakiety (szacunek)</th><td>14 260</td></tr><tr><th scope="row">Żądania HTTP</th><td>412</td></tr><tr><th scope="row">Średnie tempo</th><td>44,8 pakietów/s (45% limitu 100)</td></tr><tr><th scope="row">Czas aktywnego skanowania</th><td>5 min 18 s</td></tr><tr><th scope="row">Fragmenty zakresu</th><td>16 z 16</td></tr><tr><th scope="row">Hosty sondowane ponownie</th><td>11</td></tr><tr><th scope="row">Błędy</th><td>0</td></tr></table>
+</div>
+</section>
+<p class="safety">Czujka wykrywa obecność usług i ich cech. Nie loguje się, nie wysyła payloadów i nie zgaduje haseł. Polityka w chwili skanu dopuszczała tylko metody HTTP: GET, HEAD.</p>
+<p class="foot">Obserwacje w raporcie są informacyjne: opisują to, co widać z sieci, a nie potwierdzone podatności.</p>
+</main>
+</body>
+</html>
