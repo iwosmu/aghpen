@@ -1,0 +1,83 @@
+# Zoo truth table: what a careful analyst would say about each published port (e2e/zoo/README.md explains the columns).
+# batch	port	proto	category	image	service	product	version	techs	classes	finding	ok	ready
+# service: nmap service name (regex). product: technology name (regex, case-insensitive). version: the version the service
+# itself states to an unauthenticated GET or banner (prefix match); empty when it does not state one. techs: other
+# technologies that must be named (comma-separated regexes). classes: classes that must be set. finding: a finding title
+# substring that must be raised. ok: further technologies or classes that are right but not required (regexes).
+# ready: http<path>, https<path> or tcp: what run.sh waits for before the scan.
+01-cms	2368	tcp	cms	ghost:6.78.0-alpine	http	^Ghost$	6.78	Node\.js|Express				http/
+01-cms	33080	tcp	cms	mediawiki:1.46.2	http	^MediaWiki$	1.46.2	PHP,Apache	install-page			http/
+01-cms	80	tcp	cms	nextcloud:35.0.3-apache	http	^Nextcloud$	35.0.3	PHP,Apache	install-page			http/
+01-cms	41080	tcp	cms	matomo:5.14.3-apache	http	^Matomo$		PHP,Apache	install-page			http/
+01-cms	27080	tcp	cms	roundcube/roundcubemail:1.7.6-apache	http	^Roundcube	1.7.6	PHP,Apache	login			http/
+01-cms	8082	tcp	cms	joomla:3.10.12-php8.0-apache	http	^Joomla	3.10	PHP,Apache	install-page			http/
+01-cms	19080	tcp	cms	drupal:7.103-apache	http	^Drupal$	7	PHP,Apache	install-page			http/
+01-cms	8083	tcp	cms	joomla:6.2.0-php8.4-apache	http	^Joomla	6	PHP,Apache	install-page			http/
+02-observability	3000	tcp	monitoring	grafana/grafana:11.6.16	http	^Grafana$	11.6.16		login			http/
+02-observability	9200	tcp	database	elasticsearch:8.19.25	http	^Elasticsearch$	8.19.25		database			http/
+02-observability	45601	tcp	monitoring	kibana:8.19.25	http	^Kibana$	8.19.25					http/api/status
+02-observability	9093	tcp	monitoring	prom/alertmanager:v0.35.0	http	^Alertmanager$	0.35.0					http/
+02-observability	39100	tcp	monitoring	prom/node-exporter:v1.13.1	http	[Nn]ode.?[Ee]xporter|Prometheus exporter	1.13.1					http/
+02-observability	9091	tcp	monitoring	prom/pushgateway:v1.11.5	http	Pushgateway	1.11.5					http/
+02-observability	29999	tcp	monitoring	netdata/netdata:v2.13.0	http	^Netdata$	2.13					http/
+02-observability	3001	tcp	monitoring	louislam/uptime-kuma:2.5.12	http	^Uptime Kuma$						http/
+02-observability	30080	tcp	monitoring	jasonrivers/nagios:4.5.12	http	^Nagios	4.5.12	Apache	login			http/
+03-devtools	8080	tcp	panel	keycloak/keycloak:26.8.2	http	^Keycloak$	26.8.2		admin-panel			http/
+03-devtools	8200	tcp	panel	hashicorp/vault:2.2.2	http	Vault	2.2.2					http/v1/sys/health
+03-devtools	18500	tcp	panel	hashicorp/consul:2.1.0	http	^Consul$	2.1.0		unauth-control-api			http/v1/status/leader
+03-devtools	5000	tcp	panel	registry:3.1.2	http	Docker Registry	3.1.2		unauth-control-api			http/v2/
+03-devtools	38025	tcp	panel	axllent/mailpit:v1.34.0	http	^Mailpit$	1.34.0		dev-tool			http/
+03-devtools	1025	tcp	panel	axllent/mailpit:v1.34.0	smtp	Mailpit						tcp
+03-devtools	47080	tcp	panel	swaggerapi/swagger-ui:v5.35.1	http	^Swagger UI$			api			http/
+03-devtools	14080	tcp	panel	codercom/code-server:4.146.0	http	^code-server$	4.146.0		login			http/
+03-devtools	8888	tcp	panel	quay.io/jupyter/base-notebook:notebook-7.6.5	http	^Jupyter	7.6.5		login			http/
+03-devtools	1880	tcp	panel	nodered/node-red:5.0.10	http	^Node-RED$	5.0.10		dev-tool			http/
+03-devtools	3300	tcp	panel	gogs/gogs:0.14.4	http	^Gogs$	0.14.4		install-page			http/
+03-devtools	8081	tcp	panel	rediscommander/redis-commander:latest	http	^Redis Commander$			admin-panel			http/
+03-devtools	28081	tcp	panel	mongo-express:1.0.2-20-alpine3.19	http	^Mongo Express$			login			http/
+04-java	8080	tcp	appserver	tomcat:10.1.62-jre21-temurin	http	Tomcat	10.1.62		default-page			http/
+04-java	18081	tcp	appserver	jetty:12.1.15-jdk21	http	^Jetty$	12.1.15					http/
+04-java	28080	tcp	appserver	quay.io/wildfly/wildfly:42.0.0.Final-jdk21	http	^WildFly$			default-page			http/
+04-java	9990	tcp	appserver	quay.io/wildfly/wildfly:42.0.0.Final-jdk21	http	^WildFly$			admin-panel			http/
+04-java	8983	tcp	appserver	solr:9.11.0	http	Solr	9.11.0	Jetty	admin-panel			http/solr/
+04-java	13000	tcp	appserver	metabase/metabase:v0.65.6.3	http	^Metabase$	0.65.6.3		install-page			http/api/health
+05-vuln	3000	tcp	vuln	bkimminich/juice-shop:v20.4.0	http	Juice Shop	20.4.0		staging			http/
+05-vuln	8080	tcp	vuln	webgoat/webgoat:v2026.5	http	^WebGoat$	2026.5		staging			http/WebGoat/login
+05-vuln	9090	tcp	vuln	webgoat/webgoat:v2026.5	http	^WebWolf$			staging			http/WebWolf/login
+05-vuln	36080	tcp	vuln	raesene/bwapp:latest	http	^bWAPP			staging			http/
+05-vuln	8000	tcp	vuln	php:8.3.37-cli-alpine	http	^PHP$	8.3.37		dev-tool	phpinfo		http/
+05-vuln	48000	tcp	vuln	python:3.14.10-alpine	http	Python|SimpleHTTP	3.14.10		directory-listing			http/
+06-db	3306	tcp	database	mysql:8.4.13	mysql	^MySQL$	8.4.13		database			tcp
+06-db	37017	tcp	database	mongo:8.0.38	mongodb	^MongoDB$	8.0.38		database			tcp
+06-db	5984	tcp	database	couchdb:3.5.3	http	^CouchDB$	3.5.3		database			http/
+06-db	18086	tcp	database	influxdb:2.10.1-alpine	http	^InfluxDB$	2.10.1		database			http/health
+06-db	9042	tcp	database	cassandra:5.0.9	cassandra|unknown	^Cassandra$	5.0.9		database			tcp
+06-db	39092	tcp	database	apache/kafka:4.4.0	kafka|unknown	Kafka			database			tcp
+06-db	4222	tcp	database	nats:2.15.3	nats|unknown	^NATS	2.15.3		database			tcp
+06-db	48222	tcp	database	nats:2.15.3	http	^NATS	2.15.3					http/varz
+06-db	2379	tcp	database	quay.io/coreos/etcd:v3.6.17	http|etcd	^etcd$	3.6.17		database			http/version
+06-db	8123	tcp	database	clickhouse:26.9.27.3	http	^ClickHouse$	26.9		database			http/ping
+06-db	19000	tcp	database	clickhouse:26.9.27.3	clickhouse|unknown	^ClickHouse$			database			tcp
+06-db	7474	tcp	database	neo4j:5.26.33-community	http	^Neo4j$	5.26.33		database			http/
+06-db	47687	tcp	database	neo4j:5.26.33-community	bolt|neo4j|unknown	^Neo4j$			database			tcp
+07-remote	42222	tcp	remote	linuxserver/openssh-server:10.3_p1-r2-ls243	ssh	^OpenSSH$	10.3		remote-access			tcp
+07-remote	23022	tcp	remote	alpine:3.22 + dropbear	ssh	^Dropbear	2025		remote-access			tcp
+07-remote	2121	tcp	remote	alpine:3.22 + proftpd	ftp	^ProFTPD$	1.3		remote-access			tcp
+07-remote	21	tcp	remote	stilliard/pure-ftpd:bookworm-1.0.50	ftp	^Pure-FTPd$			remote-access			tcp
+07-remote	445	tcp	remote	alpine:3.22 + samba	microsoft-ds|netbios-ssn	^Samba	4		remote-access			tcp
+07-remote	873	tcp	remote	alpine:3.22 + rsync	rsync	rsync						tcp
+07-remote	23	tcp	remote	alpine:3.22 + busybox telnetd	telnet	telnet|BusyBox			remote-access			tcp
+07-remote	25	tcp	remote	boky/postfix:5.2.1-alpine	smtp	^Postfix						tcp
+07-remote	143	tcp	remote	dovecot/dovecot:2.4.5-root	imap	^Dovecot						tcp
+07-remote	40993	tcp	remote	dovecot/dovecot:2.4.5-root	imaps|imap	^Dovecot						tcp
+07-remote	389	tcp	remote	osixia/openldap:1.5.0	ldap	OpenLDAP						tcp
+07-remote	53	tcp	remote	coredns/coredns:1.15.0	domain	CoreDNS	1.15.0					tcp
+07-remote	53	udp	remote	coredns/coredns:1.15.0	domain	CoreDNS	1.15.0					-
+08-proxies	8404	tcp	proxy	haproxy:3.0.31-alpine	http	^HAProxy$	3.0.31		admin-panel			http/stats
+08-proxies	18888	tcp	proxy	haproxy:3.0.31-alpine -> httpd:2.4.71-alpine	http	^Apache	2.4.71		default-page			http/
+08-proxies	9901	tcp	proxy	envoyproxy/envoy:v1.39.6	http	^Envoy$	1.39.6		unauth-control-api			http/ready
+08-proxies	10000	tcp	proxy	envoyproxy/envoy:v1.39.6 -> httpd:2.4.71-alpine	http	^Envoy$		Apache	default-page			http/
+08-proxies	3128	tcp	proxy	ubuntu/squid:6.6-24.04_beta	http-proxy|http	^Squid$	6.6					tcp
+08-proxies	36081	tcp	proxy	varnish:9.1.0 -> httpd:2.4.71-alpine	http	^Varnish$	9.1	Apache	default-page			http/
+09-heavy	48081	tcp	panel	sonatype/nexus3:3.98.3	http	^Nexus	3.98.3					http/
+09-heavy	9000	tcp	panel	sonarqube:26.11.0.134175-community	http	^SonarQube$	26.11		login			http/api/system/status

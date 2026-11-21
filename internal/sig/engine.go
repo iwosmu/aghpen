@@ -476,6 +476,11 @@ func (e *Engine) MatchHost(svc *model.ServiceResult, hostnames ...string) ([]mod
 	for _, c := range classify(v) {
 		classSet[c] = true
 	}
+	// An unfinished installer asks for the new administrator's password (Nextcloud, Matomo, Joomla, WordPress):
+	// that form makes it an install page, not a login page.
+	if classSet[model.ClassInstallPage] {
+		delete(classSet, model.ClassLogin)
+	}
 	classes = sortedKeys(classSet)
 	sort.SliceStable(matches, func(i, j int) bool {
 		if matches[i].Confidence != matches[j].Confidence {
