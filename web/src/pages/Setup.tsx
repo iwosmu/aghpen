@@ -23,10 +23,10 @@ const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 function plans(): { id: Plan; label: string; text: string }[] {
   return [
-    { id: 'nightly', label: t('Co noc', 'Every night'), text: t('Start o 22:00, okno 22:00–06:00 każdego dnia. Skan, który się nie zmieści, dokończy następnej nocy.', 'Starts at 22:00, window 22:00–06:00 every day. A scan that does not fit finishes the next night.') },
+    { id: 'nightly', label: t('Co noc', 'Every night'), text: t('Start o 22:00, okno 22:00–06:00.', 'Starts at 22:00, window 22:00–06:00.') },
     { id: 'offhours', label: t('Poza godzinami pracy', 'Outside office hours'), text: t('Dni robocze 18:00–07:00 i cały weekend, start o 18:30.', 'Weekdays 18:00–07:00 and the whole weekend, start at 18:30.') },
-    { id: 'every4h', label: t('Co 4 godziny', 'Every 4 hours'), text: t('Bez okien czasowych. Najlepszy obraz zmian w ciągu dnia; więcej ruchu.', 'No time windows. The best picture of changes during the day; more traffic.') },
-    { id: 'manual', label: t('Tylko ręcznie', 'By hand only'), text: t('Bez harmonogramu. Skan startuje wyłącznie z konsoli.', 'No schedule. A scan starts from the console only.') },
+    { id: 'every4h', label: t('Co 4 godziny', 'Every 4 hours'), text: t('Bez okien czasowych. Więcej ruchu.', 'No time windows. More traffic.') },
+    { id: 'manual', label: t('Tylko ręcznie', 'Manual only'), text: t('Bez harmonogramu.', 'No schedule.') },
   ];
 }
 
@@ -108,7 +108,7 @@ export default function Setup() {
     setPwDone(true); setStep(2);
   });
   const saveNetwork = () => go(async () => {
-    const s = scope ?? await post<Scope>('/scopes', { name: netName.trim(), description: t('Utworzony w kreatorze pierwszego uruchomienia', 'Created in the first-run wizard'), owner: '', criticality: 3, tags: [] });
+    const s = scope ?? await post<Scope>('/scopes', { name: netName.trim(), description: '', owner: '', criticality: 3, tags: [] });
     setScope(s);
     await post<TargetPreview>('/scopes/' + s.id + '/targets', { text: ranges });
     invalidate(qc, '/scopes', '/dashboard');
@@ -122,7 +122,7 @@ export default function Setup() {
   });
   const saveProfile = () => go(async () => {
     const base = await post<ScanProfile>('/profiles', {
-      name: netName.trim() + t(': przegląd cykliczny', ': cyclic scan'), description: t('Utworzony w kreatorze pierwszego uruchomienia', 'Created in the first-run wizard'),
+      name: netName.trim() + t(': skan cykliczny', ': scheduled scan'), description: '',
       scope_ids: [scope!.id], ports: portSet,
       discovery: { icmp_echo: true, icmp_timestamp: false, tcp_syn_ports: [22, 80, 443], tcp_ack_ports: [80], arp: true, skip_discovery: false, mode: 'balanced' },
       service_detection: true, version_intensity: 5,
@@ -143,7 +143,7 @@ export default function Setup() {
       // The window of the cyclic profile is closed now: the first scan runs from a one-off copy without windows, so it starts at once.
       const { id: _drop, next_run_at: _n, last_run_id: _l, created_at: _c, updated_at: _u, ...rest } = profile!;
       void _drop; void _n; void _l; void _c; void _u;
-      const once = await post<ScanProfile>('/profiles', { ...rest, name: netName.trim() + t(': pierwszy przegląd', ': first scan'), schedule: scheduleFor('manual') });
+      const once = await post<ScanProfile>('/profiles', { ...rest, name: netName.trim() + t(': pierwszy skan', ': first scan'), schedule: scheduleFor('manual') });
       id = once.id;
     }
     const run = await post<ScanRun>('/runs', { profile_id: id });
@@ -165,7 +165,7 @@ export default function Setup() {
   });
   const skip = () => { try { localStorage.setItem(SETUP_DONE_KEY, 'skipped'); } catch { /* ignore */ } navigate('/', { replace: true }); };
 
-  const pwError = pw && pw.length < 12 ? t('Hasło musi mieć co najmniej 12 znaków.', 'The password needs at least 12 characters.') : pw2 && pw !== pw2 ? t('Hasła się różnią.', 'The passwords differ.') : '';
+  const pwError = pw && pw.length < 10 ? t('Hasło musi mieć co najmniej 10 znaków.', 'The password needs at least 10 characters.') : pw2 && pw !== pw2 ? t('Hasła się różnią.', 'The passwords do not match.') : '';
   const p = preview.data;
   const netOk = netName.trim().length > 0 && Boolean(p && p.valid.length > 0 && p.address_count > 0) && debounced === ranges;
 
@@ -174,17 +174,16 @@ export default function Setup() {
     <div className="mx-auto max-w-[880px]" data-testid="setup">
       <div className="flex flex-wrap items-end justify-between gap-3 px-4 pb-4 pt-6 sm:px-6">
         <div>
-          <p className="text-xs text-ink-3">{t('Pierwsze uruchomienie', 'First run')}</p>
-          <h1 className="mt-1 text-xl font-semibold tracking-[-0.015em]">{t('Od logowania do pierwszego skanu w pięciu krokach', 'From the login to the first scan in five steps')}</h1>
-          <p className="mt-1 max-w-[62ch] text-sm text-ink-2">{t('Przygotuj dane od właściciela sieci: zakresy adresów, limit tempa i dozwolone porty. Każdy krok zapisuje się od razu; możesz go później zmienić w konfiguracji.', 'Have the data from the network owner ready: address ranges, the rate limit and the allowed ports. Every step is saved at once; you can change it later in the configuration.')}</p>
-        </div>
-        <button type="button" className="link text-sm" onClick={skip}>{t('Pomiń kreator', 'Skip the wizard')}</button>
+          <p className="text-xs text-ink-3">{t('Kreator', 'Wizard')}</p>
+          <h1 className="mt-1 text-xl font-semibold tracking-[-0.015em]">{t('Pierwszy skan', 'First scan')}</h1>
+                  </div>
+        <button type="button" className="link text-sm" onClick={skip}>{t('Pomiń kreator', 'Skip wizard')}</button>
       </div>
       <section className="mx-4 mb-4 border border-rule bg-panel px-4 py-3 sm:mx-6" data-testid="setup-quick">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 max-w-[60ch]">
-            <h2 className="text-sm font-semibold">{t('Najszybciej: zeskanuj ten komputer', 'Fastest: scan this computer')}</h2>
-            <p className="mt-0.5 text-sm text-ink-2">{t('Usługi na portach tego komputera, także kontenery Dockera z opublikowanymi portami. Czujka utworzy zakres „Ten komputer”, kopię profilu domyślnego i od razu uruchomi skan.', 'The services on the ports of this computer, Docker containers with published ports included. Czujka creates the scope "This computer", a copy of the default profile, and starts the scan at once.')}</p>
+            <h2 className="text-sm font-semibold">{t('Zeskanuj ten komputer', 'Scan this computer')}</h2>
+            <p className="mt-0.5 text-sm text-ink-2">{t('Czujka utworzy zakres „Ten komputer”, kopię profilu domyślnego i uruchomi skan.', 'Czujka creates the scope "This computer", a copy of the default profile, and starts the scan.')}</p>
           </div>
           <button type="button" aria-pressed={quick} onClick={() => setQuick(!quick)} data-testid="setup-this-computer"
             className={cx('inline-flex h-[30px] flex-none items-center gap-2 border px-3 text-sm', quick ? 'border-accent bg-accent-wash text-ink' : 'border-rule-strong hover:border-accent')}>
@@ -194,52 +193,49 @@ export default function Setup() {
         {quick ? (
           <div className="mt-3 border-t border-rule pt-3">
             <LoopbackNote targets={quickPreview.data?.valid ?? [{ value: THIS_COMPUTER }]} />
-            <p className="mt-1 text-xs text-ink-3">{t('Zakres', 'Scope')} „{THIS_COMPUTER_SCOPE()}” · {t('cel', 'target')} <span className="mono">{THIS_COMPUTER}</span> · {t('profil domyślny (kopia), bez harmonogramu', 'the default profile (a copy), no schedule')} · {t('tylko GET i HEAD', 'GET and HEAD only')}</p>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button variant="primary" icon="play" busy={busy} onClick={startQuick} data-testid="setup-quick-start">{t('Uruchom skan', 'Start the scan')}</Button>
-              <span className="text-xs text-ink-3">{t('Hasło, limity i harmonogram ustawisz później w konfiguracji.', 'Set the password, limits and schedule later in the configuration.')}</span>
-            </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button variant="primary" icon="play" busy={busy} onClick={startQuick} data-testid="setup-quick-start">{t('Uruchom skan', 'Start scan')}</Button>
+                          </div>
           </div>
         ) : null}
       </section>
       <div className="border-t border-rule">
-        <Step n={1} title={t('Zmień wygenerowane hasło administratora', 'Change the generated administrator password')} done={pwDone} active={step === 1} summary={t('hasło zmienione', 'password changed')}>
-          <p className="mb-3 text-sm text-ink-2">{t('Hasło z logu instalacji widział każdy, kto ma dostęp do logów kontenera. Ustaw własne.', 'Anyone with access to the container logs has seen the password from the install log. Set your own.')} <span className="mono text-xs text-ink-3">{session.user.email}</span></p>
+        <Step n={1} title={t('Zmień hasło administratora', 'Change the administrator password')} done={pwDone} active={step === 1} summary={t('hasło zmienione', 'password changed')}>
+          <p className="mb-3 text-sm text-ink-2"><span className="mono text-xs text-ink-3">{session.user.email}</span></p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={t('Nowe hasło (min. 12 znaków)', 'New password (min. 12 characters)')}><input type="password" autoComplete="new-password" className="field" value={pw} onChange={(e) => setPw(e.target.value)} data-testid="setup-pw" /></Field>
+            <Field label={t('Nowe hasło (co najmniej 10 znaków)', 'New password (at least 10 characters)')}><input type="password" autoComplete="new-password" className="field" value={pw} onChange={(e) => setPw(e.target.value)} data-testid="setup-pw" /></Field>
             <Field label={t('Powtórz hasło', 'Repeat the password')} error={pwError || undefined}><input type="password" autoComplete="new-password" className="field" value={pw2} onChange={(e) => setPw2(e.target.value)} data-testid="setup-pw2" /></Field>
           </div>
           <div className="mt-4 flex items-center gap-3">
-            <Button variant="primary" icon="check" busy={busy} disabled={!pw || pw !== pw2 || Boolean(pwError)} onClick={savePassword}>{t('Zapisz hasło i dalej', 'Save the password and continue')}</Button>
+            <Button variant="primary" icon="check" busy={busy} disabled={!pw || pw !== pw2 || Boolean(pwError)} onClick={savePassword}>{t('Zapisz hasło i dalej', 'Save password and continue')}</Button>
             <button type="button" className="link text-sm" onClick={() => setStep(2)}>{t('Hasło już zmienione', 'The password is changed already')}</button>
           </div>
         </Step>
 
-        <Step n={2} title={t('Nazwij sieć i wklej jej zakresy', 'Name the network and paste its ranges')} done={Boolean(scope)} active={step === 2} summary={scope ? scope.name + ' · ' + fmtInt(p?.address_count ?? 0) + ' ' + t('adresów', 'addresses') : ''}>
+        <Step n={2} title={t('Nazwij zakres i wklej cele', 'Name the scope and paste the targets')} done={Boolean(scope)} active={step === 2} summary={scope ? scope.name + ' · ' + fmtInt(p?.address_count ?? 0) + ' ' + t('adresów', 'addresses') : ''}>
           <div className="grid gap-3">
-            <Field label={t('Nazwa sieci', 'Network name')} hint={t('np. Kampus główny, Akademiki, DMZ', 'for example Main campus, Dormitories, DMZ')}><input className="field" value={netName} onChange={(e) => setNetName(e.target.value)} data-testid="setup-net-name" /></Field>
+            <Field label={t('Nazwa zakresu', 'Scope name')} hint={t('np. Kampus główny, Akademiki, DMZ', 'for example Main campus, Dormitories, DMZ')}><input className="field" value={netName} onChange={(e) => setNetName(e.target.value)} data-testid="setup-net-name" /></Field>
             <div className="flex flex-wrap items-center gap-2 text-xs text-ink-3"><span>{t('Gotowe cele:', 'Ready targets:')}</span><ThisComputerChip text={ranges} onChange={(v) => { setRanges(v); if (!netName.trim()) setNetName(THIS_COMPUTER_SCOPE()); }} /></div>
-            <Field label={t('Zakresy: jeden w wierszu (IP, CIDR, zakres od-do, domena)', 'Ranges: one per line (IP, CIDR, from-to range, domain)')}>
+            <Field label={t('Cele, jeden w wierszu (IP, CIDR, przedział a-b, domena)', 'Targets, one per line (IP, CIDR, range a-b, domain)')}>
               <textarea className="field mono min-h-[110px] py-2" value={ranges} onChange={(e) => setRanges(e.target.value)} placeholder={(policyQ.data?.operator_networks?.[0] ?? '10.0.0.0/16') + '\n192.168.10.1-192.168.10.50\nportal.example.edu'} data-testid="setup-ranges" />
             </Field>
             <OperatorLockNote networks={policyQ.data?.operator_networks} />
-            {p && ranges.trim() ? <PreviewReport p={p} pending={preview.isFetching || debounced !== ranges} /> : <p className="text-xs text-ink-3">{t('Podgląd pojawi się w trakcie pisania: liczba adresów, błędne wiersze, adresy wykluczone polityką. Nic nie jest jeszcze zapisane.', 'The preview appears as you type: the address count, invalid lines, addresses excluded by the policy. Nothing is saved yet.')}</p>}
+            {p && ranges.trim() ? <PreviewReport p={p} pending={preview.isFetching || debounced !== ranges} /> : null}
           </div>
-          <div className="mt-4"><Button variant="primary" icon="check" busy={busy} disabled={!netOk} onClick={saveNetwork}>{t('Zapisz sieć i dalej', 'Save the network and continue')}</Button></div>
+          <div className="mt-4"><Button variant="primary" icon="check" busy={busy} disabled={!netOk} onClick={saveNetwork}>{t('Zapisz zakres i dalej', 'Save scope and continue')}</Button></div>
         </Step>
 
-        <Step n={3} title={t('Ustaw limity od właściciela sieci', 'Set the limits from the network owner')} done={limitsDone} active={step === 3} summary={fmtInt(pps) + ' pps · ' + httpRps + ' HTTP/s · ' + (ports.trim() || t('wszystkie porty', 'all ports'))}>
-          <p className="mb-3 text-sm text-ink-2">{t('Te limity są twarde: żaden profil ani skan ich nie przekroczy. Skaner zawsze używa tylko GET i HEAD.', 'These limits are hard: no profile or scan goes above them. The scanner always uses GET and HEAD only.')}</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={t('Pakiety na sekundę (wszystkie procesy razem)', 'Packets per second (all workers together)')}><input type="number" min={10} className="field num" value={pps} onChange={(e) => setPps(Number(e.target.value))} data-testid="setup-pps" /></Field>
-            <Field label={t('Żądania HTTP na sekundę (razem)', 'HTTP requests per second (together)')}><input type="number" min={1} step={1} className="field num" value={httpRps} onChange={(e) => setHttpRps(Number(e.target.value))} /></Field>
+        <Step n={3} title={t('Ustaw limity od właściciela sieci', 'Set limits from the network owner')} done={limitsDone} active={step === 3} summary={fmtInt(pps) + ' pps · ' + httpRps + ' HTTP/s · ' + (ports.trim() || t('wszystkie porty', 'all ports'))}>
+                    <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={t('Pakiety na sekundę (łącznie)', 'Packets per second (total)')}><input type="number" min={10} className="field num" value={pps} onChange={(e) => setPps(Number(e.target.value))} data-testid="setup-pps" /></Field>
+            <Field label={t('Żądania HTTP na sekundę (łącznie)', 'HTTP requests per second (total)')}><input type="number" min={1} step={1} className="field num" value={httpRps} onChange={(e) => setHttpRps(Number(e.target.value))} /></Field>
             <Field label={t('Dozwolone porty (składnia nmap)', 'Allowed ports (nmap syntax)')} hint={t('puste: wszystkie porty; np. 1-1024,3306,5432,8000-8999', 'empty: all ports; for example 1-1024,3306,5432,8000-8999')}><input className="field mono" value={ports} onChange={(e) => setPorts(e.target.value)} data-testid="setup-ports" /></Field>
             <Field label={t('Nigdy nie skanuj (wykluczenia)', 'Never scan (exclusions)')} hint={t('IP, CIDR albo domeny; np. adres samej Czujki', 'IPs, CIDRs or domains; for example the address of Czujka itself')}><textarea className="field mono min-h-[60px] py-1.5" value={exclusions} onChange={(e) => setExclusions(e.target.value)} data-testid="setup-exclusions" /></Field>
           </div>
-          <div className="mt-4"><Button variant="primary" icon="check" busy={busy} disabled={!policyQ.data || pps < 1 || httpRps <= 0} onClick={saveLimits}>{t('Zapisz limity i dalej', 'Save the limits and continue')}</Button></div>
+          <div className="mt-4"><Button variant="primary" icon="check" busy={busy} disabled={!policyQ.data || pps < 1 || httpRps <= 0} onClick={saveLimits}>{t('Zapisz limity i dalej', 'Save limits and continue')}</Button></div>
         </Step>
 
-        <Step n={4} title={t('Wybierz harmonogram', 'Pick the schedule')} done={Boolean(profile)} active={step === 4} summary={plans().find((x) => x.id === plan)?.label + ' · ' + portSet}>
+        <Step n={4} title={t('Wybierz harmonogram', 'Choose a schedule')} done={Boolean(profile)} active={step === 4} summary={plans().find((x) => x.id === plan)?.label + ' · ' + portSet}>
           <div className="grid gap-px border border-rule bg-rule sm:grid-cols-2" role="radiogroup" aria-label={t('Harmonogram', 'Schedule')}>
             {plans().map((x) => (
               <button key={x.id} type="button" role="radio" aria-checked={plan === x.id} onClick={() => setPlan(x.id)} className={cx('relative bg-panel px-3 py-2.5 text-left outline-offset-[-2px]', plan === x.id ? 'bg-raised' : 'hover:bg-raised/60')} data-testid={'setup-plan-' + x.id}>
@@ -252,24 +248,22 @@ export default function Setup() {
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
             <span className="text-ink-2">{t('Porty:', 'Ports:')}</span>
             {(['top-100', 'top-1000'] as const).map((x) => <Button key={x} size="sm" onClick={() => setPortSet(x)} className={portSet === x ? 'border-accent' : ''}><span className="mono">{x}</span>{x === 'top-1000' ? <span className="text-ink-3"> · {t('zalecane', 'recommended')}</span> : null}</Button>)}
-            <span className="text-xs text-ink-3">{t('Wykrywanie hostów: tryb zrównoważony. Zmienisz to w profilu.', 'Host discovery: balanced mode. Change it in the profile.')}</span>
+            <span className="text-xs text-ink-3">{t('Wykrywanie hostów: tryb zrównoważony.', 'Host discovery: balanced mode.')}</span>
           </div>
-          <div className="mt-4"><Button variant="primary" icon="check" busy={busy} onClick={saveProfile}>{t('Utwórz profil i policz budżet', 'Create the profile and compute the budget')}</Button></div>
+          <div className="mt-4"><Button variant="primary" icon="check" busy={busy} onClick={saveProfile}>{t('Utwórz profil i policz budżet', 'Create profile and compute budget')}</Button></div>
         </Step>
 
         <Step n={5} title={t('Sprawdź budżet ruchu i uruchom', 'Check the traffic budget and start')} done={false} active={step === 5}>
           {profile ? <EstimateBox profileId={profile.id} /> : null}
           {outside ? (
-            <p className="mt-3 flex items-start gap-2 text-sm text-ink-2"><Glyph name="pause" tone="changed" /><span>{t('Okno czasowe profilu jest teraz zamknięte. Pierwszy skan wystartuje od razu z jednorazowej kopii profilu bez okien; kolejne pójdą według harmonogramu.', 'The time window of the profile is closed now. The first scan starts at once from a one-off copy of the profile without windows; the next ones follow the schedule.')}</span></p>
+            <p className="mt-3 flex items-start gap-2 text-sm text-ink-2"><Glyph name="pause" tone="changed" /><span>{t('Okno czasowe jest teraz zamknięte. Pierwszy skan ruszy od razu, kolejne według harmonogramu.', 'The time window is closed now. The first scan starts at once, the next ones follow the schedule.')}</span></p>
           ) : null}
           <div className="mt-3">
-            <Check checked={reprobe} onChange={setReprobe} label={t('Sprawdzaj ponownie hosty, które przestały odpowiadać', 'Re-probe hosts that went silent')} />
-            <p className="ml-6 text-xs text-ink-3">{t('Domyślnie włączone. Host, który przestał odpowiadać, Czujka sprawdza ponownie pojedynczą sondą (nowy host w ciągu kilku minut), tylko w oknach profilu, zamiast czekać z potwierdzeniem do następnego pełnego skanu. Odznacz, aby wyłączyć.', 'On by default. A host that went silent is checked again with a single probe (a new host within minutes), only inside the profile windows, instead of waiting for the next full scan to confirm. Uncheck to turn it off.')}</p>
-          </div>
+            <Check checked={reprobe} onChange={setReprobe} label={t('Sprawdzaj ponownie hosty, które przestały odpowiadać', 'Re-probe hosts that stopped responding')} />
+                      </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Button variant="primary" icon="play" busy={busy} onClick={start} data-testid="setup-start">{t('Uruchom pierwszy skan', 'Start the first scan')}</Button>
-            <span className="text-xs text-ink-3">{t('Stop awaryjny w górnym pasku zatrzymuje skan w każdej chwili.', 'The emergency stop in the top bar halts the scan at any time.')}</span>
-          </div>
+                      </div>
         </Step>
       </div>
       {error ? <div className="px-4 py-3 sm:px-6"><InlineError error={error} /></div> : null}

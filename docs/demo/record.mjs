@@ -69,7 +69,7 @@ const SHOTS = [
     vo: "Drugi skan porównuje się z pierwszym: nowe hosty, zniknięte usługi, zmienione wersje i tytuły." },
   { id: "unstable", caption: "Rytm hosta i ponowne sprawdzenia",
     vo: "Ten host odpowiada nieregularnie. Czujka zna jego rytm tygodnia, więc cisza w zwykłej porze nie jest alarmem. Gdy milknie poza rytmem, sprawdza ponownie tylko ten adres." },
-  { id: "time", caption: "Wehikuł czasu",
+  { id: "time", caption: "Oś czasu",
     vo: "Wehikuł czasu pokazuje sieć taką, jaka była po dowolnym przebiegu, i to, co od tamtej pory zniknęło albo się zmieniło." },
   { id: "rules", caption: "Reguła i sygnatura z przykładu",
     vo: "Reguła mówi, czego w sieci być nie może, i sprawdza się po każdym skanie bez pakietów. Z jednej usługi Czujka proponuje sygnaturę i testuje ją na historii." },
@@ -228,7 +228,7 @@ if (!want("install")) {} else if (env.CZ_WIZARD_URL) {
   await type(page.getByTestId("setup-net-name"), "Kampus AGH", 70);
   await type(page.getByTestId("setup-ranges"), "10.66.0.0/16", 70);
   await settle(1500);
-  await click(page.getByRole("button", { name: "Zapisz sieć i dalej" }));
+  await click(page.getByRole("button", { name: "Zapisz zakres i dalej" }));
   await settle(1800);
   end();
 } else {

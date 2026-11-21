@@ -90,14 +90,14 @@ function ManualDialog({ onClose }: { onClose: () => void }) {
   const create = useAction(() => post<Finding>('/findings', { ...f, port: Number(f.port) || 0 }), { invalidate: ['/findings', '/dashboard'], silent: true, success: t('Dodano znalezisko', 'Finding added'), onSuccess: onClose });
   const ipOk = !f.ip || /^\d{1,3}(\.\d{1,3}){3}$/.test(f.ip);
   return (
-    <Dialog open onClose={onClose} width={560} title={t('Nowe znalezisko ręczne', 'New manual finding')}
-      footer={<><Button onClick={onClose}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="plus" busy={create.isPending} disabled={!f.title.trim() || !ipOk} onClick={() => create.mutate(undefined)}>{t('Dodaj znalezisko', 'Add the finding')}</Button></>}>
+    <Dialog open onClose={onClose} width={560} title={t('Nowe znalezisko', 'New finding')}
+      footer={<><Button onClick={onClose}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="plus" busy={create.isPending} disabled={!f.title.trim() || !ipOk} onClick={() => create.mutate(undefined)}>{t('Dodaj znalezisko', 'Add finding')}</Button></>}>
       <div className="space-y-3">
         <Field label={t('Tytuł', 'Title')}><input className="field" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} autoFocus /></Field>
         <Field label={t('Opis', 'Description')}><textarea className="field" rows={3} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label={t('Waga', 'Severity')}><Select value={f.severity} onChange={(v) => setF({ ...f, severity: v as Severity })} options={sevOpts()} /></Field>
-          <Field label={t('Adres IP', 'IP address')} error={ipOk ? undefined : t('nieprawidłowy adres IPv4', 'not a valid IPv4 address')}><input className="field mono" value={f.ip} onChange={(e) => setF({ ...f, ip: e.target.value.trim() })} placeholder="10.30.4.20" /></Field>
+          <Field label={t('Adres IP', 'IP address')} error={ipOk ? undefined : t('błędny adres IPv4', 'invalid IPv4 address')}><input className="field mono" value={f.ip} onChange={(e) => setF({ ...f, ip: e.target.value.trim() })} placeholder="10.30.4.20" /></Field>
           <Field label={t('Port', 'Port')}><input className="field mono" inputMode="numeric" value={f.port} onChange={(e) => setF({ ...f, port: e.target.value.replace(/\D/g, '') })} placeholder="443" /></Field>
         </div>
         <Field label="URL"><input className="field mono" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="https://" /></Field>
@@ -116,7 +116,7 @@ function FindingGroupList({ q, active, onOpen }: { q: ReturnType<typeof usePage<
   const groups = useMemo(() => groupFindings(q.data?.items ?? []), [q.data]);
   if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
   if (!q.data) return <div className="px-4 py-3 sm:px-6"><SkeletonRows rows={8} /></div>;
-  if (!groups.length) return <Empty icon="findings" title={active ? t('Żadne znalezisko nie pasuje do filtrów', 'No finding matches the filters') : t('Nie ma otwartych znalezisk', 'There is no open finding')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Rozwiązane i zaakceptowane są pod filtrem „Status: wszystkie”.', 'Resolved and accepted ones are under the filter "Status: all".')} />;
+  if (!groups.length) return <Empty icon="findings" title={active ? t('Żadne znalezisko nie pasuje do filtrów', 'No findings match the filters') : t('Brak otwartych znalezisk', 'No open findings')} />;
   const toggle = (k: string) => setOpenKeys((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const shown = q.data.items.length;
   return (
@@ -159,8 +159,8 @@ function FindingGroupList({ q, active, onOpen }: { q: ReturnType<typeof usePage<
         })}
       </ul>
       <p className="px-4 py-2 text-xs text-ink-3 sm:px-6">
-        {t(groups.length + ' ' + plural(groups.length, ['rodzaj', 'rodzaje', 'rodzajów'], ['', '']) + ', ' + shown + ' ' + plural(shown, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']), groups.length + ' kinds, ' + shown + ' findings')}
-        {q.data.total > shown ? t('; pokazano ' + shown + ' z ' + q.data.total + ' (zawęź filtry)', '; showing ' + shown + ' of ' + q.data.total + ' (narrow the filters)') : ''}.
+        {t(groups.length + ' ' + plural(groups.length, ['rodzaj', 'rodzaje', 'rodzajów'], ['', '']) + ', ' + shown + ' ' + plural(shown, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']), groups.length + ' ' + (groups.length === 1 ? 'type' : 'types') + ', ' + shown + ' ' + (shown === 1 ? 'finding' : 'findings'))}
+        {q.data.total > shown ? t('; pokazano ' + shown + ' z ' + q.data.total, '; showing ' + shown + ' of ' + q.data.total) : ''}.
       </p>
     </div>
   );
@@ -219,7 +219,7 @@ export default function Findings() {
       </div>
     ) },
     { id: 'status', header: t('Status', 'Status'), sort: 'status', cell: (f) => <FindingStatusMark status={f.status} /> },
-    { id: 'assignee', header: t('Przypisane', 'Assignee'), hide: 'lg', cell: (f) => f.assignee ? <span className="text-ink-2">{f.assignee.split('@')[0]}</span> : <span className="text-ink-3">–</span> },
+    { id: 'assignee', header: t('Przypisane do', 'Assignee'), hide: 'lg', cell: (f) => f.assignee ? <span className="text-ink-2">{f.assignee.split('@')[0]}</span> : <span className="text-ink-3">–</span> },
     { id: 'tags', header: t('Tagi', 'Tags'), hide: 'xl', cell: (f) => <span className="inline-flex whitespace-nowrap"><Tags tags={f.tags} max={1} /></span> },
     { id: 'note', header: t('Notatka', 'Note'), hide: 'xl', cell: (f) => <span className="block max-w-[140px] truncate text-xs text-ink-2" title={f.note}>{f.note || '–'}</span> },
     { id: 'seen', header: t('Od', 'Since'), sort: 'first_seen', hide: 'md', cell: (f) => <span className="num text-ink-2" title={fmtDateTime(f.first_seen)}>{fmtRelative(f.first_seen)}</span> },
@@ -230,17 +230,16 @@ export default function Findings() {
     <div>
       <PageHeader
         title={t('Znaleziska', 'Findings')}
-        sub={t('Rzeczy warte decyzji człowieka: panele administracyjne, środowiska testowe, wygasłe certyfikaty, nowe ekspozycje. Każde ma dowód i status.', 'Things that deserve a human decision: admin panels, staging environments, expired certificates, new exposures. Each has evidence and a status.')}
         readOnly={!canEdit}
-        actions={<>{canExport && total > 0 ? <Button icon="upload" onClick={() => setConfirmAll(true)} disabled={Boolean(u.get('assignee'))} title={u.get('assignee') ? t('Filtr „przypisane” nie działa w eksporcie do DefectDojo: usuń go albo zaznacz znaleziska ręcznie.', 'The assignee filter does not apply to the DefectDojo export: clear it or select findings by hand.') : undefined} data-testid="dojo-export-filtered">{active ? t('Pasujące do DefectDojo', 'Matching to DefectDojo') : t('Wszystkie do DefectDojo', 'All to DefectDojo')}</Button> : null}<ExportButtons kind="findings" query={filters} />{can('results:create') ? <Button variant="primary" icon="plus" onClick={() => setManual(true)}>{t('Dodaj ręcznie', 'Add by hand')}</Button> : null}</>}
+        actions={<>{canExport && total > 0 ? <Button icon="upload" onClick={() => setConfirmAll(true)} disabled={Boolean(u.get('assignee'))} title={u.get('assignee') ? t('Eksport pomija filtr „przypisane”. Usuń go albo zaznacz znaleziska.', 'The export ignores the assignee filter. Clear it or select findings.') : undefined} data-testid="dojo-export-filtered">{active ? t('Pasujące do DefectDojo', 'Export matching to DefectDojo') : t('Wszystkie do DefectDojo', 'Export all to DefectDojo')}</Button> : null}<ExportButtons kind="findings" query={filters} />{can('results:create') ? <Button variant="primary" icon="plus" onClick={() => setManual(true)}>{t('Dodaj', 'Add')}</Button> : null}</>}
       />
       <div className="px-4 pt-2 sm:px-6">
-        <Tabs value={view} onChange={(v) => u.set({ view: v === 'groups' ? null : v })} tabs={[{ id: 'groups', label: t('Według rodzaju', 'By kind') }, { id: 'list', label: t('Lista', 'List') }]} />
+        <Tabs value={view} onChange={(v) => u.set({ view: v === 'groups' ? null : v })} tabs={[{ id: 'groups', label: t('Według rodzaju', 'By type') }, { id: 'list', label: t('Lista', 'List') }]} />
       </div>
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
         <SearchField value={text} onChange={setText} placeholder={t('tytuł, adres, opis', 'title, address, text')} />
         <FilterField label={t('Status', 'Status')} width={170}>
-          <Select value={u.get('status', 'open')} onChange={(v) => u.set({ status: v === 'open' ? null : v })} options={[{ value: 'open', label: t('otwarte (nowe i w analizie)', 'open (new and triaged)') }, { value: 'all', label: t('wszystkie', 'all') }, ...statusOpts()]} />
+          <Select value={u.get('status', 'open')} onChange={(v) => u.set({ status: v === 'open' ? null : v })} options={[{ value: 'open', label: t('otwarte (nowe i w analizie)', 'open (new and in analysis)') }, { value: 'all', label: t('wszystkie', 'all') }, ...statusOpts()]} />
         </FilterField>
         <FilterField label={t('Waga', 'Severity')} width={120}><Select value={u.get('severity')} onChange={(v) => u.set({ severity: v })} options={[{ value: '', label: t('dowolna', 'any') }, ...sevOpts()]} /></FilterField>
         <FilterField label={t('Rodzaj', 'Type')} width={130}><Select value={u.get('type')} onChange={(v) => u.set({ type: v })} options={[{ value: '', label: t('dowolny', 'any') }, ...['signature', 'exposure', 'policy-violation', 'tls', 'change', 'manual'].map((x) => ({ value: x, label: typeLabel(x) }))]} /></FilterField>
@@ -254,12 +253,12 @@ export default function Findings() {
           <span><span className="num font-medium">{selected.size}</span> {plural(selected.size, ['zaznaczone', 'zaznaczone', 'zaznaczonych'], ['selected', 'selected'])}</span>
           {canEdit ? (
             <>
-              <span className="w-[190px]"><Select label={t('Ustaw status', 'Set the status')} value="" onChange={(v) => { if (v) bulk.mutate({ status: v as FindingStatus }); }} options={[{ value: '', label: t('Ustaw status…', 'Set the status…') }, ...statusOpts()]} /></span>
+              <span className="w-[190px]"><Select label={t('Ustaw status', 'Set status')} value="" onChange={(v) => { if (v) bulk.mutate({ status: v as FindingStatus }); }} options={[{ value: '', label: t('Ustaw status…', 'Set status…') }, ...statusOpts()]} /></span>
               <span className="flex items-center gap-1.5"><input className="field w-[170px]" value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder={t('przypisz do (e-mail)', 'assign to (e-mail)')} aria-label={t('Przypisz do', 'Assign to')} /><Button size="sm" disabled={!assignee.trim()} busy={bulk.isPending} onClick={() => bulk.mutate({ assignee: assignee.trim() })}>{t('Przypisz', 'Assign')}</Button></span>
             </>
           ) : null}
           {canExport ? <Button size="sm" variant="primary" icon="upload" busy={exportDojo.isPending} onClick={() => exportDojo.mutate(undefined)}>{t('Eksportuj do DefectDojo', 'Export to DefectDojo')}</Button> : null}
-          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>{t('Odznacz', 'Clear')}</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>{t('Odznacz', 'Deselect')}</Button>
         </div>
       ) : null}
       {view === 'list' ? <><DataTable
@@ -267,7 +266,7 @@ export default function Findings() {
         sort={u.get('sort', '-interest')} onSort={(s) => u.set({ sort: s })}
         selected={canEdit || canExport ? selected : undefined} onSelect={canEdit || canExport ? setSelected : undefined}
         rowClass={(f) => (f.status === 'resolved' || f.status === 'false_positive' ? 'text-ink-2' : undefined)}
-        empty={<Empty icon="findings" title={active ? t('Żadne znalezisko nie pasuje do filtrów', 'No finding matches the filters') : t('Nie ma jeszcze znalezisk', 'There is no finding yet')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Znaleziska powstają po skanie z dopasowań sygnatur i wykrytych zmian. Możesz też dodać własne.', 'Findings come from signature matches and detected changes after a scan. You can also add your own.')} action={active ? undefined : <NextSteps />} />}
+        empty={<Empty icon="findings" title={active ? t('Żadne znalezisko nie pasuje do filtrów', 'No findings match the filters') : t('Brak znalezisk', 'No findings yet')} action={active ? undefined : <NextSteps />} />}
         mobile={(f) => (
           <div>
             <div className="flex items-center justify-between gap-2"><Sev level={f.severity} /><FindingStatusMark status={f.status} /></div>
@@ -279,18 +278,18 @@ export default function Findings() {
       {q.data ? <Pager total={q.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}</> : null}
       {open ? <DetailDialog id={open} onClose={() => u.set({ open: null }, { keepOffset: true })} /> : null}
       {manual ? <ManualDialog onClose={() => setManual(false)} /> : null}
-      <Dialog open={confirmAll} onClose={() => setConfirmAll(false)} width={460} title={t('Eksportować pasujące znaleziska?', 'Export the matching findings?')}
+      <Dialog open={confirmAll} onClose={() => setConfirmAll(false)} width={460} title={t('Eksportować pasujące znaleziska?', 'Export matching findings?')}
         footer={<><Button onClick={() => setConfirmAll(false)}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="upload" busy={exportAll.isPending} onClick={() => exportAll.mutate(undefined)} data-testid="dojo-export-filtered-go">{t('Eksportuj', 'Export')} {q.data?.total ?? 0}</Button></>}>
         <p className="text-sm">{active
-          ? t('Do DefectDojo trafi ' + total + ' ' + plural(q.data?.total ?? 0, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']) + ' pasujących do bieżących filtrów. Te, które już tam są, zostaną zaktualizowane, nie zdublowane.', total + ' findings that match the current filters go to DefectDojo. Those already there are updated, not duplicated.')
-          : t('Do DefectDojo trafią wszystkie znaleziska (' + total + '). Te, które już tam są, zostaną zaktualizowane, nie zdublowane.', 'All findings (' + total + ') go to DefectDojo. Those already there are updated, not duplicated.')}</p>
+          ? t('Do DefectDojo: ' + total + ' (pasujące do filtrów). Istniejące zostaną zaktualizowane.', total + ' matching findings go to DefectDojo. Existing ones are updated.')
+          : t('Do DefectDojo: wszystkie znaleziska (' + total + '). Istniejące zostaną zaktualizowane.', 'All findings (' + total + ') go to DefectDojo. Existing ones are updated.')}</p>
         <div className="mt-3"><InlineError error={exportAll.error} /></div>
-        {exportAll.error && !(exportAll.error instanceof ApiError && exportAll.error.code === 'dojo_unconfirmed') ? <p className="mt-2 text-xs text-ink-2" data-testid="dojo-export-retry-hint">{t('Część znalezisk mogła już trafić do DefectDojo. Ponów eksport, gdy DefectDojo odpowiada: Czujka rozpozna je po kluczu i zaktualizuje, bez duplikatów.', 'Some findings may already be in DefectDojo. Repeat the export when DefectDojo answers: Czujka recognises them by key and updates them, without duplicates.')}</p> : null}
+        {exportAll.error && !(exportAll.error instanceof ApiError && exportAll.error.code === 'dojo_unconfirmed') ? <p className="mt-2 text-xs text-ink-2" data-testid="dojo-export-retry-hint">{t('Część znalezisk mogła już trafić do DefectDojo. Ponów eksport, duplikaty nie powstaną.', 'Some findings may already be in DefectDojo. Repeat the export. No duplicates are created.')}</p> : null}
       </Dialog>
       <Dialog open={result !== null} onClose={() => setResult(null)} title={t('Eksport do DefectDojo', 'Export to DefectDojo')} width={480} footer={<Button variant="primary" onClick={() => setResult(null)}>{t('Gotowe', 'Done')}</Button>}>
         {result ? (
           <div className="space-y-3 text-sm" data-testid="dojo-result">
-            <p className="flex items-center gap-2"><Glyph name={result.failed ? 'delta' : 'check'} tone={result.failed ? 'changed' : 'new'} />{result.failed ? t('Eksport zakończony z błędami.', 'The export finished with errors.') : t('Eksport zakończony.', 'The export finished.')}</p>
+            <p className="flex items-center gap-2"><Glyph name={result.failed ? 'delta' : 'check'} tone={result.failed ? 'changed' : 'new'} />{result.failed ? t('Eksport zakończony z błędami.', 'Export finished with errors.') : t('Eksport zakończony.', 'Export finished.')}</p>
             <dl>
               <KV k={t('Nowe w DefectDojo', 'New in DefectDojo')}><span className="num">{result.exported}</span></KV>
               <KV k={t('Zaktualizowane', 'Updated')}><span className="num">{result.updated}</span></KV>

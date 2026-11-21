@@ -50,13 +50,13 @@ function Editor({ rule, onSaved }: { rule: ExposureRule | null; onSaved: (r: Exp
       <Panel title={rule ? rule.name : t('Nowa reguła', 'New rule')} actions={editable ? (
         <span className="flex gap-2">
           {rule && !rule.builtin && canDelete ? <Button size="sm" variant="danger" icon="trash" busy={remove.isPending} onClick={() => remove.mutate(undefined)}>{t('Usuń', 'Delete')}</Button> : null}
-          <Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!v?.ok || pending} onClick={() => save.mutate(undefined)}>{t('Zapisz regułę', 'Save the rule')}</Button>
+          <Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!v?.ok || pending} onClick={() => save.mutate(undefined)}>{t('Zapisz regułę', 'Save rule')}</Button>
         </span>
       ) : undefined}>
-        {rule?.builtin ? <p className="mb-2 text-xs text-ink-3">{t('Reguła wbudowana: tekst jest stały, możesz ją tylko włączyć albo wyłączyć. Skopiuj ją do nowej reguły, aby zmienić warunki.', 'A built-in rule: the text is fixed, you can only switch it on or off. Copy it into a new rule to change the conditions.')}</p> : null}
+        {rule?.builtin ? <p className="mb-2 text-xs text-ink-3">{t('Reguła wbudowana. Można ją tylko włączyć albo wyłączyć.', 'Built-in rule. It can only be switched on or off.')}</p> : null}
         <textarea className="field mono min-h-[260px] text-xs leading-5" spellCheck={false} value={yaml} readOnly={!editable} onChange={(e) => setYaml(e.target.value)} data-testid="rule-yaml" aria-label={t('Treść reguły (YAML)', 'Rule text (YAML)')} />
         <div className="mt-2 min-h-[44px]" data-testid="rule-dryrun" aria-live="polite">
-          {dry.error ? (routeMissing(dry.error) ? <Unavailable what={t('Walidacja i próba na sucho wymagają POST /rules/dry-run.', 'Validation and the dry run need POST /rules/dry-run.')} /> : <InlineError error={dry.error} />) : null}
+          {dry.error ? (routeMissing(dry.error) ? <Unavailable /> : <InlineError error={dry.error} />) : null}
           {v && !v.ok ? <ul className="space-y-0.5 text-sm text-danger">{v.issues.map((x, i) => <li key={i}><span className="mono text-xs text-ink-3">{x.path}</span> {x.message}</li>)}</ul> : null}
           {v?.ok && dry.data ? (
             <p className={cx('text-sm', pending && 'opacity-60')}><span className="font-medium">{dry.data.message}</span>{dry.data.condition ? <span className="ml-2 text-xs text-ink-3">{dry.data.condition}</span> : null}<span className="num ml-2 text-2xs text-ink-3">{dry.data.took_ms} ms</span></p>
@@ -75,7 +75,7 @@ function Editor({ rule, onSaved }: { rule: ExposureRule | null; onSaved: (r: Exp
       </Panel>
       {rule ? (
         <Panel title={t('Bieżące naruszenia', 'Current violations')} count={violations.data?.total} flush>
-          {violations.error ? <ErrorState error={violations.error} retry={() => violations.refetch()} /> : !violations.data ? <SkeletonRows rows={3} /> : violations.data.items.length === 0 ? <p className="px-3 py-3 text-sm text-ink-2 sm:px-4">{t('Ta reguła nie ma teraz naruszeń.', 'This rule has no violation now.')}</p> : (
+          {violations.error ? <ErrorState error={violations.error} retry={() => violations.refetch()} /> : !violations.data ? <SkeletonRows rows={3} /> : violations.data.items.length === 0 ? <p className="px-3 py-3 text-sm text-ink-2 sm:px-4">{t('Brak naruszeń.', 'No violations.')}</p> : (
             <ul className="divide-y divide-rule">
               {violations.data.items.map((f) => (
                 <li key={f.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-1.5 text-sm sm:px-4">
@@ -103,10 +103,9 @@ export default function Rules() {
   const rule = sel === 'new' ? null : items.find((r) => String(r.id) === sel || (bySlug && r.slug === bySlug)) ?? items[0] ?? null;
   const one = useItem<ExposureRule>('/rules/' + rule?.id, undefined, { enabled: Boolean(rule) });
   const toggle = useAction((r: ExposureRule) => patch('/rules/' + r.id, { enabled: !r.enabled }), { invalidate: ['/rules', '/findings'], silent: true });
-  const evaluate = useAction(() => post<{ violations: number; took_ms: number }>('/rules/evaluate'), { invalidate: ['/rules', '/findings'], success: (r) => t('Sprawdzono reguły: ' + r.violations + ' naruszeń (' + r.took_ms + ' ms)', 'Rules checked: ' + r.violations + ' violations (' + r.took_ms + ' ms)') });
-  const header = <PageHeader title={t('Reguły ekspozycji', 'Exposure rules')} sub={t('Zasady, które sieć ma spełniać, np. „panel administracyjny tylko z sieci zarządzania”. Każde naruszenie staje się znaleziskiem z odnośnikiem do reguły.', 'Rules the network must follow, for example "an admin panel only from the management network". Each violation becomes a finding that links to its rule.')}
-    actions={<>{canEvaluate && items.length ? <Button icon="refresh" busy={evaluate.isPending} onClick={() => evaluate.mutate(undefined)}>{t('Sprawdź teraz', 'Check now')}</Button> : null}{canCreate ? <Button variant="primary" icon="plus" onClick={() => u.set({ rule: 'new', slug: null })}>{t('Nowa reguła', 'New rule')}</Button> : null}</>} />;
-  if (q.error) return <div>{header}<div className="p-4 sm:p-6">{routeMissing(q.error) ? <Unavailable what={t('Serwer nie udostępnia jeszcze reguł (GET /rules). Gdy integrator podłączy moduł, zobaczysz tu reguły wbudowane, ich naruszenia i edytor z próbą na sucho.', 'The server does not serve rules yet (GET /rules). When the integrator wires the module, this page shows the built-in rules, their violations and an editor with a dry run.')} /> : <ErrorState error={q.error} retry={() => q.refetch()} />}</div></div>;
+  const evaluate = useAction(() => post<{ violations: number; took_ms: number }>('/rules/evaluate'), { invalidate: ['/rules', '/findings'], success: (r) => t('Naruszenia: ' + r.violations, 'Violations: ' + r.violations) });
+  const header = <PageHeader title={t('Reguły ekspozycji', 'Exposure rules')}    actions={<>{canEvaluate && items.length ? <Button icon="refresh" busy={evaluate.isPending} onClick={() => evaluate.mutate(undefined)}>{t('Sprawdź teraz', 'Check now')}</Button> : null}{canCreate ? <Button variant="primary" icon="plus" onClick={() => u.set({ rule: 'new', slug: null })}>{t('Nowa reguła', 'New rule')}</Button> : null}</>} />;
+  if (q.error) return <div>{header}<div className="p-4 sm:p-6">{routeMissing(q.error) ? <Unavailable /> : <ErrorState error={q.error} retry={() => q.refetch()} />}</div></div>;
   if (!q.data) return <div>{header}<SkeletonRows rows={8} /></div>;
   return (
     <div>
@@ -124,7 +123,7 @@ export default function Rules() {
               </li>
             ))}
           </ul>
-          {items.length === 0 ? <p className="p-4 text-sm text-ink-2">{t('Brak reguł.', 'No rule yet.')}</p> : null}
+          {items.length === 0 ? <p className="p-4 text-sm text-ink-2">{t('Brak reguł.', 'No rules yet.')}</p> : null}
         </Panel>
         <Editor rule={sel === 'new' ? null : one.data ?? rule} onSaved={(r) => u.set({ rule: r ? r.id : null })} />
       </div>
