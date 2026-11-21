@@ -67,13 +67,14 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   const gone = s ? s.hosts_gone + s.services_gone : 0;
   const returned = s?.services_returned ?? 0;
   const slower = s?.responses_slower ?? 0;
-  const quiet = s ? added + gone + changed + s.hosts_unstable + missing + returned + slower === 0 : true;
+  const recovered = s?.by_kind?.response_recovered ?? 0;
+  const quiet = s ? added + gone + changed + s.hosts_unstable + missing + returned + slower + recovered === 0 : true;
   const open = (d.top_findings ?? []).filter((f) => f.status === 'new' || f.status === 'triaged');
   const important = open.filter((f) => f.severity === 'high' || f.interest >= ATTENTION_INTEREST);
   const panels = adminPanelNames(open);
   const attention = h.admin_panels > 0 || h.findings_high > 0 || important.length > 0;
   const named = (panels.length ? panels : adminPanelServiceNames(d.top_services ?? [])).slice(0, 2);
-  const parts = s ? changeParts({ added, gone, changed, missing, unstable: s.hosts_unstable, returned, slower }, getLang(), plural) : [];
+  const parts = s ? changeParts({ added, gone, changed, missing, unstable: s.hosts_unstable, returned, slower, recovered }, getLang(), plural) : [];
   const headline = baseline
     ? t('Pierwszy obraz sieci: ' + fmtInt(h.hosts_up) + ' ' + plural(h.hosts_up, ['aktywny host', 'aktywne hosty', 'aktywnych hostów'], ['', '']) + ', ' + fmtInt(h.services_open) + ' ' + plural(h.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['', '']) + '.',
       'First picture of the network: ' + fmtInt(h.hosts_up) + ' ' + (h.hosts_up === 1 ? 'host' : 'hosts') + ' up, ' + fmtInt(h.services_open) + ' open ' + (h.services_open === 1 ? 'service' : 'services') + '.')

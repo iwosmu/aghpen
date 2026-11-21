@@ -31,15 +31,17 @@ export function awaySeconds(c: Change): number | null {
 /** "120 ms → 640 ms" for a response-time change (before.baseline_ms → after.ms), or ''. */
 export function responseDelta(c: Change): string {
   const ms = field(c.after, 'ms');
+  // Never two equal values with an arrow: then only the current one.
+  const arrow = (a: string, b: string) => (a === b ? t('teraz ', 'now ') + b : a + ' → ' + b);
   if (c.kind === 'response_recovered') {
     // from the slow answer (or no answer) back to the usual time: "901 ms → 1 ms"
     const was = field(c.before, 'ms');
     if (typeof ms !== 'number') return '';
-    return (typeof was === 'number' ? fmtMs(was) : t('brak odpowiedzi HTTP', 'no HTTP answer')) + ' → ' + fmtMs(ms);
+    return arrow(typeof was === 'number' ? fmtMs(was) : t('nie odpowiadała', 'no answer'), fmtMs(ms));
   }
   const base = field(c.before, 'baseline_ms') ?? field(c.before, 'ms');
   if (typeof base !== 'number') return '';
-  if (typeof ms === 'number') return fmtMs(base) + ' → ' + fmtMs(ms);
+  if (typeof ms === 'number') return arrow(fmtMs(base), fmtMs(ms));
   if (ms === null || field(c.after, 'error')) return fmtMs(base) + ' → ' + t('brak odpowiedzi HTTP', 'no HTTP answer');
   return '';
 }
