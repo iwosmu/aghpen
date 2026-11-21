@@ -586,7 +586,7 @@ func (r *run) httpHost(ctx context.Context, res *model.HostResult, done func(*mo
 	if d := r.lim.PerHostDelay; d > 0 && 1/d.Seconds() < perHost {
 		perHost = 1 / d.Seconds()
 	}
-	hostLim := probe.NewLimiter(perHost, 1)
+	hostLim := hostLimits{own: probe.NewLimiter(perHost, 1), shared: r.e.hostLimiter(res.IP, r.polPerHost)}
 	sem := make(chan struct{}, r.lim.PerHostConc)
 	hostname := ""
 	if len(res.Hostnames) > 0 {

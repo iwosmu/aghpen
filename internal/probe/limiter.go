@@ -24,6 +24,14 @@ func NewLimiter(perSecond float64, burst int) *Limiter {
 	return &Limiter{rate: perSecond, burst: float64(burst), tokens: float64(burst), last: time.Now()}
 }
 
+// Rate is the refill rate in tokens per second (fixed when the limiter is made).
+func (l *Limiter) Rate() float64 {
+	if l == nil {
+		return 0
+	}
+	return l.rate
+}
+
 // Wait takes one token.
 func (l *Limiter) Wait(ctx context.Context) error { return l.WaitN(ctx, 1) }
 

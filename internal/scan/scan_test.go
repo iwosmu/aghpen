@@ -1395,3 +1395,123 @@ func TestPortTableGuessGivesWayToTheHTTPAnswer(t *testing.T) {
 		t.Fatalf("services = %+v", h.Services)
 	}
 }
+
+// rateNet records the nmap rates in flight across all runs.
+type rateNet struct {
+	*fakeNet
+	rmu       sync.Mutex
+	cur, peak int
+}
+
+func (n *rateNet) take(rate int) func() {
+	n.rmu.Lock()
+	n.cur += rate
+	n.peak = max(n.peak, n.cur)
+	n.rmu.Unlock()
+	time.Sleep(30 * time.Millisecond) // overlap with the other run
+	return func() { n.rmu.Lock(); n.cur -= rate; n.rmu.Unlock() }
+}
+
+func (n *rateNet) Discover(ctx context.Context, req probe.DiscoverRequest) (*probe.Result, error) {
+	defer n.take(req.MaxRate)()
+	return n.fakeNet.Discover(ctx, req)
+}
+
+func (n *rateNet) PortScan(ctx context.Context, req probe.PortScanRequest) (*probe.Result, error) {
+	defer n.take(req.MaxRate)()
+	return n.fakeNet.PortScan(ctx, req)
+}
+
+func (n *rateNet) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*probe.Result, error) {
+	defer n.take(req.MaxRate)()
+	return n.fakeNet.ServiceScan(ctx, req)
+}
+
+// The safety policy's packet cap holds for every run of the engine
+// together: a scheduled scan, a re-probe and an ad-hoc run at the same time
+// do not send 3 x max_pps.
+func TestConcurrentRunsShareThePolicyBudget(t *testing.T) {
+	hosts := map[string][]int{}
+	for i := 1; i <= 40; i++ {
+		hosts[fmt.Sprintf("10.8.%d.%d", i/20, i%20+1)] = []int{22, 80}
+	}
+	netw := &rateNet{fakeNet: &fakeNet{hosts: hosts}}
+	e := New(Deps{Prober: netw, Logger: quiet})
+	plan := func(id int64, scope string) model.ScanPlan {
+		p := basePlan(scope)
+		p.RunID = id
+		p.Profile.Rate.MaxPPS = 1000 // the profile allows more than the policy
+		p.Policy.MaxPPS = 300
+		return p
+	}
+	var wg sync.WaitGroup
+	for i, scope := range []string{"10.8.0.0/24", "10.8.1.0/24", "10.8.2.0/24"} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if out := e.Run(context.Background(), plan(int64(i+1), scope), newSink()); out.Status != model.RunCompleted {
+				t.Errorf("run %d: %+v", i+1, out)
+			}
+		}()
+	}
+	wg.Wait()
+	limit := EffectiveLimits(model.ScanProfile{}, model.SafetyPolicy{MaxPPS: 300}).ProbePPS()
+	if netw.peak > limit || netw.peak == 0 {
+		t.Errorf("nmap rates in flight peaked at %d pps; the policy's budget for all runs is %d", netw.peak, limit)
+	}
+	// the engine-wide per-host request limiter is one per address
+	if a, b := e.hostLimiter("10.8.0.2", 2), e.hostLimiter("10.8.0.2", 2); a != b {
+		t.Error("two runs must share the request limiter of one address")
+	}
+}
+
+// The engine keeps to the allowed networks itself: a domain that resolves
+// outside them at scan time, a target outside the operator lock, and the
+// stored chunks of a resumed run after the lock was narrowed are not scanned.
+func TestEngineKeepsToTheAllowedNetworks(t *testing.T) {
+	hosts := map[string][]int{"10.9.0.5": {80}, "10.9.0.200": {80}, "10.9.1.1": {80}}
+	scanned := func(plan model.ScanPlan, dns fakeDNS) map[string]bool {
+		e := New(Deps{Prober: &fakeNet{hosts: hosts}, Logger: quiet, Resolver: dns})
+		sink := newSink()
+		if out := e.Run(context.Background(), plan, sink); out.Status != model.RunCompleted {
+			t.Fatalf("outcome = %+v", out)
+		}
+		got := map[string]bool{}
+		for ip := range hosts {
+			if h := sink.host(ip); h != nil && h.Up {
+				got[ip] = true
+			}
+		}
+		return got
+	}
+
+	// the name answered inside the allowed network when the runner checked it; now it answers outside
+	plan := basePlan("10.9.0.5", "panel.example.com")
+	plan.Policy.AllowedNetworks = []string{"10.9.0.0/25"}
+	if got := scanned(plan, fakeDNS{"panel.example.com": "10.9.0.200"}); !got["10.9.0.5"] || got["10.9.0.200"] {
+		t.Errorf("re-resolved domain: scanned %v", got)
+	}
+
+	// the operator lock alone, and both lists together (an address must lie in both)
+	plan = basePlan("10.9.0.0/24", "10.9.1.0/30")
+	plan.Policy.OperatorNetworks = []string{"10.9.0.0/24"}
+	if got := scanned(plan, nil); got["10.9.1.1"] || !got["10.9.0.200"] {
+		t.Errorf("operator lock: scanned %v", got)
+	}
+	plan.Policy.AllowedNetworks = []string{"10.9.0.0/25", "10.9.1.0/24"}
+	if got := scanned(plan, nil); got["10.9.1.1"] || got["10.9.0.200"] || !got["10.9.0.5"] {
+		t.Errorf("both lists: scanned %v", got)
+	}
+
+	// a resumed run: the stored chunk covers the /24, the lock is now a /25
+	plan = basePlan("10.9.0.0/24")
+	plan.Chunks = []model.Chunk{{RunID: 7, Seq: 1, Spec: []string{"10.9.0.0/24"}, Size: 256, Status: model.ChunkDeferred}}
+	plan.Policy.OperatorNetworks = []string{"10.9.0.0/25"}
+	if got := scanned(plan, nil); !got["10.9.0.5"] || got["10.9.0.200"] {
+		t.Errorf("resumed chunk: scanned %v", got)
+	}
+
+	if _, _, err := allowedScope(model.SafetyPolicy{AllowedNetworks: []string{"not-a-net"}}); err == nil {
+		t.Error("a bad allowed network must fail the run, not open it")
+	}
+}

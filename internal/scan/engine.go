@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"net/netip"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -63,6 +65,118 @@ type Engine struct {
 	// direct is the "second method" of the last retry round: a TCP connect
 	// to the ports a host had open before. Tests replace it.
 	direct func(ctx context.Context, ip string, ports []int, timeout time.Duration, lim *probe.Limiter) (probe.Host, int64)
+
+	// One budget for every run of the engine: the safety policy's caps hold
+	// for all concurrent runs together (a scheduled scan, a re-probe and an
+	// ad-hoc run at the same time), the profile's caps are lower limits
+	// inside them. See shared.
+	sharedMu   sync.Mutex
+	global     *Budget                   // nmap packets per second, all runs
+	globalHTTP *probe.Limiter            // HTTP requests per second, all runs
+	hostLims   map[string]*probe.Limiter // HTTP requests per second to one address, all runs
+}
+
+// allowedScope turns the policy's allowed networks (the operator lock
+// CZUJKA_ALLOWED_NETWORKS and the policy's own list; an address must lie in
+// both when both are set) into the IPv4 addresses outside them and a test
+// for IPv6. outside is nil when neither list is set (everything allowed).
+func allowedScope(pol model.SafetyPolicy) (outside *targets.Set, v6 func(netip.Addr) bool, err error) {
+	lists := [][]string{pol.OperatorNetworks, pol.AllowedNetworks}
+	var sets []targets.Set
+	var v6s [][]netip.Prefix
+	for _, list := range lists {
+		var rs []targets.Range
+		var p6 []netip.Prefix
+		n := 0
+		for _, v := range list {
+			v = strings.TrimSpace(v)
+			if v == "" {
+				continue
+			}
+			n++
+			var p netip.Prefix
+			if strings.Contains(v, "/") {
+				if p, err = netip.ParsePrefix(v); err != nil {
+					return nil, nil, fmt.Errorf("%q is not a CIDR network", v)
+				}
+				p = p.Masked()
+			} else {
+				a, perr := netip.ParseAddr(v)
+				if perr != nil {
+					return nil, nil, fmt.Errorf("%q is not a CIDR network or an IP address", v)
+				}
+				a = a.Unmap()
+				p = netip.PrefixFrom(a, a.BitLen())
+			}
+			if p.Addr().Is4() {
+				rs = append(rs, targets.PrefixRange(p))
+			} else {
+				p6 = append(p6, p)
+			}
+		}
+		if n == 0 {
+			continue // this list is not set
+		}
+		sets = append(sets, targets.NewSet(rs...))
+		v6s = append(v6s, p6)
+	}
+	if len(sets) == 0 {
+		return nil, func(netip.Addr) bool { return true }, nil
+	}
+	all := targets.NewSet(targets.Range{Lo: 0, Hi: 0xFFFFFFFF})
+	out := targets.NewSet()
+	for _, s := range sets {
+		out = out.Union(all.Subtract(s)) // outside any one list is outside
+	}
+	v6 = func(a netip.Addr) bool {
+		for _, ps := range v6s {
+			in := false
+			for _, p := range ps {
+				if p.Contains(a) {
+					in = true
+					break
+				}
+			}
+			if !in {
+				return false
+			}
+		}
+		return true
+	}
+	return &out, v6, nil
+}
+
+// shared returns the engine-wide limits for the policy, made on first use
+// and resized when the policy changed (a limiter is replaced, not resized:
+// a run that started before keeps the old one until it ends).
+func (e *Engine) shared(pol model.SafetyPolicy) (*Budget, *probe.Limiter) {
+	l := EffectiveLimits(model.ScanProfile{}, pol)
+	e.sharedMu.Lock()
+	defer e.sharedMu.Unlock()
+	if e.global == nil {
+		e.global = NewBudget(l.ProbePPS())
+	} else if e.global.Total() != l.ProbePPS() {
+		e.global.SetTotal(l.ProbePPS())
+	}
+	if e.globalHTTP == nil || e.globalHTTP.Rate() != l.HTTPRPS {
+		e.globalHTTP = probe.NewLimiter(l.HTTPRPS, 1)
+	}
+	return e.global, e.globalHTTP
+}
+
+// hostLimiter is the engine-wide request limiter of one address.
+func (e *Engine) hostLimiter(ip string, perSecond float64) *probe.Limiter {
+	e.sharedMu.Lock()
+	defer e.sharedMu.Unlock()
+	if e.hostLims == nil {
+		e.hostLims = map[string]*probe.Limiter{}
+	}
+	l := e.hostLims[ip]
+	if l == nil || l.Rate() != perSecond {
+		l = probe.NewLimiter(perSecond, 1)
+		e.hostLims[ip] = l
+	}
+	return l
 }
 
 var _ model.Engine = (*Engine)(nil)
@@ -107,24 +221,28 @@ type run struct {
 	fullWake    chan struct{}
 	fullPlanned bool
 
-	e        *Engine
-	log      *slog.Logger
-	plan     model.ScanPlan
-	sink     model.ResultSink
-	sinkCtx  context.Context // survives cancellation, so the final state reaches the store
-	prober   probe.Prober
-	ports    *probe.PortSet
-	disc     model.DiscoveryOpts
-	mode     string          // discovery mode: fast, balanced or thorough
-	local    []targets.Range // directly connected IPv4 networks
-	lim      Limits
-	sizer    *sizer
-	budget   *Budget
-	stats    *statsKeeper
-	httpLim  *probe.Limiter
-	hostSem  chan struct{}
-	paths    []string
-	udpPorts []int // allow-listed UDP ports to probe; empty: no UDP stage
+	e       *Engine
+	log     *slog.Logger
+	plan    model.ScanPlan
+	sink    model.ResultSink
+	sinkCtx context.Context // survives cancellation, so the final state reaches the store
+	prober  probe.Prober
+	ports   *probe.PortSet
+	disc    model.DiscoveryOpts
+	mode    string          // discovery mode: fast, balanced or thorough
+	local   []targets.Range // directly connected IPv4 networks
+	lim     Limits
+	sizer   *sizer
+	budget  *Budget
+	stats   *statsKeeper
+	httpLim *probe.Limiter
+	// the engine-wide limits (Engine.shared) the run takes from as well
+	global     *Budget
+	globalHTTP *probe.Limiter
+	polPerHost float64 // the policy's per-host request rate (engine-wide limiter)
+	hostSem    chan struct{}
+	paths      []string
+	udpPorts   []int // allow-listed UDP ports to probe; empty: no UDP stage
 	// covered holds, per host IP, the extra TCP ports a finished dense or
 	// full-range pass scanned (*probe.PortSet); see coverage.
 	covered sync.Map
@@ -198,6 +316,28 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 	if ctx.Err() != nil {
 		return model.RunOutcome{Status: model.RunCancelled, Stats: prev, Err: context.Cause(ctx)}
 	}
+	// The allowed networks hold inside the engine too: the runner checked
+	// the targets, but a domain is resolved again here (its answer may have
+	// changed) and a resumed run brings stored chunks (the lock may have
+	// been narrowed during the pause). Addresses outside are dropped.
+	outside, v6Allowed, err := allowedScope(plan.Policy)
+	if err != nil {
+		return fail(fmt.Errorf("scan: allowed networks: %w", err))
+	}
+	if outside != nil {
+		before := exp.Count()
+		exp.V4 = exp.V4.Subtract(*outside)
+		kept := exp.V6[:0:0]
+		for _, a := range exp.V6 {
+			if v6Allowed(a) {
+				kept = append(kept, a)
+			}
+		}
+		exp.V6 = kept
+		if n := before - exp.Count(); n > 0 {
+			log.Warn("addresses outside the allowed networks dropped by the engine", "addresses", n)
+		}
+	}
 
 	r := &run{
 		e: e, log: log, plan: plan, sink: sink, sinkCtx: context.WithoutCancel(ctx),
@@ -209,6 +349,8 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 		hostnames: exp.Hostnames,
 		hints:     map[string]model.HostHint{},
 	}
+	r.global, r.globalHTTP = e.shared(plan.Policy)
+	r.polPerHost = EffectiveLimits(model.ScanProfile{}, plan.Policy).PerHostRPS
 	for _, h := range plan.Hints {
 		p, err := targets.ParseValue(h.IP)
 		if err != nil || p.Count != 1 {
@@ -248,7 +390,11 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 	resumed := len(plan.Chunks) > 0
 	var units []*unit
 	if resumed {
-		units, err = unitsFromChunks(plan.Chunks, exp.Exclusions)
+		excl := exp.Exclusions
+		if outside != nil {
+			excl = excl.Union(*outside)
+		}
+		units, err = unitsFromChunks(plan.Chunks, excl, v6Allowed)
 	} else {
 		units, err = buildUnits(plan.RunID, exp.V4, exp.V6, r.hintIPs, unitSizeFor(chunking, exp.Count()))
 	}
@@ -462,7 +608,16 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 	gs := &groupStats{}
 	rate, err := r.budget.Acquire(ctx, want)
 	if err == nil {
-		err = r.scanGroup(ctx, g, rate, gs)
+		// the group's share must also fit into what all runs together may send
+		var got int
+		if got, err = r.global.Acquire(ctx, rate); err == nil {
+			if got < rate {
+				r.budget.Release(rate - got)
+				rate = got
+			}
+			err = r.scanGroup(ctx, g, rate, gs)
+			r.global.Release(rate)
+		}
 		r.budget.Release(rate)
 	}
 	end := r.e.now()
