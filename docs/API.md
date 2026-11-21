@@ -111,6 +111,36 @@ Base path `/api/v1`. JSON bodies use the types of `internal/model/types.go` (the
 - **Response time.** Every service observation keeps the time of the first HTTP request (`result.http.response_ms`). Baseline: the median of the last 5 answered observations that were not slow themselves (one is enough). `response_slower` (low) when the time is at least 2× the baseline and at least 300 ms above it, or when the port is open and HTTP no longer answers; `response_recovered` (info) when a slow service is back to normal. Reported on the transition only. `field: "http.response_ms"`, `before: {baseline_ms, ms}`, `after: {ms}` or `{ms: null, error: "no_answer"}`. `summary.responses_slower` counts them. Service items carry `response_ms` (latest observation, null without an HTTP answer) and `response_slow` (that observation was slow).
 - **Sub-routers.** Other packages can mount routes under `/api/v1` through `Deps.Mounts` (`api.Mount{Pattern, Router func(guard api.Guard) http.Handler}`). `api.Guard` is the permission middleware of this router (`guard(model.PermResultsRead)`); `api.WriteJSON` and `api.WriteError` write answers in the format above.
 
+## API with curl
+
+There are no API tokens. A script logs in like the browser: a session cookie, and the CSRF token from the login answer in the `X-CSRF-Token` header of every request that changes data (POST, PUT, PATCH, DELETE). A missing or wrong token answers 403; no session answers 401. Checked against a running server on 21.11.2026.
+
+```sh
+# 1. Log in. The session cookie goes to the jar; the answer carries the CSRF token.
+C=http://127.0.0.1:8080/api/v1
+CSRF=$(curl -s -c jar.txt -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.org","password":"..."}' $C/auth/login | jq -r .csrf_token)
+
+# 2. Read: only the cookie.
+curl -s -b jar.txt "$C/profiles" | jq '.items[] | {id, name}'
+
+# 3. Change: the cookie and the X-CSRF-Token header. Start a run of profile 1.
+RUN=$(curl -s -b jar.txt -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' \
+  -d '{"profile_id":1}' $C/runs | jq -r .id)
+curl -s -b jar.txt "$C/runs/$RUN" | jq '{id, status, stats}'
+
+# 4. Export the run and the findings.
+curl -s -b jar.txt -o run-$RUN.json "$C/export/runs/$RUN.json"
+curl -s -b jar.txt -o findings.csv "$C/export/findings.csv"
+
+# 5. Log out.
+curl -s -b jar.txt -H "X-CSRF-Token: $CSRF" -X POST $C/auth/logout
+```
+
+- The profile needs a scope: a profile without one answers 422 `profil nie ma zakresu`. „Ten komputer” in the UI creates a profile with a scope.
+- The session lasts `CZUJKA_SESSION_TTL` (default 12 h). Logins are rate limited (`CZUJKA_LOGIN_RATE_PER_MIN`) and locked after `CZUJKA_LOGIN_MAX_FAILURES` failures.
+- Use an account with only the permissions the script needs (for example a custom role with `scans:run` and `export:run`).
+
 ## Alert webhook
 
 After every analysed run (scan, re-probe, import, manual entry), Czujka sends one `POST` to the configured URL, when the webhook is enabled and the run has at least one change or new finding at `min_severity` or above. Otherwise it sends nothing.
