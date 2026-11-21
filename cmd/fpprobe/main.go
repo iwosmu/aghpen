@@ -4,6 +4,7 @@
 //
 //	fpprobe -addr 127.0.0.1:8080 [-host name] [-paths] [-brief]
 //	fpprobe -validate file.yaml
+//	fpprobe -convert file      (JSON, a map keyed by name, a passive nuclei template → Czujka YAML)
 //	fpprobe -list
 //
 // The probe is passive: GET requests only, to the given address only.
@@ -14,6 +15,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -55,12 +57,15 @@ func main() {
 		full     = flag.Bool("full", false, "keep body excerpts and cookie values in the JSON output")
 		validate = flag.String("validate", "", "validate a signature YAML file and exit")
 		list     = flag.Bool("list", false, "list the built-in signatures and exit")
+		convert  = flag.String("convert", "", "convert a signature file in a foreign format (JSON, nuclei template) to Czujka YAML and exit")
 	)
 	flag.Parse()
 
 	switch {
 	case *validate != "":
 		os.Exit(runValidate(*validate))
+	case *convert != "":
+		os.Exit(runConvert(*convert, os.Stdout, os.Stderr))
 	case *list:
 		os.Exit(runList())
 	case *addr == "":
@@ -217,6 +222,37 @@ func printBrief(out output) {
 		}
 	}
 	fmt.Printf("findings: %s\n", strings.Join(findings, ", "))
+}
+
+// runConvert prints the converted Czujka YAML on stdout and the issues of the
+// validator on stderr. The exit code is 1 when the file is refused.
+func runConvert(path string, stdout, stderr io.Writer) int {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintln(stderr, "fpprobe:", err)
+		return 2
+	}
+	out, val := sig.Convert(string(data))
+	for _, is := range val.Issues {
+		kind := ""
+		if is.Safety {
+			kind = " [tryb bezpieczny]"
+		}
+		where := is.Path
+		if where == "" {
+			where = "-"
+		}
+		fmt.Fprintf(stderr, "%s%s: %s: %s\n", is.Level, kind, where, is.Message)
+	}
+	fmt.Fprint(stdout, out)
+	switch {
+	case out == "":
+		fmt.Fprintln(stderr, "fpprobe: plik odrzucony; powody są powyżej")
+		return 1
+	case !val.OK:
+		fmt.Fprintln(stderr, "fpprobe: część sygnatur odrzucono (powody powyżej); pozostałe są na wyjściu")
+	}
+	return 0
 }
 
 func runValidate(path string) int {

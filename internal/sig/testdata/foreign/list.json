@@ -1,0 +1,22 @@
+[
+  {
+    "id": "acme-portal",
+    "name": "ACME Portal",
+    "category": "cms",
+    "severity": "medium",
+    "tags": "portal, php",
+    "matchers": [
+      {"type": "word", "part": "body", "words": ["acme-portal.css", "ACME Portal"]},
+      {"type": "regex", "part": "header", "pattern": "X-Powered-By: ACME/([0-9.]+)", "group": 1},
+      {"type": "word", "part": "title", "value": "ACME"}
+    ],
+    "version_regex": "ACME Portal v([0-9.]+)"
+  },
+  {
+    "name": "Router Admin",
+    "category": "iot",
+    "favicon_hash": 116323821,
+    "cookies": {"router_sid": ""},
+    "headers": {"Server": "^RouterOS httpd"}
+  }
+]

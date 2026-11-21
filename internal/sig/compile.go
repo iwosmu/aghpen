@@ -349,8 +349,8 @@ func (p *parser) compileRule(rd *RuleDef, versionRule bool) *rule {
 		if !pathFields[r.field] {
 			bad("nieznane pole field „%s” w regule path (dozwolone: body, title, header, location)", r.field)
 		}
-		if r.field == "header" && r.name == "" {
-			bad("reguła path z field: header potrzebuje nazwy nagłówka (name)")
+		if r.field == "header" && r.name == "" && !r.hasText {
+			bad("reguła path z field: header potrzebuje nazwy nagłówka (name) albo dopasowania")
 		}
 		if !r.hasText && !r.not && !r.absent && !versionRule {
 			p.issues = append(p.issues, model.SignatureIssue{Level: "warning", Path: rd.ypath, Message: withLine("reguła path bez dopasowania treści (contains, regex): serwer, który na każdą ścieżkę odpowiada 200, da fałszywe trafienie", rd.line)})

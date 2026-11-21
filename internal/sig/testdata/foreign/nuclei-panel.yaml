@@ -1,0 +1,40 @@
+id: acme-gateway-detect
+
+info:
+  name: ACME Gateway - Detect
+  author: jkowalski,anowak
+  severity: info
+  description: ACME Gateway login panel was detected.
+  classification:
+    cpe: cpe:2.3:a:acme:gateway:*:*:*:*:*:*:*:*
+  metadata:
+    max-request: 2
+    shodan-query: http.title:"ACME Gateway"
+  tags: panel,acme,detect
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/gateway/login"
+      - "{{BaseURL}}/login"
+
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "<title>ACME Gateway</title>"
+          - "acme-gateway-login"
+        condition: and
+
+      - type: status
+        status:
+          - 200
+
+    extractors:
+      - type: regex
+        part: body
+        group: 1
+        regex:
+          - 'Gateway version ([0-9.]+)'

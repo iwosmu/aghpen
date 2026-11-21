@@ -1,0 +1,21 @@
+id: acme-default-login
+info:
+  name: ACME Gateway - Default Login
+  author: test
+  severity: high
+  tags: default-login,acme
+http:
+  - raw:
+      - |
+        POST /gateway/login HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/x-www-form-urlencoded
+
+        username={{username}}&password={{password}}
+    attack: pitchfork
+    payloads:
+      username: [admin]
+      password: [admin]
+    matchers:
+      - type: word
+        words: ["Welcome, admin"]

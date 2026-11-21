@@ -844,6 +844,10 @@ type RetroHuntResult struct {
 	MissingPaths []string `json:"missing_paths"`
 	Incomplete   int      `json:"incomplete"`
 	Notes        []string `json:"notes"`
+	// TotalHits counts every hit. Hits holds at most the hit limit of the
+	// caller; Truncated says that the list was cut.
+	TotalHits int  `json:"total_hits"`
+	Truncated bool `json:"truncated"`
 }
 
 // ---------- Integrations ----------

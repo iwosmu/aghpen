@@ -456,3 +456,36 @@ func TestAhoCorasick(t *testing.T) {
 	empty := buildAC(nil)
 	empty.scan("anything", make([]uint64, empty.words()))
 }
+
+// A custom signature asks for a path: that path must be inside a small
+// per-host budget even when the root page gives no hint.
+func TestPathsForPrefersCustomSignatures(t *testing.T) {
+	records, err := Builtin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	custom := "id: moja-aplikacja\nname: Moja aplikacja\nmatch:\n  rules:\n    - {type: path, path: /moja-aplikacja/login, status: [200], contains: 'moja_aplikacja_password'}\n"
+	records = append(records, model.Signature{Slug: "moja-aplikacja", Name: "Moja aplikacja", YAML: custom, Enabled: true})
+	e := NewEngine()
+	if rep := e.Load(records); len(rep.Rejected) != 0 {
+		t.Fatalf("rejected: %+v", rep.Rejected)
+	}
+	if n := len(e.ExtraPaths()); n < 20 {
+		t.Fatalf("the library has only %d extra paths; the test needs more than the budget", n)
+	}
+	svc := &model.ServiceResult{Port: 80, Proto: "tcp", State: "open", HTTP: &model.HTTPFingerprint{Status: 200, BodyExcerpt: "<html>nic szczególnego</html>"}}
+	got := e.PathsFor(svc, 5)
+	if len(got) != 5 || got[0] != "/moja-aplikacja/login" {
+		t.Errorf("PathsFor = %v, want the custom path first", got)
+	}
+	// A path that the root page supports still comes before it.
+	svc.HTTP.BodyExcerpt = `<link rel="stylesheet" href="/wp-content/themes/x/style.css"><script src="/wp-includes/js/a.js"></script>`
+	got = e.PathsFor(svc, 5)
+	pos := map[string]int{}
+	for i, p := range got {
+		pos[p] = i + 1
+	}
+	if pos["/moja-aplikacja/login"] == 0 || pos["/wp-login.php"] == 0 || pos["/wp-login.php"] > pos["/moja-aplikacja/login"] {
+		t.Errorf("PathsFor = %v, want /wp-login.php before the custom path, both inside the budget", got)
+	}
+}
