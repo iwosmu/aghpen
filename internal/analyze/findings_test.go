@@ -43,6 +43,9 @@ func TestDeriveFindingsTypes(t *testing.T) {
 		sev  model.Severity
 	}{
 		{"admin panel", FindingService{Result: withClass("Panel", model.ClassAdminPanel)}, []string{FindingAdminPanel}, model.SevInfo},
+		// an unfinished installer is high wherever it is shown (rule unfinished-install-page is high too)
+		{"unfinished installer panel", FindingService{Result: withClass("Instalacja", model.ClassAdminPanel, model.ClassInstallPage)}, []string{FindingAdminPanel}, model.SevHigh},
+		{"unfinished installer dev tool", FindingService{Result: withClass("Instalacja", model.ClassDevTool, model.ClassInstallPage)}, []string{FindingDevTool}, model.SevHigh},
 		{"login over plain http", FindingService{Result: withClass("Logowanie", model.ClassLogin)}, []string{FindingLoginPlainHTTP}, model.SevLow},
 		{"staging", FindingService{Result: withClass("Sklep", model.ClassStaging)}, []string{FindingStaging}, model.SevInfo},
 		{"debug page", FindingService{Result: httpSvc(80, "phpinfo()", 200)}, []string{FindingDebugPage}, model.SevLow},
