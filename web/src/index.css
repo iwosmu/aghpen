@@ -254,57 +254,140 @@
 /* Presentation mode (?present=1 or Shift+P): one step larger for a 1080p recording. */
 html[data-present] { zoom: 1.125; }
 
-/* ---------- The night field of the login page: slow light, film grain, one warm alarm glow. ---------- */
-.night-field { position: absolute; inset: 0; overflow: hidden; background: #060a11; z-index: 0; }
-.night-field::before {
-  content: ""; position: absolute; inset: -25%;
-  background:
-    radial-gradient(42% 38% at 24% 22%, rgb(46 82 150 / 0.42), transparent 70%),
-    radial-gradient(55% 45% at 72% 30%, rgb(24 44 88 / 0.55), transparent 72%),
-    radial-gradient(30% 26% at 80% 80%, rgb(229 85 106 / 0.20), transparent 70%),
-    radial-gradient(60% 40% at 40% 95%, rgb(16 30 60 / 0.6), transparent 75%);
-  animation: night-drift 70s ease-in-out infinite alternate;
-  will-change: transform;
-}
-.night-field::after {
-  content: ""; position: absolute; inset: 0; opacity: 0.11; pointer-events: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-}
-@keyframes night-drift {
-  from { transform: translate3d(-4%, -3%, 0) scale(1); }
-  to { transform: translate3d(4%, 3%, 0) scale(1.1); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .night-field::before { animation: none; }
-}
-
-/* ---------- The login form: one glass surface on the night field. ---------- */
+/* ---------- One glass surface (used by viz/RhythmFigure). ---------- */
 .login-glass {
   background: rgb(255 255 255 / 0.045);
   -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2);
   border-radius: 18px;
   box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06) inset, 0 40px 80px -30px rgb(0 0 0 / 0.85);
 }
-.login-field {
-  height: 50px; width: 100%; padding: 0 16px; font-size: 16px; color: var(--ink);
-  background: rgb(6 10 17 / 0.55); border: 1px solid rgb(255 255 255 / 0.10); border-radius: 10px;
-  transition: border-color 150ms, background-color 150ms;
+
+
+/* ==========================================================================
+   LOGIN PAGE (owned by the login screen: web/src/pages/Login.tsx,
+   web/src/viz/FlutedField.tsx). Night colour field behind fluted glass,
+   one frosted panel. Every rule and variable here is prefixed lgn-.
+   ========================================================================== */
+.lgn {
+  --lgn-ink: #f3f1ea;
+  --lgn-ink-2: #c9ccd6;
+  --lgn-glass: rgb(12 18 36 / 0.34);
+  --lgn-glass-edge: rgb(255 255 255 / 0.14);
+  --lgn-field: rgb(3 6 16 / 0.42);
+  --lgn-field-edge: rgb(255 255 255 / 0.16);
+  --lgn-focus: #f3f1ea;
+  --lgn-alarm: #ff9a8a;
+  --lgn-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  position: relative; isolation: isolate; min-height: 100dvh; overflow: hidden;
+  color: var(--lgn-ink); background: #03060e;
+  display: grid;
+  --lgn-gutter: clamp(20px, 4.4vw, 88px);
+  grid-template-columns: var(--lgn-gutter) minmax(0, 1fr) minmax(0, 420px) var(--lgn-gutter);
+  grid-template-rows: auto 1fr auto;
+  column-gap: clamp(24px, 4vw, 80px);
+  padding: clamp(20px, 2.6vw, 44px) 0 clamp(16px, 2.2vw, 40px);
 }
-.login-field:hover { border-color: rgb(255 255 255 / 0.22); }
-.login-field:focus-visible { outline: 1.5px solid #e9e5da; outline-offset: 2px; border-color: rgb(255 255 255 / 0.28); background: rgb(6 10 17 / 0.75); }
-.login-field[aria-invalid="true"] { border-color: #f2907f; }
-.login-field:-webkit-autofill, .login-field:-webkit-autofill:hover, .login-field:-webkit-autofill:focus {
-  -webkit-text-fill-color: var(--ink); caret-color: var(--ink);
-  -webkit-box-shadow: 0 0 0 100px #0c121c inset; box-shadow: 0 0 0 100px #0c121c inset;
+.lgn-bg { position: absolute; inset: 0; z-index: -1; }
+.lgn-bg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 900ms var(--lgn-ease); }
+.lgn-bg-canvas[data-ready] { opacity: 1; }
+/* No hardware WebGL: the same picture, still, from gradients and a rib overlay. */
+.lgn-bg-fallback {
+  position: absolute; inset: 0;
+  background:
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.07) 0 1px, rgb(255 255 255 / 0.015) 1px 6px, transparent 6px 11px, rgb(0 0 0 / 0.22) 16px 20px),
+    radial-gradient(28% 22% at 48% 68%, rgb(229 85 106 / 0.85), transparent 70%),
+    radial-gradient(34% 18% at 70% 82%, rgb(163 43 122 / 0.6), transparent 72%),
+    radial-gradient(14% 44% at 64% 42%, rgb(1 2 5 / 0.9), transparent 70%),
+    radial-gradient(70% 30% at 40% 38%, rgb(38 97 220 / 0.85), transparent 70%),
+    radial-gradient(30% 24% at 18% 20%, rgb(110 163 242 / 0.55), transparent 70%),
+    linear-gradient(180deg, #071330, #040814 70%);
+}
+
+.lgn-top { grid-column: 2 / 4; grid-row: 1; display: flex; align-items: center; justify-content: space-between; }
+.lgn-mark { display: inline-flex; align-items: center; gap: 10px; color: var(--lgn-ink); }
+
+.lgn-pill {
+  display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px;
+  background: var(--lgn-glass); box-shadow: inset 0 0 0 1px var(--lgn-glass-edge), inset 0 1px 0 rgb(255 255 255 / 0.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6) brightness(0.6); backdrop-filter: blur(20px) saturate(1.6) brightness(0.6);
+}
+.lgn-pill button {
+  height: 30px; min-width: 42px; padding: 0 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--lgn-ink);
+  transition: background-color 200ms var(--lgn-ease), color 200ms var(--lgn-ease);
+}
+.lgn-pill button[aria-pressed="true"] { background: rgb(255 255 255 / 0.9); color: #08101f; }
+.lgn-pill button:focus-visible { outline: 2px solid var(--lgn-focus); outline-offset: 2px; }
+
+.lgn-word {
+  grid-column: 2; grid-row: 2; align-self: end; margin: 0;
+  font-size: clamp(76px, 13vw, 300px); font-weight: 500; line-height: 0.8; letter-spacing: -0.04em;
+  color: var(--lgn-ink); text-shadow: 0 2px 40px rgb(2 4 12 / 0.35);
+  user-select: none; transform: translateX(-0.04em); padding-bottom: 0.12em;
+}
+/* the top edge is fixed, so a status line grows the panel down and the fields stay put */
+.lgn-main { grid-column: 3; grid-row: 2; align-self: start; margin-top: max(24px, calc(50dvh - 270px)); display: flex; justify-content: flex-end; }
+
+.lgn-panel {
+  width: 100%; max-width: 420px; padding: 28px; border-radius: 30px;
+  /* frost: the picture blurred, kept rich (saturate) but held down (brightness),
+     so the text stays AA even when the brightest blue passes behind */
+  background: linear-gradient(160deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0) 40%), var(--lgn-glass);
+  -webkit-backdrop-filter: blur(32px) saturate(1.6) brightness(0.62); backdrop-filter: blur(32px) saturate(1.6) brightness(0.62);
+  box-shadow: inset 0 0 0 1px var(--lgn-glass-edge), inset 0 1px 0 rgb(255 255 255 / 0.16), 0 40px 90px -40px rgb(0 0 0 / 0.8);
+}
+.lgn-form { display: grid; gap: 16px; }
+.lgn-label { display: grid; gap: 8px; }
+.lgn-label > span { font-size: 13px; font-weight: 500; color: var(--lgn-ink); padding-left: 4px; }
+.lgn-input {
+  height: 52px; width: 100%; padding: 0 18px; font-size: 16px; color: var(--lgn-ink);
+  background: var(--lgn-field); border: 1px solid var(--lgn-field-edge); border-radius: 16px;
+  transition: border-color 160ms var(--lgn-ease), background-color 160ms var(--lgn-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lgn-input:hover { border-color: rgb(255 255 255 / 0.28); }
+      .lgn-pill button[aria-pressed="false"]:hover { background: rgb(255 255 255 / 0.1); }
+}
+.lgn-input:focus-visible { outline: 2px solid var(--lgn-focus); outline-offset: 2px; border-color: transparent; background: rgb(4 8 18 / 0.7); }
+.lgn-input[aria-invalid="true"] { border-color: var(--lgn-alarm); }
+.lgn-input:-webkit-autofill, .lgn-input:-webkit-autofill:hover, .lgn-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--lgn-ink); caret-color: var(--lgn-ink);
+  -webkit-box-shadow: 0 0 0 100px #0b1222 inset; box-shadow: 0 0 0 100px #0b1222 inset;
   transition: background-color 9999s ease-out 0s;
 }
-.login-submit {
-  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 50px;
-  border-radius: 10px; background: #e9e5da; color: #0a0e15; font-size: 15px; font-weight: 600;
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.5) inset, 0 14px 30px -14px rgb(233 229 218 / 0.45);
-  transition: background-color 150ms, transform 120ms;
+.lgn-submit {
+  margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 52px;
+  border-radius: 999px; background: #f3f1ea; color: #08101f; font-size: 15px; font-weight: 600;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.7), 0 12px 28px -14px rgb(0 0 0 / 0.6);
+  transition: background-color 160ms ease, transform 140ms var(--lgn-ease);
 }
-.login-submit:hover { background: #ffffff; }
-.login-submit:active { transform: translateY(1px) scale(0.995); background: #d9d4c7; }
-.login-submit:focus-visible { outline: 1.5px solid #e9e5da; outline-offset: 3px; }
-.login-submit:disabled { opacity: 0.7; cursor: progress; }
+.lgn-submit:hover { background: #ffffff; }
+.lgn-submit:active { transform: scale(0.97); }
+.lgn-submit:focus-visible { outline: 2px solid var(--lgn-focus); outline-offset: 3px; }
+.lgn-submit:disabled { opacity: 0.75; cursor: progress; }
+.lgn-submit-arrow { transition: transform 200ms var(--lgn-ease); }
+.lgn-submit:hover .lgn-submit-arrow { transform: translateX(3px); }
+.lgn-status:empty { display: none; }
+.lgn-msg { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 20px; color: var(--lgn-ink); padding: 0 4px; }
+.lgn-dot { margin-top: 6px; width: 8px; height: 8px; flex: none; border-radius: 999px; background: var(--lgn-alarm); }
+.lgn-msg-icon { margin-top: 3px; flex: none; color: var(--lgn-ink-2); }
+.lgn-fixtures { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgb(255 255 255 / 0.12); font-size: 12px; color: var(--lgn-ink-2); display: grid; gap: 6px; }
+.lgn-fixtures-title { color: var(--lgn-ink); font-weight: 500; }
+.lgn-fixtures ul { display: grid; gap: 2px; }
+.lgn-fixtures button { color: #a9c8f8; text-decoration: underline; text-underline-offset: 3px; }
+.lgn-fixtures button:focus-visible { outline: 2px solid var(--lgn-focus); outline-offset: 2px; border-radius: 4px; }
+.lgn ::selection { background: #8fb8f6; color: #08101f; }
+.lgn input { caret-color: #8fb8f6; }
+
+@media (max-width: 860px) {
+  .lgn { grid-template-columns: 20px minmax(0, 1fr) 20px; grid-template-rows: auto 1fr auto auto; column-gap: 0; padding: 16px 0 20px; }
+  .lgn-top, .lgn-word, .lgn-main { grid-column: 2; }
+  .lgn-word { grid-row: 2; align-self: end; font-size: clamp(72px, 24vw, 140px); margin-bottom: 24px; }
+  .lgn-main { grid-row: 3; justify-content: stretch; margin-top: 0; }
+  .lgn-panel { max-width: none; padding: 22px; border-radius: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lgn-submit:active { transform: none; }
+  .lgn-submit-arrow { transition: none; }
+}
+/* ======================== END LOGIN PAGE ======================== */
