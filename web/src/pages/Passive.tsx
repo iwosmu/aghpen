@@ -4,7 +4,7 @@ import { ApiError, post, put, upload } from '../api/client';
 import type { PassiveCandidate, PassiveResult, PassiveSettings, Scope, TargetPreview } from '../api/types';
 import { t, plural } from '../i18n';
 import { cx, fmtInt, fmtRelative } from '../lib/format';
-import { Button, Check, InlineError, Panel, Tabs } from '../ui/kit';
+import { Button, Check, InlineError, Panel, Tabs, FileInput } from '../ui/kit';
 import { Glyph } from '../ui/marks';
 import { useSession } from '../session';
 import { Switch } from './Signatures';
@@ -123,7 +123,7 @@ export function PassivePanel({ scope }: { scope: Scope }) {
           <div className="flex flex-wrap items-end gap-2">
             <label className="block min-w-[240px] flex-1">
               <span className="label mb-1 block">{t('Plik ze strefą DNS, CSV, JSON albo JSONL (nazwy i adresy)', 'A DNS zone, CSV, JSON or JSONL file (names and addresses)')}</span>
-              <input type="file" className="field py-1" data-testid="passive-file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              <FileInput testId="passive-file" file={file} onFile={setFile} />
             </label>
             <Button icon="upload" busy={runIt.isPending} disabled={!file} onClick={() => runIt.mutate('file')}>{t('Wczytaj', 'Read')}</Button>
           </div>

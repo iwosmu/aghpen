@@ -9,7 +9,7 @@ import { cx, fmtInt } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
 import { isLockRefusal } from '../lib/lock';
 import { Icon } from '../ui/Icon';
-import { Button, Dialog, Empty, ErrorState, Field, IconButton, InlineError, PageHeader, Panel, Select, SkeletonRows, Spinner, Tabs, Tags } from '../ui/kit';
+import { Button, Dialog, Empty, ErrorState, Field, IconButton, InlineError, PageHeader, Panel, Select, SkeletonRows, Spinner, Tabs, Tags, FileInput } from '../ui/kit';
 import { PassivePanel } from './Passive';
 import { DataTable, Pager, type Col } from '../ui/table';
 import { Crit, Glyph } from '../ui/marks';
@@ -148,7 +148,7 @@ function AddTargets({ scope }: { scope: Scope }) {
         <div className="mt-3 grid gap-4 lg:grid-cols-2">
           <div>
             <Field label={t('Plik z celami', 'Target file')} hint={t('CSV: cel w pierwszej kolumnie. JSON: tablica tekstów albo obiektów z polem value.', 'CSV: the target in the first column. JSON: an array of strings or of objects with a value field.')}>
-              <input ref={input} type="file" accept=".csv,.json,.txt,text/csv,application/json" className="field py-1" onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); setDry(null); if (f) dryRun.mutate(f); }} />
+              <FileInput inputRef={input} accept=".csv,.json,.txt,text/csv,application/json" file={file} onFile={(f) => { setFile(f); setDry(null); if (f) dryRun.mutate(f); }} />
             </Field>
             <div className="mt-2 flex items-center gap-2">
               <Button variant="primary" icon="upload" busy={imp.isPending} disabled={!file || !dry || dry.valid.length === 0} onClick={() => file && imp.mutate(file)}>{dry && dry.valid.length ? t('Importuj ' + dry.valid.length, 'Import ' + dry.valid.length) : t('Importuj', 'Import')}</Button>
@@ -233,13 +233,13 @@ export default function Targets() {
                   <button type="button" aria-current={s.id === scopeId ? 'true' : undefined} onClick={() => u.set({ scope: s.id })}
                     className={cx('block w-full px-3 py-2 text-left outline-offset-[-2px] hover:bg-raised', s.id === scopeId && 'bg-accent-wash')}>
                     <span className="flex items-center justify-between gap-2"><span className={cx('text-sm', s.id === scopeId ? 'font-semibold text-ink' : 'text-ink')}>{s.name}</span><Crit value={s.criticality} /></span>
-                    <span className="mt-0.5 block text-xs text-ink-2"><span className="num">{fmtInt(s.address_count)}</span> {t('adresów', 'addresses')} · <span className="num">{s.target_count}</span> {plural(s.target_count, ['cel', 'cele', 'celów'], ['target', 'targets'])}</span>
+                    <span className="mt-0.5 block text-xs text-ink-2"><span className="num">{fmtInt(s.address_count)}</span> {plural(s.address_count, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])} · <span className="num">{s.target_count}</span> {plural(s.target_count, ['cel', 'cele', 'celów'], ['target', 'targets'])}</span>
                     {s.owner ? <span className="block truncate text-xs text-ink-3">{s.owner}</span> : null}
                   </button>
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-ink-3">{t('Razem', 'Total')} <span className="num text-ink-2">{fmtInt(list.reduce((a, s) => a + s.address_count, 0))}</span> {t('adresów w', 'addresses in')} {list.length} {plural(list.length, ['zakresie', 'zakresach', 'zakresach'], ['scope', 'scopes'])}.</p>
+            <p className="mt-2 text-xs text-ink-3">{t('Razem', 'Total')} <span className="num text-ink-2">{fmtInt(list.reduce((a, s) => a + s.address_count, 0))}</span> {plural(list.reduce((a, s) => a + s.address_count, 0), ['adres', 'adresy', 'adresów'], ['address', 'addresses'])} {t('w', 'in')} {list.length} {plural(list.length, ['zakresie', 'zakresach', 'zakresach'], ['scope', 'scopes'])}.</p>
           </nav>
           {scope ? (
             <div className="min-w-0 space-y-4">

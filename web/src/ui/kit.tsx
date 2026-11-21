@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Ref } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import { cx } from '../lib/format';
@@ -427,5 +427,16 @@ export function TagInput({ value, onChange, placeholder }: { value: string[]; on
         onBlur={add}
       />
     </div>
+  );
+}
+
+/** A file picker with a translated button and the chosen name; the native input stays in the DOM (sr-only) for tests and the keyboard. */
+export function FileInput({ accept, file, onFile, inputRef, testId }: { accept?: string; file: File | null; onFile: (f: File | null) => void; inputRef?: Ref<HTMLInputElement>; testId?: string }) {
+  return (
+    <span className="field flex h-9 cursor-pointer items-center gap-3 pr-3 focus-within:outline focus-within:outline-2 focus-within:outline-accent">
+      <input ref={inputRef} type="file" accept={accept} data-testid={testId} className="sr-only" onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
+      <span className="flex h-full flex-none items-center border-r border-rule bg-raised px-3 text-sm font-medium text-ink">{t('Wybierz plik', 'Choose a file')}</span>
+      <span className={'min-w-0 truncate text-sm ' + (file ? 'mono text-ink' : 'text-ink-3')}>{file ? file.name : t('nie wybrano pliku', 'no file chosen')}</span>
+    </span>
   );
 }
