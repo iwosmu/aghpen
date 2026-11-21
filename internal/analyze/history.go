@@ -116,13 +116,13 @@ func (d *differ) response(h *HostSnapshot, s *model.ServiceResult, hist ServiceH
 	switch {
 	case last.Slow && !prev.Slow && cur >= 0:
 		d.add(h, s, model.ChangeResponseSlower, model.SevLow, "http.response_ms", before, map[string]any{"ms": cur},
-			false, fmt.Sprintf("Usługa %s odpowiada wolniej: %d ms (zwykle %d ms)", at, cur, last.Baseline))
+			false, fmt.Sprintf("Usługa %s odpowiada wolniej: %d ms (%s)", at, cur, usualText(last.Baseline)))
 	case last.Slow && !prev.Slow:
 		d.add(h, s, model.ChangeResponseSlower, model.SevLow, "http.response_ms", before, map[string]any{"ms": nil, "error": "no_answer"},
-			false, fmt.Sprintf("Usługa %s: port otwarty, ale HTTP nie odpowiedział w czasie (zwykle %d ms)", at, last.Baseline))
+			false, fmt.Sprintf("Usługa %s: port otwarty, ale HTTP nie odpowiedział w czasie (%s)", at, usualText(last.Baseline)))
 	case !last.Slow && prev.Slow && cur >= 0:
 		d.add(h, s, model.ChangeResponseRecovered, model.SevInfo, "http.response_ms", before, map[string]any{"ms": cur},
-			false, fmt.Sprintf("Usługa %s znów odpowiada w zwykłym czasie: %d ms (zwykle %d ms)", at, cur, last.Baseline))
+			false, fmt.Sprintf("Usługa %s znów odpowiada w zwykłym czasie: %d ms (%s)", at, cur, usualText(last.Baseline)))
 	}
 }
 
@@ -172,4 +172,14 @@ func runsText(n int) string {
 		return fmt.Sprintf("%d skanach", n)
 	}
 	return "poprzednim skanie"
+}
+
+// usualText names the usual response time of a service. A service on the same
+// machine or switch answers in under a millisecond, and "zwykle 0 ms" reads as
+// a missing value.
+func usualText(baselineMs int) string {
+	if baselineMs < 1 {
+		return "zwykle poniżej 1 ms"
+	}
+	return fmt.Sprintf("zwykle %d ms", baselineMs)
 }
