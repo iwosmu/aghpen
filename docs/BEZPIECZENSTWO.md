@@ -15,6 +15,7 @@ Zasada: Czujka wykrywa obecność cech. Nie loguje się, nie wysyła ładunków,
 | Wykrycie hostów | ICMP echo, ICMP timestamp, TCP SYN, TCP ACK, ARP (z surowymi gniazdami) albo połączenie TCP (bez nich) | – | `internal/probe/nmap.go` (`DiscoverArgs`) |
 | Skan portów | TCP SYN (`-sS`) albo pełne połączenie TCP (`-sT`) | pakietów UDP; portów spoza listy dozwolonej polityką | `PortScanArgs`, `probe.EffectivePorts` |
 | Wykrycie usług | sondy `nmap -sV` tylko na otwarte porty | opcji `--script`, `-sC`, `-A`, `-O` | `ServiceArgs`; test `TestNmapArgs` |
+| Skan UDP (opcja profilu) | zapytania protokołów z listy dozwolonej (DNS, NTP, NetBIOS, IKE, SSDP, mDNS; SNMP tylko jako SNMPv3 engine discovery bez społeczności i użytkownika). Na porty, które odpowiedziały (stan `open`), `nmap -sU -sV --version-intensity 0`: tylko sondy, które nmap ma dla tego portu (zapytanie o wersję DNS, zapytanie klienta NTP …), w limicie pakietów, wliczone do szacunku. Wyłączone, gdy profil wyłącza wykrywanie usług | portu 161 do nmap (jego sondy SNMP niosą społeczność „public”), skryptów, portów spoza listy | `internal/probe/udp.go` (`UDPArgs`, `UDPVersionArgs`); testy `TestUDPArgsAreSafe`, `TestUDPVersionArgsAreSafe` |
 | Wersja brokera AMQP (mały zakres) | 8 bajtów nagłówka protokołu `AMQP 0 0 9 1`, które jako pierwsze wysyła każdy klient AMQP i sonda amqp samego nmap; odczyt ramki `Connection.Start` (produkt, wersja) i zamknięcie połączenia. Tylko na otwarty port 5672 albo port, który tablica portów nmap nazywa `amqp`, i tylko gdy `nmap -sV` nie nazwał go w ciągu 3 s. Wyłączone, gdy profil wyłącza wykrywanie usług | uwierzytelnienia (`Connection.StartOk`), innych ramek, nagłówka na inne porty | `internal/probe/amqp.go` (`AMQPHello`), `internal/scan/pipeline.go` (`quickHost`); testy `TestAMQPHelloReadsTheVersion`, `TestQuickPathReadsTheAMQPVersion` |
 | HTTP/TLS | `GET` (i `HEAD`) bez treści | innych metod, treści żądania, danych logowania, ciasteczek z poprzedniej odpowiedzi | `internal/httpfp/fetch.go` (`methodAllowed`, `do`); test `TestMethodGuard` |
 | Ścieżki sygnatur | `GET` ścieżek, które przeszły walidator | ścieżek zmieniających stan albo pobierających sekrety (rozdz. 1.5) | `internal/sig/safety.go` (`CheckPath`) |
@@ -35,9 +36,9 @@ Limit skuteczny to mniejsza z wartości profilu skanu i polityki bezpieczeństwa
 
 | Limit | Profil (domyślnie) | Polityka (domyślnie) | Gdzie egzekwowany |
 | --- | --- | --- | --- |
-| Pakiety sond na sekundę, wszystkie procesy razem | `rate.max_pps` (500) | `max_pps` (1000) | Jeden budżet (`scan.Budget`) dzielony między równoległe procesy nmap. Każdy proces dostaje udział jako `--min-rate` i `--max-rate`. |
-| Żądania HTTP na sekundę, wszystkie hosty razem | `rate.http_rps` (20) | `max_http_rps` (50) | Kubełek żetonów w silniku (`probe.Limiter`). Przed wywołaniem kolektora silnik pobiera tyle żetonów, ile żądań planuje (strona + ścieżki + ikona). |
-| Żądania HTTP na sekundę do jednego hosta | – | `max_per_host_rps` (2) | Limiter na host w silniku. |
+| Pakiety sond na sekundę, wszystkie procesy razem | `rate.max_pps` (500) | `max_pps` (1000) | Dwa budżety (`scan.Budget`). Budżet globalny jest jeden dla całego procesu Czujki i dla wszystkich równoległych przebiegów (zaplanowanych, ręcznych, doraźnych, ponownych sond); jego wielkość to `max_pps` polityki. Budżet przebiegu to limit profilu wewnątrz niego. Grupa adresów bierze udział z obu i oddaje oba po skanie. Każdy proces nmap dostaje swój udział jako `--min-rate` i `--max-rate`. Test: `TestConcurrentRunsShareThePolicyBudget` (trzy równoległe przebiegi, suma tempa nmap nie przekracza budżetu polityki). |
+| Żądania HTTP na sekundę, wszystkie hosty razem | `rate.http_rps` (20) | `max_http_rps` (50) | Kubełki żetonów w silniku (`probe.Limiter`): jeden na przebieg (limit profilu) i jeden wspólny dla wszystkich przebiegów (limit polityki). Przed wywołaniem kolektora silnik pobiera tyle żetonów, ile żądań planuje (strona + ścieżki + ikona). |
+| Żądania HTTP na sekundę do jednego hosta | – | `max_per_host_rps` (2) | Limiter na host w przebiegu i limiter na host wspólny dla wszystkich przebiegów. |
 | Równoległe usługi HTTP na jednym hoście | `rate.per_host_concurrency` (1) | – | Semafor na host. |
 | Dodatkowe ścieżki sygnatur na usługę | – | `max_paths_per_host` (8) | Silnik obcina listę ścieżek przed przekazaniem kolektorowi. |
 | Przekierowania | `http.max_redirects` (3) | twardy limit 10 | `httpfp` (`root`) |
@@ -51,7 +52,6 @@ Znane ograniczenia limitów:
 
 - Sondy wykrywania wersji (`-sV`) idą zwykłymi gniazdami. `--max-rate` ich nie obejmuje; licznik pakietów jest dla nich szacunkiem.
 - Limiter HTTP pobiera z góry koszt całego wywołania kolektora (strona, ikona, ścieżki). Żądania wewnątrz jednego wywołania idą bez odstępu między sobą, a przekierowania nie są wliczane.
-- Egzekwowanie w produkcie: **do weryfikacji po integracji silnika**.
 
 ### 1.3 Polityka bezpieczeństwa
 
@@ -126,7 +126,7 @@ Testy: `TestValidatorRejectsUnsafeSignatures`, `TestCheckPath`, `TestRetroHuntRe
 | Usługa zewnętrzna crt.sh | Domyślnie wyłączona. Wymaga dwóch zgód naraz. Wysyła tylko nazwę domeny. | `docs/INTEGRACJE.md` §3.1 |
 | Okno czasowe | Silnik nie zaczyna części, która nie zmieści się przed końcem okna, a o końcu okna przerywa pracę. | `TestWindowGuardDoesNotStartWhatCannotFit` |
 
-Polityka nie ma listy dozwolonych sieci. Zakres wyznaczają cele wpisane przez użytkownika z uprawnieniem `targets:create` minus wyłączenia.
+Dozwolone sieci: blokada operatora (`CZUJKA_ALLOWED_NETWORKS`, pole `operator_networks`) i lista `allowed_networks` polityki (docs/WDROZENIE.md). Cel poza nimi jest odrzucany przy wpisie i przy planowaniu przebiegu. Silnik sprawdza je jeszcze raz: adresy po rozwinięciu celów (nazwa domenowa jest rozwiązywana ponownie i może teraz wskazywać inny adres) i części wznowionego przebiegu (blokada mogła się zawęzić w czasie pauzy). Adres poza którąkolwiek z list jest pomijany i trafia do logu. Test: `TestEngineKeepsToTheAllowedNetworks`.
 
 ### 1.7 Kontener skanera
 
@@ -293,7 +293,6 @@ Sprawdzone na działającym stosie jako `viewer`: dodanie celu → 403, awaryjne
 | --- | --- |
 | Silnik | Limity i awaryjne zatrzymanie skanu w produkcie: do weryfikacji po integracji silnika. |
 | Tempo | `--min-rate` = `--max-rate`: stałe tempo, bez samoczynnego zwalniania nmap. Sondy `-sV` poza limitem pakietów. |
-| Zakres | Brak listy dozwolonych sieci w polityce. |
 | Dane | Surowy nagłówek `Set-Cookie` bez warstwy 2 i bez ukrycia przed rolą „Odczyt”. |
 | Kopie | Zrzut `pg_dump` jest jawny poza kolumnami warstwy 2. Trzeba go szyfrować. |
 | Klucze | Klucz `pg_tde` w pliku na wolumenie. Domyślne hasło roli bazy, gdy brak `deploy/.env`. |

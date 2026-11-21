@@ -19,7 +19,9 @@
 # Environment: LR_PROJECT (czacc), LR_PORT (18520), LR_IP (10.66.0.30), LR_STATES ("t0 t1 t2"),
 # LR_PROFILE (JSON merged into the seeded profile), LR_NAME, LR_SKIP_BUILD=1, LR_KEEP=1 (keep the product),
 # LR_FINAL_STATE (state to leave the lab in, default t0), LR_FRESH=0 (reuse the running product and its database),
-# LR_IGNORE_NEIGH=1 (run even when the Docker host's neighbour table is nearly full; see e2e/neigh-check.sh).
+# LR_IGNORE_NEIGH=1 (run even when the Docker host's neighbour table is nearly full; see e2e/neigh-check.sh),
+# LR_SECOND="10.66.10.0/24" (a second run with its own scope and a copy of the profile, started LR_SECOND_AFTER
+# seconds, default 60, after each main run: the packet rate on the wire must stay under the policy cap for both).
 set -uo pipefail
 cd "$(dirname "$0")/.."
 PROJECT=${LR_PROJECT:-czacc}
@@ -121,6 +123,7 @@ if ! NB=$(e2e/neigh-check.sh); then
   [ "${LR_IGNORE_NEIGH:-0}" = 1 ] || { log "the neighbour table is nearly full: results would be wrong (LR_IGNORE_NEIGH=1 runs anyway)"; exit 3; }
 fi
 log "before: $NB"
+log "load average at the start: $(sysctl -n vm.loadavg 2>/dev/null || cut -d' ' -f1-3 /proc/loadavg)"
 mem_sampler
 trap 'rm -f "$OUT/.mem.on"' EXIT
 PREV=""
@@ -141,6 +144,18 @@ for st in $STATES; do
   T0=$(date +%s)
   RUN=$(api POST /runs "{\"profile_id\":$PROFILE}" | jq -r .id)
   log "run $RUN started"
+  rm -f "$OUT/.second-run"
+  if [ -n "${LR_SECOND:-}" ]; then
+    (
+      sleep "${LR_SECOND_AFTER:-60}"
+      S2=$(api POST /scopes '{"name":"lab-run: second run","criticality":1}' | jq -r .id)
+      api POST /scopes/$S2/targets "$(jq -nc --arg t "$LR_SECOND" '{text: $t}')" >/dev/null
+      P2=$(api POST /profiles "$(echo "$PJSON" | jq -c --argjson s "$S2" '.name = (.name + " (second)") | .scope_ids = [$s]')" | jq -r .id)
+      R2=$(api POST /runs "{\"profile_id\":$P2}" | jq -r .id)
+      log "second run $R2 started on $LR_SECOND, $(( $(date +%s) - T0 )) s after run $RUN"
+      echo "$R2" >"$OUT/.second-run"
+    ) &
+  fi
   PEAK=0; LP=$P0; LT=$(date +%s)
   while :; do
     R=$(api GET /runs/$RUN)
@@ -152,11 +167,24 @@ for st in $STATES; do
     LP=$NP; LT=$NT
   done
   WALL=$(( $(date +%s) - T0 ))
+  wait
+  if [ -f "$OUT/.second-run" ]; then
+    R2=$(cat "$OUT/.second-run")
+    while :; do
+      S2J=$(api GET /runs/$R2)
+      case "$(echo "$S2J" | jq -r .status)" in completed|failed|cancelled) break ;; esac
+      sleep 3
+    done
+    log "second run $R2 $(echo "$S2J" | jq -c '{status, started_at, finished_at, hosts_up: .stats.hosts_up, services: .stats.services_open, packets: .stats.packets_sent, peak_pps: .stats.peak_pps}')"
+  fi
   P1=$(txp)
   sleep 1; docker logs "$PROJECT-tcpdump" 2>/dev/null > "$OUT/tcpdump-$K.txt"; docker rm -f "$PROJECT-tcpdump" >/dev/null 2>&1
   CAPPPS=$(echo "$PJSON" | jq '.rate.max_pps')
   go run ./e2e/ppsbins -src "$LR_IP" -cap "$CAPPPS" "$OUT/tcpdump-$K.txt" > "$OUT/pps-$K.txt"
   go run ./e2e/ppsbins -src "$LR_IP" -cap "$CAPPPS" -json "$OUT/tcpdump-$K.txt" > "$OUT/pps-$K.json"
+  # a gap of 5 s or more with no packet from the scanner is a frozen VM (overloaded host), not a quiet scan
+  GAP=$(awk -v ip="$LR_IP" '$3 ~ "^"ip"\\." {t=$1; if (p && t-p > g) {g=t-p; at=p}; p=t} END {printf "%.1f %d", g, at}' "$OUT/tcpdump-$K.txt")
+  log "tcpdump: longest gap without scanner packets ${GAP% *} s (at $(date -r "${GAP#* }" +%H:%M:%S 2>/dev/null || echo "${GAP#* }"))$(awk -v g="${GAP% *}" 'BEGIN { if (g >= 5) print "; INVALID for the wire measurement: a gap of 5 s or more (VM freeze); rerun" }')"
   gzip -f "$OUT/tcpdump-$K.txt"
   sed -n 2,3p "$OUT/pps-$K.txt" | tee -a "$OUT/run.log"
   echo "$R" | jq . > "$OUT/run-$K.json"
@@ -182,6 +210,7 @@ done
 rm -f "$OUT/.mem.on"; sleep 2
 log "memory of the Czujka container: max $(mem_max) MiB ($(wc -l < "$OUT/mem.txt" | tr -d ' ') samples)"
 log "database size: $(docker exec $PROJECT-db-1 psql -U czujka -d czujka -tAc "select pg_size_pretty(pg_database_size('czujka'))")"
+log "load average at the end: $(sysctl -n vm.loadavg 2>/dev/null || cut -d' ' -f1-3 /proc/loadavg)"
 FINAL=${LR_FINAL_STATE-t0}
 if [ -n "$FINAL" ]; then lab/scenario.sh "$FINAL" 2>&1 | tail -1 | tee -a "$OUT/run.log"; fi
 if [ "${LR_KEEP:-0}" != 1 ]; then $DC down -v --remove-orphans >/dev/null 2>&1; log "product stopped (LR_KEEP=1 keeps it)"; fi
