@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.95 scan initiated Sat Nov 21 11:59:36 2026 as: nmap -sS -Pn -p 7,9,13,21-23,25-26,37,53,79-81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6379,6646,7070,8000,8008-8009,8080-8081,8443,8765,8888,9100,9443,9999-10000,32768,49152-49157 -n -T4 -v -&#45;max-rate 500 -&#45;max-retries 2 -&#45;host-timeout 300s -oX /dev/fd/3 -iL - -->
+<nmaprun scanner="nmap" args="nmap -sS -Pn -p 7,9,13,21-23,25-26,37,53,79-81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6379,6646,7070,8000,8008-8009,8080-8081,8443,8765,8888,9100,9443,9999-10000,32768,49152-49157 -n -T4 -v -&#45;max-rate 500 -&#45;max-retries 2 -&#45;host-timeout 300s -oX /dev/fd/3 -iL -" start="1795262376" startstr="Sat Nov 21 11:59:36 2026" version="7.95" xmloutputversion="1.05">
+<scaninfo type="syn" protocol="tcp" numservices="103" services="7,9,13,21-23,25-26,37,53,79-81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6379,6646,7070,8000,8008-8009,8080-8081,8443,8765,8888,9100,9443,9999-10000,32768,49152-49157"/>
+<verbose level="1"/>
+<debugging level="0"/>
+<taskbegin task="ARP Ping Scan" time="1795262376"/>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.0.20" addrtype="ipv4"/>
+<address addr="46:04:0B:3A:76:5C" addrtype="mac"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.1.30" addrtype="ipv4"/>
+<address addr="7E:2B:CD:5B:48:9F" addrtype="mac"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.2.40" addrtype="ipv4"/>
+<address addr="4E:31:A0:AC:BD:5E" addrtype="mac"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.2.41" addrtype="ipv4"/>
+<address addr="3E:AF:C9:36:56:A7" addrtype="mac"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.3.50" addrtype="ipv4"/>
+<address addr="7A:CE:BC:6E:D9:0D" addrtype="mac"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.3.60" addrtype="ipv4"/>
+<address addr="A2:56:02:F6:EF:7A" addrtype="mac"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.0.10" addrtype="ipv4"/>
+<address addr="92:7B:25:A0:D8:C3" addrtype="mac"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<taskend task="ARP Ping Scan" time="1795262376" extrainfo="7 total hosts"/>
+<taskbegin task="SYN Stealth Scan" time="1795262376"/>
+<taskend task="SYN Stealth Scan" time="1795262378" extrainfo="721 total ports"/>
+<host starttime="1795262376" endtime="1795262378"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.0.10" addrtype="ipv4"/>
+<address addr="92:7B:25:A0:D8:C3" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="closed" count="102">
+<extrareasons reason="reset" count="102" proto="tcp" ports="7,9,13,21-23,25-26,37,53,79,81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6379,6646,7070,8000,8008-8009,8080-8081,8443,8765,8888,9100,9443,9999-10000,32768,49152-49157"/>
+</extraports>
+<port protocol="tcp" portid="80"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="http" method="table" conf="3"/></port>
+</ports>
+<times srtt="70" rttvar="20" to="100000"/>
+</host>
+<host starttime="1795262376" endtime="1795262378"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.0.20" addrtype="ipv4"/>
+<address addr="46:04:0B:3A:76:5C" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="closed" count="102">
+<extrareasons reason="reset" count="102" proto="tcp" ports="7,9,13,21,23,25-26,37,53,79-81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6379,6646,7070,8000,8008-8009,8080-8081,8443,8765,8888,9100,9443,9999-10000,32768,49152-49157"/>
+</extraports>
+<port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ssh" method="table" conf="3"/></port>
+</ports>
+<times srtt="55" rttvar="29" to="100000"/>
+</host>
+<host starttime="1795262376" endtime="1795262378"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.1.30" addrtype="ipv4"/>
+<address addr="7E:2B:CD:5B:48:9F" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="closed" count="102">
+<extrareasons reason="reset" count="102" proto="tcp" ports="7,9,13,21-23,25-26,37,53,79-81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6646,7070,8000,8008-8009,8080-8081,8443,8765,8888,9100,9443,9999-10000,32768,49152-49157"/>
+</extraports>
+<port protocol="tcp" portid="6379"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="redis" method="table" conf="3"/></port>
+</ports>
+<times srtt="33" rttvar="19" to="100000"/>
+</host>
+<host starttime="1795262376" endtime="1795262378"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.2.40" addrtype="ipv4"/>
+<address addr="4E:31:A0:AC:BD:5E" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="closed" count="102">
+<extrareasons reason="reset" count="102" proto="tcp" ports="7,9,13,21-23,25-26,37,53,79-81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6379,6646,7070,8000,8008-8009,8080-8081,8443,8888,9100,9443,9999-10000,32768,49152-49157"/>
+</extraports>
+<port protocol="tcp" portid="8765"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ultraseek-http" method="table" conf="3"/></port>
+</ports>
+<times srtt="114" rttvar="94" to="100000"/>
+</host>
+<host starttime="1795262376" endtime="1795262378"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.2.41" addrtype="ipv4"/>
+<address addr="3E:AF:C9:36:56:A7" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="closed" count="102">
+<extrareasons reason="reset" count="102" proto="tcp" ports="7,9,13,21-23,25-26,37,53,79-81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6379,6646,7070,8000,8008-8009,8080,8443,8765,8888,9100,9443,9999-10000,32768,49152-49157"/>
+</extraports>
+<port protocol="tcp" portid="8081"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="blackice-icecap" method="table" conf="3"/></port>
+</ports>
+<times srtt="26" rttvar="10" to="100000"/>
+</host>
+<host starttime="1795262376" endtime="1795262378"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.3.50" addrtype="ipv4"/>
+<address addr="7A:CE:BC:6E:D9:0D" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="closed" count="102">
+<extrareasons reason="reset" count="102" proto="tcp" ports="7,9,13,21-23,25-26,37,53,79-81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6379,6646,7070,8000,8008-8009,8080-8081,8443,8765,8888,9100,9999-10000,32768,49152-49157"/>
+</extraports>
+<port protocol="tcp" portid="9443"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="tungsten-https" method="table" conf="3"/></port>
+</ports>
+<times srtt="92" rttvar="35" to="100000"/>
+</host>
+<host starttime="1795262376" endtime="1795262378"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.77.3.60" addrtype="ipv4"/>
+<address addr="A2:56:02:F6:EF:7A" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="closed" count="102">
+<extrareasons reason="reset" count="102" proto="tcp" ports="7,9,13,21-23,25-26,37,53,79,81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6379,6646,7070,8000,8008-8009,8080-8081,8443,8765,8888,9100,9443,9999-10000,32768,49152-49157"/>
+</extraports>
+<port protocol="tcp" portid="80"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="http" method="table" conf="3"/></port>
+</ports>
+<times srtt="49" rttvar="40" to="100000"/>
+</host>
+<runstats><finished time="1795262378" timestr="Sat Nov 21 11:59:38 2026" summary="Nmap done at Sat Nov 21 11:59:38 2026; 7 IP addresses (7 hosts up) scanned in 1.54 seconds" elapsed="1.54" exit="success"/><hosts up="7" down="0" total="7"/>
+</runstats>
+</nmaprun>
