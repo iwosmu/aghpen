@@ -631,9 +631,19 @@ func nameService(s *model.ServiceResult) {
 // window end) is scanned again, and its hosts must not be reported twice.
 func (r *run) emitHost(g *group, gs *groupStats, res model.HostResult) {
 	gs.mu.Lock()
-	gs.hosts = append(gs.hosts, res)
 	prev, hadInterim := gs.interim[res.IP]
 	delete(gs.interim, res.IP)
+	if hadInterim {
+		// the store keeps the latest observation of a run (by time): the
+		// final result must be later than every partial one
+		if now := r.e.now().UTC(); now.After(res.ObservedAt) {
+			res.ObservedAt = now
+		}
+		if !res.ObservedAt.After(prev.at) {
+			res.ObservedAt = prev.at.Add(time.Millisecond)
+		}
+	}
+	gs.hosts = append(gs.hosts, res)
 	gs.mu.Unlock()
 	if hadInterim { // the final result replaces the stored partial one in the counters
 		r.stats.update(func(s *model.RunStats) {
@@ -674,7 +684,10 @@ func serviceCounts(res model.HostResult) (open, web int) {
 }
 
 // interimCount is what a stored partial result added to the run counters.
-type interimCount struct{ hosts, open, web int }
+type interimCount struct {
+	hosts, open, web int
+	at               time.Time // ObservedAt of the latest partial result
+}
 
 // interimHost stores a partial result of a host before its group ends, so
 // GET /services shows it while the run goes on. It is marked PortsUnknown:
@@ -692,7 +705,11 @@ func (r *run) interimHost(gs *groupStats, res model.HostResult) {
 		gs.interim = map[string]interimCount{}
 	}
 	prev := gs.interim[res.IP]
-	gs.interim[res.IP] = interimCount{1, open, web}
+	at := res.ObservedAt
+	if prev.at.After(at) {
+		at = prev.at
+	}
+	gs.interim[res.IP] = interimCount{hosts: 1, open: open, web: web, at: at}
 	gs.mu.Unlock()
 	r.stats.update(func(s *model.RunStats) {
 		s.HostsUp += 1 - prev.hosts

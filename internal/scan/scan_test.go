@@ -1006,6 +1006,12 @@ func TestQuickPathStoresAPartialResultFirst(t *testing.T) {
 	if final.PortsUnknown || final.Services[0].Product != "OpenSSH" {
 		t.Errorf("final = %+v", final)
 	}
+	for _, p := range reports[:len(reports)-1] {
+		// the store keeps the latest observation of a run by time
+		if !final.ObservedAt.After(p.ObservedAt) {
+			t.Errorf("final observed at %v, a partial at %v", final.ObservedAt, p.ObservedAt)
+		}
+	}
 	if out.Stats.HostsUp != 1 || out.Stats.ServicesOpen != 3 || out.Stats.HTTPServices != 2 {
 		t.Errorf("stats counted the partial result twice: %+v", out.Stats)
 	}
