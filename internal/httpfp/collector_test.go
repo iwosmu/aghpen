@@ -1,6 +1,7 @@
 package httpfp
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -13,6 +14,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"net/http"
@@ -908,3 +910,77 @@ func TestResponseMsIsTimeToFirstByte(t *testing.T) {
 		t.Errorf("response_ms = %d, want about 300 (first byte), not 1000 (all headers)", fp.ResponseMs)
 	}
 }
+
+// T1/T2: a port that answers TLS with a default certificate and 404 on every
+// path, and serves the site on plain HTTP (Traefik's entrypoints do this).
+func TestTLS404FallsBackToPlainHTTP(t *testing.T) {
+	tlsSrv := httptest.NewUnstartedServer(http.NotFoundHandler())
+	tlsSrv.StartTLS()
+	defer tlsSrv.Close()
+	cfg := tlsSrv.TLS
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	site := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "<title>Traefik</title>")
+	})
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				br := bufio.NewReader(c)
+				b, err := br.Peek(1)
+				if err != nil {
+					c.Close()
+					return
+				}
+				pc := &peekedConn{Conn: c, r: br}
+				if b[0] == 0x16 {
+					tc := tls.Server(pc, cfg)
+					(&http.Server{Handler: http.NotFoundHandler()}).Serve(&oneConnListener{c: tc})
+					return
+				}
+				(&http.Server{Handler: site}).Serve(&oneConnListener{c: pc})
+			}(c)
+		}
+	}()
+	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
+	port, _ := strconv.Atoi(portStr)
+	fp, ti, err := New().Fingerprint(context.Background(), model.FingerprintRequest{IP: "127.0.0.1", Port: port, TLSHint: true, Opts: model.HTTPOpts{TimeoutMs: 3000}})
+	if err != nil || fp == nil {
+		t.Fatalf("fp=%v err=%v", fp, err)
+	}
+	if fp.Scheme != "http" || fp.Status != 200 || fp.Title != "Traefik" || ti == nil || !strings.Contains(fp.Error, "also answers TLS") {
+		t.Errorf("scheme %q status %d title %q tls %v note %q", fp.Scheme, fp.Status, fp.Title, ti != nil, fp.Error)
+	}
+}
+
+type peekedConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (p *peekedConn) Read(b []byte) (int, error) { return p.r.Read(b) }
+
+type oneConnListener struct {
+	c    net.Conn
+	done bool
+	mu   sync.Mutex
+}
+
+func (l *oneConnListener) Accept() (net.Conn, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.done {
+		return nil, io.EOF
+	}
+	l.done = true
+	return l.c, nil
+}
+func (l *oneConnListener) Close() error   { return nil }
+func (l *oneConnListener) Addr() net.Addr { return l.c.LocalAddr() }

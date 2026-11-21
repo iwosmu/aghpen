@@ -314,10 +314,10 @@ func (c *Collector) Fingerprint(ctx context.Context, req model.FingerprintReques
 		order = []string{"https", "http"}
 	}
 
-	var fp, plainMisdirected *model.HTTPFingerprint
+	var fp, plainMisdirected, tls404 *model.HTTPFingerprint
 	var scheme string
 	var tlsErr error
-	for _, sch := range order {
+	for i, sch := range order {
 		got, misdirected, err := s.root(ctx, sch)
 		if sch == "https" && err != nil {
 			tlsErr = err
@@ -335,6 +335,14 @@ func (c *Collector) Fingerprint(ctx context.Context, req model.FingerprintReques
 			plainMisdirected = got
 			continue
 		}
+		if got != nil && sch == "https" && got.Status == http.StatusNotFound && i+1 < len(order) {
+			// TLS answers but the root is 404: a reverse proxy (Traefik) that
+			// takes TLS on every entrypoint with its default certificate and
+			// has no TLS route. The site may be on plain HTTP on the same
+			// port: try it and keep the richer answer.
+			tls404 = got
+			continue
+		}
 		if got != nil {
 			fp, scheme = got, sch
 			break
@@ -342,6 +350,24 @@ func (c *Collector) Fingerprint(ctx context.Context, req model.FingerprintReques
 		if sch == "https" && s.tlsInfo() != nil {
 			// TLS works but the service inside is not HTTP (IMAPS, LDAPS ...).
 			return nil, s.tlsInfo(), nil
+		}
+	}
+	if tls404 != nil {
+		switch {
+		case fp != nil && fp.Status != http.StatusNotFound:
+			// plain HTTP is the site; the TLS side stays in the evidence
+			fp.Error = strings.TrimPrefix(fp.Error+"; port also answers TLS: HTTPS root 404", "; ")
+			var ti *model.TLSInfo = s.tlsInfo()
+			if req.Opts.Favicon {
+				s.favicon(ctx, scheme, fp)
+			}
+			if len(req.Paths) > 0 && ctx.Err() == nil {
+				s.paths(ctx, scheme, fp)
+			}
+			return fp, ti, nil
+		default:
+			fp, scheme = tls404, "https"
+			fp.Error = strings.TrimPrefix(fp.Error+"; plain HTTP on this port gave no better answer", "; ")
 		}
 	}
 	if fp == nil && plainMisdirected != nil {
