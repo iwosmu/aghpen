@@ -27,7 +27,7 @@ Razem 96 wierszy.
 
 1. **Skala (kryterium 30%).** Pomiar trafności i tempa dotyczy laboratorium /16 z 70 hostami (`docs/WYNIKI.md`). Czas dla większej sieci to ekstrapolacja z tego pomiaru, nie pomiar.
 2. **Liczby pakietów: zmierzone na łączu.** `e2e/full/transcript.txt` (100 ze 100) przechwytuje ruch z filtrem źródła (`src host <adres Czujki> or arp`), który widzi pakiety wysyłane przez nmapa przez surowe gniazdo; stare liczby z przechwytywania `-Q out` są usunięte. Przebieg 1: 13 147 surowych pakietów nmapa na łączu (licznik silnika 13 246), najwięcej 641 na sekundę przy limicie 800, średnio 234,7/s. Przebieg 2: 13 125 pakietów, najwięcej 641/s, średnio 305,2/s. Wszystkie wysłane pakiety: najwięcej 643/s. Stop awaryjny: wywołanie trwało 0,09 s, po 1 s nie działał żaden proces nmap, po stopie wyszło 5 pakietów IP w ciągu 0,01 s i żaden później niż 1 s. Retro-hunt: 0 pakietów od Czujki. Pozostaje: pomiar dotyczy sieci /22 z 9 hostami; tempo na /16 opisuje `docs/WYNIKI.md`.
-3. **IPv6, UDP, tokeny API.** Zakresy CIDR IPv6 są odrzucane, a nazwy domen dają tylko adresy IPv4 (rekordy A). UDP działa bez wykrywania wersji. REST API wymaga sesji i tokenu CSRF; nie ma tokenów API (`docs/API.md`, „API z curl”).
+3. **IPv6, UDP, tokeny API.** Zakresy CIDR IPv6 są odrzucane, a nazwy domen dają tylko adresy IPv4 (rekordy A). UDP działa bez wykrywania wersji. REST API wymaga sesji i tokenu CSRF; nie ma tokenów API (`docs/API.md`, „API with curl”).
 
 ## 1. Wymagania z rozdziału 2 zadania
 

@@ -99,7 +99,7 @@ Pomiary trafności, tempa i czasu startu: [`docs/WYNIKI.md`](docs/WYNIKI.md). Wy
 
 - Zakresy CIDR IPv6 są odrzucane; pojedyncze adresy IPv6 działają. Nazwy domen dają tylko adresy IPv4 (rekordy A).
 - UDP: tylko 7 portów z niegroźnymi zapytaniami (53, 123, 137, 161, 500, 1900, 5353), bez wykrywania wersji.
-- REST API działa z sesją i tokenem CSRF; nie ma tokenów API. Logowanie nie ma drugiego składnika.
+- REST API działa z sesją i tokenem CSRF; nie ma tokenów API. Skrypt loguje się jak przeglądarka: [`docs/API.md`](docs/API.md), „API with curl”. Logowanie nie ma drugiego składnika.
 - Skala jest zmierzona na laboratorium /16 z 70 żywymi hostami. Czas dla większej sieci to ekstrapolacja, nie pomiar.
 
 ## Uruchomienie: szczegóły
