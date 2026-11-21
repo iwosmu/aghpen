@@ -797,7 +797,9 @@ func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 		}
 		rw = newRowWriter(w, kind, format, []string{"id", "run_id", "prev_run_id", "at", "kind", "severity", "ip", "port", "summary", "field", "before",
 			"after", "expected", "acked_by", "acked_at"})
+		lang := reqLang(r)
 		err = s.st.EachChange(ctx, f, func(v *model.Change) error {
+			v.Summary = summaryIn(*v, lang)
 			return rw.write(v, func() []string {
 				prev := ""
 				if v.PrevRunID != nil {
