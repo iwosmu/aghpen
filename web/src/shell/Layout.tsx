@@ -22,11 +22,11 @@ function navItems(): { title: string; items: NavItem[] }[] {
       title: t('Obserwacja', 'Watch'),
       items: [
         { to: '/', label: t('Pulpit', 'Dashboard'), icon: 'dashboard', perms: ['results:read'], end: true },
-        { to: '/runs', label: t('Przebiegi skanów', 'Scan runs'), icon: 'runs', perms: ['scans:read'] },
+        { to: '/runs', label: t('Skany', 'Scans'), icon: 'runs', perms: ['scans:read'] },
         { to: '/hosts', label: t('Hosty', 'Hosts'), icon: 'hosts', perms: ['results:read'] },
         { to: '/services', label: t('Usługi', 'Services'), icon: 'services', perms: ['results:read'] },
         { to: '/changes', label: t('Zmiany', 'Changes'), icon: 'changes', perms: ['results:read'] },
-        { to: '/time', label: t('Wehikuł czasu', 'Time machine'), icon: 'history', perms: ['results:read'] },
+        { to: '/time', label: t('Oś czasu', 'Timeline'), icon: 'history', perms: ['results:read'] },
         { to: '/findings', label: t('Znaleziska', 'Findings'), icon: 'findings', perms: ['results:read'] },
       ],
     },
@@ -37,7 +37,7 @@ function navItems(): { title: string; items: NavItem[] }[] {
         { to: '/rules', label: t('Reguły ekspozycji', 'Exposure rules'), icon: 'shield', perms: ['results:read'] },
         { to: '/targets', label: t('Cele', 'Targets'), icon: 'targets', perms: ['targets:read'] },
         { to: '/profiles', label: t('Profile skanów', 'Scan profiles'), icon: 'profiles', perms: ['scans:read'] },
-        { to: '/transfer', label: t('Import / eksport', 'Import / export'), icon: 'transfer', perms: ['results:create', 'export:run'] },
+        { to: '/transfer', label: t('Import i eksport', 'Import and export'), icon: 'transfer', perms: ['results:create', 'export:run'] },
         { to: '/admin', label: t('Administracja', 'Administration'), icon: 'admin', perms: ['scans:read', 'users:manage', 'roles:manage', 'audit:read'] },
       ],
     },
@@ -169,9 +169,9 @@ function ActiveRunStrip() {
   return (
     <Link to={'/runs/' + run.id} className="hidden min-w-0 items-center gap-2 text-xs text-ink-2 hover:text-ink md:inline-flex">
       <Glyph name="run" tone="accent" pulse size={12} />
-      <span className="truncate">{t('Skan', 'Run')} <span className="num">#{run.id}</span> · {run.profile_name}</span>
+      <span className="truncate">{t('Skan', 'Scan')} <span className="num">#{run.id}</span> · {run.profile_name}</span>
       <span className="num text-ink">{fmtPct(pct)}</span>
-      <span className={cx('num inline-flex items-center gap-1', over ? 'font-medium text-danger' : 'text-ink-3')} title={tip || undefined} data-testid={over ? 'strip-over-cap' : pace ? 'strip-pace' : undefined}>{over ? <Icon name="alert" size={11} /> : null}{pace ? <span className="font-sans text-ink-3">{t('tempo zadane', 'set pace')}</span> : null}{pace ? '≈' : ''}{fmtInt(run.stats.current_pps)}{cap ? <span className="text-ink-3"> / {fmtInt(cap)}</span> : null} pps</span>
+      <span className={cx('num inline-flex items-center gap-1', over ? 'font-medium text-danger' : 'text-ink-3')} title={tip || undefined} data-testid={over ? 'strip-over-cap' : pace ? 'strip-pace' : undefined}>{over ? <Icon name="alert" size={11} /> : null}{pace ? <span className="font-sans text-ink-3">{t('zadane', 'set')}</span> : null}{pace ? '≈' : ''}{fmtInt(run.stats.current_pps)}{cap ? <span className="text-ink-3"> / {fmtInt(cap)}</span> : null} pps</span>
     </Link>
   );
 }
@@ -181,7 +181,7 @@ function EmergencyStop({ policy }: { policy: SafetyPolicy | undefined }) {
   const [open, setOpen] = useState(false);
   const stop = useAction(() => post<SafetyPolicy>('/emergency-stop'), {
     invalidate: ['/settings/safety', '/runs', '/dashboard'], silent: true,
-    success: t('Stop awaryjny włączony. Skany zatrzymane.', 'Emergency stop is on. Scans are stopped.'),
+    success: t('Stop awaryjny włączony.', 'Emergency stop is on.'),
     onSuccess: () => setOpen(false),
   });
   if (!can('safety:stop') || !policy || policy.emergency_stop) return null;
@@ -201,8 +201,8 @@ function EmergencyStop({ policy }: { policy: SafetyPolicy | undefined }) {
         }
       >
         <ul className="list-disc space-y-1.5 pl-4 text-sm text-ink">
-          <li>{t('Wszystkie trwające przebiegi zostaną natychmiast przerwane.', 'Every running scan is cancelled at once.')}</li>
-          <li>{t('Żaden nowy skan nie wystartuje, także z harmonogramu.', 'No new scan starts, scheduled ones included.')}</li>
+          <li>{t('Wszystkie trwające skany zostaną wstrzymane.', 'All running scans pause.')}</li>
+          <li>{t('Nowe skany nie ruszą, także z harmonogramu.', 'No new scan starts, including scheduled ones.')}</li>
           <li>{t('Blokadę zwalnia osoba z uprawnieniem ', 'A person with the permission ')}<span className="mono text-xs">safety:manage</span>{t('.', ' releases the stop.')}</li>
         </ul>
         <p className="mt-3 text-xs text-ink-3">{t('Operacja trafia do dziennika audytu.', 'The action is written to the audit log.')}</p>
@@ -216,21 +216,21 @@ function StopBanner({ policy }: { policy: SafetyPolicy | undefined }) {
   const { can } = useSession();
   const release = useAction(() => post<SafetyPolicy>('/emergency-stop/release'), {
     invalidate: ['/settings/safety', '/runs', '/dashboard'],
-    success: t('Blokada zwolniona. Skany mogą startować.', 'The stop is released. Scans can start.'),
+    success: t('Stop awaryjny wyłączony.', 'Emergency stop is off.'),
   });
   if (!policy?.emergency_stop) return null;
   return (
     <div role="alert" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-danger-solid px-4 py-2 text-sm text-danger-ink sm:px-6" data-testid="stop-banner">
       <span className="flex items-center gap-2 font-medium">
         <Icon name="stop" />
-        {t('Stop awaryjny jest aktywny. Żaden skan nie działa i żaden nie wystartuje.', 'The emergency stop is active. No scan runs and none will start.')}
+        {t('Stop awaryjny jest włączony. Żaden skan nie działa.', 'The emergency stop is on. No scan is running.')}
       </span>
       {can('safety:manage') ? (
         <button type="button" disabled={release.isPending} onClick={() => release.mutate(undefined)} className="inline-flex h-[26px] items-center gap-1.5 border border-white/70 px-2 text-xs font-medium hover:bg-white/15">
-          <Icon name="undo" size={14} />{t('Zwolnij blokadę', 'Release the stop')}
+          <Icon name="undo" size={14} />{t('Wyłącz stop', 'Turn off the stop')}
         </button>
       ) : (
-        <span className="text-xs opacity-90">{t('Blokadę zwalnia administrator.', 'An administrator releases the stop.')}</span>
+        <span className="text-xs opacity-90">{t('Stop wyłącza administrator.', 'An administrator turns the stop off.')}</span>
       )}
     </div>
   );
@@ -250,7 +250,7 @@ function SafetyChip({ policy }: { policy: SafetyPolicy | undefined }) {
   const health = useItem<Health>('/healthz', undefined, { staleTime: 60_000 });
   if (!policy) return null;
   const op = policy.operator_networks ?? [];
-  const title = t('Polityka bezpieczeństwa skanowania', 'Scan safety policy')
+  const title = t('Polityka bezpieczeństwa', 'Safety policy')
     + (op.length ? '. ' + t('Blokada operatora wdrożenia: skanowanie tylko w ' + op.join(', ') + '. Żaden użytkownik, także administrator, nie może jej poszerzyć.', 'Deployment operator lock: scanning only inside ' + op.join(', ') + '. No user, an administrator included, can widen it.') : '');
   return (
     <Link
@@ -259,7 +259,7 @@ function SafetyChip({ policy }: { policy: SafetyPolicy | undefined }) {
     >
       <Icon name="shield" size={14} className="text-st-new" />
       {op.length ? <span className="inline-flex items-center gap-1" data-testid="safety-chip-lock"><Icon name="lock" size={12} className="text-ink-3" /><span className="mono text-ink">{op.length === 1 ? op[0] : op.length + ' ' + t('sieci', 'networks')}</span></span> : null}
-      {health.data && health.data.engine === false ? <span className="text-st-changed">{t('skaner niepodłączony', 'scanner not wired')}</span> : null}
+      {health.data && health.data.engine === false ? <span className="text-st-changed">{t('brak skanera', 'no scanner')}</span> : null}
     </Link>
   );
 }
@@ -327,7 +327,7 @@ export function NoAccess({ children }: { children?: ReactNode }) {
   return (
     <div className="flex flex-col items-start gap-1.5 px-6 py-10">
       <Icon name="lock" className="text-ink-3" size={18} />
-      <p className="text-sm font-medium">{t('Ta strona wymaga uprawnień, których Twoja rola nie ma.', 'This page needs permissions that your role does not have.')}</p>
+      <p className="text-sm font-medium">{t('Twoja rola nie ma dostępu do tej strony.', 'Your role has no access to this page.')}</p>
       {children}
       <Link to="/" className="link text-sm">{t('Wróć na pulpit', 'Back to the dashboard')}</Link>
     </div>

@@ -56,7 +56,7 @@ export function overCap(current: number, cap: number): boolean {
 
 /** What the live rate is: the set nmap pace, or a measurement from exact packet counts. */
 export function paceTip(): string {
-  return t('To tempo zadane nmap (--min-rate/--max-rate) dla etapów, które jeszcze trwają, nie pomiar. Dokładna liczba pakietów przychodzi po zakończeniu etapu.', 'This is the pace set for nmap (--min-rate/--max-rate) in stages still running, not a measurement. The exact packet count arrives when a stage ends.');
+  return t('Tempo zadane dla nmap, bez pomiaru.', 'Rate set for nmap, not measured.');
 }
 
 /** Triggers whose runs see only part of the network (they add facts, they do not show a change of it). */
