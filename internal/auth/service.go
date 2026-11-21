@@ -192,6 +192,7 @@ func (s *Service) Login(ctx context.Context, email, password, ip, userAgent stri
 		return nil, "", err
 	}
 	if u.LockedUntil != nil && u.LockedUntil.After(time.Now()) {
+		VerifyPassword(s.dummy, password) // same work as the other answers
 		return nil, "", ErrLocked
 	}
 	if !VerifyPassword(u.PasswordHash, password) || u.Disabled {
@@ -438,6 +439,16 @@ func (s *Service) SetPasswordByEmail(ctx context.Context, email, password string
 		return err
 	}
 	return s.st.DeleteUserSessions(ctx, u.ID)
+}
+
+// UnlockByEmail clears the lock and the failure counter of an account
+// without changing its password (czujka user unlock).
+func (s *Service) UnlockByEmail(ctx context.Context, email string) error {
+	u, err := s.st.GetUserAuthByEmail(ctx, normEmail(email))
+	if err != nil {
+		return err
+	}
+	return s.st.UnlockUser(ctx, u.ID)
 }
 
 // ---------- role management ----------

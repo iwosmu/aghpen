@@ -89,7 +89,7 @@ Start z kluczem, który nie pasuje do bazy, kończy się czytelnym błędem.
 
 ## Polecenia binarki
 
-`czujka serve`, `czujka migrate`, `czujka user create --email E --role R [--password P] [--reset]`,
+`czujka serve`, `czujka migrate`, `czujka user create --email E --role R [--password P] [--reset]`, `czujka user unlock EMAIL`,
 `czujka rotate-key`, `czujka genkey`, `czujka healthcheck`, `czujka version`.
 Konfiguracja: zmienne `CZUJKA_*`, patrz `deploy/.env.example` i `internal/config`.
 
