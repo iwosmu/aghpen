@@ -126,6 +126,7 @@ function ActiveRun({ initial, d }: { initial: ScanRun; d: Dash }) {
   const live = useLiveRun(initial.id);
   const run = live.run.data ?? initial;
   const map = useItem<RunMap>('/runs/' + run.id + '/map', undefined, { enabled: can('scans:read') });
+  const profile = useItem<ScanProfile>('/profiles/' + run.profile_id, undefined, { enabled: Boolean(run.profile_id) && can('scans:read') });
   const s = run.stats;
   const pct = s.addresses_total ? s.addresses_done / s.addresses_total : 0;
   return (
@@ -150,7 +151,7 @@ function ActiveRun({ initial, d }: { initial: ScanRun; d: Dash }) {
             <div><dt className="text-ink-3">{t('czas', 'elapsed')}</dt><dd className="num text-sm text-ink">{fmtDuration(s.elapsed_sec)}</dd></div>
           </dl>
         </div>
-        <RateGauge current={s.current_pps} cap={Math.min(800, d.safety.max_pps)} policyCap={d.safety.max_pps} />
+        <RateGauge current={s.current_pps} cap={Math.min(profile.data?.rate.max_pps ?? d.safety.max_pps, d.safety.max_pps)} policyCap={d.safety.max_pps} />
         <div className="min-w-[150px] max-w-[320px]">
           {map.data ? <AddressMap blocks={map.data.blocks} compact /> : <div className="skeleton h-[104px] w-[220px]" />}
         </div>

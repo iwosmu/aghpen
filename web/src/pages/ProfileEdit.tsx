@@ -34,7 +34,7 @@ export function EstimateBox({ profileId, stale }: { profileId: number; stale?: b
             ? windowsSet ? t('Okno czasowe jest teraz zamknięte. Skan potrwa około ', 'The time window is closed now. A scan takes about ') : t('Profil nie ma okna czasowego. Skan potrwa około ', 'The profile has no time window. A scan takes about ')
             : e.fits_window ? t('Skan mieści się w oknie: około ', 'The scan fits the window: about ') : t('Skan nie mieści się w jednym oknie: około ', 'The scan does not fit one window: about ')}
           <span className="num font-medium">{fmtDuration(e.est_duration_sec)}</span>
-          {hasWindow ? <>{t(' z ', ' of ')}<span className="num">{fmtDuration(e.window_sec)}</span>{t(' okna', ' window')}</> : null}.
+          {hasWindow ? <>{t('\u00a0z\u00a0', '\u00a0of\u00a0')}<span className="num">{fmtDuration(e.window_sec)}</span>{t('\u00a0okna', '\u00a0window')}</> : null}.
           {hasWindow && !e.fits_window ? ' ' + t('Zostanie wstrzymany na końcu okna i dokończony w następnym.', 'It is paused at the end of the window and finished in the next one.') : ''}
         </span>
       </div>
