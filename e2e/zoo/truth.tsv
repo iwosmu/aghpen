@@ -20,7 +20,7 @@
 02-observability	39100	tcp	monitoring	prom/node-exporter:v1.13.1	http	[Nn]ode.?[Ee]xporter|Prometheus exporter	1.13.1				class:dev-tool,Eksporter Prometheus	http/
 02-observability	9091	tcp	monitoring	prom/pushgateway:v1.11.5	http	Pushgateway	1.11.5				class:dev-tool,Eksporter Prometheus|Prometheus exporter	http/
 02-observability	29999	tcp	monitoring	netdata/netdata:v2.13.0	http	^Netdata$	2.13				class:dev-tool	http/
-02-observability	3001	tcp	monitoring	louislam/uptime-kuma:2.5.12	http	^Uptime Kuma$			install-page		class:dev-tool	http/
+02-observability	3001	tcp	monitoring	louislam/uptime-kuma:2.5.12	http	^Uptime Kuma$			install-page		class:dev-tool,class:admin-panel	http/
 02-observability	30080	tcp	monitoring	jasonrivers/nagios:4.5.12	http	^Nagios		Apache	login		class:admin-panel	http/
 03-devtools	8080	tcp	panel	keycloak/keycloak:26.8.2	http	^Keycloak$			admin-panel		class:login	http/
 03-devtools	8200	tcp	panel	hashicorp/vault:2.2.2	http	Vault	2.2.2				class:login	http/v1/sys/health
@@ -55,9 +55,9 @@
 06-db	39092	tcp	database	apache/kafka:4.4.0	kafka|unknown	Kafka			database			tcp
 06-db	4222	tcp	database	nats:2.15.3	nats|unknown	^NATS	2.15.3		database			tcp
 06-db	48222	tcp	database	nats:2.15.3	http	^NATS	2.15.3					http/varz
-06-db	2379	tcp	database	quay.io/coreos/etcd:v3.6.17	http|etcd	^etcd$	3.6.17		database			http/version
+06-db	2379	tcp	database	quay.io/coreos/etcd:v3.6.17	http|etcd	^etcd$	3.6.17		database		class:error-page	http/version
 06-db	8123	tcp	database	clickhouse:26.9.27.3	http	^ClickHouse$	26.9		database			http/ping
-06-db	19000	tcp	database	clickhouse:26.9.27.3	clickhouse|unknown	^ClickHouse$			database			tcp
+06-db	19000	tcp	database	clickhouse:26.9.27.3	clickhouse|unknown	^ClickHouse$			database		class:error-page	tcp
 06-db	7474	tcp	database	neo4j:5.26.33-community	http	^Neo4j$	5.26.33		database			http/
 06-db	47687	tcp	database	neo4j:5.26.33-community	bolt|neo4j|unknown	^Neo4j$			database			tcp
 07-remote	42222	tcp	remote	linuxserver/openssh-server:10.3_p1-r2-ls243	ssh	^OpenSSH$	10.3		remote-access			tcp
@@ -73,13 +73,13 @@
 07-remote	389	tcp	remote	osixia/openldap:1.5.0	ldap	OpenLDAP					class:database	tcp
 07-remote	53	tcp	remote	coredns/coredns:1.15.0	domain	CoreDNS	1.15.0					tcp
 07-remote	53	udp	remote	coredns/coredns:1.15.0	domain	CoreDNS	1.15.0					-
-08-proxies	8404	tcp	proxy	haproxy:3.0.31-alpine	http	^HAProxy$	3.0.31		admin-panel			http/stats
-08-proxies	18888	tcp	proxy	haproxy:3.0.31-alpine -> httpd:2.4.71-alpine	http	^Apache	2.4.71		default-page			http/
-08-proxies	9901	tcp	proxy	envoyproxy/envoy:v1.39.6	http	^Envoy$	1.39.6		unauth-control-api			http/ready
+08-proxies	8404	tcp	proxy	haproxy:3.0.31-alpine	http	^HAProxy$	3.0.31		admin-panel		class:error-page	http/stats
+08-proxies	18888	tcp	proxy	haproxy:3.0.31-alpine -> httpd:2.4.71-alpine	http	^Apache	2.4.71		default-page		tech:HAProxy	http/
+08-proxies	9901	tcp	proxy	envoyproxy/envoy:v1.39.6	http	^Envoy$	1.39.6		unauth-control-api		class:admin-panel	http/ready
 08-proxies	10000	tcp	proxy	envoyproxy/envoy:v1.39.6 -> httpd:2.4.71-alpine	http	^Envoy$		Apache	default-page			http/
 08-proxies	3128	tcp	proxy	ubuntu/squid:6.6-24.04_beta	http-proxy|http	^Squid$	6.6					tcp
 08-proxies	36081	tcp	proxy	varnish:9.1.0 -> httpd:2.4.71-alpine	http	^Varnish$	9.1	Apache	default-page			http/
-09-heavy	48081	tcp	panel	sonatype/nexus3:3.98.3	http	^Nexus	3.98.3					http/
+09-heavy	48081	tcp	panel	sonatype/nexus3:3.98.3	http	Nexus	3.98.3				class:dev-tool	http/
 10-sonarqube	9000	tcp	panel	sonarqube:26.11.0.134175-community	http	^SonarQube$	26.11		login			http/api/system/status
 # Held-out set (batches held-*): truth written before any scan; never looked at during tuning.
 held-1	23000	tcp	cms	requarks/wiki:3.5.0	http	Wiki\.js			install-page			http/

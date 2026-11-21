@@ -219,3 +219,19 @@ func TestZooTrainers(t *testing.T) {
 	check(t, eng, bw, want{"bwapp-installer", "bWAPP", "", model.ClassInstallPage})
 	check(t, eng, bw, want{"bwapp", "bWAPP", "", model.ClassStaging})
 }
+
+func TestZooEnvoyAdmin(t *testing.T) {
+	eng, err := sig.NewBuiltinEngine()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// envoyproxy/envoy:v1.39.6, admin listener on 9901: the root page lists the admin endpoints.
+	svc := httpSvc(9901, "", "", zooPage(t, 200, "envoy-1.39-admin.html", "Envoy Admin", "http://localhost:9901/"))
+	svc.HTTP.Server = "envoy"
+	svc.HTTP.Headers = map[string][]string{"Server": {"envoy"}}
+	check(t, eng, svc, want{"envoy-admin", "Envoy", "", model.ClassUnauthControlAPI})
+	// The proxied listener of the same Envoy is not the admin interface.
+	front := httpSvc(10000, "", "", &model.HTTPFingerprint{Scheme: "http", Status: 200, Title: "It works! Apache httpd", Server: "envoy",
+		Headers: map[string][]string{"Server": {"envoy"}}, BodyExcerpt: "<html><body><p>It works!</p></body></html>", URL: "http://localhost:10000/", FinalURL: "http://localhost:10000/"})
+	noMatch(t, eng, front, "envoy-admin")
+}
