@@ -14,7 +14,8 @@ services:
   # database starts, so the stack needs no .env and the repository holds no
   # password. Order: CZUJKA_DB_PASSWORD from .env when set; else the password
   # already in the volume; else a new random one. A database volume created
-  # before this service existed keeps the password it was created with.
+  # before this service existed had a fixed password: it gets a new random one
+  # too, and czujka moves the database role to it (db_password_legacy).
   secrets:
     image: alpine:3.22
     restart: "no"
@@ -36,8 +37,14 @@ services:
         elif [ -s "$$f" ]; then
           echo "secrets: database password kept"
         elif [ -f /pgdata/PG_VERSION ]; then
-          printf '%s\n' czujka-internal-network-only > "$$f"
-          echo "secrets: existing database from an older version: its password is kept"
+          # A database from an older version still has the old fixed password. It goes to
+          # db_password_legacy; db_password gets a new random one, and czujka moves the
+          # database role to it at its first connection (security review L5).
+          printf '%s\n' czujka-internal-network-only > "$$f"_legacy
+          chmod 0444 "$$f"_legacy
+          head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$$f"
+          echo >> "$$f"
+          echo "secrets: existing database from an older version: czujka moves it to a new generated password"
         else
           head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$$f"
           echo >> "$$f"

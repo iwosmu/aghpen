@@ -100,10 +100,10 @@ export default function Signatures() {
     ) },
     { id: 'slug', header: 'ID', hide: 'xl', cell: (s) => <span className="mono text-xs text-ink-2">{s.slug}</span> },
     { id: 'cat', header: t('Kategoria', 'Category'), sort: 'category', cell: (s) => <span className="text-ink-2">{categoryLabel(s.category)}</span> },
-    { id: 'tags', header: t('Tagi', 'Tags'), hide: 'lg', cell: (s) => <Tags tags={s.tags} max={3} /> },
+    { id: 'tags', header: t('Tagi', 'Tags'), hide: '2xl', cell: (s) => <Tags tags={s.tags} max={3} /> },
     { id: 'src', header: t('Źródło', 'Source'), hide: 'md', cell: (s) => s.builtin ? <span className="text-ink-3">{t('wbudowana', 'built-in')}</span> : <span>{t('własna', 'custom')} <span className="text-xs text-ink-3">{s.author.split('@')[0]}</span></span> },
     { id: 'matches', header: t('Dopasowania', 'Matches'), sort: 'match_count', align: 'right', cell: (s) => s.match_count ? <span className="num">{fmtInt(s.match_count)}</span> : <span className="num text-ink-3">0</span> },
-    { id: 'upd', header: t('Zmieniona', 'Updated'), hide: 'xl', cell: (s) => <span className="num text-ink-2">{fmtRelative(s.updated_at)}</span> },
+    { id: 'upd', header: t('Zmieniona', 'Updated'), hide: '2xl', cell: (s) => <span className="num text-ink-2">{fmtRelative(s.updated_at)}</span> },
   ];
   return (
     <div>

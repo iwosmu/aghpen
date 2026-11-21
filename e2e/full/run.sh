@@ -176,9 +176,7 @@ step "2. Start the product with compose (Czujka joins $NET through deploy/docker
 $DC down -v --remove-orphans >/dev/null 2>&1 || true
 if [ "${E2E_SKIP_BUILD:-0}" = 1 ]; then $DC up -d --wait 2>&1 | grep -E "Healthy|rror" || true
 else $DC up -d --build --wait 2>&1 | grep -E "Healthy|rror" || true; fi
-HZ=$(curl -sS $BASE/healthz)
-echo "$HZ" | jq -c '{status, tde, engine, probe}'
-check "healthz: engine and prober" "$(echo "$HZ" | jq -r '"engine=\(.engine) mode=\(.probe.mode)"')" "engine=true mode=nmap-raw"
+check "healthz without a session: status and version only" "$(curl -sS $BASE/healthz | jq -r 'keys | join(",")')" "status,version"
 check "process user in the container" "$(docker exec $CZ id -u)" "10001"
 check "web UI served by the binary on the same port" "$(curl -sS $BASE/ | grep -c '<div id="root">')" "1"
 LABIF=$(labif)
@@ -189,6 +187,9 @@ step "3. Log in"
 LOGIN=$(curl -sS -c "$JAR" -H "Content-Type: application/json" -d "{\"email\":\"$ADMIN\",\"password\":\"$ADMIN_PW\"}" $API/auth/login)
 CSRF=$(echo "$LOGIN" | jq -r .csrf_token)
 check "login" "$(echo "$LOGIN" | jq -r .user.role_slug)" "admin"
+HZ=$(curl -sS -b "$JAR" $BASE/healthz)
+echo "$HZ" | jq -c '{status, tde, engine, probe}'
+check "healthz: engine and prober" "$(echo "$HZ" | jq -r '"engine=\(.engine) mode=\(.probe.mode)"')" "engine=true mode=nmap-raw"
 
 step "4. Safety policy: never touch Czujka's own address or the network gateway"
 # The gateway is the docker host side of the network, not a lab host: excluded too.

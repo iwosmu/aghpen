@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/iwosmu/aghpen/internal/auth"
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/runner"
 	"github.com/iwosmu/aghpen/internal/targets"
@@ -517,6 +518,25 @@ func (s *Server) testDojo(w http.ResponseWriter, r *http.Request) {
 func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
+	// Without a session only status and version (security review L6): the
+	// port is reachable from the scanned network, and the key id, the
+	// gateway and the prober are nobody else's business. The root /healthz
+	// has no session middleware, so the cookie is checked here.
+	p := principal(r)
+	if p == nil {
+		if c, err := r.Cookie(auth.CookieName); err == nil && c.Value != "" && s.d.Auth != nil {
+			p, _ = s.d.Auth.AuthenticateToken(ctx, c.Value)
+		}
+	}
+	if p == nil {
+		out := map[string]any{"status": "ok", "version": s.d.Version}
+		code := http.StatusOK
+		if err := s.st.Ping(ctx); err != nil {
+			out["status"], code = "error", http.StatusServiceUnavailable
+		}
+		writeJSON(w, code, out)
+		return
+	}
 	out := map[string]any{"status": "ok", "version": s.d.Version, "db": "ok", "tde": false}
 	if err := s.st.Ping(ctx); err != nil {
 		out["status"], out["db"] = "error", "unreachable"

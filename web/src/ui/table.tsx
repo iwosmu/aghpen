@@ -13,11 +13,11 @@ export interface Col<T> {
   align?: 'right';
   sort?: string;
   /** hide the column under this breakpoint */
-  hide?: 'md' | 'lg' | 'xl';
+  hide?: 'md' | 'lg' | 'xl' | '2xl';
   wrap?: boolean;
 }
 
-const HIDE = { md: 'hidden md:table-cell', lg: 'hidden lg:table-cell', xl: 'hidden xl:table-cell' };
+const HIDE = { md: 'hidden md:table-cell', lg: 'hidden lg:table-cell', xl: 'hidden xl:table-cell', '2xl': 'hidden 2xl:table-cell' };
 
 export function useIsNarrow(px = 640): boolean {
   const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: ' + (px - 1) + 'px)').matches);

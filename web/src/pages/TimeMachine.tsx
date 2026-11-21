@@ -87,9 +87,9 @@ function Scrubber({ runs, index, onIndex }: { runs: RunPoint[]; index: number; o
 function Count({ label, value, now, tone }: { label: string; value: number; now?: number; tone?: string }) {
   const d = now === undefined ? 0 : now - value;
   return (
-    <div className="min-w-0 border-l border-rule pl-3 [&:nth-child(3n+1)]:border-l-0 [&:nth-child(3n+1)]:pl-0">
-      <dt className="text-xs text-ink-3">{label}</dt>
-      <dd className={cx('num text-xl', tone)}>{fmtInt(value)}{d ? <span className="ml-1.5 text-xs text-ink-3" title={t('zmiana do dziś', 'change to today')}>{d > 0 ? '+' : ''}{fmtInt(d)} {t('dziś', 'today')}</span> : null}</dd>
+    <div className="flex min-w-0 flex-col-reverse">
+      <dt className="mt-1.5 text-xs text-ink-3">{label}{d ? <span className="num ml-1.5 text-ink-2" title={t('zmiana do dziś', 'change to today')}>{d > 0 ? '+' : ''}{fmtInt(d)} {t('dziś', 'today')}</span> : null}</dt>
+      <dd className={cx('font-display text-[40px] leading-none tracking-[-0.01em] text-ink sm:text-[48px]', tone)}>{fmtInt(value)}</dd>
     </div>
   );
 }
@@ -281,29 +281,27 @@ export default function TimeMachine() {
           actions={<span className="num text-ink-3">{cur + 1} / {runs.length}{snap.data ? ' · ' + snap.data.took_ms + ' ms' : ''}</span>}>
           <Scrubber runs={runs} index={cur} onIndex={setIndex} />
         </Panel>
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-          <Panel title={t('Stan w tamtej chwili', 'Status at that moment')}>
-            {snap.error ? <ErrorState error={snap.error} retry={() => snap.refetch()} /> : !s ? <SkeletonRows rows={4} /> : (
-              <div className={cx(snap.isFetching && 'opacity-70 transition-opacity')} data-testid="tm-summary">
-                <dl className="grid grid-cols-3 gap-y-3">
-                  <Count label={t('Aktywne hosty', 'Hosts up')} value={s.hosts_up} now={latest.hosts_up} />
-                  <Count label={t('Nie odpowiadają', 'Not responding')} value={s.hosts_missing} now={latest.hosts_missing} />
-                  <Count label={t('Nieaktywne hosty', 'Hosts down')} value={s.hosts_down} now={latest.hosts_down} />
-                  <Count label={t('Otwarte usługi', 'Open services')} value={s.services_open} now={latest.services_open} />
-                  <Count label={t('Nieznane usługi', 'Unknown services')} value={s.services_unknown} now={latest.services_unknown} />
-                  <Count label={t('Otwarte znaleziska', 'Open findings')} value={s.findings_open} now={latest.findings_open} />
-                </dl>
-                <div className="mt-4 border-t border-rule pt-3">
-                  <p className="label mb-1.5">{t('Od tamtej chwili do dziś', 'From then to today')}</p>
-                  {(s.diff_to_now?.sentences ?? []).length ? (
-                    <ul className="space-y-1 text-sm" data-testid="tm-sentences">{(s.diff_to_now.sentences ?? []).map((x, i) => <li key={i} className="flex gap-2"><span className="mt-2 h-1 w-1 flex-none bg-ink-3" />{x}</li>)}</ul>
-                  ) : <p className="text-sm text-ink-2">{run.run_id === latest.run_id ? t('To najnowszy skan.', 'This is the latest scan.') : t('Brak zmian od tamtej chwili.', 'No changes since then.')}</p>}
-                </div>
+        <Panel title={t('Stan w tamtej chwili', 'Status at that moment')}>
+          {snap.error ? <ErrorState error={snap.error} retry={() => snap.refetch()} /> : !s ? <SkeletonRows rows={4} /> : (
+            <div className={cx('grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]', snap.isFetching && 'opacity-70 transition-opacity')} data-testid="tm-summary">
+              <dl className="grid grid-cols-3 gap-x-4 gap-y-6">
+                <Count label={t('Aktywne hosty', 'Hosts up')} value={s.hosts_up} now={latest.hosts_up} />
+                <Count label={t('Nie odpowiadają', 'Not responding')} value={s.hosts_missing} now={latest.hosts_missing} />
+                <Count label={t('Nieaktywne hosty', 'Hosts down')} value={s.hosts_down} now={latest.hosts_down} />
+                <Count label={t('Otwarte usługi', 'Open services')} value={s.services_open} now={latest.services_open} />
+                <Count label={t('Nieznane usługi', 'Unknown services')} value={s.services_unknown} now={latest.services_unknown} />
+                <Count label={t('Otwarte znaleziska', 'Open findings')} value={s.findings_open} now={latest.findings_open} />
+              </dl>
+              <div className="border-t border-rule pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                <p className="label mb-2">{t('Od tamtej chwili do dziś', 'From then to today')}</p>
+                {(s.diff_to_now?.sentences ?? []).length ? (
+                  <ul className="space-y-2 text-base text-ink" data-testid="tm-sentences">{(s.diff_to_now.sentences ?? []).map((x, i) => <li key={i} className="flex gap-2.5"><span className="mt-[11px] h-1 w-1 flex-none bg-ink-3" />{x}</li>)}</ul>
+                ) : <p className="text-base text-ink-2">{run.run_id === latest.run_id ? t('To najnowszy skan.', 'This is the latest scan.') : t('Brak zmian od tamtej chwili.', 'No changes since then.')}</p>}
               </div>
-            )}
-          </Panel>
-          {runId ? <MapPanel runId={runId} frameRunId={frameRun?.id} /> : null}
-        </div>
+            </div>
+          )}
+        </Panel>
+        {runId ? <MapPanel runId={runId} frameRunId={frameRun?.id} /> : null}
         {runId ? <SnapshotLists runId={runId} /> : null}
       </div>
     </div>
