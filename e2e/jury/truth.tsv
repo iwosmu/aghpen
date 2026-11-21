@@ -31,7 +31,7 @@ proxy	8085	open	-		WordPress latest behind Traefik and Toxiproxy, installer not 
 proxy	8085	tech	WordPress@7.1.5
 proxy	8085	sig	wordpress-installer
 proxy	8086	open	-		Traefik v3.1 dashboard and API with api.insecure=true
-proxy	8086	tech	Traefik
+proxy	8086	tech	Traefik	engine	same cause as the row below: the HTTPS answer is a 404 everywhere
 proxy	8086	sig	traefik-api-insecure	engine	the port also answers TLS (Traefik default cert, every path 404); the collector tries only HTTPS
 proxy	8474	open	-		Toxiproxy 2.12.0 control API, no authentication
 proxy	8474	tech	Toxiproxy@2.12.0

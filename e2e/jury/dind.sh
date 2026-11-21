@@ -30,7 +30,8 @@ docker rm -f -v "$N" >/dev/null 2>&1 || true
 docker run -d --name "$N" --privileged -e DOCKER_TLS_CERTDIR= -p "127.0.0.1:$UI:18080" docker:28-dind >/dev/null || exit 1
 for i in $(seq 1 60); do inner 'docker info >/dev/null 2>&1' && break; sleep 1; done
 inner 'apk add -q --no-cache bash curl jq >/dev/null' || exit 1
-tar -c deploy lab/jury e2e/jury | docker exec -i "$N" sh -c 'mkdir -p /work && tar -x -C /work'
+# COPYFILE_DISABLE and the exclude keep macOS AppleDouble files (._*) out: Traefik's file provider fails on them.
+COPYFILE_DISABLE=1 tar --exclude='._*' -c deploy lab/jury e2e/jury | docker exec -i "$N" sh -c 'mkdir -p /work && tar -x -C /work'
 
 log "copying images into the jury machine"
 docker save "czujka:$TAG" czujka-db:17 | docker exec -i "$N" docker load -q
@@ -46,7 +47,7 @@ inner "cd /work && CZUJKA_VERSION=$TAG CZUJKA_BIND=0.0.0.0 CZUJKA_PORT=18080 CZU
   docker compose -p czujka -f deploy/docker-compose.yml up -d --no-build --wait 2>&1 | tail -2" || exit 1
 log "Czujka UI: http://127.0.0.1:$UI (admin@czujka.local; the password is printed only to this terminal: $PW)"
 
-docker exec -e CZ_URL=http://127.0.0.1:18080 -e CZ_PASSWORD="$PW" -e JURY_TARGET=host.docker.internal -e JURY_ONLY="${JURY_ONLY:-}" "$N" \
+docker exec -e CZ_URL=http://127.0.0.1:18080 -e CZ_PASSWORD="$PW" -e JURY_TARGET="${JURY_TARGET:-localhost}" -e JURY_GUARD=0 -e JURY_ONLY="${JURY_ONLY:-}" "$N" \
   bash -c 'cd /work && [ -n "$JURY_ONLY" ] || unset JURY_ONLY; bash e2e/jury/run.sh' 2>&1 | sed "s/$PW/<hasło>/g" | tee "$OUT"
 RC=${PIPESTATUS[0]}
 log "transcript: $OUT (exit $RC)"

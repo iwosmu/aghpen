@@ -18,6 +18,12 @@ ROOT=$PWD; J=$ROOT/lab/jury; E=$ROOT/e2e/jury
 CZ_URL=${CZ_URL:-http://127.0.0.1:8080}; API=$CZ_URL/api/v1
 EMAIL=${CZ_EMAIL:-admin@czujka.local}; PW=${CZ_PASSWORD:?set CZ_PASSWORD}
 TARGET=${JURY_TARGET:-host.docker.internal}
+# JURY_GUARD=1 (default) sets the safety policy's allowed_ports to the template ports: a hard guard for any docker host.
+# dind.sh sets 0: there the operator lock (CZUJKA_ALLOWED_NETWORKS) confines every scan to the throwaway jury machine,
+# and the juror flow (the default profile) must scan its real port list.
+GUARD=${JURY_GUARD:-1}
+# Template ports that the default profile (top-1000 + infrastructure ports) does not cover; measured with nmap 7.97.
+DEFAULT_MISSES=" 2223 5673 8474 8787 15432 15673 21000 21010 "
 PORTS=21,80,81,443,2223,3001,5673,6379,8080,8081,8085,8086,8088,8089,8090,8474,8787,8888,15432,15673,21000-21010
 ONLY=${JURY_ONLY:-quickstart custom-network modern version vulnerable proxy}
 JAR=$(mktemp); CSRF=
@@ -46,10 +52,9 @@ file_of() { case $1 in modern) echo docker-compose-modern.yml ;; proxy) echo doc
 compose() { # stack [env] -- args...
   local st=$1 envf=$E/env/proxy-base.env; shift
   if [ "${1:-}" != "--" ]; then envf=$E/env/$1.env; shift; fi; shift
-  local plat=
-  # mysql:5.7 and DVWA have amd64 images only.
-  if [ "$st" = vulnerable ]; then case $(uname -m) in arm64|aarch64) plat=linux/amd64 ;; esac; fi
-  ( cd "$J" && DOCKER_DEFAULT_PLATFORM=$plat docker compose --env-file "$envf" -f "$(file_of "$st")" "$@" )
+  # mysql:5.7, DVWA, vsftpd and wordpress:4.7 have amd64 images only. On an arm64 host pull them first with
+  # --platform linux/amd64 (dind.sh copies them in); compose then runs the local image under emulation.
+  ( cd "$J" && docker compose --env-file "$envf" -f "$(file_of "$st")" "$@" )
 }
 all_down() { for s in modern proxy vulnerable custom-network; do compose $s -- down -v --remove-orphans >/dev/null 2>&1; done
   ( cd "$J" && docker compose -f "$E/compose/docker-compose-modern-redis6.yml" down -v --remove-orphans >/dev/null 2>&1 ); }
@@ -77,8 +82,12 @@ READY_quick=("3001/ 15673/ 8787/" "5673 2223")
 setup() {
   CSRF=$(curl -sS -c "$JAR" -H "Content-Type: application/json" -d "$(jq -nc --arg e "$EMAIL" --arg p "$PW" '{email:$e,password:$p}')" "$API/auth/login" | jq -r .csrf_token)
   [ -n "$CSRF" ] && [ "$CSRF" != null ] || { echo "login failed at $API"; exit 2; }
-  api GET /settings/safety | jq -c --arg p "$PORTS" '.allowed_ports = $p' > "$JAR.pol"
-  api PUT /settings/safety "$(cat "$JAR.pol")" | jq -c '{allowed_ports, max_pps, operator_networks}'
+  if [ "$GUARD" = 1 ]; then
+    api GET /settings/safety | jq -c --arg p "$PORTS" '.allowed_ports = $p' > "$JAR.pol"
+    api PUT /settings/safety "$(cat "$JAR.pol")" | jq -c '{allowed_ports, max_pps, operator_networks}'
+  else
+    api GET /settings/safety | jq -c '{allowed_ports, max_pps, operator_networks}'
+  fi
   SCOPE=$(api GET "/scopes?limit=100" | jq -r '[.items[] | select(.name == "Szablon jury (e2e)")][0].id // empty')
   if [ -z "$SCOPE" ]; then
     SCOPE=$(api POST /scopes '{"name":"Szablon jury (e2e)","criticality":3}' | jq -r .id)
@@ -90,12 +99,21 @@ setup() {
       'del(.id, .created_at, .updated_at, .next_run_at, .last_run_id) | .name = "Szablon jury (e2e): porty szablonu" | .scope_ids = [$s] | .ports = $p | .udp = {enabled: false, ports: ""} | .schedule.enabled = false' \
       | { read -r body; api POST /profiles "$body"; } | jq -r .id)
   fi
-  log "Czujka $CZ_URL: scope $SCOPE (target $TARGET), profile $PROF (ports $PORTS)"
+  DEFPROF=
+  if [ "$GUARD" = 0 ]; then
+    DEFPROF=$(api GET "/profiles?limit=100" | jq -r '[.items[] | select(.name == "Szablon jury (e2e): profil domyślny")][0].id // empty')
+    if [ -z "$DEFPROF" ]; then
+      DEFPROF=$(api GET "/profiles?limit=100" | jq -c '[.items[] | select(.name | startswith("Domyślny"))][0]' | jq -c --argjson s "$SCOPE" \
+        'del(.id, .created_at, .updated_at, .next_run_at, .last_run_id) | .name = "Szablon jury (e2e): profil domyślny" | .scope_ids = [$s] | .schedule.enabled = false' \
+        | { read -r body; api POST /profiles "$body"; } | jq -r .id)
+    fi
+  fi
+  log "Czujka $CZ_URL: scope $SCOPE (target $TARGET), profile $PROF (ports $PORTS), default profile ${DEFPROF:-skipped (guard on)}"
 }
-scan() { # label -> sets RUN, SV, FN, CH
-  local t0 st
+scan() { # label [profile] -> sets RUN, SV, FN, CH
+  local t0 st p=${2:-$PROF}
   t0=$(date +%s)
-  RUN=$(api POST /runs "{\"profile_id\":$PROF}" | jq -r .id)
+  RUN=$(api POST /runs "{\"profile_id\":$p}" | jq -r .id)
   while :; do st=$(api GET "/runs/$RUN" | jq -r .status); case $st in completed|failed|cancelled) break ;; esac; sleep 3; done
   local r; r=$(api GET "/runs/$RUN")
   log "$1: run $RUN $st in $(( $(date +%s) - t0 )) s: $(echo "$r" | jq -c '{hosts: .stats.hosts_up, services: .stats.services_open, packets: .stats.packets_sent, warnings: (.warnings // [] | length)}')"
@@ -125,16 +143,29 @@ check_row() { # stack port check value owner
   esac
   row "$st" "$port" "$ck" "$val" "$owner" "$ok" "${det:0:110}"
 }
+juror() { # stack: what a juror sees with the default profile on target $TARGET
+  JUROR_RUN=
+  [ -n "$DEFPROF" ] || return 0
+  scan "$1 with the default profile" "$DEFPROF"
+  JUROR_RUN=$RUN
+  local port owner s
+  for port in $(grep -v '^#' "$E/truth.tsv" | awk -F'\t' -v s="$1" '$1 == s && $3 == "open" {print $2}'); do
+    owner=; [[ "$DEFAULT_MISSES" == *" $port "* ]] && owner=engine
+    s=$(svc "$port")
+    if [ "$(echo "$s" | jq -r '.state // ""')" = open ]; then row "juror:$1" "$port" open "found with the default profile" "$owner" 1 "$(echo "$s" | jq -r '[.name, .product, .version] | map(select(. != null and . != "")) | join(" ")')"
+    else row "juror:$1" "$port" open "found with the default profile" "$owner" 0 "not in run $RUN${owner:+, port outside the default port list}"; fi
+  done
+}
 truth() { # stack
-  while IFS=$'\t' read -r st port ck val owner note; do
-    [ "$st" = "$1" ] || continue
+  # awk keeps empty columns (read with a tab IFS would merge them); \x1f is not whitespace.
+  while IFS=$'\x1f' read -r st port ck val owner; do
     check_row "$st" "$port" "$ck" "$val" "$owner"
-  done < <(grep -v '^#' "$E/truth.tsv")
+  done < <(awk -F'\t' -v s="$1" '!/^#/ && $1 == s {printf "%s\x1f%s\x1f%s\x1f%s\x1f%s\n", $1, $2, $3, $4, $5}' "$E/truth.tsv")
 }
 change_row() { # label port kinds-regex text-regex owner
   local c
-  c=$(echo "$CH" | jq -r --argjson p "$2" --arg k "$3" --arg t "$4" '[.items[] | select(.port == $p and ((.kind | test($k)) or ($t != "" and (.summary | test($t; "i")))))][0] | if . == null then "" else .kind + ": " + .summary end')
-  local all; all=$(echo "$CH" | jq -r --argjson p "$2" '[.items[] | select(.port == $p) | .kind] | unique | join(",")')
+  c=$(echo "$CH" | jq -r --argjson p "$2" --arg k "$3" --arg t "$4" '[.items[] | select(.port == $p and ((.kind | test($k)) or ($t != "" and (.summary | test($t; "i")))))][0] | if . == null then "" else "run \(.run_id) \(.kind): \(.summary)" end')
+  local all; all=$(echo "$CH" | jq -r --argjson p "$2" '[.items[] | select(.port == $p) | "\(.kind)@run\(.run_id)"] | unique | join(",")')
   if [ -n "$c" ]; then row scenario "$2" change "$1" "$5" 1 "${c:0:110}"; else row scenario "$2" change "$1" "$5" 0 "changes on this port in run $RUN: ${all:-none}"; fi
 }
 open_row() { # label port owner
@@ -142,6 +173,7 @@ open_row() { # label port owner
   if [ "$(echo "$s" | jq -r '.state // ""')" = open ]; then row scenario "$2" open "$1" "$3" 1 "open"; else row scenario "$2" open "$1" "$3" 0 "state=$(echo "$s" | jq -r '.state // "none"')"; fi
 }
 rt_of() { local id; id=$(svc "$1" | jq -r '.id // empty'); [ -n "$id" ] && api GET "/services/$id" | jq -r '.latest.result.http.response_ms // empty'; }
+status_of() { local id; id=$(svc "$1" | jq -r '.id // empty'); [ -n "$id" ] && api GET "/services/$id" | jq -r '.latest.result.http.status // empty'; }
 
 # ---------- run ----------
 echo "=== Czujka on the organisers' template (lab/jury), $(date '+%Y-%m-%d %H:%M %Z') ==="
@@ -152,21 +184,22 @@ want() { [[ " $ONLY " == *" $1 "* ]]; }
 
 if want quickstart; then
   echo; echo "=== Quickstart: the service on 8787 disappears and comes back (lab/jury/quickstart.sh) ==="
-  ( cd "$J" && bash quickstart.sh up >/dev/null ) && wait_ready quickstart "${READY_quick[0]}" "${READY_quick[1]}"
+  ( cd "$J" && bash quickstart.sh up >/dev/null 2>&1 ) && wait_ready quickstart "${READY_quick[0]}" "${READY_quick[1]}"
   scan "quickstart up"; for p in 2223 3001 5673 8787 15673; do open_row "quickstart: open after up" $p ""; done
-  ( cd "$J" && bash quickstart.sh change >/dev/null ); sleep 2
+  ( cd "$J" && bash quickstart.sh change >/dev/null 2>&1 ); sleep 2
   scan "quickstart change"
   change_row "quickstart: 8787 gone after change" 8787 '^service_gone$' '' ""
   for p in 2223 3001 5673 15673; do open_row "quickstart: still open after change" $p ""; done
-  ( cd "$J" && bash quickstart.sh up >/dev/null ) && wait_ready quickstart "${READY_quick[0]}" "${READY_quick[1]}"
+  ( cd "$J" && bash quickstart.sh up >/dev/null 2>&1 ) && wait_ready quickstart "${READY_quick[0]}" "${READY_quick[1]}"
   scan "quickstart up again"
   open_row "quickstart: 8787 open again" 8787 ""
-  change_row "quickstart: 8787 reported as back" 8787 '^service_(back|returned|restored)$' 'wróci' integrator
+  change_row "quickstart: 8787 reported as back" 8787 '^service_returned$' 'wróci' ""
 fi
 
 if want custom-network; then
   echo; echo "=== custom-network: httpbin, PostgreSQL, RabbitMQ, Gitea, nginx ==="
   compose custom-network -- up -d >/dev/null 2>&1; wait_ready custom-network "${READY_custom[0]}" "${READY_custom[1]}"
+  juror custom-network
   scan custom-network; truth custom-network
 fi
 
@@ -174,8 +207,11 @@ if want modern; then
   echo; echo "=== modern: WordPress, phpMyAdmin, Redis, Nginx Proxy Manager (and the swap from custom-network) ==="
   compose custom-network -- down -v >/dev/null 2>&1
   compose modern -- up -d >/dev/null 2>&1; wait_ready modern "${READY_modern[0]}" "${READY_modern[1]}"
+  juror modern
   scan modern; truth modern
   if want custom-network; then
+    # The swap shows in the first scan of the stage: the default-profile scan when it ran, else the template scan.
+    CH=$(api GET "/changes?limit=1000" | jq -c --argjson r "${JUROR_RUN:-$RUN}" '{items: [.items[] | select(.run_id >= $r)]}')
     change_row "swap: custom-network 8787 gone" 8787 '^service_gone$' '' ""
     change_row "swap: custom-network 3001 gone" 3001 '^service_gone$' '' ""
     change_row "swap: modern 8080 new" 8080 '^service_new$' '' ""
@@ -184,7 +220,8 @@ fi
 
 if want version; then
   echo; echo "=== version change: modern with redis:6 instead of redis:7 (a copy under e2e/jury/compose) ==="
-  ( cd "$J" && docker compose -f "$E/compose/docker-compose-modern-redis6.yml" up -d >/dev/null 2>&1 ); wait_ready modern-redis6 "${READY_modern[0]}" "${READY_modern[1]}"
+  # --renew-anon-volumes: redis:6 cannot read the RDB file that redis:7 left in the image's anonymous /data volume.
+  ( cd "$J" && docker compose -f "$E/compose/docker-compose-modern-redis6.yml" up -d --renew-anon-volumes >/dev/null 2>&1 ); wait_ready modern-redis6 "${READY_modern[0]}" "${READY_modern[1]}"
   scan "modern with redis:6"
   change_row "version: Redis 7.4.12 -> 6.x" 6379 '^(tech_version|service_changed)$' '' ""
   check_row version 6379 tech "Redis" ""
@@ -195,6 +232,7 @@ if want vulnerable; then
   echo; echo "=== vulnerable: vsftpd, WordPress 4.7, Adminer, DVWA ==="
   compose modern -- down -v >/dev/null 2>&1
   compose vulnerable -- up -d >/dev/null 2>&1; wait_ready vulnerable "${READY_vulnerable[0]}" "${READY_vulnerable[1]}"
+  juror vulnerable
   scan vulnerable; truth vulnerable
   compose vulnerable -- down -v >/dev/null 2>&1
 fi
@@ -202,6 +240,7 @@ fi
 if want proxy; then
   echo; echo "=== modern-proxy: WordPress behind Traefik and Toxiproxy; then the four toxics ==="
   compose proxy proxy-base -- up -d >/dev/null 2>&1; wait_ready proxy "${READY_proxy[0]}" ""
+  juror proxy
   scan "proxy, no toxic"; truth proxy
   RT0=$(rt_of 8085); log "8085 response time without a toxic: ${RT0:-?} ms"
   for tox in latency timeout bandwidth slowclose; do
@@ -216,7 +255,13 @@ if want proxy; then
     if [ "$tox" = latency ]; then
       [ -n "$RT" ] && [ -n "$RT0" ] && [ "$RT" -ge $((RT0 + 400)) ] && ok=1 || ok=0
       row scenario 8085 rt "latency 500 ms: response time recorded" "" $ok "response_ms ${RT0:-?} -> ${RT:-?}"
-      change_row "latency 500 ms: reported as slower" 8085 '^(response_slower|slower|service_slower|latency_changed)$' 'wolniej' integrator
+      change_row "latency 500 ms: reported as slower" 8085 '^response_slower$' 'wolniej' ""
+    fi
+    if [ "$tox" = timeout ]; then
+      # Through Traefik the timeout toxic gives HTTP 502 after about 1.5 s (curl from the docker host).
+      ST=$(status_of 8085)
+      { [ "${ST:-0}" -ge 500 ] || [ "${RT:-0}" -ge 1000 ] || echo "$CH" | jq -e '[.items[] | select(.port == 8085 and .kind == "response_slower")] | length > 0' >/dev/null; } && ok=1 || ok=0
+      row scenario 8085 http "timeout 1 s: failing or slow answer recorded" engine $ok "http status ${ST:-none}, response_ms ${RT:-none}"
     fi
   done
   compose proxy proxy-base -- down -v >/dev/null 2>&1
