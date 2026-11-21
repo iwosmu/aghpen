@@ -102,7 +102,7 @@ CZUJKA_PORT=9180 docker compose -f deploy/docker-compose.yml logs czujka | grep 
 (cd lab/jury && ./quickstart.sh up)
 ```
 
-Szablon zajmuje port 8080, dlatego Czujka dostaje 9180. W interfejsie (`http://127.0.0.1:9180`) wpisz cel `localhost` i w profilu ustaw porty `2223,3001,5673,8787,15673` albo `1-65535`. Podgląd celu pokazuje „skanowany jako 192.168.65.254” (pole `maps_to` w API), a `/api/v1/healthz` podaje `host_gateway`. Host trafia do inwentarza raz, pod adresem bramy, z nazwą `localhost` i etykietą „Host dockera (ten komputer)”. Usługa Czujki na porcie `CZUJKA_PORT` tego hosta dostaje tag `czujka` i nie daje znalezisk. Wykluczenia i blokada operatora dotyczą adresu bramy, nie `127.0.0.1`.
+Szablon zajmuje port 8080, dlatego Czujka dostaje 9180. W interfejsie (`http://127.0.0.1:9180`) wpisz cel `localhost` i w profilu ustaw porty szablonu: `21,80,81,443,2223,3001,5673,6379,8080,8081,8085,8086,8088,8089,8090,8474,8787,8888,15432,15673,21000-21010` (quickstart: `2223,3001,5673,8787,15673`). Na stacji roboczej host dockera to ten sam komputer: pełny zakres portów (`1-65535`, `top-1000`) trafia sondami wykrywania wersji także w lokalne usługi innych programów. Skanuj wtedy tylko porty szablonu i ustaw tę samą listę w `allowed_ports` polityki bezpieczeństwa. Podgląd celu pokazuje „skanowany jako 192.168.65.254” (pole `maps_to` w API), a `/api/v1/healthz` podaje `host_gateway`. Host trafia do inwentarza raz, pod adresem bramy, z nazwą `localhost` i etykietą „Host dockera (ten komputer)”. Usługa Czujki na porcie `CZUJKA_PORT` tego hosta dostaje tag `czujka` i nie daje znalezisk. Wykluczenia i blokada operatora dotyczą adresu bramy, nie `127.0.0.1`.
 
 Sieć hosta (Linux):
 
