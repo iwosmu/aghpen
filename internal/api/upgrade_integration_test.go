@@ -54,9 +54,9 @@ func loadOldChanges(t *testing.T, url string) {
 	}
 	var rows []struct {
 		IP, Kind, Severity, Field, Summary string
-		Port                              int
-		Expected                          bool
-		Before, After                     json.RawMessage
+		Port                               int
+		Expected                           bool
+		Before, After                      json.RawMessage
 	}
 	if err := json.Unmarshal(raw, &rows); err != nil {
 		t.Fatal(err)
