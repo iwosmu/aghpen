@@ -243,3 +243,16 @@ func TestBuiltinDetections(t *testing.T) {
 		})
 	}
 }
+
+func TestStagingLabelIgnoresLab(t *testing.T) {
+	for name, want := range map[string]bool{
+		"pg.lab.czujka.test":        false,
+		"lab212.agh.edu.pl":         false,
+		"staging-portal.example.pl": true,
+		"api.dev.example.pl":        true,
+	} {
+		if got := stagingLabelRe.MatchString(firstLabels(name)); got != want {
+			t.Errorf("%s: staging = %v, want %v", name, got, want)
+		}
+	}
+}

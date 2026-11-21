@@ -11,7 +11,7 @@ import { triggerLabel } from './Runs';
 import { Icon } from '../ui/Icon';
 import { ChunkStatusMark, Glyph, RunStatusMark } from '../ui/marks';
 import { AddressMap } from '../viz/AddressMap';
-import { ProgressBar, RateGauge } from '../viz/charts';
+import { PacketCount, ProgressBar, RateGauge } from '../viz/charts';
 import { useCan } from '../session';
 
 function Fact({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
@@ -166,14 +166,14 @@ export default function RunDetail() {
               <Fact label={t('Podgrupy', 'Chunks')}><span className="num">{s.chunks_done} / {s.chunks_total}</span></Fact>
               <Fact label={t('Aktywne hosty', 'Hosts up')}><span className="num">{fmtInt(s.hosts_up)}</span></Fact>
               <Fact label={t('Otwarte usługi', 'Open services')}><span className="num">{fmtInt(s.services_open)}</span> <span className="text-xs font-normal text-ink-3">({fmtInt(s.http_services)} WWW)</span></Fact>
-              <Fact label={t('Wysłane pakiety', 'Packets sent')}><span className="num">{fmtInt(s.packets_sent)}</span></Fact>
+              <Fact label={t('Pakiety prób', 'Probe packets')}><PacketCount sent={s.packets_sent} estimated={s.packets_estimated} /></Fact>
               <Fact label={t('Żądania HTTP', 'HTTP requests')}><span className="num">{fmtInt(s.http_requests)}</span></Fact>
               <Fact label={t('Ponowione próby', 'Retried hosts')}><span className="num">{fmtInt(s.retried)}</span></Fact>
             </dl>
           </section>
           <section className="border border-rule bg-panel p-3">
             <h2 className="mb-2 text-sm font-semibold">{t('Tempo skanowania', 'Scan rate')}</h2>
-            {policyCap ? <RateGauge current={isLive ? s.current_pps : 0} cap={cap} policyCap={policyCap} /> : <div className="skeleton h-12" />}
+            {policyCap ? <RateGauge current={isLive ? s.current_pps : 0} cap={cap} policyCap={policyCap} basis={isLive ? s.current_pps_basis : undefined} /> : <div className="skeleton h-12" />}
             <p className="mt-2 text-xs text-ink-2">{t('Średnio', 'Average')} <span className="num text-ink">{fmtInt(s.avg_pps)}</span> pps. {profile.data && profile.data.rate.max_pps > policyCap ? t('Profil prosi o ' + fmtInt(profile.data.rate.max_pps) + ' pps, polityka bezpieczeństwa obcina do ' + fmtInt(policyCap) + '.', 'The profile asks for ' + fmtInt(profile.data.rate.max_pps) + ' pps, the safety policy cuts it to ' + fmtInt(policyCap) + '.') : null}</p>
           </section>
         </div>

@@ -29,7 +29,7 @@ func (r *run) account(gs *groupStats, res *probe.Result, start time.Time) {
 	gs.mu.Lock()
 	gs.packets += res.Packets
 	gs.mu.Unlock()
-	r.stats.addStage(res.Packets, start, r.e.now())
+	r.stats.addStage(res.Packets, res.PacketsExact, start, r.e.now())
 }
 
 // nmapTargets returns what the group scans. IPv4 units use their ranges,
@@ -226,7 +226,7 @@ func (r *run) retryRound(ctx context.Context, g *group, missing []model.HostHint
 		t0 := r.e.now()
 		res, err := r.prober.Discover(ctx, probe.DiscoverRequest{
 			Targets: rediscover, Opts: r.disc, MaxRate: rate, MaxRetries: 2, HostTimeout: discoveryHostTimeout, IPv6: g.v6,
-			ARPOnly: r.disc.ARP && r.prober.Privileged() && r.onLink(g),
+			ARPOnly: r.prober.Privileged() && r.onLink(g),
 		})
 		r.account(gs, res, t0)
 		if err != nil {

@@ -8,6 +8,7 @@ import (
 func TestClassifyAndSummarize(t *testing.T) {
 	in := strings.Join([]string{
 		"100.10 ARP, Request who-has 10.66.1.5 tell 10.66.0.30, length 28",
+		"100.100002 ARP, Request who-has 10.66.1.5 tell 10.66.0.30, length 28", // the same frame reported twice
 		"100.20 IP 10.66.0.30.40000 > 10.66.1.10.80: Flags [S], seq 1, win 1024, options [mss 1460], length 0",
 		"100.30 IP 10.66.0.30.40001 > 10.66.1.10.80: Flags [S], seq 1, win 64240, options [mss 1460,sackOK,TS val 1 ecr 0,nop,wscale 7], length 0",
 		"100.40 IP 10.66.0.30.40000 > 10.66.1.10.80: Flags [R], seq 2, win 0, length 0",

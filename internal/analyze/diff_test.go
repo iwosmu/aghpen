@@ -266,3 +266,35 @@ func TestSimhashDistance(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// A full run (version detection on) followed by a discovery-only run and a
+// full run again: the field that a run did not measure keeps its value, so
+// no change event either way.
+func TestDiffDiscoveryRunAfterFullRunIsQuiet(t *testing.T) {
+	full := model.ServiceResult{Port: 22, Proto: "tcp", State: "open", Name: "ssh", Product: "OpenSSH", Version: "9.6p1", CPE: []string{"cpe:/a:openbsd:openssh:9.6p1"}, Confidence: 1,
+		Technologies: []model.Technology{{Name: "OpenSSH", Version: "9.6p1", Sources: []string{"nmap"}}}}
+	bare := model.ServiceResult{Port: 22, Proto: "tcp", State: "open", Name: "ssh", Confidence: 0.3}
+	web := model.ServiceResult{Port: 80, Proto: "tcp", State: "open", Name: "http", Product: "nginx", Version: "1.26.2", Confidence: 1,
+		Technologies: []model.Technology{{Name: "nginx", Version: "1.26.2", Sources: []string{"nmap", "header:server"}}}}
+	webBare := model.ServiceResult{Port: 80, Proto: "tcp", State: "open", Name: "http-alt", Confidence: 0.3,
+		Technologies: []model.Technology{{Name: "nginx", Sources: []string{"header:server"}}}}
+	runs := []Snapshot{
+		snap(1, host("10.0.0.5", model.HostUp, full, web)),
+		snap(2, host("10.0.0.5", model.HostUp, bare, webBare)),
+		snap(3, host("10.0.0.5", model.HostUp, full, web)),
+	}
+	for i := 1; i < len(runs); i++ {
+		changes, _ := Diff(&runs[i-1], runs[i], DiffOptions{})
+		if len(changes) != 0 {
+			t.Errorf("run %d -> %d: %v", i, i+1, kinds(changes))
+		}
+	}
+	// a real upgrade between two full runs is still a change
+	newer := full
+	newer.Version = "9.9p1"
+	newer.Technologies = []model.Technology{{Name: "OpenSSH", Version: "9.9p1", Sources: []string{"nmap"}}}
+	changes, _ := Diff(&runs[2], snap(4, host("10.0.0.5", model.HostUp, newer, web)), DiffOptions{})
+	if got := kinds(changes); len(got) == 0 {
+		t.Errorf("upgrade 9.6p1 -> 9.9p1 not reported")
+	}
+}

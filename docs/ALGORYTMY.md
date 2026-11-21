@@ -190,6 +190,27 @@ Wszystkie stałe są w `stability.go` i `diff.go`, każda z komentarzem. Zmiana 
 - Zmiana czasu (lato/zima) przesuwa godzinę lokalną skanu o jeden kubełek. Sąsiednie godziny z wagą 0,5 łagodzą ten efekt.
 - Model ocenia host, nie pojedynczy port. Usługi hosta, który milczy, mają stan „nieznany".
 
+### 2.9 Ponowne sondowanie sterowane modelem
+
+Pakiet `internal/reprobe` dopytuje hosty, o których model wie za mało. Szczegóły tras są w `docs/API-time.md`.
+
+- **Potwierdzenie.** Host dostał `host_missing` (status `unstable`, wcześniej odpowiadał). Czujka sprawdza go ponownie 10, 30 i 90 minut po pierwszym braku odpowiedzi (`backoff_minutes`). Seria starsza niż ostatni krok plus 12 godzin nie jest już potwierdzana.
+- **Prawdopodobnie aktywny.** Host niestabilny jest sprawdzany 5 minut po początku najbliższej godziny, w której model daje częstość odpowiedzi co najmniej `likely_up_rate` (domyślnie 0,6). Warunek: co najmniej 8 obserwacji i prawdziwa odpowiedź w tym samym typie dnia (dzień roboczy albo weekend, godzina ±1).
+- **Bezpieczeństwo.** Sondy działają tylko w oknach skanowania profilu (`sched.NextAllowed`) i pod polityką bezpieczeństwa: wykluczenia, limity pakietów i HTTP, wyłącznik awaryjny. Budżet to 200 adresów na godzinę (`budget_per_hour`), liczony razem dla wszystkich sond z ostatniej godziny. Nadmiar przechodzi na następną godzinę. Sonda sprawdza najwyżej 32 znane porty hosta.
+- Wykonawca startuje co minutę. Zbiera należne sondy w jeden przebieg na profil (`trigger = reprobe`) i nie startuje nowego, dopóki poprzedni trwa.
+- Operator wyłącza mechanizm w `PUT /settings/reprobe` (`enabled: false`).
+
+### 2.10 Zegar laboratoryjny
+
+Kubełki modelu mają domyślnie szerokość 1 h i okres 1 tygodnia (168 kubełków). Do pokazu w laboratorium zegar można skrócić zmiennymi środowiskowymi procesu `czujka`:
+
+| Zmienna | Domyślnie | Przykład w laboratorium |
+| --- | --- | --- |
+| `CZUJKA_AVAIL_BUCKET` | `1h` | `3m` |
+| `CZUJKA_AVAIL_PERIOD` | `168h` | `30m` |
+
+Reguły: szerokość co najmniej 1 s, okres jest całkowitą wielokrotnością szerokości, najwyżej 168 kubełków. Przy innym zegarze model liczy kubełek jako `(czas Unix mod okres) / szerokość`, kurczy częstość kubełka prosto do częstości globalnej (bez poziomu dnia tygodnia) i opisuje rytm jako „zegar laboratoryjny”. To ustawienie służy tylko do pokazu. W produkcji zostaw wartości domyślne.
+
 ## 3. Wykrywanie zmian
 
 `Diff(prev, cur)` porównuje dwa obrazy sieci i zwraca listę zmian oraz podsumowanie. Gdy nie ma poprzedniego przebiegu, nie ma zmian: pierwszy skan to punkt odniesienia.
@@ -296,7 +317,9 @@ Jak analiza używa pewności:
 
 ## 5. Ocena ciekawości (0–100)
 
-Ocena odpowiada na pytanie „na co analityk powinien spojrzeć najpierw". Jest sumą punktów z jednej tabeli, obciętą do 100. Każdy składnik trafia do listy powodów (`interest_why`), więc analityk widzi, skąd wzięła się liczba.
+Ocena odpowiada na pytanie „na co analityk powinien spojrzeć najpierw". Jest sumą punktów z jednej tabeli. Do 70 ocena równa się sumie. Powyżej 70 suma jest ściskana w stronę 100: `ocena = 70 + 30 · (1 − e^(−(suma − 70)/50))`, najwyżej 99 (`CompressInterest`). Każdy składnik trafia do listy powodów (`interest_why`), więc analityk widzi, skąd wzięła się liczba.
+
+Dlaczego krzywa, a nie obcięcie: w laboratorium pięć najciekawszych usług miało ocenę 100 (strona wydziału, blog WordPress, Tomcat, phpMyAdmin, Adminer), więc ranking nic nie mówił. Z krzywą suma 100 daje 84, suma 140 daje 92, suma 200 daje 97. Większa suma zawsze daje wyższą ocenę.
 
 | Kod | Punkty | Powód |
 | --- | --- | --- |
@@ -340,10 +363,10 @@ Przykład z laboratorium: strona logowania DefectDojo pod `http://127.0.0.1:1808
 
 | | Przed kalibracją | Po kalibracji |
 | --- | --- | --- |
-| ocena usługi | 100 = sygnatura DefectDojo 40 + sygnatura „logowanie po HTTP" 40 + `login-plain-http` 25 + brak CSP 11 + ciasteczko 4, obcięte do 100 | 80 = sygnatura DefectDojo 40 + `login-plain-http` 25 + słabe sygnały 15 (brak CSP 11, ciasteczko 4) |
+| ocena usługi | 100 = sygnatura DefectDojo 40 + sygnatura „logowanie po HTTP" 40 + `login-plain-http` 25 + brak CSP 11 + ciasteczko 4, obcięte do 100 | 75 = suma 80 (sygnatura DefectDojo 40 + `login-plain-http` 25 + słabe sygnały 15: brak CSP 11, ciasteczko 4) po krzywej |
 | obserwacje | 5, każda z oceną 100: logowanie po HTTP, nagłówek „logowanie po HTTP", nagłówek „brak CSP", ciasteczko `csrftoken`, ciasteczko „sesja frameworka" | 3: logowanie po HTTP **50** (z dowodami obu źródeł), nagłówki HTTP **11**, ciasteczka **10** |
 
-Przykład z raportu przykładowego: nowa usługa Jenkins na porcie 8080 ma 89 punktów = panel administracyjny (30) + narzędzie deweloperskie (20) + sygnatura Jenkins (19) + nowa ekspozycja (15) + nagłówek ujawniający wersję (5).
+Przykład z raportu przykładowego: nowa usługa Jenkins na porcie 8080 ma sumę 89 punktów (ocena 79 po krzywej) = panel administracyjny (30) + narzędzie deweloperskie (20) + sygnatura Jenkins (19) + nowa ekspozycja (15) + nagłówek ujawniający wersję (5).
 
 ## 6. Grupowanie podobnych usług
 

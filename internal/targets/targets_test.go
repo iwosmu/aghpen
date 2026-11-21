@@ -6,7 +6,9 @@ import (
 	"net"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/iwosmu/aghpen/internal/model"
 )
@@ -277,5 +279,36 @@ func TestPreview(t *testing.T) {
 	p := Preview("10.0.0.0/24\n10.0.0.0/24\nbad\n10.0.1.1", []string{"10.0.0.0/25"})
 	if len(p.Valid) != 2 || p.Duplicates != 1 || len(p.Invalid) != 1 || p.Excluded != 128 || p.AddressCount != 129 {
 		t.Fatalf("preview = %+v", p)
+	}
+}
+
+// flakyResolver times out on the first lookup of each name.
+type flakyResolver struct {
+	mu   sync.Mutex
+	seen map[string]int
+}
+
+func (f *flakyResolver) LookupIP(_ context.Context, _ string, host string) ([]net.IP, error) {
+	f.mu.Lock()
+	f.seen[host]++
+	n := f.seen[host]
+	f.mu.Unlock()
+	if host == "none.example.com" {
+		return nil, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true}
+	}
+	if n == 1 {
+		return nil, &net.DNSError{Err: "i/o timeout", Name: host, IsTimeout: true}
+	}
+	return []net.IP{net.ParseIP("10.0.0.9")}, nil
+}
+
+func TestExpandRetriesTimedOutLookups(t *testing.T) {
+	res := &flakyResolver{seen: map[string]int{}}
+	ex := Expand(context.Background(), tg("a.example.com", "none.example.com"), nil, res, time.Second)
+	if ex.V4.Count() != 1 || len(ex.Unresolved) != 1 || ex.Unresolved["none.example.com"] == "" {
+		t.Fatalf("expanded = %+v", ex)
+	}
+	if res.seen["none.example.com"] != 1 {
+		t.Errorf("a name that does not exist was asked %d times, want 1", res.seen["none.example.com"])
 	}
 }

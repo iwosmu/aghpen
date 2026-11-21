@@ -100,6 +100,28 @@ func EffectiveLimits(p model.ScanProfile, pol model.SafetyPolicy) Limits {
 	return l
 }
 
+// httpPacketsPerRequest is the kernel TCP traffic of one HTTP request
+// (handshake, request, ACKs, close), with version-detection connects
+// included. Measured on the lab /16: 9 238 kernel TCP packets for 1 183
+// HTTP requests.
+const httpPacketsPerRequest = 8
+
+// HTTPReserve is the part of the packet cap kept for the traffic that does
+// not go through nmap's pacing: HTTP fingerprinting and the TCP connects of
+// version detection. At most a quarter of the cap.
+func (l Limits) HTTPReserve() int {
+	r := int(l.HTTPRPS*httpPacketsPerRequest + 0.5)
+	return min(r, l.PPS/4)
+}
+
+// ProbePPS is the budget of the nmap processes together: the cap minus the
+// HTTP reserve. With it, everything the scanner sends stays under the cap
+// in every second (measured with e2e/ppsbins; before the reserve the nmap
+// packets held 1 000 pps and the kernel's TCP added up to 103 more).
+func (l Limits) ProbePPS() int {
+	return max(1, l.PPS-l.HTTPReserve())
+}
+
 // Budget is the global packet budget of a run. Every nmap process takes a
 // share before it starts and passes it to nmap as --max-rate. The shares in
 // use never add up to more than the total.

@@ -112,3 +112,13 @@
     rules:
       - {type: header, name: X-Powered-CMS, contains: 'Bitrix', weight: 0.95}
       - {type: cookie, name_regex: '^BITRIX_SM_', weight: 0.9}
+
+- id: cookie-remember-me-readable
+  name: Ciasteczko trwałego logowania (remember_me) bez HttpOnly albo Secure
+  category: cookie
+  description: Ciasteczko „zapamiętaj mnie” daje dostęp do konta bez hasła. Bez HttpOnly odczyta je skrypt na stronie, bez Secure przejdzie po nieszyfrowanym HTTP.
+  interest: 35
+  match:
+    rules:
+      - {type: cookie, name_regex: '(?i)^(remember_?me|remember_token|remember_web_[a-z0-9_]+|autologin|stay_logged_in)$', http_only: false, weight: 0.85}
+      - {type: cookie, name_regex: '(?i)^(remember_?me|remember_token|remember_web_[a-z0-9_]+|autologin|stay_logged_in)$', secure: false, weight: 0.6}

@@ -308,6 +308,11 @@ function DojoTab() {
         <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label={t('Integracja włączona', 'Integration enabled')} />
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label={t('Adres DefectDojo', 'DefectDojo URL')} hint={/\/\/(host\.docker\.internal|localhost|127\.)/.test(f.url) ? t('Czujka zapisuje odnośniki do znalezisk z tym adresem. Adres widoczny tylko z kontenera (host.docker.internal, localhost) nie otworzy się w przeglądarce analityka.', 'Czujka writes finding links with this address. An address visible only from the container (host.docker.internal, localhost) does not open in the analyst browser.') : undefined}><input className="field mono" value={f.url} onChange={(e) => { setF({ ...f, url: e.target.value }); setTest(null); }} placeholder="https://defectdojo.example" /></Field>
+          {'link_url' in q.data ? (
+            <Field label={t('Adres do odnośników (publiczny)', 'Link address (public)')} hint={t('Pod tym adresem przeglądarka analityka otwiera DefectDojo. Puste: jak adres DefectDojo wyżej.', 'The analyst browser opens DefectDojo at this address. Empty: the DefectDojo URL above.')}>
+              <input className="field mono" value={f.link_url ?? ''} onChange={(e) => setF({ ...f, link_url: e.target.value })} placeholder="http://127.0.0.1:18080" data-testid="dojo-link-url" />
+            </Field>
+          ) : null}
           <Field label={t('Klucz API', 'API key')} hint={f.api_key_set ? t('Klucz jest zapisany i zaszyfrowany. Wpisz nowy tylko, aby go zmienić.', 'A key is stored and encrypted. Type a new one only to replace it.') : t('Klucz nie jest jeszcze ustawiony.', 'No key is set yet.')}>
             <input className="field mono" type="password" autoComplete="off" value={key} onChange={(e) => { setKey(e.target.value); setTest(null); }} placeholder={f.api_key_set ? '••••••••••••••••' : ''} />
           </Field>

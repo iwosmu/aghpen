@@ -81,6 +81,7 @@ type Summary struct {
 	AllMax  int            `json:"all_max_per_s"`
 	AllP99  int            `json:"all_p99_per_s"`
 	Over    int            `json:"raw_seconds_over_cap"`
+	AllOver int            `json:"all_seconds_over_cap"`
 	OverTol int            `json:"raw_seconds_over_cap_plus_5pct"`
 	Busiest []int          `json:"raw_top5"`
 }
@@ -97,9 +98,18 @@ func Sent(line, src string) bool {
 	return strings.HasPrefix(line, "IP "+src+".") || strings.HasPrefix(line, "IP "+src+" >")
 }
 
+// dupWindow: inside a container's network namespace tcpdump reports every
+// frame that nmap injects through its packet socket (the ARP requests)
+// twice, about 2 µs apart (measured: nmap 2048 raw packets, interface
+// tx_packets +2048, the target saw one request, the capture 4096). An
+// identical line within this window is the same frame; real retransmissions
+// are about 100 ms apart.
+const dupWindow = 0.001
+
 // Bin counts the lines of r that src sent, per second and class.
 func Bin(r io.Reader, src string) (map[int64]map[string]int, error) {
 	bins := map[int64]map[string]int{}
+	last := map[string]float64{}
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 64*1024), 1024*1024)
 	for sc.Scan() {
@@ -112,8 +122,16 @@ func Bin(r io.Reader, src string) (map[int64]map[string]int, error) {
 		if err != nil {
 			continue
 		}
-		if !Sent(line[sp+1:], src) {
+		body := line[sp+1:]
+		if !Sent(body, src) {
 			continue
+		}
+		if prev, ok := last[body]; ok && ts-prev < dupWindow {
+			continue
+		}
+		last[body] = ts
+		if len(last) > 100000 {
+			clear(last)
 		}
 		sec := int64(ts)
 		if bins[sec] == nil {
@@ -149,6 +167,9 @@ func Summarize(bins map[int64]map[string]int, cap int) Summary {
 		if cap > 0 && r > cap {
 			s.Over++
 		}
+		if cap > 0 && a > cap {
+			s.AllOver++
+		}
 		if cap > 0 && float64(r) > float64(cap)*1.05 {
 			s.OverTol++
 		}
@@ -178,6 +199,7 @@ func main() {
 	capPPS := flag.Int("cap", 0, "the profile's packet cap (packets per second)")
 	asJSON := flag.Bool("json", false, "print JSON")
 	src := flag.String("src", "", "count only packets this address sent")
+	showOver := flag.Bool("over", false, "list the seconds where all sent packets exceed the cap, by class")
 	flag.Parse()
 	in := io.Reader(os.Stdin)
 	if flag.NArg() > 0 {
@@ -195,13 +217,29 @@ func main() {
 		os.Exit(1)
 	}
 	s := Summarize(bins, *capPPS)
+	if *showOver {
+		var secs []int64
+		for sec, m := range bins {
+			n := 0
+			for _, v := range m {
+				n += v
+			}
+			if n > *capPPS {
+				secs = append(secs, sec)
+			}
+		}
+		sort.Slice(secs, func(i, j int) bool { return secs[i] < secs[j] })
+		for _, sec := range secs {
+			fmt.Printf("over cap at %d: %v\n", sec, bins[sec])
+		}
+	}
 	if *asJSON {
 		_ = json.NewEncoder(os.Stdout).Encode(s)
 		return
 	}
 	fmt.Printf("seconds %d, cap %d pps\n", s.Seconds, s.Cap)
 	fmt.Printf("nmap raw packets per second: max %d, p99 %d, avg %.1f, top5 %v; seconds over cap %d (over cap+5%%: %d)\n", s.RawMax, s.RawP99, s.RawAvg, s.Busiest, s.Over, s.OverTol)
-	fmt.Printf("all sent packets per second: max %d, p99 %d\n", s.AllMax, s.AllP99)
+	fmt.Printf("all sent packets per second: max %d, p99 %d; seconds over cap %d\n", s.AllMax, s.AllP99, s.AllOver)
 	for _, c := range classes {
 		fmt.Printf("  %-11s %d\n", c, s.Total[c])
 	}

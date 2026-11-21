@@ -79,7 +79,7 @@ func TestSNMPProbe(t *testing.T) {
 		seen <- append([]byte{}, buf[:n]...)
 		_, _ = pc.WriteTo([]byte{0x30, 0x03, 0x02, 0x01, 0x03}, from) // any SNMP message counts as an answer
 	}()
-	open, sent := snmpProbe(context.Background(), pc.LocalAddr().String(), time.Second, NewLimiter(100, 1))
+	open, _, sent := snmpProbe(context.Background(), pc.LocalAddr().String(), time.Second, NewLimiter(100, 1))
 	got := <-seen
 	if !open || sent != 1 || !bytes.Equal(got, snmpEngineDiscovery) {
 		t.Errorf("agent present: open=%v sent=%d, agent received % x", open, sent, got)
@@ -91,7 +91,19 @@ func TestSNMPProbe(t *testing.T) {
 	}
 	addr := closed.LocalAddr().String()
 	closed.Close()
-	if open, sent := snmpProbe(context.Background(), addr, 300*time.Millisecond, NewLimiter(100, 1)); open || sent > 2 {
+	if open, _, sent := snmpProbe(context.Background(), addr, 300*time.Millisecond, NewLimiter(100, 1)); open || sent > 2 {
 		t.Errorf("closed port: open=%v sent=%d", open, sent)
+	}
+}
+
+func TestSNMPVendorFromEngineID(t *testing.T) {
+	// SNMPv3 Report from net-snmp 5.9: engine ID 80 00 1f 88 80 ... (enterprise 8072)
+	report := []byte{0x30, 0x30, 0x02, 0x01, 0x03, 0x30, 0x0f, 0x02, 0x02, 0x4a, 0x69, 0x02, 0x03, 0x00, 0xff, 0xe3, 0x04, 0x01, 0x00, 0x02, 0x01, 0x03,
+		0x04, 0x1a, 0x30, 0x18, 0x04, 0x11, 0x80, 0x00, 0x1f, 0x88, 0x80, 0x5b, 0x2c, 0x1d, 0x6f, 0x0e, 0x4a, 0x5a, 0x67, 0x00, 0x00, 0x00, 0x00, 0x02, 0x01, 0x05}
+	if got := snmpVendor(report); got != "net-snmp" {
+		t.Errorf("vendor = %q, want net-snmp", got)
+	}
+	if got := snmpVendor([]byte{0x30, 0x03, 0x04, 0x01, 0x00}); got != "" {
+		t.Errorf("vendor of a message without engine ID = %q", got)
 	}
 }

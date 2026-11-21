@@ -338,11 +338,20 @@
 - id: angular
   name: Angular
   category: library
-  description: Framework interfejsu Angular / AngularJS.
+  description: Framework interfejsu Angular (2 i nowsze).
   match:
     rules:
       - {type: body, regex: '<app-root|ng-version="([0-9.]+)"', weight: 0.8, version_group: 1}
-      - {type: body, regex: '\bng-app=|angular(?:\.min)?\.js', weight: 0.7}
+
+# ng-app and angular.js belong to AngularJS 1.x, a different framework (end of support 2021).
+- id: angularjs
+  name: AngularJS
+  category: library
+  description: Framework interfejsu AngularJS 1.x (bez wsparcia od 2022 r.).
+  interest: 15
+  match:
+    rules:
+      - {type: body, regex: '\bng-app(?:=|\s|>)|\bangular(?:\.min)?\.js\b', weight: 0.7}
 
 - id: jquery
   name: jQuery
