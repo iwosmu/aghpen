@@ -364,6 +364,13 @@ type RunStats struct {
 	ETASec          int64   `json:"eta_sec"`
 	Retried         int     `json:"retried"` // unstable hosts probed again
 	Errors          int     `json:"errors"`
+	// PortsUnknown counts live hosts whose port scan did not finish (nmap
+	// --host-timeout, even after one more try): their services are not
+	// measured in this run, not gone.
+	PortsUnknown int `json:"ports_unknown"`
+	// Warnings are the engine's sanity checks that failed: the run ended,
+	// but its result is not complete. The API and the UI show them.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 type ScanRun struct {
@@ -448,6 +455,21 @@ type HostResult struct {
 	ObservedAt time.Time       `json:"observed_at"`
 	Services   []ServiceResult `json:"services"`
 	Scripts    []ScriptResult  `json:"scripts,omitempty"` // nmap host scripts, kept for import/export round trips
+	// PortsUnknown: the host answered, but its port scan did not finish. The
+	// listed services are what was measured; services it does not list are
+	// unknown, not gone.
+	PortsUnknown bool `json:"ports_unknown,omitempty"`
+}
+
+// ReasonPortsUnknown is the HostResult.Reason of a host that answered but
+// whose port scan did not finish. The reason is stored with the host
+// observation, so the analysis after the run still knows it.
+const ReasonPortsUnknown = "ports-unknown"
+
+// HasUnknownPorts reports whether the host's services that the result does
+// not list are unknown in this run rather than gone.
+func (h HostResult) HasUnknownPorts() bool {
+	return h.PortsUnknown || h.Reason == ReasonPortsUnknown
 }
 
 // ScriptResult is the output of one nmap script (NSE), as found in imported

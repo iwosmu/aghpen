@@ -398,6 +398,8 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 			HostID int64 `json:"host_id"`
 			Up     bool  `json:"up"`
 			RunID  int64 `json:"run_id"`
+			// the port scan of the host did not finish: unlisted services are unknown, not gone
+			PortsUnknown bool `json:"ports_unknown"`
 		}
 		var present []presence
 		hostIDs := make([]int64, 0, len(order))
@@ -451,7 +453,7 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 				}
 				hostObs = append(hostObs, o)
 			}
-			present = append(present, presence{id, r.Up, r.RunID})
+			present = append(present, presence{id, r.Up, r.RunID, r.HasUnknownPorts()})
 
 			seen := map[svcKey]bool{}
 			for i := range r.Services {
@@ -581,8 +583,8 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 		}
 		if opt.MarkMissing {
 			if _, err := tx.db.Exec(ctx, `UPDATE services s SET state = CASE WHEN d.up THEN 'gone' ELSE 'unknown' END
-				FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, up boolean, run_id bigint)
-				WHERE s.host_id = d.host_id AND s.last_run_id IS DISTINCT FROM d.run_id
+				FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, up boolean, run_id bigint, ports_unknown boolean)
+				WHERE s.host_id = d.host_id AND s.last_run_id IS DISTINCT FROM d.run_id AND NOT d.ports_unknown
 				AND ((d.up AND s.state IN ('open', 'filtered', 'unknown')) OR (NOT d.up AND s.state IN ('open', 'filtered')))`, js(present)); err != nil {
 				return mapErr(err)
 			}

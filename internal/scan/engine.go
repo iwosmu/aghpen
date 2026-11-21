@@ -8,6 +8,7 @@ import (
 	"math"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/iwosmu/aghpen/internal/model"
@@ -92,6 +93,11 @@ func (e *Engine) Prober() probe.Prober {
 
 // run is the state of one Run call.
 type run struct {
+	// portAnswered counts live hosts that answered the port scan (an open
+	// or a closed port); the end-of-run sanity check compares it with the
+	// hosts discovery found.
+	portAnswered atomic.Int64
+
 	e        *Engine
 	log      *slog.Logger
 	plan     model.ScanPlan
@@ -534,6 +540,7 @@ func (r *run) finish(parent, work context.Context) model.RunOutcome {
 			}
 		}
 	}
+	r.sanityCheck()
 	out.Stats = r.stats.snapshot()
 	if out.Status == model.RunCompleted {
 		out.Stats.ETASec = 0
@@ -708,3 +715,23 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 	}
 	return est
 }
+
+// sanityCheck warns when the run found hosts but lost their ports: a run like
+// that must not look like a clean success. Measured on the public instance:
+// 71 hosts up, 8 open services instead of 107, no error, and the diff then
+// reported 100 services gone. Live hosts on a network answer a SYN to a
+// closed port with a reset, so most of them answer the port scan.
+func (r *run) sanityCheck() {
+	s := r.stats.snapshot()
+	if r.disc.SkipDiscovery || s.HostsUp < minHostsForSanity {
+		return
+	}
+	answered := r.portAnswered.Load()
+	if answered*2 < int64(s.HostsUp) {
+		r.log.Warn("sanity check: most live hosts gave the port scan no answer", "hosts_up", s.HostsUp, "answered", answered)
+		r.stats.warn(fmt.Sprintf("Wykrywanie znalazło %d hostów, a na skan portów odpowiedziało tylko %d. Wynik portów jest niepełny: sprawdź limit pakietów, limit czasu i obciążenie sieci.", s.HostsUp, answered))
+	}
+}
+
+// minHostsForSanity: below this many live hosts the ratio says little.
+const minHostsForSanity = 8

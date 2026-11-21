@@ -298,3 +298,27 @@ func TestDiffDiscoveryRunAfterFullRunIsQuiet(t *testing.T) {
 		t.Errorf("upgrade 9.6p1 -> 9.9p1 not reported")
 	}
 }
+
+// A host whose port scan did not finish (nmap host timeout) keeps its
+// services: they are unreachable in this run, not gone. Measured on the
+// public instance: one such run reported 100 services gone.
+func TestDiffPortsUnknownIsNotGone(t *testing.T) {
+	svc := func(port int) model.ServiceResult {
+		return model.ServiceResult{Port: port, Proto: "tcp", State: "open", Name: "http"}
+	}
+	prev := &Snapshot{RunID: 1, Hosts: []HostSnapshot{{HostID: 1, IP: "10.0.0.1", Up: true, Status: model.HostUp, Services: []model.ServiceResult{svc(22), svc(80)}}}}
+	cur := Snapshot{RunID: 2, Hosts: []HostSnapshot{{HostID: 1, IP: "10.0.0.1", Up: true, Status: model.HostUp, PortsUnknown: true, Services: []model.ServiceResult{svc(80)}}}}
+	ch, sum := Diff(prev, cur, DiffOptions{})
+	for _, c := range ch {
+		if c.Kind == model.ChangeServiceGone {
+			t.Errorf("unexpected %+v", c)
+		}
+	}
+	if sum.ServicesGone != 0 || sum.ServicesUnreachable != 1 {
+		t.Errorf("summary %+v", sum)
+	}
+	cur.Hosts[0].PortsUnknown = false
+	if _, sum = Diff(prev, cur, DiffOptions{}); sum.ServicesGone != 1 {
+		t.Errorf("a finished scan reports the service gone: %+v", sum)
+	}
+}

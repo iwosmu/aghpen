@@ -3,11 +3,13 @@ package scan
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -33,6 +35,8 @@ type fakeNet struct {
 	discovered  [][]string
 	failAll     bool
 	portMiss    map[string]int // ip → port-scan calls that get no answer at all
+	portTimeout map[string]int // ip → port-scan calls where nmap gives up on the host
+	timeouts    []time.Duration
 }
 
 func (f *fakeNet) Name() string     { return "fake" }
@@ -94,6 +98,9 @@ func (f *fakeNet) PortScan(ctx context.Context, req probe.PortScanRequest) (*pro
 		return nil, context.Cause(ctx)
 	}
 	res := &probe.Result{Packets: int64(len(req.Hosts) * req.Ports.Count()), PacketsExact: true}
+	f.mu.Lock()
+	f.timeouts = append(f.timeouts, req.HostTimeout)
+	f.mu.Unlock()
 	for _, ip := range req.Hosts {
 		h := probe.Host{IP: ip, Up: true}
 		ports, ok := f.hosts[ip]
@@ -101,6 +108,11 @@ func (f *fakeNet) PortScan(ctx context.Context, req probe.PortScanRequest) (*pro
 		if f.portMiss[ip] > 0 {
 			f.portMiss[ip]--
 			ok, ports = false, nil
+		}
+		if f.portTimeout[ip] > 0 {
+			f.portTimeout[ip]--
+			ok, ports = false, nil
+			h.TimedOut = true
 		}
 		f.mu.Unlock()
 		h.Responded = ok
@@ -755,5 +767,66 @@ func TestHTTPRateFollowsALowCap(t *testing.T) {
 	l := EffectiveLimits(model.ScanProfile{Rate: model.RateLimits{MaxPPS: 200, HTTPRPS: 20}}, model.SafetyPolicy{})
 	if l.HTTPRPS != 6.25 || l.HTTPReserve() != 50 || l.ProbePPS() != 150 {
 		t.Errorf("cap 200: http %v rps, reserve %d, probes %d", l.HTTPRPS, l.HTTPReserve(), l.ProbePPS())
+	}
+}
+
+// nmap gave up on a host (--host-timeout): the host is scanned once more,
+// and when it times out again its ports are unknown, the run says so, and
+// the host is not reported as a host without services.
+func TestTimedOutHostIsRetriedThenReportedUnknown(t *testing.T) {
+	net := &fakeNet{
+		hosts:       map[string][]int{"10.0.0.10": {80}, "10.0.0.11": {22}, "10.0.0.12": {443}},
+		portTimeout: map[string]int{"10.0.0.11": 1, "10.0.0.12": 2},
+	}
+	e := New(Deps{Prober: net, Logger: quiet})
+	sink := newSink()
+	out := e.Run(context.Background(), basePlan("10.0.0.0/24"), sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	if h := sink.host("10.0.0.11"); h == nil || len(h.Services) != 1 || h.PortsUnknown {
+		t.Fatalf("10.0.0.11 = %+v, want port 22 from the second scan", h)
+	}
+	h := sink.host("10.0.0.12")
+	if h == nil || !h.Up || !h.PortsUnknown || h.Reason != model.ReasonPortsUnknown || !h.HasUnknownPorts() {
+		t.Fatalf("10.0.0.12 = %+v, want up with unknown ports", h)
+	}
+	if out.Stats.PortsUnknown != 1 || len(out.Stats.Warnings) != 1 {
+		t.Errorf("stats: ports_unknown %d, warnings %q", out.Stats.PortsUnknown, out.Stats.Warnings)
+	}
+}
+
+// Most live hosts without any answer to the port scan: the run ends, but
+// with a warning, not as a clean success.
+func TestSanityCheckWarnsWhenPortsAreLost(t *testing.T) {
+	hosts, miss := map[string][]int{}, map[string]int{}
+	for i := 10; i < 22; i++ {
+		ip := fmt.Sprintf("10.0.0.%d", i)
+		hosts[ip] = []int{80}
+		if i < 20 {
+			miss[ip] = 2
+		}
+	}
+	net := &fakeNet{hosts: hosts, portMiss: miss}
+	out := New(Deps{Prober: net, Logger: quiet}).Run(context.Background(), basePlan("10.0.0.0/24"), newSink())
+	if out.Stats.HostsUp != 12 || len(out.Stats.Warnings) != 1 || !strings.Contains(out.Stats.Warnings[0], "tylko 2") {
+		t.Errorf("hosts up %d, warnings %q", out.Stats.HostsUp, out.Stats.Warnings)
+	}
+	net = &fakeNet{hosts: hosts}
+	if out = New(Deps{Prober: net, Logger: quiet}).Run(context.Background(), basePlan("10.0.0.0/24"), newSink()); len(out.Stats.Warnings) != 0 {
+		t.Errorf("a clean run warns: %q", out.Stats.Warnings)
+	}
+}
+
+func TestPortScanTimeoutGrowsWithTheWork(t *testing.T) {
+	if got := portScanTimeout(1, 1000, 840); got != portScanHostTimeout {
+		t.Errorf("one host: %v", got)
+	}
+	// the public instance: 35 live hosts, 1000 ports, 105 pps per group
+	if got := portScanTimeout(35, 1000, 105); got < 900*time.Second {
+		t.Errorf("35 hosts at 105 pps: %v, want at least 3 x 333 s", got)
+	}
+	if got := portScanTimeout(10, 100, 0); got < portScanHostTimeout {
+		t.Errorf("rate 0: %v", got)
 	}
 }

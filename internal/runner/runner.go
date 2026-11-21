@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"sync"
 	"time"
 
@@ -419,7 +420,7 @@ func (m *Manager) execute(ctx context.Context, a *activeRun, p model.ScanProfile
 
 	end := time.Now().UTC()
 	a.mu.Lock()
-	if outcome.Stats != (model.RunStats{}) {
+	if !reflect.DeepEqual(outcome.Stats, model.RunStats{}) {
 		a.run.Stats = outcome.Stats
 	}
 	intent := a.intent
