@@ -582,23 +582,26 @@ func portScanTimeout(hosts, ports, rate int) time.Duration {
 }
 
 // A host that already shows denseOpenPorts open ports in the profile's list
-// gets one more port scan over the rest of the TCP range (at most
+// gets one more port scan over the rest of ports 1-10000 (at most
 // maxDensePerGroup hosts per group). A host that exposes many services
 // usually listens on unusual ports too (application servers, proxies, test
 // instances). Measured on the lab: the 64-port host showed 33 ports from the
 // default list and hid 31 ports ranked 1045 to 7379 in nmap's frequency
-// table or not ranked at all; no other lab host has 10 open ports, so the
-// pass costs one host x 64 500 ports.
+// table or not ranked at all, all below 10000; no other lab host has 10
+// open ports. The full range 1-65535 found the same 31 ports but took the
+// group's share of the cap (210 pps) for 307 s and made the /16 run 1060 s
+// instead of 559 s; 1-10000 is about 9 000 ports, 43 s at that share.
 const (
 	denseOpenPorts   = 10
 	maxDensePerGroup = 4
+	densePorts       = "1-10000"
 )
 
 func (r *run) densePass(ctx context.Context, g *group, scanned map[string]*probe.Host, rate int, gs *groupStats) error {
 	if r.ports == nil || ctx.Err() != nil {
 		return nil
 	}
-	rest, err := probe.ParsePorts("1-65535")
+	rest, err := probe.ParsePorts(densePorts)
 	if err != nil {
 		return nil
 	}
@@ -628,7 +631,7 @@ func (r *run) densePass(ctx context.Context, g *group, scanned map[string]*probe
 		if ctx.Err() != nil {
 			return context.Cause(ctx)
 		}
-		r.log.Warn("full-range pass for dense hosts failed", "group", g.id, "error", err.Error())
+		r.log.Warn("wide port pass for dense hosts failed", "group", g.id, "error", err.Error())
 		return nil
 	}
 	added := 0
@@ -644,6 +647,6 @@ func (r *run) densePass(ctx context.Context, g *group, scanned map[string]*probe
 		scanned[h.IP] = &cp
 		added += len(h.Ports)
 	}
-	r.log.Info("full-range pass for dense hosts", "group", g.id, "hosts", len(dense), "ports", rest.Count(), "new_open", added)
+	r.log.Info("wide port pass for dense hosts", "group", g.id, "hosts", len(dense), "ports", rest.Count(), "new_open", added)
 	return nil
 }

@@ -247,7 +247,11 @@ func (b *findingBuilder) derive() {
 			"Pod tym adresem odpowiada narzędzie deweloperskie (CI, repozytorium kodu, monitoring). Takie narzędzia mają dostęp do kodu i sekretów.",
 			withBase(ev), sig)
 	}
-	if has(model.ClassDatabase) {
+	// A web tool for databases (phpMyAdmin, Adminer, pgAdmin) is an admin
+	// panel, and the admin-panel finding names it; "database open to the
+	// network" is for the database protocol itself. Measured on the lab: the
+	// three web tools each had both findings at the top of the list.
+	if has(model.ClassDatabase) && s.HTTP == nil {
 		ev, sig, _ := b.classEvidence(model.ClassDatabase)
 		b.add(FindingDatabase, "", "Baza danych dostępna z sieci: "+firstNonEmpty(productVersion(s), "port "+fmt.Sprint(s.Port)),
 			"Port bazy danych przyjmuje połączenia z sieci, z której wykonano skan. Czujka nie próbuje się łączyć ani logować.",
@@ -516,6 +520,11 @@ func (b *findingBuilder) interest(typ string, ev []model.Evidence) int {
 	if b.fs.New && typ != FindingNewExposure {
 		p += 10
 	}
+	// Tie-break inside one type: the service's own interest adds 0..4 (one
+	// point per 10 above 50). Measured on the lab: 15 findings shared the top
+	// value 75; the service interest separates a router panel over plain
+	// HTTP (96) from a WordPress login page (80).
+	p += clampInt((min(b.fs.Interest, 99)-50)/10, 0, 4)
 	return min(p, 100)
 }
 

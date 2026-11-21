@@ -87,7 +87,9 @@ CSRF=$(echo "$LOGIN" | jq -r .csrf_token)
 # ---- policy, scope, signature, profile ----
 # 10.66.0.1-10.66.0.49: the gateway and the addresses the lab keeps for scanners (lab/README.md, section 4).
 # Other workers' scanners stand there; they are not lab hosts.
-POL=$(api GET /settings/safety | jq -c '.exclusions = (["10.66.0.1-10.66.0.49"] + .exclusions | unique)')
+# A profile cap above the policy cap (LR_PROFILE '{"rate":{"max_pps":2000}}') raises the policy cap with it.
+WANTPPS=$(printf '%s' "${LR_PROFILE:-}" | jq '.rate.max_pps // 0' 2>/dev/null)
+POL=$(api GET /settings/safety | jq -c --argjson w "${WANTPPS:-0}" '.exclusions = (["10.66.0.1-10.66.0.49"] + .exclusions | unique) | .max_pps = ([.max_pps, $w] | max)')
 api PUT /settings/safety "$POL" | jq -c '{max_pps, max_http_rps, max_per_host_rps, exclusions}' | tee -a "$OUT/run.log"
 SCOPE=$(api GET "/scopes?limit=100" | jq -r '[.items[] | select(.name == "Laboratorium (lab-run)")][0].id // empty')
 if [ -z "$SCOPE" ]; then
