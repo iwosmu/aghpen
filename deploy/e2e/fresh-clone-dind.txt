@@ -1,0 +1,76 @@
+# Czujka: from a fresh clone to the first "Ten komputer" scan, on a clean machine
+# Machine: docker:28-dind (privileged) on Docker Desktop, arm64, 0 images at the start.
+# Source: git bundle of branch iwosmu/czujka-core at d250e29, cloned inside dind.
+# Docker Hub had hit its anonymous pull limit for this network ("toomanyrequests"),
+# so this dind ran with --registry-mirror=https://mirror.gcr.io (Google's public Docker Hub mirror).
+# Recorded 2026-11-21 by deploy/e2e scripts run from the Mac; the UI part was driven
+# with playwright-cli through 127.0.0.1:18180 -> dind:18080 -> socat -> 127.0.0.1:8080.
+
+## A. git clone; docker compose up -d (images built on the machine)
+
+# prep (not counted): git, socat, curl, jq installed in docker:28-dind
+# prep (not counted): one service of this machine: nginx published on 0.0.0.0:8787
+# images before: 1 (only nginx:alpine for the sample service, in use)
+$ git clone /src/czujka.bundle czujka && cd czujka
+$ docker compose up -d
+# exit 0
+ Container czujka-czujka-1  Creating
+ Container czujka-czujka-1  Created
+ Container czujka-secrets-1  Starting
+ Container czujka-secrets-1  Started
+ Container czujka-secrets-1  Waiting
+ Container czujka-secrets-1  Exited
+ Container czujka-db-1  Starting
+ Container czujka-db-1  Started
+ Container czujka-db-1  Waiting
+ Container czujka-db-1  Healthy
+ Container czujka-czujka-1  Starting
+ Container czujka-czujka-1  Started
+# healthz: {"status":"ok","db":"ok","tde":21,"host_gateway":"172.18.0.1","probe":"nmap-raw"}
+$ docker compose logs czujka | grep -A3 "first administrator"
+czujka-1  |   Czujka: first administrator created
+czujka-1  |     e-mail:   admin@czujka.local
+czujka-1  |     password: <24 random characters, shown once>
+czujka-1  |   Change it after the first login.
+# secrets-1  | secrets: generated a new database password
+# grep -c 'czujka-internal-network-only\|POSTGRES_PASSWORD:' deploy/docker-compose.yml: 0 fixed password lines
+# TIMES clone=1 s; docker compose up -d returned after 114 s; API healthy 115 s after the command; total 116 s
+
+## B. Browser: open, log in, "Ten komputer", "Uruchom skan"
+# (times are wall clock of the automated browser; a person needs a few seconds more for typing)
+
+18:03:02 open http://127.0.0.1:18180 (the dind UI on 127.0.0.1:8080, forwarded)
+18:03:04 log in with the password from the log
+18:03:08 click "Ten komputer (localhost)"
+18:03:10 preview: localhost = host Dockera 172.18.0.1
+18:03:11 click "Uruchom skan" -> Page URL: http://127.0.0.1:18180/runs/1
+18:03:52 run finished 41 s after the click
+run 1: completed, 2026-11-21T18:03:10.680768Z -> 2026-11-21T18:03:51.780688Z
+  172.18.0.1:2376 open docker  title= response_ms=null
+  172.18.0.1:8787 open http nginx title=Welcome to nginx! response_ms=1
+  172.18.0.1:18080 open http Golang net/http server title=Czujka response_ms=2
+  host 172.18.0.1 Host dockera (ten komputer) hostnames=localhost
+
+## C. Offline bundle (make bundle, 354 MiB) on another clean docker:28-dind, no registry used
+
+# images before: 0
+$ tar -xzf czujka-bundle-d250e29.tar.gz && cd czujka-bundle-d250e29
+$ sh install.sh
+# exit 0
+install: loading the images
+Loaded image: czujka:d250e29
+Loaded image: czujka-db:17
+Loaded image: alpine:3.22
+  password:      <random, written to .env>
+ Container czujka-db-1  Healthy
+ Container czujka-db-1  Healthy
+ Container czujka-czujka-1  Healthy
+install: Czujka listens on http://127.0.0.1:8080 (administrator: admin@czujka.local)
+# healthz: {"db":"ok","engine":true,"field_encryption":{"algorithm":"AES-256-GCM envelope","key_id":"042cd5acd62c"},"host_gateway":
+# TIMES extract=3 s; install.sh (docker load, .env, start, wait healthy, doctor) 23 s; total 26 s
+
+## Earlier clean run, same flow, Docker Hub directly (commit f964d6e, before the rate limit)
+# images before: 0
+# TIMES clone=1 s; docker compose up -d returned after 78 s; API healthy 79 s after the command; total 80 s
+# Run "Ten komputer": completed in 35 s (the sample service on 8787 was not found then:
+# 8787 was outside the default port set; fixed in d250e29, see A/B above).

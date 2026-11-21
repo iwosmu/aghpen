@@ -3,12 +3,12 @@
 ## Start
 
 ```sh
-cp deploy/.env.example deploy/.env        # ustaw własne sekrety
-docker compose -f deploy/docker-compose.yml up -d --build --wait
-# albo: make up
+docker compose up -d                       # w katalogu głównym repozytorium (compose.yaml)
+# z własnymi sekretami: make init (zapisuje deploy/.env), potem to samo polecenie albo make up
 ```
 
-Stos startuje także bez `deploy/.env`. Wtedy baza jest dostępna tylko w sieci wewnętrznej, klucz główny
+Stos startuje bez `deploy/.env`. Wtedy baza jest dostępna tylko w sieci wewnętrznej, jednorazowa usługa
+`secrets` zapisuje losowe hasło bazy w wolumenie `czujka-secrets`, klucz główny
 powstaje w wolumenie `czujka-keys`, a losowe hasło pierwszego administratora pojawia się raz w logu:
 
 ```sh
