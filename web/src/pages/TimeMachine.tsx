@@ -343,7 +343,7 @@ export function HostLifePanel({ hostId }: { hostId: number }) {
         ))}
       </div>
       <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-2xs text-ink-3">
-        {[['up', t('host odpowiada', 'host responds')], ['not responding', t('nie odpowiada', 'not responding')], ['down', t('nieaktywny', 'down')], ['open', t('usługa otwarta', 'service open')], ['unknown', t('stan nieznany', 'status unknown')]].map(([k, l]) => <span key={k} className="inline-flex items-center gap-1"><span className="inline-block h-2 w-3" style={{ background: laneColor[k], opacity: k === 'unknown' ? 0.5 : 1 }} />{l}</span>)}
+        {[['up', t('host odpowiada', 'host responds')], ['missing', t('nie odpowiada', 'not responding')], ['down', t('nieaktywny', 'down')], ['open', t('usługa otwarta', 'service open')], ['unknown', t('stan nieznany', 'status unknown')]].map(([k, l]) => <span key={k} className="inline-flex items-center gap-1"><span className="inline-block h-2 w-3" style={{ background: laneColor[k], opacity: k === 'unknown' ? 0.5 : 1 }} />{l}</span>)}
         <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-px bg-ink" />{t('zmiana wersji', 'version change')}</span>
       </p>
     </Panel>

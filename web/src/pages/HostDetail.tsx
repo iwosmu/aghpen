@@ -117,7 +117,7 @@ export default function HostDetail() {
     { id: 'name', header: t('Usługa', 'Service'), cell: (s) => <span>{serviceName(s)}{s.tls ? <span className="ml-1.5 text-2xs text-ink-3">TLS</span> : null}{isSelf(s) ? <SelfTag /> : null}</span> },
     { id: 'product', header: t('Produkt', 'Product'), hide: 'md', cell: (s) => <span className="text-ink-2"><ProductValue s={s} /></span> },
     { id: 'title', header: t('Tytuł / technologie', 'Title / technologies'), wrap: true, cell: (s) => <span className="block min-w-[160px] max-w-[420px] truncate text-ink-2">{s.title || (s.technologies ?? []).map((x) => x.name).join(', ') || '–'}</span> },
-    { id: 'class', header: t('Klasy', 'Classes'), hide: 'lg', cell: (s) => <ClassChips classes={s.classes} max={2} /> },
+    { id: 'class', header: t('Klasy', 'Classes'), hide: '2xl', cell: (s) => <ClassChips classes={s.classes} max={2} /> },
     ...((services.data ?? []).some((s) => s.response_ms !== undefined) ? [{ id: 'rt', header: t('Czas odpowiedzi', 'Response time'), align: 'right' as const, hide: 'md' as const, cell: (s: Service) => <ResponseCell s={s} /> }] : []),
     { id: 'interest', header: t('Ciekawość', 'Interest'), align: 'right', cell: (s) => <InterestScore value={s.interest} reasons={s.interest_why} /> },
   ];

@@ -264,7 +264,7 @@ export function InterestScore({ value, reasons, showTip }: { value: number; reas
 export function InterestBreakdown({ value, reasons }: { value: number; reasons: InterestReason[] | null | undefined }) {
   const list = reasons ?? [];
   // Each reason is a segment of one 0-100 bar, in list order; what goes over 100 is cut, as the score is.
-  const shade = (i: number) => Math.max(0.28, 1 - i * 0.14);
+  const shade = (i: number) => Math.max(0.42, 1 - i * 0.12);
   let used = 0;
   const segs = list.map((r, i) => { const w = Math.max(0, Math.min(r.points, 100 - used)); used += w; return { w, i }; }).filter((x) => x.w > 0);
   return (
