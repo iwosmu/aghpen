@@ -78,7 +78,7 @@ export function changeSummary(c: Change): string {
       return 'Service ' + where + ' answers in its usual time again' + (typeof ms === 'number' ? ': ' + fmtMs(ms) : '') + usualText;
     }
     case 'host_gone':
-      return 'Host ' + c.ip + ' reported inactive';
+      return 'Host ' + c.ip + ' reported down';
     case 'service_gone':
       return 'Service ' + where + ' is gone';
     case 'host_missing':

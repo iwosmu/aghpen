@@ -140,8 +140,7 @@ function AddTargets({ scope }: { scope: Scope }) {
             <div className="mt-2"><InlineError error={add.error ?? preview.error} /></div>
           </div>
           <div>
-            <p className="label mb-1.5">{t('Podgląd przed zapisem', 'Preview before saving')}</p>
-            {text.trim() && p ? <PreviewReport p={p} pending={stale} /> : null}
+            {text.trim() && p ? <><p className="label mb-1.5">{t('Podgląd przed zapisem', 'Preview before saving')}</p><PreviewReport p={p} pending={stale} /></> : null}
           </div>
         </div>
       ) : (
