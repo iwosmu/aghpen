@@ -27,3 +27,18 @@ func TestAMQPIsNotTheManagementPanel(t *testing.T) {
 		}
 	}
 }
+
+// T3: the Gitea installer carries the install-page class, so the policy rule
+// unfinished-install-page fires on it.
+func TestGiteaInstallerIsAnInstallPage(t *testing.T) {
+	e, err := NewBuiltinEngine()
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := &model.ServiceResult{Port: 3001, Proto: "tcp", State: "open", Name: "http",
+		HTTP: &model.HTTPFingerprint{Status: 200, Title: "Installation - Gitea: Git with a cup of tea"}}
+	_, _, classes := e.Match(svc)
+	if !slices.Contains(classes, model.ClassInstallPage) {
+		t.Errorf("classes = %v", classes)
+	}
+}
