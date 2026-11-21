@@ -1,0 +1,32 @@
+id: example-server-detect
+info:
+  name: Example Server Detect
+  author: test
+  severity: info
+  tags: tech,example
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+    matchers-condition: or
+    matchers:
+      - type: regex
+        part: header
+        regex:
+          - '(?i)Server: ExampleServer(/[0-9.]+)?'
+      - type: word
+        words:
+          - "Powered by ExampleServer"
+        case-insensitive: true
+      - type: dsl
+        dsl:
+          - "status_code==200 && (\"-1840324437\" == mmh3(base64_py(body)))"
+    extractors:
+      - type: regex
+        part: header
+        group: 1
+        regex:
+          - 'ExampleServer/([0-9.]+)'
+      - type: kval
+        kval:
+          - server

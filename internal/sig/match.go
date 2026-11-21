@@ -414,7 +414,17 @@ func (v *view) eval(r *rule) (ok bool, ev model.Evidence, version string) {
 			found, snippet, version = r.anyText([]string{pv.probe.Title})
 		case "header":
 			for name, vals := range pv.probe.Headers {
-				if strings.EqualFold(name, r.name) {
+				switch {
+				case r.name == "":
+					// No name: match "Name: value" lines.
+					lines := make([]string, len(vals))
+					for i, val := range vals {
+						lines[i] = name + ": " + val
+					}
+					if ok, snip, ver := r.anyText(lines); ok {
+						found, snippet, version = ok, snip, ver
+					}
+				case strings.EqualFold(name, r.name):
 					found, snippet, version = r.anyText(vals)
 				}
 			}

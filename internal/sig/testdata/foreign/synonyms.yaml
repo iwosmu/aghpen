@@ -1,0 +1,20 @@
+
+fingerprints:
+  - slug: campus-login
+    label: Campus Login
+    kind: panel
+    endpoint: /login
+    detect:
+      - {part: body, contains: 'name="campus_password"'}
+      - {part: title, pattern: '^Campus (Login|Sign in)'}
+      - {status_code: 200}
+    operator: and
+  - identifier: Old Printer UI
+    product: Old Printer UI
+    group: iot
+    rules:
+      - {header: Server, value: 'PrintServer'}
+      - {cookie: PRNSESSID}
+      - {url: /status.htm, word: 'Toner level'}
+      - {favicon: [-1234567, 7654321]}
+      - {keyword: 'Printer Web Interface'}

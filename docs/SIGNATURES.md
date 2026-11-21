@@ -2,7 +2,9 @@
 
 Ten dokument opisuje język sygnatur (DSL), tryb bezpieczny walidatora, sposób liczenia pewności, retro-hunt, wbudowaną bibliotekę i narzędzie `fpprobe`.
 
-Kod: `internal/sig` (silnik), `internal/httpfp` (kolektor HTTP/TLS), `signatures/*.yaml` (biblioteka wbudowana), `cmd/fpprobe` (narzędzie wiersza poleceń).
+Kod: `internal/sig` (silnik), `internal/httpfp` (kolektor HTTP/TLS), `signatures/*.yaml` (biblioteka wbudowana), `internal/sigwire` (połączenie silnika z bazą i API), `cmd/fpprobe` (narzędzie wiersza poleceń).
+
+Szybki start: [rozdział 13](#13-jak-napisać-własną-sygnaturę-w-2-minuty) pokazuje siedem gotowych przykładów. Obce formaty (JSON, mapa po nazwie, szablony nuclei) opisuje [rozdział 14](#14-zgodność-z-innymi-formatami).
 
 ## 1. Zasada: tylko bezpieczna detekcja
 
@@ -244,6 +246,8 @@ Gdy sygnatura potrzebuje ścieżki, której dana obserwacja nigdy nie pobrała, 
 
 Te trzy pola dodano do `model.RetroHuntResult`.
 
+W produkcie retro-hunt czyta obserwacje strumieniowo z bazy (`sigwire.RetroHunt`, `sig.Hunter`). W pamięci jest jedna obserwacja naraz, więc zużycie pamięci nie rośnie z liczbą obserwacji. Lista `hits` ma limit 5000 pozycji; `total_hits` podaje pełną liczbę trafień, a `truncated: true` mówi, że listę ucięto. Te dwa pola też dodano do `model.RetroHuntResult`. Pomiar jest w rozdziale 15.
+
 ## 9. Biblioteka wbudowana
 
 386 sygnatur w 10 plikach. Test `TestBuiltinLibraryIsValid` ładuje każdy plik i nie przepuszcza żadnego błędu ani ostrzeżenia walidatora.
@@ -280,6 +284,7 @@ Skróty ikon (`mmh3`) w bibliotece pochodzą wyłącznie z prawdziwych instancji
 ```
 fpprobe -addr 127.0.0.1:8080 [-host nazwa] [-tls] [-paths] [-max-paths 20] [-brief] [-full] [-sigs plik.yaml]
 fpprobe -validate plik.yaml
+fpprobe -convert plik          # obcy format → YAML Czujki (rozdział 14)
 fpprobe -list
 ```
 
@@ -347,3 +352,257 @@ findings: header-version-server, cookie-language-framework
 - Reguły `hostname` potrzebują nazw hosta. `Match` zna tylko nagłówek Host; pełne nazwy podaje `MatchHost`.
 - Strona, która generuje inną treść przy każdym żądaniu (np. token w HTML), omija wykrywanie „miękkiego 404” po skrócie. Dlatego reguły `path` w bibliotece sprawdzają też treść.
 - Kolektor nie wykonuje JavaScriptu. Aplikacje, które budują całą stronę w przeglądarce, są rozpoznawane po znacznikach w HTML startowym, nagłówkach i ikonie.
+
+## 13. Jak napisać własną sygnaturę w 2 minuty
+
+1. Obejrzyj usługę: `fpprobe -addr 127.0.0.1:8080 -paths -brief`. Wynik pokazuje nagłówki, nazwy ciasteczek, tytuł i skrót ikony (`favicon: mmh3 …`).
+2. Zapisz sygnaturę w pliku `moja.yaml`. Wzory są niżej.
+3. Sprawdź ją: `fpprobe -validate moja.yaml`. Walidator podaje błędy po polsku, ze ścieżką pola i numerem wiersza.
+4. Wypróbuj na usłudze: `fpprobe -addr 127.0.0.1:8080 -paths -brief -sigs moja.yaml`.
+5. Dodaj ją w interfejsie (zakładka sygnatur) albo przez API: `POST /api/v1/signatures` z polem `yaml`. `POST /api/v1/signatures/retrohunt` pokaże, gdzie sygnatura pasuje w danych już zebranych, bez wysłania pakietu.
+
+Każda sygnatura potrzebuje `id`, `name` i co najmniej jednej reguły. Poniższe siedem przykładów to dokładnie lista „bezpiecznych sygnatur” z opisu zadania. Test `TestDocsWalkthroughExamples` wczytuje je z tego pliku i sprawdza, że każdy przechodzi walidację i wykrywa swoją cechę.
+
+**1. Obecność konkretnego nagłówka**
+
+```yaml
+id: aplikacjax-naglowek
+name: AplikacjaX (nagłówek)
+category: framework
+match:
+  rules:
+    - {type: header, name: X-Powered-By, contains: 'AplikacjaX'}
+```
+
+Sam fakt istnienia nagłówka: `{type: header, name: X-Debug-Token, exists: true}`.
+
+**2. Konkretna nazwa ciasteczka**
+
+```yaml
+id: aplikacjax-ciasteczko
+name: AplikacjaX (ciasteczko)
+category: framework
+match:
+  rules:
+    - {type: cookie, name: APLIKACJAX_SESSION}
+```
+
+Czujka porównuje tylko nazwę i atrybuty ciasteczka. Nie odsyła go do serwera.
+
+**3. Skrót ikony (favicon hash)**
+
+```yaml
+id: aplikacjax-ikona
+name: AplikacjaX (ikona)
+category: panel
+match:
+  rules:
+    - {type: favicon, mmh3: [116323821]}
+```
+
+Liczbę podaje `fpprobe -brief` w wierszu `favicon`. To ten sam skrót MurmurHash3, którego używają Shodan i FOFA.
+
+**4. Charakterystyczny fragment HTML**
+
+```yaml
+id: aplikacjax-html
+name: AplikacjaX (fragment HTML)
+category: framework
+match:
+  rules:
+    - {type: body, contains: '<div id="aplikacjax-root">'}
+```
+
+**5. Ścieżka typu `/login`, bez próby logowania**
+
+```yaml
+id: aplikacjax-logowanie
+name: AplikacjaX (strona logowania)
+category: panel
+classes: [login]
+match:
+  rules:
+    - {type: path, path: /login, status: [200], contains: 'name="aplikacjax_password"'}
+```
+
+Czujka wysyła jedno `GET /login` i czyta odpowiedź. Nie wypełnia formularza i nie wysyła hasła. Ścieżki sygnatur własnych mają pierwszeństwo w limicie dodatkowych ścieżek na usługę (`PathsFor`), przed ogólnymi ścieżkami biblioteki wbudowanej. Reguła sprawdza też treść, bo serwer, który na każdą ścieżkę odpowiada 200, dałby fałszywe trafienie.
+
+**6. Wersja w stopce**
+
+```yaml
+id: aplikacjax-wersja
+name: AplikacjaX
+category: framework
+match:
+  rules:
+    - {type: body, regex: 'Powered by AplikacjaX v([0-9]+(\.[0-9]+)+)', version_group: 1}
+```
+
+Pierwsza grupa w nawiasach to wersja. Trafia do pola `version` technologii i do CPE, gdy sygnatura ma pole `cpe`.
+
+**7. Odcisk popularnego CMS-a**
+
+```yaml
+id: kampuscms
+name: KampusCMS
+category: cms
+cpe: 'cpe:2.3:a:kampus:kampuscms'
+implies: [PHP]
+match:
+  rules:
+    - {type: meta, name: generator, regex: '^KampusCMS ?([0-9.]+)?', version_group: 1}
+    - {type: header, name: X-Generator, contains: 'KampusCMS'}
+    - {type: cookie, name: kampuscms_sid}
+    - {type: body, contains: '/kampuscms/assets/'}
+    - {type: path, path: /kampuscms/admin/, status: [200, 302], contains: 'KampusCMS'}
+```
+
+Wystarczy jedna reguła. Każda następna podnosi pewność (rozdział 6), więc CMS rozpoznany po trzech cechach ma wyższy wynik niż po jednej.
+
+## 14. Zgodność z innymi formatami
+
+Loader przyjmuje pliki, które nie są w formacie Czujki. Każda sygnatura, niezależnie od formatu wejścia, przechodzi przez ten sam kompilator i ten sam tryb bezpieczny (rozdział 5). Walidator jest ostatnią bramką: konwersja niczego nie omija.
+
+### 14.1 Kształt pliku
+
+| Kształt | Przykład |
+| --- | --- |
+| YAML albo JSON | `{"id": "x", "name": "X", "body": "tekst"}` |
+| jedna sygnatura, lista albo kilka dokumentów `---` | `[{...}, {...}]` |
+| klucz zbiorczy | `signatures`, `sigs`, `fingerprints`, `technologies`, `apps`, `templates`, `items`, `entries`, `definitions`, a także `rules` z listą całych sygnatur |
+| mapa po nazwie | `{"WordPress": {...}, "Drupal": {...}}` – klucz staje się nazwą i id |
+
+### 14.2 Synonimy pól
+
+| Pole Czujki | Przyjmowane nazwy |
+| --- | --- |
+| `id` | `id`, `slug`, `identifier`, `sid`, `template-id`; gdy brak, id powstaje z nazwy |
+| `name` | `name`, `label`, `app`, `software`, `product`, `technology` |
+| `category` | `category`, `cat`, `group`, `kind` |
+| `description` | `description`, `desc`, `summary`, `details`, `comment`, `notes` |
+| `tags` | `tags`, `labels`; lista albo tekst z przecinkami |
+| `interest` | `interest`, `priority`, albo `severity` / `risk` (info 10, low 25, medium 50, high 75, critical 90) |
+| `match.rules` | `match`, `matchers`, `rules`, `detect`, `detection`, `checks`, `conditions`, `fingerprint(s)`, `patterns`, `indicators` |
+| `condition` | `condition`, `mode`, `operator`, `matchers-condition`, `logic` (`and` / `all` → wszystkie reguły) |
+| typ reguły | `type` albo `part` / `in` / `where` / `target` / `scope`; gdy `type` to `word` lub `regex`, cel bierze się z `part` |
+| tekst | `contains`, `word`, `words`, `text`, `keyword(s)`, `string(s)`, `substring`, `value`, `match` |
+| wyrażenie regularne | `regex`, `regexp`, `pattern`, `patterns`, `matches`, `re` |
+| nagłówek | `header`, `headers`, `header_name` |
+| ciasteczko | `cookie`, `cookies`, `cookie_name` |
+| ścieżka | `path`, `paths`, `endpoint`, `uri`, `url` (gdy zaczyna się od `/`) |
+| skrót ikony | `favicon_hash`, `favicon`, `mmh3`, `favicon_mmh3`, `icon_hash`, `hash` |
+| treść strony | `html`, `body`, `content`, `response`, `text` |
+| tytuł | `title` |
+| wersja | `version`, `versions`, `version_regex`, `version_pattern`, `version_extract` – reguła albo sam wzorzec z grupą |
+| waga | `weight`, `confidence`, `score`; liczba całkowita od 2 do 100 to procent |
+
+Pozostałe reguły zgodności:
+
+- Nazwy pól nie rozróżniają wielkości liter ani znaków `-` i `_` (`matchers-condition` = `matchers_condition`).
+- Reguła bez typu dostaje typ z pól, które ma: ścieżka → `path`, skrót → `favicon`, `header` → `header`, `cookie` → `cookie`. Sam tekst oznacza treść strony; walidator zgłasza wtedy ostrzeżenie.
+- `condition: and` w regule z listą słów oznacza: wszystkie słowa (`contains_all`).
+- Ścieżka na górnym poziomie sygnatury (`endpoint: /login`) razem z listą reguł przenosi reguły treści, tytułu, statusu i nagłówków na tę ścieżkę.
+- Id w dowolnej postaci („Old Printer UI”) jest zamieniane na poprawne (`old-printer-ui`) z ostrzeżeniem.
+- Nieznane pole daje ostrzeżenie, nie błąd.
+
+### 14.3 Pliki w stylu Wappalyzera
+
+Mapa po nazwie technologii albo wpis z polem `cats` lub `scriptSrc` jest czytany według konwencji Wappalyzera:
+
+- wzorce w `headers`, `cookies`, `meta`, `html`, `url`, `scriptSrc` to wyrażenia regularne; pusty wzorzec oznacza „pole istnieje”;
+- znacznik `\;version:\1` ustawia grupę wersji, a `\;confidence:50` wagę reguły;
+- `cats` ustawia kategorię, `implies` i `cpe` są przenoszone, `certIssuer` staje się regułą `tls`;
+- `js`, `dom`, `dns`, `xhr`, `css`, `robots`, `probe` są pomijane z ostrzeżeniem, bo wymagają przeglądarki albo innego protokołu. Wpis, który ma tylko takie pola, jest odrzucany: nie ma reguły, którą Czujka może sprawdzić.
+
+### 14.4 Szablony nuclei
+
+Konwerter przyjmuje pasywny podzbiór szablonów HTTP nuclei:
+
+| Element nuclei | Wynik w Czujce |
+| --- | --- |
+| `id`, `info.name`, `author`, `description`, `tags` | te same pola; `severity` → `interest`; `classification.cpe` → `cpe`; tagi `panel` / `login` → kategoria `panel` i klasa `login` |
+| `method: GET`, `path: ["{{BaseURL}}/x"]` | `{{BaseURL}}` → reguły strony głównej; inna ścieżka → reguła `path` |
+| matcher `word` (`condition: and`, `case-insensitive`), `regex`, `status`, `negative` | `contains` / `contains_all`, `regex`, `status`, `not` |
+| `part: body / header / all` | treść albo wiersze „Nazwa: wartość” nagłówków |
+| `matchers-condition: and` | jedna reguła łącząca ścieżkę, status i tekst; gdy się nie da – reguły `required` |
+| `dsl` z `mmh3(base64_py(body))` i liczbą | reguła `favicon` (jedyne przyjmowane wyrażenie DSL) |
+| `extractors` typu `regex` z `group` | reguły `version` |
+
+Konwerter odrzuca, z komunikatem po polsku i oznaczeniem trybu bezpiecznego:
+
+- metodę inną niż GET lub HEAD, treść żądania (`body`), surowe żądania (`raw`);
+- `payloads`, `attack`, `fuzzing`, `race`, `threads`, `pipeline`, `unsafe`, własne nagłówki żądania (`headers`), `cookie-reuse`, `self-contained`;
+- zmienne i funkcje pomocnicze `{{...}}` w ścieżce albo w dopasowaniu (także `interactsh`), ścieżki do innego hosta, sekcję `variables`;
+- wyrażenia DSL inne niż porównanie skrótu ikony;
+- protokoły inne niż HTTP: `dns`, `tcp` / `network`, `ssl`, `file`, `headless`, `websocket`, `whois`, `code`, `javascript`, `workflows`, `flow`.
+
+Matchery `binary`, `size`, `xpath` i `kval` są zgłaszane jako zwykły błąd (nieobsługiwane, ale nie groźne). Ekstraktory inne niż `regex` są pomijane z ostrzeżeniem.
+
+Po konwersji działa tryb bezpieczny. Szablon z samym `GET {{BaseURL}}/.git/config` albo `/actuator/shutdown` jest poprawnym szablonem pasywnym dla konwertera, ale walidator odrzuca jego ścieżkę (rozdział 5).
+
+### 14.5 `fpprobe -convert`
+
+`fpprobe -convert plik` wypisuje YAML Czujki na standardowe wyjście, a ostrzeżenia i błędy na wyjście błędów. Kod wyjścia 1 oznacza, że żadna sygnatura z pliku nie przeszła. Pliki przykładowe są w `internal/sig/testdata/foreign/`.
+
+```
+$ fpprobe -convert internal/sig/testdata/foreign/nuclei-panel.yaml
+id: acme-gateway-detect
+name: ACME Gateway - Detect
+category: panel
+description: ACME Gateway login panel was detected.
+author: 'jkowalski, anowak'
+cpe: 'cpe:2.3:a:acme:gateway'
+tags: [panel, acme, detect]
+classes: [login]
+interest: 10
+match:
+  rules:
+    - {type: path, path: /gateway/login, status: [200], contains_all: ['<title>ACME Gateway</title>', acme-gateway-login], case_sensitive: true, weight: 0.9}
+    - {type: path, path: /login, status: [200], contains_all: ['<title>ACME Gateway</title>', acme-gateway-login], case_sensitive: true, weight: 0.9}
+version:
+  - {type: path, path: /gateway/login, regex: 'Gateway version ([0-9.]+)'}
+  - {type: path, path: /login, regex: 'Gateway version ([0-9.]+)'}
+
+$ fpprobe -convert internal/sig/testdata/foreign/nuclei-active.yaml
+error [tryb bezpieczny]: http[0].raw: szablon nuclei używa pola „raw” (surowe żądania (raw)); Czujka konwertuje tylko pasywne żądania GET bez treści, nagłówków i ładunków (wiersz 9)
+error [tryb bezpieczny]: http[0].attack: szablon nuclei używa pola „attack” (tryb ataku z ładunkami); Czujka konwertuje tylko pasywne żądania GET bez treści, nagłówków i ładunków (wiersz 15)
+error [tryb bezpieczny]: http[0].payloads: szablon nuclei używa pola „payloads” (ładunki (payloads)); Czujka konwertuje tylko pasywne żądania GET bez treści, nagłówków i ładunków (wiersz 17)
+fpprobe: plik odrzucony; powody są powyżej
+```
+
+Sygnatura w obcym formacie działa też bez konwersji: `POST /api/v1/signatures`, `fpprobe -sigs` i `sigwire.Import` przyjmują ją wprost. `sigwire.Import` zapisuje ją jako kanoniczny YAML Czujki.
+
+### 14.6 Ograniczenia zgodności
+
+- Format zestawu od organizatorów nie był znany w chwili pisania. Loader obsługuje kształty i nazwy z tabel powyżej. Pole o innej nazwie daje ostrzeżenie z nazwą pola; dopisanie synonimu to jeden wiersz w `internal/sig/dsl.go`.
+- Konwersja nuclei gubi to, czego Czujka nie ma: `stop-at-first-match`, podążanie za przekierowaniami na dodatkowych ścieżkach, ekstraktory `kval` / `json` / `xpath`.
+- Złożony warunek `and` w szablonie z kilkoma żądaniami albo ścieżkami, którego nie da się zapisać jedną regułą, jest odrzucany z prośbą o podział szablonu.
+- Z plików Wappalyzera używane są tylko cechy widoczne w odpowiedzi HTTP.
+
+## 15. Połączenie z bazą i API (`internal/sigwire`)
+
+`sigwire.Wire` łączy silnik z tabelą `signatures` i z API. Jeden obiekt spełnia `api.SignatureValidator` i `api.RetroHunter`, a `Engine()` zwraca ten sam `*sig.Engine`, który dostaje silnik skanowania jako `model.SignatureEngine`.
+
+| Funkcja | Działanie |
+| --- | --- |
+| `Start(ctx)` | `Seed` + `Reload` przy starcie programu |
+| `Seed(ctx)` | zapisuje bibliotekę wbudowaną jako wiersze `builtin`; odświeża YAML, gdy wbudowany się zmienił; zachowuje wybór `enabled` analityka; usuwa wiersze wbudowane, których biblioteka już nie ma; nie dotyka sygnatur własnych |
+| `Reload(ctx)`, `Changed(ctx)` | czyta wszystkie wiersze i podmienia zestaw silnika jedną operacją atomową; `Changed` to `api.Hooks.SignaturesChanged` |
+| `Validate(yaml)` | wynik walidacji i metadane sygnatury; tekst z więcej niż jedną sygnaturą odrzuca (jeden wiersz = jedna sygnatura) |
+| `RetroHunt(ctx, yaml, latestOnly)` | strumieniowy retro-hunt po zapisanych obserwacjach (rozdział 8) |
+| `Import(ctx, tekst, autor)` | zapisuje wszystkie poprawne sygnatury z pliku (dowolny format z rozdziału 14) jako własne i przeładowuje silnik; sygnatury wbudowanej nie nadpisuje |
+| `UpdateMatchCounts(ctx)` | liczy, ile usług pasuje do każdej sygnatury w najnowszych obserwacjach (`match_count`), jednym zapytaniem SQL |
+
+Wiersz, którego walidator nie przyjmie (np. sygnatura własna zapisana przed zaostrzeniem reguł), nie zatrzymuje programu. `Reload` pomija go i zapisuje w logu: `signature rejected; it is not loaded slug=… reason=…`. Gdy bazy nie da się odczytać, silnik zostaje przy poprzednim zestawie.
+
+Pomiar z 2026-11-21 (`TestRetroHuntScale` z `CZUJKA_RETRO_N=100000`, PostgreSQL 17 z pg_tde w kontenerze, laptop):
+
+```
+stored 100000 observations (about 4 KiB of encrypted body each) in 17.14s
+retro-hunt: 100000 observations, 2000 hits, 5436 ms (18396 observations/s), 0 packets, peak heap 48 MiB (before 18 MiB)
+match counts over 100000 services: 183ms
+signatures seeded builtin=386 removed=0 took_ms=55
+signatures loaded rows=386 loaded=386 enabled=386 rejected=0 paths=45 took_ms=75
+```
+
+Testy integracyjne potrzebują bazy (`CZUJKA_TEST_DB_URL`); bez niej są pomijane.
