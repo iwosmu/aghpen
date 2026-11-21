@@ -300,7 +300,8 @@ func (d *differ) host(prev, cur *HostSnapshot) {
 		} else if prev.Up {
 			n := openCount(prev.Services)
 			d.unreachable += n
-			d.add(cur, nil, model.ChangeHostMissing, model.SevMedium, "status", string(model.HostUp), "missing", false, missingSummary(cur, n))
+			d.add(cur, nil, model.ChangeHostMissing, model.SevMedium, "status", string(model.HostUp), "missing", false, missingSummary(cur, prev.Services))
+			d.servicesUnreachable(cur, prev)
 		} else {
 			d.unreachable += openCount(prev.Services)
 			d.add(cur, nil, model.ChangeHostUnstable, model.SevLow, "status", string(prev.Status), string(model.HostUnstable), false,
@@ -948,12 +949,22 @@ func goneSummary(h *HostSnapshot) string {
 }
 
 // missingSummary is the sentence of host_missing, with the model's view.
-func missingSummary(h *HostSnapshot, open int) string {
-	prev := "w poprzednim aktywny"
-	if open > 0 {
-		prev += fmt.Sprintf(", %d %s", open, plural(open, "otwarta usługa", "otwarte usługi", "otwartych usług"))
+func missingSummary(h *HostSnapshot, had []model.ServiceResult) string {
+	prev := "w poprzednim przebiegu odpowiadał"
+	var list []string
+	for i := range had {
+		if s := &had[i]; isOpen(s) {
+			list = append(list, serviceLabel(s))
+		}
 	}
-	s := fmt.Sprintf("Host %s nie odpowiedział w tym przebiegu (%s); ", h.IP, prev)
+	if n := len(list); n > 0 {
+		shown := list
+		if n > 6 {
+			shown = append(append([]string{}, list[:6]...), fmt.Sprintf("i %d innych", n-6))
+		}
+		prev += fmt.Sprintf(" i miał %d %s: %s", n, plural(n, "otwartą usługę", "otwarte usługi", "otwartych usług"), strings.Join(shown, ", "))
+	}
+	s := fmt.Sprintf("Host %s nie odpowiada (niepotwierdzone): %s; ", h.IP, prev)
 	var parts []string
 	if h.PAlive > 0 {
 		parts = append(parts, "p_alive "+decimalPL(h.PAlive))
@@ -989,4 +1000,47 @@ func plural(n int, one, few, many string) string {
 // decimalPL formats a probability with two decimals and a decimal comma.
 func decimalPL(f float64) string {
 	return strings.Replace(strconv.FormatFloat(f, 'f', 2, 64), ".", ",", 1)
+}
+
+// servicesUnreachable records each open service of a host that did not
+// answer (host_missing): its state is unknown in this run, not gone. The
+// changes name what disappeared with the host before a confirmation probe
+// decides between "back" and "inactive" (then service_gone follows).
+func (d *differ) servicesUnreachable(cur, prev *HostSnapshot) {
+	for i := range prev.Services {
+		s := &prev.Services[i]
+		if !isOpen(s) {
+			continue
+		}
+		d.add(cur, s, model.ChangeServiceUnreachable, model.SevLow, "state", "open", "unknown", false,
+			fmt.Sprintf("Usługa %s:%d%s nie odpowiada (niepotwierdzone): host nie odpowiedział w tym przebiegu", cur.IP, s.Port, nameNote(s)))
+		if id, ok := prev.ServiceIDs[svcKey(s)]; ok {
+			d.out[len(d.out)-1].ServiceID = &id
+		}
+	}
+}
+
+// serviceLabel is "80/tcp http nginx" for a change summary.
+func serviceLabel(s *model.ServiceResult) string {
+	proto := s.Proto
+	if proto == "" {
+		proto = "tcp"
+	}
+	out := fmt.Sprintf("%d/%s", s.Port, proto)
+	if s.Name != "" {
+		out += " " + s.Name
+	}
+	if s.Product != "" {
+		out += " " + s.Product
+	}
+	return out
+}
+
+// nameNote is " (ssh OpenSSH)", or "" when the service has no name.
+func nameNote(s *model.ServiceResult) string {
+	n := strings.TrimSpace(s.Name + " " + s.Product)
+	if n == "" {
+		return ""
+	}
+	return " (" + n + ")"
 }

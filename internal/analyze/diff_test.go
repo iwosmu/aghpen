@@ -71,7 +71,7 @@ func TestDiffHostTransitions(t *testing.T) {
 		{"back", ptr(host("10.0.0.2", model.HostDown)), host("10.0.0.2", model.HostUp),
 			[]string{"host_back"}, "Host 10.0.0.2 znów odpowiada po zgłoszeniu jako nieaktywny", model.SevLow},
 		{"missing after an answer", ptr(host("10.0.0.2", model.HostUp)), host("10.0.0.2", model.HostUnstable),
-			[]string{"host_missing"}, "Host 10.0.0.2 nie odpowiedział w tym przebiegu (w poprzednim aktywny)", model.SevMedium},
+			[]string{"host_missing"}, "Host 10.0.0.2 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał", model.SevMedium},
 		{"unstable after expected offline", ptr(host("10.0.0.2", model.HostExpectedOffline)), host("10.0.0.2", model.HostUnstable),
 			[]string{"host_unstable"}, "Host 10.0.0.2 nie odpowiedział w porze", model.SevLow},
 		{"irregular host misses again", ptr(host("10.0.0.2", model.HostUp)), HostSnapshot{IP: "10.0.0.2", Status: model.HostUnstable, Stability: 0.5, Observations: 40},

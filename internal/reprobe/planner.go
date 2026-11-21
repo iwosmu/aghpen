@@ -34,6 +34,11 @@ type Settings struct {
 	MaxPortsPerHost int     `json:"max_ports_per_host"` // known open ports probed again, at most
 }
 
+// YoungBackoffMinutes are the confirmation steps of a host with fewer than
+// analyze.MinObsForExpected observations (no rhythm learned yet), instead of
+// Settings.BackoffMinutes.
+var YoungBackoffMinutes = []int{1, 3, 10}
+
 // DefaultSettings are used until an operator stores others.
 func DefaultSettings() Settings {
 	return Settings{Enabled: true, BudgetPerHour: 200, BackoffMinutes: []int{10, 30, 90}, LikelyUpRate: 0.6, MaxPortsPerHost: 32}
@@ -198,10 +203,23 @@ func Build(in Input) Plan {
 			ports = []int{}
 		}
 		p := Probe{HostID: c.HostID, IP: c.IP, Ports: ports, ProfileID: c.ProfileID}
+		n := 0
+		for _, b := range c.Buckets {
+			n += b.Up + b.Down
+		}
+		// A host without a learned rhythm gets its first confirmation within
+		// minutes: one more miss reports it inactive, so a second scan of a
+		// stopped host ends in "inactive, confirmed" and not in a long wait.
+		hs, hLast := steps, lastStep
+		young := n < analyze.MinObsForExpected
+		if young {
+			hs, hLast = YoungBackoffMinutes, time.Duration(YoungBackoffMinutes[len(YoungBackoffMinutes)-1])*time.Minute
+		}
 
-		confirm := c.Status == model.HostUnstable && c.LastUp != nil && c.Attempts < len(steps) &&
-			now.Sub(c.StreakStart) <= lastStep+ConfirmHorizon
+		confirm := c.Status == model.HostUnstable && c.LastUp != nil && c.Attempts < len(hs) &&
+			now.Sub(c.StreakStart) <= hLast+ConfirmHorizon
 		if confirm {
+			steps := hs
 			k := c.Attempts
 			at := c.StreakStart.Add(time.Duration(steps[k]) * time.Minute)
 			if at.Before(now) {
@@ -215,6 +233,9 @@ func Build(in Input) Plan {
 			p.Kind, p.Step, p.Steps, p.NotBefore = KindConfirm, k+1, len(steps), wAt
 			p.Reason = fmt.Sprintf("Host nie odpowiedział w skanie o %s. Potwierdzenie %d z %d, %d min po pierwszym braku: szybki werdykt, czy host wrócił, czy jest nieaktywny.",
 				c.StreakStart.In(tz).Format("02.01 15:04"), k+1, len(steps), steps[k])
+			if young {
+				p.Reason += fmt.Sprintf(" Host ma %d %s, więc jego rytm nie jest jeszcze znany: krótkie odstępy.", n, plural(n, "obserwację", "obserwacje", "obserwacji"))
+			}
 			if wAt.After(at) {
 				p.Reason += fmt.Sprintf(" Przesunięte do okna skanowania (start %s).", wAt.In(tz).Format("02.01 15:04"))
 			}
@@ -223,10 +244,6 @@ func Build(in Input) Plan {
 		}
 
 		// Likely-up rule: unstable or expected-offline hosts with a known rhythm.
-		n := 0
-		for _, b := range c.Buckets {
-			n += b.Up + b.Down
-		}
 		if n < analyze.MinObsForExpected {
 			plan.Skipped = append(plan.Skipped, Skip{c.HostID, c.IP, fmt.Sprintf("Za mało obserwacji (%d), żeby znać rytm hosta; czeka na pełny skan.", n)})
 			continue

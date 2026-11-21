@@ -20,13 +20,14 @@ import (
 	"github.com/iwosmu/aghpen/internal/timeline"
 )
 
-// seedReprobeOff stores re-probing settings with enabled = false when none
-// are stored: traffic that the scanner starts on its own needs the consent of
-// an administrator (the first-run wizard offers it). It reports whether it
-// stored them.
-func seedReprobeOff(ctx context.Context, st *store.Store) (bool, error) {
+// seedReprobe stores the default re-probing settings (enabled) when none are
+// stored. Re-probing sends the profile's own probes to single addresses that
+// a scan already found, within an hourly budget, the safety policy and the
+// emergency stop; it confirms a silent host within minutes instead of waiting
+// for the next scheduled scan. An administrator can turn it off
+// (PUT /api/v1/settings/reprobe). It reports whether it stored them.
+func seedReprobe(ctx context.Context, st *store.Store) (bool, error) {
 	s := reprobe.DefaultSettings()
-	s.Enabled = false
 	raw, err := json.Marshal(s)
 	if err != nil {
 		return false, err
@@ -100,10 +101,10 @@ func timeMachine(ctx context.Context, st *store.Store, mgr *runner.Manager, loc 
 	if err := rb.Init(ctx); err != nil {
 		return nil, fmt.Errorf("reprobe: %w", err)
 	}
-	if seeded, err := seedReprobeOff(ctx, st); err != nil {
+	if seeded, err := seedReprobe(ctx, st); err != nil {
 		return nil, fmt.Errorf("reprobe settings: %w", err)
 	} else if seeded {
-		log.Info("first start: re-probing is off until an administrator enables it (PUT /api/v1/settings/reprobe)")
+		log.Info("first start: re-probing is on (confirmation probes of silent hosts, budgeted); PUT /api/v1/settings/reprobe turns it off")
 	}
 	rb.SetStarter(targeted(mgr))
 	go (&reprobe.Executor{B: rb, Log: log}).Run(ctx)

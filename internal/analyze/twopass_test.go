@@ -32,13 +32,13 @@ func TestTwoPassMissingHost(t *testing.T) {
 		unreachable int
 		svcGone     int
 	}{
-		{"model decides, one earlier run", 1, 0, []string{"host_missing"}, model.HostUnstable,
-			"nie odpowiedział w tym przebiegu (w poprzednim aktywny, 3 otwarte usługi); model: p_alive 0,", 1, 0, 3, 0},
-		{"model decides, long stable history", 40, 0, []string{"host_missing"}, model.HostUnstable,
+		{"model decides, one earlier run", 1, 0, []string{"host_missing", "service_unreachable", "service_unreachable", "service_unreachable"}, model.HostUnstable,
+			"nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 3 otwarte usługi: 22/tcp ssh OpenSSH, 80/tcp http nginx, 8080/tcp http Jenkins; model: p_alive 0,", 1, 0, 3, 0},
+		{"model decides, long stable history", 40, 0, []string{"host_missing", "service_unreachable", "service_unreachable", "service_unreachable"}, model.HostUnstable,
 			"zgłoszenie nieaktywności po kolejnym braku", 1, 0, 3, 0},
 		{"rule N=1", 1, 1, []string{"host_gone", "service_gone", "service_gone", "service_gone"}, model.HostDown,
 			"brak odpowiedzi w 1 przebiegu z rzędu (reguła profilu: zgłoszenie po 1 braku)", 0, 1, 0, 3},
-		{"rule N=2", 1, 2, []string{"host_missing"}, model.HostUnstable,
+		{"rule N=2", 1, 2, []string{"host_missing", "service_unreachable", "service_unreachable", "service_unreachable"}, model.HostUnstable,
 			"zgłoszenie nieaktywności po kolejnym braku, reguła profilu: 2 braki z rzędu", 1, 0, 3, 0},
 	}
 	for _, c := range cases {
