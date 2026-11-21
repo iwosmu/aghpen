@@ -13,6 +13,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"sort"
 	"strconv"
@@ -69,6 +70,14 @@ func (s *session) do(ctx context.Context, method string, u *url.URL, maxBody int
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Encoding", "gzip")
 
+	// elapsed is the time to the first response byte: from the start of the
+	// round trip (on a new connection: TCP connect and TLS handshake
+	// included) to the first byte of the answer. Header parsing and body
+	// transfer are not in it, so a slow link does not stretch it.
+	var first time.Time
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), &httptrace.ClientTrace{
+		GotFirstResponseByte: func() { first = time.Now() },
+	}))
 	start := time.Now()
 	resp, err := s.transport().RoundTrip(req)
 	if s.c.OnRequest != nil {
@@ -78,7 +87,11 @@ func (s *session) do(ctx context.Context, method string, u *url.URL, maxBody int
 		return nil, err
 	}
 	defer resp.Body.Close()
-	r := &response{url: u, status: resp.StatusCode, header: resp.Header, elapsed: time.Since(start)}
+	elapsed := time.Since(start)
+	if !first.IsZero() {
+		elapsed = first.Sub(start)
+	}
+	r := &response{url: u, status: resp.StatusCode, header: resp.Header, elapsed: elapsed}
 	r.cookies = cookiesOf(resp)
 
 	// Read at most maxBody+1 bytes: the extra byte tells "exactly the limit" from "more".

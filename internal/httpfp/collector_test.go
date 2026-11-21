@@ -871,3 +871,40 @@ func TestFetchPathsSkipsTheRoot(t *testing.T) {
 		t.Errorf("hits = %v", hits)
 	}
 }
+
+// response_ms is the time to the first byte of the first GET: a server that
+// thinks 300 ms and then sends headers slowly over a raw connection gives
+// about 300 ms, not the time the headers took to arrive.
+func TestResponseMsIsTimeToFirstByte(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				buf := make([]byte, 4096)
+				c.Read(buf)
+				time.Sleep(300 * time.Millisecond)
+				c.Write([]byte("HTTP/1.1 200 OK\r\n"))
+				time.Sleep(700 * time.Millisecond) // the rest of the headers comes late (a slow link)
+				c.Write([]byte("Content-Type: text/html\r\nContent-Length: 15\r\nConnection: close\r\n\r\n<title>x</title>"))
+			}(c)
+		}
+	}()
+	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
+	port, _ := strconv.Atoi(portStr)
+	fp, _, err := New().Fingerprint(context.Background(), model.FingerprintRequest{IP: "127.0.0.1", Port: port, Opts: model.HTTPOpts{TimeoutMs: 5000}})
+	if err != nil || fp == nil {
+		t.Fatalf("fp=%v err=%v", fp, err)
+	}
+	if fp.ResponseMs < 290 || fp.ResponseMs > 650 {
+		t.Errorf("response_ms = %d, want about 300 (first byte), not 1000 (all headers)", fp.ResponseMs)
+	}
+}
