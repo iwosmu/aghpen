@@ -898,6 +898,9 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 		if plan.Profile.UDP.Enabled {
 			if udp, err := probe.UDPPorts(plan.Profile.UDP.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil {
 				packets += live * float64(len(udp)) * 2 // one retry for silent ports
+				if plan.Profile.ServiceDetection {
+					packets += live * 0.1 * float64(len(udp)) * 3 // version probes of the open ones (about 1 in 10 answers)
+				}
 			}
 		}
 		if plan.Profile.Retry.UnstableRetries > 0 {

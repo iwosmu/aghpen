@@ -171,7 +171,7 @@ func (r *run) udpStage(ctx context.Context, g *group, up []probe.Host, rate int,
 	}
 	t0 := r.e.now()
 	end := r.stats.begin(rate)
-	res, err := scanner.UDPScan(ctx, probe.UDPScanRequest{Hosts: ips, Ports: r.udpPorts, MaxRate: rate, HostTimeout: udpHostTimeout, IPv6: g.v6})
+	res, err := scanner.UDPScan(ctx, probe.UDPScanRequest{Hosts: ips, Ports: r.udpPorts, MaxRate: rate, HostTimeout: udpHostTimeout, IPv6: g.v6, Versions: r.plan.Profile.ServiceDetection})
 	end()
 	r.account(gs, res, t0)
 	if err != nil {

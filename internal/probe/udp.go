@@ -59,6 +59,10 @@ type UDPScanRequest struct {
 	MaxRate     int
 	HostTimeout time.Duration
 	IPv6        bool
+	// Versions: version detection on the open ports (intensity 0: only the
+	// probes nmap lists for the port; never 161). Off when the profile turns
+	// service detection off.
+	Versions bool
 }
 
 // UDPScanner is the optional UDP stage of a prober. Only nmap with raw
@@ -184,6 +188,84 @@ func (n *Nmap) UDPArgs(req UDPScanRequest) []string {
 	return append(args, n.commonArgs(req.MaxRate, 1, req.HostTimeout, req.IPv6)...)
 }
 
+// UDPVersionArgs builds the version detection of open UDP ports (without
+// targets): nmap -sU -sV at intensity 0, so only the probes that nmap lists
+// for that port go out (the DNS version query on 53, the NTP client request
+// on 123, NBSTAT on 137, ...): the same questions the UDP scan's payloads
+// ask, no scripts, never port 161 (its nmap probes carry the SNMP community
+// "public"; SNMP has its own engine-discovery probe).
+func (n *Nmap) UDPVersionArgs(ports []int, maxRate int, hostTimeout time.Duration, v6 bool) []string {
+	var list []int
+	for _, p := range ports {
+		if _, ok := UDPServices[p]; ok && p != snmpPort {
+			list = append(list, p)
+		}
+	}
+	args := []string{"-sU", "-sV", "--version-intensity", "0", "-Pn", "-p", "U:" + portList(list)}
+	return append(args, n.commonArgs(maxRate, 1, hostTimeout, v6)...)
+}
+
+// udpVersions runs UDPVersionArgs on the hosts with open UDP ports (open
+// only: not open|filtered) and copies name, product and version into res.
+func (n *Nmap) udpVersions(ctx context.Context, req UDPScanRequest, res *Result) error {
+	var hosts []string
+	set := map[int]bool{}
+	for _, h := range res.Hosts {
+		found := false
+		for _, p := range h.Ports {
+			if p.Proto == "udp" && p.State == "open" && p.Port != snmpPort {
+				set[p.Port], found = true, true
+			}
+		}
+		if found {
+			hosts = append(hosts, h.IP)
+		}
+	}
+	if len(hosts) == 0 {
+		return nil
+	}
+	var ports []int
+	for p := range set {
+		ports = append(ports, p)
+	}
+	sort.Ints(ports)
+	sv, err := n.run(ctx, "udp-version", n.UDPVersionArgs(ports, req.MaxRate, req.HostTimeout, req.IPv6), hosts)
+	if err != nil {
+		return err
+	}
+	if sv.PacketsExact {
+		res.Packets += sv.Packets
+	} else {
+		res.Packets += int64(len(hosts)*len(ports)) * 3
+		res.PacketsExact = false
+	}
+	byKey := map[string]Port{}
+	for _, h := range sv.Hosts {
+		for _, p := range h.Ports {
+			if p.Proto == "udp" && p.State == "open" {
+				byKey[h.IP+"/"+strconv.Itoa(p.Port)] = p
+			}
+		}
+	}
+	for i := range res.Hosts {
+		for j, p := range res.Hosts[i].Ports {
+			d, ok := byKey[res.Hosts[i].IP+"/"+strconv.Itoa(p.Port)]
+			if !ok || p.Proto != "udp" || p.State != "open" {
+				continue
+			}
+			if d.Name != "" {
+				p.Name = d.Name
+			}
+			p.Product, p.Version, p.ExtraInfo, p.Method, p.Confidence = d.Product, d.Version, d.ExtraInfo, d.Method, d.Confidence
+			if len(d.CPE) > 0 {
+				p.CPE = d.CPE
+			}
+			res.Hosts[i].Ports[j] = p
+		}
+	}
+	return nil
+}
+
 // UDPScan probes the allow-listed UDP ports of hosts that are up.
 func (n *Nmap) UDPScan(ctx context.Context, req UDPScanRequest) (*Result, error) {
 	if !n.privileged {
@@ -198,6 +280,11 @@ func (n *Nmap) UDPScan(ctx context.Context, req UDPScanRequest) (*Result, error)
 		if !res.PacketsExact {
 			res.Packets = int64(len(req.Hosts)) * int64(len(req.Ports)) * 2
 		}
+		if !req.Versions {
+			// version detection is off in the profile
+		} else if err := n.udpVersions(ctx, req, res); err != nil && ctx.Err() != nil {
+			return res, context.Cause(ctx)
+		} // on another error the ports stay open with the table's name; only the version is missing
 	}
 	for _, p := range req.Ports {
 		if p != snmpPort || req.IPv6 {
