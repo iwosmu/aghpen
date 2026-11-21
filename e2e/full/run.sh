@@ -31,6 +31,7 @@ export CZUJKA_SCHED_INTERVAL=5s CZUJKA_SCAN_NETWORK=$NET CZUJKA_TZ=Europe/Warsaw
 cleanup() {
   rm -f "$TMP/mem.on"
   if [ "${E2E_KEEP:-0}" != 1 ]; then
+    docker rm -f "$PROJECT-tcpdump" >/dev/null 2>&1 || true
     $DC down -v --remove-orphans >/dev/null 2>&1 || true
     e2e/full/lab.sh down >/dev/null 2>&1 || true
   fi
@@ -71,6 +72,22 @@ status_of() { # method path [json] -> HTTP status only
 upload() { curl -sS -b "$JAR" -H "X-CSRF-Token: $CSRF" -F "file=@$2" "$API$1"; }
 labif() { docker exec "$CZ" sh -c "ip -o -4 addr | awk '/ $P\\./ {print \$2}'"; }
 txpackets() { docker exec "$CZ" cat "/sys/class/net/$LABIF/statistics/tx_packets"; }
+# A tcpdump sidecar shares the network namespace of the Czujka container and records every packet
+# that leaves the scan interface. The image (alpine + tcpdump) is built locally on first use.
+cap_start() {
+  docker image inspect czfull-tcpdump:latest >/dev/null 2>&1 ||
+    printf 'FROM alpine:3.22\nRUN apk add --no-cache tcpdump\n' | docker build -q -t czfull-tcpdump:latest - >/dev/null
+  docker rm -f "$PROJECT-tcpdump" >/dev/null 2>&1 || true
+  docker run -d --name "$PROJECT-tcpdump" --net "container:$CZ" --cap-add NET_RAW --cap-add NET_ADMIN \
+    czfull-tcpdump:latest tcpdump -i "$LABIF" -n -tt -l -Q out >/dev/null
+  sleep 3
+}
+# cap_stop FILE: stops the capture and writes it without the API's own replies (source port 8080),
+# which leave through the same interface when the default route uses it. They are not scan traffic.
+cap_stop() {
+  docker logs "$PROJECT-tcpdump" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+ ' | grep -v '\.8080 >' > "$1" || true
+  docker rm -f "$PROJECT-tcpdump" >/dev/null 2>&1 || true
+}
 mem_sampler() { # samples the memory of the Czujka container every 2 s while $TMP/mem.on exists
   touch "$TMP/mem.on"
   ( while [ -f "$TMP/mem.on" ]; do docker stats --no-stream --format '{{.MemUsage}}' "$CZ" 2>/dev/null | awk '{print $1}' >> "$TMP/mem.txt"; sleep 2; done ) &
@@ -128,14 +145,15 @@ LOGIN=$(curl -sS -c "$JAR" -H "Content-Type: application/json" -d "{\"email\":\"
 CSRF=$(echo "$LOGIN" | jq -r .csrf_token)
 check "login" "$(echo "$LOGIN" | jq -r .user.role_slug)" "admin"
 
-step "4. Safety policy: never touch Czujka's own address"
-POL=$(api GET /settings/safety | jq -c --arg ip "$CZIP" '.exclusions = [$ip]')
+step "4. Safety policy: never touch Czujka's own address or the network gateway"
+# The gateway is the docker host side of the network, not a lab host: excluded too.
+POL=$(api GET /settings/safety | jq -c --arg ip "$CZIP" --arg gw "$P.0.1" '.exclusions = [$ip, $gw]')
 api PUT /settings/safety "$POL" | jq -c '{max_pps, max_http_rps, max_per_host_rps, exclusions, allowed_methods}'
 
 step "5. Scope and profile"
 SCOPE=$(api POST /scopes '{"name":"Laboratorium e2e","description":"sieć dockera czfull-net","criticality":3}' | jq -r .id)
 api POST /scopes/$SCOPE/targets "{\"text\":\"$P.0.0/22\"}" | jq -c '{saved: (.valid | length), address_count, excluded, invalid: (.invalid | length)}'
-PROFILE_JSON=$(jq -nc --argjson s "$SCOPE" '{name:"e2e: pełny skan", scope_ids:[$s], ports:"top-1000,8765,9443", service_detection:true, version_intensity:5,
+PROFILE_JSON=$(jq -nc --argjson s "$SCOPE" '{name:"e2e: pełny skan", scope_ids:[$s], ports:"top-1000,6379,8765,9443", service_detection:true, version_intensity:5,
   http:{enabled:true, max_redirects:3, signature_paths:true, favicon:true, timeout_ms:5000},
   rate:{max_pps:800, max_parallel_chunks:2, max_parallel_hosts:8, http_rps:20},
   retry:{unstable_retries:1}, schedule:{enabled:false}, enabled:true}')
@@ -144,7 +162,7 @@ echo "profile $PROFILE"
 case "$PROFILE" in ''|null) echo "the profile could not be created: stopping"; exit 1 ;; esac
 EST=$(api POST /profiles/$PROFILE/estimate)
 echo "$EST" | jq -c .
-checkge "estimate: addresses (1024 minus Czujka)" "$(echo "$EST" | jq .addresses)" 1023
+checkge "estimate: addresses (1024 minus Czujka and the gateway)" "$(echo "$EST" | jq .addresses)" 1022
 
 step "6. Run 1: start, follow the SSE stream to the end"
 mem_sampler
@@ -155,7 +173,7 @@ wait_done "$RUN1" 120
 D1=$(( $(date +%s) - T0 ))
 R1=$(api GET /runs/$RUN1)
 check "run 1 status" "$(echo "$R1" | jq -r .status)" "completed"
-checkge "run 1 hosts up (9 lab hosts)" "$(echo "$R1" | jq .stats.hosts_up)" 9
+check "run 1 hosts up (the 9 lab hosts)" "$(echo "$R1" | jq .stats.hosts_up)" "9"
 
 step "7. Results of run 1"
 echo "-- hosts:"
@@ -169,7 +187,8 @@ check "Grafana recognised" "$(echo "$SVC" | jq -r --arg ip "$P.2.90" '[.items[] 
 check "MariaDB classified as database" "$(echo "$SVC" | jq -r --arg ip "$P.1.81" '[.items[] | select(.ip == $ip and .port == 3306)][0].classes | index("database") != null')" "true"
 check "host that drops ICMP found" "$(api GET "/hosts?limit=100" | jq -r --arg ip "$P.3.60" '[.items[] | select(.ip == $ip)][0].status')" "up"
 check "TLS service on 9443" "$(echo "$SVC" | jq -r --arg ip "$P.3.50" '[.items[] | select(.ip == $ip and .port == 9443)][0].tls')" "true"
-check "Czujka did not scan itself (exclusion)" "$(api GET "/hosts?limit=100" | jq -r --arg ip "$CZIP" '[.items[] | select(.ip == $ip)] | length')" "0"
+check "Czujka and the gateway were not scanned (exclusions)" "$(api GET "/hosts?limit=100" | jq -r --arg ip "$CZIP" --arg gw "$P.0.1" '[.items[] | select(.ip == $ip or .ip == $gw)] | length')" "0"
+check "Redis found on 6379" "$(echo "$SVC" | jq -r --arg ip "$P.1.30" '[.items[] | select(.ip == $ip and .port == 6379)][0].product')" "Redis key-value store"
 echo "-- findings:"
 api GET "/findings?limit=100" | jq -r '.items[] | "  #\(.id) [\(.status)] \(.type) \(.ip):\(.port) interest=\(.interest)  \(.title)"'
 checkge "findings of run 1" "$(api GET /findings | jq .total)" 3
@@ -185,12 +204,14 @@ api PATCH /findings/$DBF '{"status":"accepted","note":"baza testowa, ryzyko zaak
 step "9. Custom signature through the API; retro-hunt with 0 packets"
 SIGYAML=$'id: e2e-lab-page\nname: Strona laboratorium e2e\ncategory: other\ninterest: 20\nbody: \'lab host\''
 api POST /signatures "$(jq -nc --arg y "$SIGYAML" '{yaml: $y}')" | jq -c '{id, slug, name, enabled}'
-TX0=$(txpackets)
+cap_start
 RH=$(api POST /signatures/retrohunt "$(jq -nc --arg y "$SIGYAML" '{yaml: $y, latest_only: true}')")
-TX1=$(txpackets)
+sleep 1
+cap_stop "$TMP/retrohunt.cap.txt"
 echo "$RH" | jq -c '{scanned, total_hits, hits: [.hits[]? | "\(.ip):\(.port)"]}'
 checkge "retro-hunt hits in stored observations" "$(echo "$RH" | jq .total_hits)" 3
-checkle "packets sent to the target network during the retro-hunt" "$((TX1 - TX0))" 0
+# Traffic to the gateway is the docker host side (API replies, ARP refresh for them), not a lab host.
+check "packets sent to lab hosts during the retro-hunt (tcpdump)" "$(grep -v -e "who-has $P.0.1 " -e "> $P.0.1\." "$TMP/retrohunt.cap.txt" | wc -l | tr -d ' ')" "0"
 
 step "10. Change the target network: redis stops, a new nginx host, nginx upgraded, one page title changed"
 e2e/full/lab.sh change
@@ -231,7 +252,7 @@ for fmt in json csv xml; do
   curl -sS -b "$JAR" -o $TMP/run2.$fmt $API/export/runs/$RUN2.$fmt
   IMP=$(upload /import/results $TMP/run2.$fmt)
   echo "  $fmt: $(wc -c < $TMP/run2.$fmt | tr -d ' ') bytes -> $(echo "$IMP" | jq -c '{format, run_id, hosts, services, invalid: (.invalid | length)}')"
-  check "$fmt export imports again with every live host" "$(echo "$IMP" | jq '.hosts')" "$(echo "$R2" | jq .stats.hosts_up)"
+  check "$fmt export imports again: hosts (live and silent) and open services" "$(echo "$IMP" | jq -r '"hosts=\(.hosts) services=\(.services)"')" "hosts=$(api GET "/hosts?limit=1" | jq .total) services=$(echo "$R2" | jq .stats.services_open)"
 done
 
 step "14. Signature file import (one valid, one unsafe)"
@@ -266,25 +287,30 @@ check "crt.sh stays off until an admin enables it" "$(status_of POST /passive/cr
 step "16. Scan window closes mid-run; the scheduler resumes the run in the next window"
 NOWM=$(( 10#$(TZ=Europe/Warsaw date +%H) * 60 + 10#$(TZ=Europe/Warsaw date +%M) ))
 SEC=$(( 10#$(date +%S) ))
-W1E=$(( NOWM + 2 )); [ "$SEC" -gt 30 ] && W1E=$(( NOWM + 3 ))
+W1E=$(( NOWM + 2 )); [ "$SEC" -gt 40 ] && W1E=$(( NOWM + 3 ))
 W2S=$(( W1E + 1 )); W2E=$(( W2S + 25 ))
 WIN=$(jq -nc --arg a "$(hm $NOWM)" --arg b "$(hm $W1E)" --arg c "$(hm $W2S)" --arg d "$(hm $W2E)" \
   '[{days:[0,1,2,3,4,5,6], start:$a, end:$b}, {days:[0,1,2,3,4,5,6], start:$c, end:$d}]')
 echo "windows (Europe/Warsaw): $WIN"
 WP=$(api POST /profiles "$(jq -nc --argjson s "$SCOPE" --argjson w "$WIN" '{name:"e2e: okno", scope_ids:[$s], ports:"22,80", service_detection:false,
-  http:{enabled:false}, rate:{max_pps:12, max_parallel_chunks:1}, chunking:{adaptive:false, initial_size:256, min_size:256, max_size:256},
+  http:{enabled:false}, rate:{max_pps:40, max_parallel_chunks:1}, chunking:{adaptive:false, initial_size:256, min_size:256, max_size:256, target_seconds:30},
   schedule:{enabled:true, interval_minutes:1440, windows:$w, timezone:"Europe/Warsaw"}, enabled:true}')" | jq -r .id)
 RW=$(api POST /runs "{\"profile_id\":$WP}" 2>/dev/null | jq -r '.id // empty')
 if [ -z "$RW" ]; then RW=$(api GET "/runs?profile_id=$WP&limit=1" | jq -r '.items[0].id'); echo "  (the scheduler started the run first)"; fi
+case "$WP" in ''|null) fail "the window profile could not be created" ;; esac
 echo "window run $RW started at $(TZ=Europe/Warsaw date +%H:%M:%S); window 1 closes at $(hm $W1E):00"
 if wait_status "$RW" '.status == "paused" and .pause_reason == "window_closed"' 260; then
   RWJ=$(api GET /runs/$RW)
   pass "run paused at $(TZ=Europe/Warsaw date +%H:%M:%S) with window_closed, resume_at=$(echo "$RWJ" | jq -r .resume_at), chunks $(echo "$RWJ" | jq -r '"\(.stats.chunks_done)/\(.stats.chunks_total)"')"
+  checkge "chunks finished before the window closed (the window closed mid-run)" "$(echo "$RWJ" | jq .stats.chunks_done)" 1
+  echo "-- chunks of the paused run:"
+  api GET /runs/$RW/chunks | jq -r '.[] | "  chunk \(.seq) \(.spec | join(",")) \(.status) hosts_up=\(.hosts_up) group=\(.group)"'
   check "no service reported gone outside the scanned ports 22,80" "$(api GET "/changes?run_id=$RW&kind=service_gone&limit=200" | jq '[.items[] | select(.port != 22 and .port != 80)] | length')" "0"
 else
   fail "run did not pause with window_closed: $(api GET /runs/$RW | jq -c '{status, pause_reason, window_end}')"
 fi
-if wait_status "$RW" '.status == "running" or .status == "analyzing" or .status == "completed"' 150; then
+WAIT2=$(( W2S * 60 - NOWM * 60 - SEC + 90 ))
+if wait_status "$RW" '.status == "running" or .status == "analyzing" or .status == "completed"' "$WAIT2"; then
   pass "the scheduler resumed the run at $(TZ=Europe/Warsaw date +%H:%M:%S) (window 2 opens at $(hm $W2S):00)"
 else
   fail "run was not resumed: $(api GET /runs/$RW | jq -c '{status, pause_reason, resume_at}')"
@@ -298,17 +324,28 @@ SP=$(api POST /profiles "$(jq -nc --argjson s "$SCOPE" '{name:"e2e: stop", scope
 RS=$(api POST /runs "{\"profile_id\":$SP}" | jq -r .id)
 wait_status "$RS" '.status == "running" and .stats.packets_sent > 0' 60 || sleep 5
 sleep 2
+cap_start
 NM0=$(docker exec $CZ sh -c 'pgrep nmap | wc -l')
-T0=$(date +%s)
+TS=$(date +%s.%N)
 ES=$(api POST /emergency-stop)
-T1=$(date +%s)
+TE=$(date +%s.%N)
 sleep 1
 NM1=$(docker exec $CZ sh -c 'pgrep nmap | wc -l')
-TXA=$(txpackets); sleep 2; TXB=$(txpackets)
-echo "  nmap processes before the stop: $NM0; one second after: $NM1; the stop call took about $((T1 - T0)) s"
+sleep 3
+cap_stop "$TMP/stop.pcap.txt"
+awk -v t="$TS" '$1+0 > t' "$TMP/stop.pcap.txt" > "$TMP/stop.after.txt" || true
+IP_LATE=$(awk -v t="$TS" '$1+0 > t+1 && $2 == "IP"' "$TMP/stop.after.txt" | wc -l | tr -d ' ')
+IP_ANY=$(awk '$2 == "IP"' "$TMP/stop.after.txt" | wc -l | tr -d ' ')
+ARP_ALL=$(grep -c ' ARP, ' "$TMP/stop.after.txt" || true)
+ARP_LAST=$(grep ' ARP, ' "$TMP/stop.after.txt" | tail -1 | awk -v t="$TS" '{printf "%.1f", $1 - t}')
+BEFORE=$(awk -v t="$TS" '$1+0 <= t' "$TMP/stop.pcap.txt" | wc -l | tr -d ' ')
+echo "  nmap processes before the stop: $NM0; one second after: $NM1; the stop call took $(echo "$TE - $TS" | bc) s"
+echo "  packets leaving the scan interface: $BEFORE in the 3 s before the stop; after the stop: $IP_ANY IP packets (SYN/ICMP/HTTP), $IP_LATE of them later than 1 s"
+echo "  after the stop the kernel still sent $ARP_ALL ARP requests (neighbour retries for addresses nmap had probed; the last at +${ARP_LAST:-0} s)"
 check "emergency flag set" "$(echo "$ES" | jq -r .emergency_stop)" "true"
 check "no nmap process one second after the stop" "$(echo $NM1)" "0"
-checkle "packets to the target network in the 2 s after that" "$((TXB - TXA))" 2
+checkge "scan packets were flowing before the stop" "$BEFORE" 1
+check "no IP packet (SYN, ICMP, HTTP) to the target network later than 1 s after the stop" "$IP_LATE" "0"
 check "run paused by the emergency stop" "$(api GET /runs/$RS | jq -r '"\(.status) \(.pause_reason)"')" "paused emergency_stop"
 check "a new run is refused while the stop is active" "$(status_of POST /runs "{\"profile_id\":$SP}")" "409"
 api POST /emergency-stop/release | jq -c '{emergency_stop}'

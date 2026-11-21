@@ -11,14 +11,14 @@ E2E_SKIP_BUILD=1 ./e2e/full/run.sh  # bez przebudowy obrazu
 ./e2e/full/lab.sh down              # ręczne sprzątanie laboratorium
 ```
 
-Wymagania: Docker, `curl`, `jq`. Czas: około 12–15 minut (najdłużej trwa test okna skanowania, które celowo zamyka się w trakcie skanu).
+Wymagania: Docker, `curl`, `jq`, `bc`. Pakiety mierzy kontener pomocniczy `tcpdump` (obraz `czfull-tcpdump`, budowany lokalnie z Alpine), który dzieli przestrzeń sieciową z kontenerem Czujki. Czas: około 12–15 minut (najdłużej trwa test okna skanowania, które celowo zamyka się w trakcie skanu).
 Skrypt sprząta po sobie: usuwa stos `czfull-e2e` z wolumenami i wszystkie kontenery `czfull-lab-*` oraz sieć `czfull-net`. Można go uruchamiać wielokrotnie.
 
 Zmienne: `E2E_PROJECT` (domyślnie `czfull-e2e`), `E2E_PORT` (`18492`, tylko `127.0.0.1`).
 
 ## Sieć docelowa (`lab.sh`)
 
-Skaner skanuje **tylko** sieć `czfull-net` (10.91.0.0/22), którą skrypt tworzy sam. Czujka dołącza do niej przez `deploy/docker-compose.scan-network.yml` (na macOS host nie ma trasy do adresów kontenerów). Własny adres Czujki trafia do wykluczeń polityki bezpieczeństwa.
+Skaner skanuje **tylko** sieć `czfull-net` (10.91.0.0/22), którą skrypt tworzy sam. Czujka dołącza do niej przez `deploy/docker-compose.scan-network.yml` (na macOS host nie ma trasy do adresów kontenerów). Własny adres Czujki i brama sieci (strona hosta dockera) trafiają do wykluczeń polityki bezpieczeństwa.
 
 | Adres | Usługa | Stan 2 (`lab.sh change`) |
 | --- | --- | --- |
@@ -39,14 +39,14 @@ Skaner skanuje **tylko** sieć `czfull-net` (10.91.0.0/22), którą skrypt tworz
 2. Logowanie, polityka bezpieczeństwa (wykluczenie), zakres z CIDR, profil, estymacja ruchu.
 3. Przebieg 1: start, strumień SSE do końca, hosty, usługi z technologiami, wersjami, klasami i powodami oceny, ustalenia, dashboard.
 4. Edycje analityka (notatka i tagi usługi, akceptacja ustalenia).
-5. Własna sygnatura przez API i retro-hunt na zapisanych obserwacjach: licznik pakietów interfejsu sieci docelowej nie rośnie.
+5. Własna sygnatura przez API i retro-hunt na zapisanych obserwacjach: `tcpdump` na interfejsie sieci docelowej nie widzi żadnego pakietu do hostów laboratorium.
 6. Zmiana sieci, przebieg 2: nowy host, zmiana wersji nginx, zmiana tytułu, milczący host, `GET /diff`, dopasowanie własnej sygnatury, edycje przetrwały skan.
 7. Raport przebiegu (HTML i Markdown).
 8. Eksport JSON, CSV i nmap XML przebiegu 2 i ponowny import.
 9. Import pliku sygnatur: poprawna zapisana, niebezpieczna (POST) odrzucona z powodem.
 10. Źródła pasywne: plik (adres spoza zakresu nie jest kandydatem), zatwierdzenie kandydata, PTR (nazwy z DNS dockera), crt.sh wyłączone (409).
 11. Okno skanowania zamyka się w trakcie skanu: przebieg `paused` z `window_closed`, w przebiegu częściowym brak „zniknięć” usług spoza skanowanych portów, wznowienie przez harmonogram w następnym oknie, zakończenie.
-12. Awaryjne zatrzymanie w trakcie skanu: brak procesów nmap po sekundzie, licznik pakietów nie rośnie, przebieg `paused` z `emergency_stop`, nowy przebieg odrzucony (409).
+12. Awaryjne zatrzymanie w trakcie skanu: brak procesów nmap po sekundzie, `tcpdump` nie widzi żadnego pakietu IP (SYN, ICMP, HTTP) później niż 1 s po zatrzymaniu, przebieg `paused` z `emergency_stop`, nowy przebieg odrzucony (409). Jądro wysyła jeszcze przez około 2 s zapytania ARP: to ponowienia rozwiązywania adresów, o które pytał nmap (warstwa 2, bez sond do usług). Skrypt podaje ich liczbę.
 13. Pomiary: pamięć kontenera Czujki w czasie skanów, czas przebiegów, liczba pakietów i żądań HTTP wobec limitów.
 
-Wynik ostatniego uruchomienia: `deploy/INTEGRATION2_REPORT.md`.
+Zapis ostatniego uruchomienia: `e2e/full/transcript.txt`. Podsumowanie i pomiary: `deploy/INTEGRATION2_REPORT.md`.

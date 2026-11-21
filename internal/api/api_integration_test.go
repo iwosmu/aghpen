@@ -388,6 +388,10 @@ func TestProfilesSafetyAndValidation(t *testing.T) {
 		t.Errorf("profile above the policy cap: %d %s", resp.StatusCode, raw)
 	}
 	admin.want(422, "PATCH", fmt.Sprintf("/api/v1/profiles/%d", p.ID), map[string]any{"ports": "80; rm -rf /"}, nil)
+	if p.Discovery.Mode != model.DiscoveryBalanced {
+		t.Fatalf("default discovery mode = %q, want balanced", p.Discovery.Mode)
+	}
+	admin.want(422, "PATCH", fmt.Sprintf("/api/v1/profiles/%d", p.ID), map[string]any{"discovery": map[string]any{"mode": "turbo"}}, nil)
 	admin.want(409, "POST", "/api/v1/profiles", map[string]any{"name": "Domyślny"}, nil)
 	// Safe detection: the policy accepts GET and HEAD only.
 	if resp, raw := admin.raw("PUT", "/api/v1/settings/safety", map[string]any{"allowed_methods": []string{"GET", "POST"}}, map[string]string{auth.CSRFHeader: admin.csrf}); resp.StatusCode != 422 || !strings.Contains(string(raw), "GET and HEAD") {

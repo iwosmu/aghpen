@@ -115,7 +115,9 @@ func (m *Manager) cause(intent string) error {
 		return nil
 	}
 	switch intent {
-	case "pause":
+	case "pause", "shutdown":
+		// A shutdown pauses the run so the engine keeps its chunk progress;
+		// the manager records the pause reason as a restart.
 		return m.opt.PauseCause(model.PauseManual)
 	case "emergency":
 		return m.opt.PauseCause(model.PauseEmergency)
