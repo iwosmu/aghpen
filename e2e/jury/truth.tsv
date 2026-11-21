@@ -1,0 +1,77 @@
+# Truth table of the organisers' template (lab/jury), checked by e2e/jury/run.sh after a scan of the stack.
+# Columns (tab-separated): stack  port  check  value  owner  note
+#   check: open (port open) | name (nmap service name) | tech (technology, optional "name@version") | notech (technology
+#          that must NOT be there) | sig (signature slug matched on the service) | class (service class) |
+#          finding (an open finding on this port seen in this run: type or text in its title)
+#   owner: empty = must pass; otherwise the row is a known gap that this owner is closing (printed GAP, not FAIL)
+# The truth comes from the compose files and from the running services (versions read from the images, 2026-11-21).
+modern	80	open	-		Nginx Proxy Manager, default site
+modern	80	tech	Nginx Proxy Manager
+modern	80	class	default-page
+modern	80	finding	Domyślna strona serwera
+modern	81	open	-		Nginx Proxy Manager admin UI
+modern	81	tech	Nginx Proxy Manager
+modern	81	class	admin-panel
+modern	81	finding	Panel administracyjny poza siecią zarządzania
+modern	81	finding	login-plain-http
+modern	443	open	-		Nginx Proxy Manager TLS port, no certificate configured
+modern	443	name	https
+modern	8080	open	-		WordPress latest (7.1.5), installer not finished
+modern	8080	tech	WordPress@7.1.5
+modern	8080	sig	wordpress-installer
+modern	8081	open	-		phpMyAdmin 5.2.3
+modern	8081	tech	phpMyAdmin
+modern	8081	class	admin-panel
+modern	8081	finding	Panel administracyjny poza siecią zarządzania
+modern	6379	open	-		Redis 7.4.12 without a password
+modern	6379	tech	Redis@7.4.12
+modern	6379	sig	redis-no-auth
+modern	6379	finding	Port bazy danych otwarty na sieć skanowaną
+proxy	8085	open	-		WordPress latest behind Traefik and Toxiproxy, installer not finished
+proxy	8085	tech	WordPress@7.1.5
+proxy	8085	sig	wordpress-installer
+proxy	8086	open	-		Traefik v3.1 dashboard and API with api.insecure=true
+proxy	8086	tech	Traefik
+proxy	8086	sig	traefik-api-insecure	engine	the port also answers TLS (Traefik default cert, every path 404); the collector tries only HTTPS
+proxy	8474	open	-		Toxiproxy 2.12.0 control API, no authentication
+proxy	8474	tech	Toxiproxy@2.12.0
+proxy	8474	sig	toxiproxy-api
+proxy	8474	class	api
+vulnerable	21	open	-		vsftpd (fauria/vsftpd), plain-text FTP
+vulnerable	21	name	ftp
+vulnerable	21	finding	Telnet albo FTP dostępny w sieci
+vulnerable	21	tech	vsftpd	platform	on an arm64 Mac the amd64 image runs under emulation and answers with an emulator error instead of its banner
+vulnerable	21000	open	-		FTP passive range 21000-21010 (one row per range end)
+vulnerable	21010	open	-
+vulnerable	8088	open	-		WordPress 4.7.5 (image wordpress:4.7), outdated, installer not finished
+vulnerable	8088	tech	WordPress@4.7.5
+vulnerable	8088	sig	wordpress-installer
+vulnerable	8088	finding	Przestarzała główna wersja CMS
+vulnerable	8089	open	-		Adminer
+vulnerable	8089	tech	Adminer
+vulnerable	8089	finding	Panel administracyjny poza siecią zarządzania
+vulnerable	8090	open	-		DVWA 1.10, deliberately vulnerable application
+vulnerable	8090	tech	DVWA (Damn Vulnerable Web Application)@1.10
+vulnerable	8090	class	staging
+vulnerable	8090	finding	Środowisko testowe albo narzędzie deweloperskie
+custom-network	8888	open	-		httpbin 0.9.2 (gunicorn 19.9.0)
+custom-network	8888	tech	httpbin@0.9.2
+custom-network	8888	finding	Środowisko testowe albo narzędzie deweloperskie
+custom-network	8888	name	http	engine	nmap says tcpwrapped although the HTTP collector reads the page
+custom-network	15432	open	-		PostgreSQL 16 on a non-standard port
+custom-network	15432	tech	PostgreSQL
+custom-network	15432	finding	Port bazy danych otwarty na sieć skanowaną
+custom-network	5673	open	-		RabbitMQ 3.13.7 AMQP
+custom-network	5673	name	amqp
+custom-network	5673	notech	RabbitMQ Management	accuracy	the alias in panels.yaml maps nmap's product RabbitMQ to the management panel
+custom-network	15673	open	-		RabbitMQ management UI
+custom-network	15673	tech	RabbitMQ Management
+custom-network	15673	finding	Panel administracyjny poza siecią zarządzania
+custom-network	3001	open	-		Gitea 28.4.0, installer not finished
+custom-network	3001	tech	Gitea@28.4.0
+custom-network	3001	sig	gitea-installer
+custom-network	2223	open	-		Gitea SSH (OpenSSH 10.3)
+custom-network	2223	tech	OpenSSH
+custom-network	8787	open	-		nginx (alpine) default page
+custom-network	8787	class	default-page
+custom-network	8787	finding	Domyślna strona serwera

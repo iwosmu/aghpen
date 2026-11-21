@@ -1,0 +1,52 @@
+=== Czujka on the organisers' template (lab/jury), 2026-11-21 17:32 UTC ===
+Czujka {"version":"jury","engine":true,"tde":true}; docker host aarch64; target host.docker.internal
+{"allowed_ports":"21,80,81,443,2223,3001,5673,6379,8080,8081,8085,8086,8088,8089,8090,8474,8787,8888,15432,15673,21000-21010","max_pps":1000,"operator_networks":["172.18.0.1/32"]}
+{"valid":["host.docker.internal"],"invalid":[]}
+[17:32:18] Czujka http://127.0.0.1:18080: scope 1 (target host.docker.internal), profile 2 (ports 21,80,81,443,2223,3001,5673,6379,8080,8081,8085,8086,8088,8089,8090,8474,8787,8888,15432,15673,21000-21010)
+
+=== Quickstart: the service on 8787 disappears and comes back (lab/jury/quickstart.sh) ===
+ Network hacknation-custom-network_backend  Creating
+ Network hacknation-custom-network_backend  Created
+ Network hacknation-custom-network_frontend  Creating
+ Network hacknation-custom-network_frontend  Created
+ Container hacknation-custom-network-gitea-1  Creating
+ Container hacknation-custom-network-flask-app-1  Creating
+ Container hacknation-custom-network-rabbitmq-1  Creating
+ Container hacknation-custom-network-gitea-1  Created
+ Container hacknation-custom-network-flask-app-1  Created
+ Container hacknation-custom-network-rabbitmq-1  Created
+ Container hacknation-custom-network-flask-app-1  Starting
+ Container hacknation-custom-network-rabbitmq-1  Starting
+ Container hacknation-custom-network-gitea-1  Starting
+ Container hacknation-custom-network-flask-app-1  Started
+ Container hacknation-custom-network-gitea-1  Started
+ Container hacknation-custom-network-rabbitmq-1  Started
+[17:32:24] quickstart: every service answers after 6 s
+[17:33:30] quickstart up: run 1 completed in 66 s: {"hosts":1,"services":5,"packets":99,"warnings":0}
+  PASS                       scenario        2223   open     quickstart: open after up                        open
+  PASS                       scenario        3001   open     quickstart: open after up                        open
+  PASS                       scenario        5673   open     quickstart: open after up                        open
+  PASS                       scenario        8787   open     quickstart: open after up                        open
+  PASS                       scenario        15673  open     quickstart: open after up                        open
+ Container hacknation-custom-network-flask-app-1  Stopping
+ Container hacknation-custom-network-flask-app-1  Stopped
+[17:34:36] quickstart change: run 2 completed in 63 s: {"hosts":1,"services":4,"packets":86,"warnings":0}
+  PASS                       scenario        8787   change   quickstart: 8787 gone after change               service_gone: Usługa 172.18.0.1:8787 zniknęła (nginx 1.31.9)
+  PASS                       scenario        2223   open     quickstart: still open after change              open
+  PASS                       scenario        3001   open     quickstart: still open after change              open
+  PASS                       scenario        5673   open     quickstart: still open after change              open
+  PASS                       scenario        15673  open     quickstart: still open after change              open
+ Container hacknation-custom-network-rabbitmq-1  Running
+ Container hacknation-custom-network-gitea-1  Running
+ Container hacknation-custom-network-flask-app-1  Starting
+ Container hacknation-custom-network-flask-app-1  Started
+[17:34:36] quickstart: every service answers after 0 s
+[17:35:42] quickstart up again: run 3 completed in 66 s: {"hosts":1,"services":5,"packets":99,"warnings":0}
+  PASS                       scenario        8787   open     quickstart: 8787 open again                      open
+  GAP (integrator)           scenario        8787   change   quickstart: 8787 reported as back                changes on this port in run 3: service_new
+
+=== Summary ===
+      1 GAP
+     11 PASS
+PASS: 11  FAIL: 0  GAP: 1  GAP CLOSED: 0
+JURY TEMPLATE OK

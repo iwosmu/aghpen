@@ -1,0 +1,114 @@
+# Czujka: signatures for the tools of the organisers' test template (lab/jury: modern, modern-proxy, vulnerable,
+# custom-network). Only what the existing files did not cover or covered wrongly. Safe detection: GET only, presence only.
+# Every response quoted in a rule was read from the real service (fixtures in signatures/testdata/labtools, tests in
+# labtools_test.go). Syntax: docs/SIGNATURES.md.
+
+- id: toxiproxy-api
+  name: Toxiproxy – API sterujące
+  category: devops
+  technology: Toxiproxy
+  description: API sterujące Toxiproxy bez uwierzytelnienia. Każdy, kto je widzi, może dodać opóźnienia, ograniczyć pasmo albo zerwać połączenia do usług za proxy.
+  tags: [go, chaos, api]
+  interest: 75
+  classes: [api, dev-tool, admin-panel]
+  match:
+    min_confidence: 0.6
+    rules:
+      - {type: path, path: /version, status: [200], regex: '^\{"version": "([0-9][0-9.]*)"\}\s*$', weight: 0.75, version_group: 1}
+      - {type: body, regex: '^404 page not found\s*$', weight: 0.2}
+      - {type: service, field: product, regex: '^Golang net/http server', weight: 0.2}
+  version:
+    - {type: path, path: /version, regex: '"version": "([0-9][0-9.]*)"'}
+
+- id: traefik-api-insecure
+  name: Traefik – API bez uwierzytelnienia
+  category: devops
+  technology: Traefik
+  description: Traefik uruchomiony z api.insecure=true. API i panel pokazują routery, usługi i adresy zaplecza każdemu bez logowania.
+  tags: [go, proxy, api]
+  interest: 70
+  classes: [api, admin-panel, dev-tool]
+  match:
+    rules:
+      - {type: path, path: /api/version, status: [200], contains_all: ['"Version"', '"Codename"'], weight: 0.95}
+  version:
+    - {type: path, path: /api/version, regex: '"Version":"v?([0-9][0-9.]*)"'}
+
+- id: nginx-proxy-manager-default-site
+  name: Nginx Proxy Manager – domyślna strona
+  category: proxy
+  technology: Nginx Proxy Manager
+  description: Domyślna strona Nginx Proxy Manager. Proxy działa, ale ten adres nie ma skonfigurowanego hosta; panel administracyjny jest zwykle na porcie 81.
+  tags: [proxy]
+  interest: 20
+  classes: [default-page]
+  match:
+    min_confidence: 0.6
+    rules:
+      - {type: body, contains: "You've successfully started the Nginx Proxy Manager", weight: 0.95}
+      - {type: title, equals: 'Default Site', weight: 0.3}
+
+- id: dvwa
+  name: DVWA (Damn Vulnerable Web Application)
+  category: other
+  description: Celowo podatna aplikacja do ćwiczeń z bezpieczeństwa. W sieci produkcyjnej to krytyczne ryzyko; domyślne hasła są publicznie znane.
+  tags: [php, vulnerable, training]
+  interest: 95
+  classes: [staging, dev-tool, login]
+  implies: [PHP]
+  match:
+    min_confidence: 0.6
+    rules:
+      - {type: title, contains: 'Damn Vulnerable Web Application', weight: 0.95}
+      - {type: body, contains: 'dvwa/css/login.css', weight: 0.7}
+      - {type: body, contains: 'dvwa/images/login_logo.png', weight: 0.6}
+  version:
+    - {type: title, regex: '\(DVWA\) v([0-9][0-9.]*)'}
+
+- id: httpbin
+  name: httpbin
+  category: devops
+  description: Usługa testowa httpbin odbija żądania HTTP. Narzędzie deweloperskie; w sieci produkcyjnej nie powinno być dostępne.
+  tags: [python, test, api]
+  interest: 45
+  classes: [api, dev-tool]
+  implies: [Python]
+  match:
+    min_confidence: 0.6
+    rules:
+      - {type: title, equals: 'httpbin.org', weight: 0.8}
+      - {type: body, contains_all: ['A simple HTTP Request', 'Response Service'], weight: 0.9}
+  version:
+    - {type: body, regex: 'class="version">\s*([0-9][0-9.]*)\s*<'}
+
+- id: wordpress-installer
+  name: WordPress – niedokończona instalacja
+  category: cms
+  technology: WordPress
+  description: Instalator WordPressa (wp-admin/install.php) jest dostępny. Kto go wypełni, zostaje administratorem strony i może uruchomić własny kod PHP.
+  tags: [php, install]
+  interest: 85
+  classes: [admin-panel]
+  match:
+    min_confidence: 0.6
+    rules:
+      - {type: title, regex: '^WordPress \S+ (?:Installation|Instalacja)$', weight: 0.9}
+      - {type: url, contains: '/wp-admin/install.php', weight: 0.6}
+      - {type: body, contains: 'wp-admin/css/install.min.css', weight: 0.6}
+  version:
+    - {type: body, regex: 'wp-admin/css/install(?:\.min)?\.css\?ver=([0-9][0-9.]*)'}
+    - {type: body, regex: 'wp-includes/css/buttons(?:\.min)?\.css\?ver=([0-9][0-9.]*)'}
+
+- id: redis-no-auth
+  name: Redis bez hasła
+  category: database
+  technology: false
+  description: Redis odpowiada na polecenie INFO bez uwierzytelnienia (nmap odczytał wersję). Każdy w sieci może czytać i zmieniać dane.
+  tags: [baza-danych]
+  interest: 90
+  classes: [database]
+  match:
+    condition: all
+    rules:
+      - {type: service, field: product, regex: '^Redis', weight: 0.5}
+      - {type: service, field: version, regex: '^[0-9]', weight: 0.5}
