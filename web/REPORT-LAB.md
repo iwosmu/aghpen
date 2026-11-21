@@ -28,7 +28,7 @@ Discovery mode cards with the fast-mode warning; UDP section (allow-list 53, 123
 | Manual host entry (POST /hosts, services as `port/proto name product version` lines) | PASS: host 10.66.250.15 created, run `manual-entry`, 3 changes | `60`, `61` |
 | Findings export in DefectDojo Generic Findings (JSON, CSV) | PASS: 274.5 kB JSON | `63` |
 | Findings import (format detected) | PASS: re-import of the export → 180 updated, 0 created, 0 duplicates | `63` |
-| DefectDojo per-scope mapping, `status_sync`, pull (dry run + apply), sync | UI built; not run end to end: no DefectDojo instance in the lab | `65` |
+| DefectDojo per-scope mapping, `status_sync`, pull (dry run + apply), sync | PASS end to end against a local DefectDojo 3.5.202: see section 11 (steps 1–9). One open point there: step 5, a finding of a frequent profile can still flip (backend 4) | `65`, `dojo-*` |
 | Allowed networks in the safety policy | PASS: saved `10.66.0.0/16`, `127.0.0.0/8` | `64` |
 | Run note and label (PATCH /runs/{id}) | PASS | `62` |
 | SSE final event `paused` | handled: the run stream closes and the cache takes the paused run | code |
