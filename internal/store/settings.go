@@ -14,6 +14,7 @@ import (
 const (
 	keySafety     = "safety"
 	keyDefectDojo = "defectdojo"
+	keyWebhook    = "webhook"
 )
 
 // DefaultSafetyPolicy is the policy of a new installation: conservative limits, GET and HEAD only.
@@ -257,4 +258,66 @@ func parseNet(v string) (netip.Prefix, bool) {
 	}
 	a = a.Unmap()
 	return netip.PrefixFrom(a, a.BitLen()), true
+}
+
+// webhookSecret is the encrypted part of the webhook settings.
+type webhookSecret struct {
+	URL    string `json:"url"`
+	Secret string `json:"secret"`
+}
+
+// GetWebhook returns the webhook settings. withSecret also returns the HMAC
+// key (for the sender); without it only SecretSet is filled. The URL is
+// returned in both cases.
+func (s *Store) GetWebhook(ctx context.Context, withSecret bool) (model.WebhookSettings, error) {
+	w := model.WebhookSettings{MinSeverity: model.SevMedium}
+	enc, _, err := s.getSetting(ctx, keyWebhook, &w)
+	if errors.Is(err, ErrNotFound) {
+		return w, nil
+	}
+	if err != nil {
+		return w, err
+	}
+	w.URL, w.Secret, w.SecretSet = "", "", false
+	if enc == "" {
+		return w, nil
+	}
+	plain, err := s.kr.DecryptString(enc, "settings|"+keyWebhook)
+	if err != nil {
+		return w, err
+	}
+	var sec webhookSecret
+	if err := json.Unmarshal([]byte(plain), &sec); err != nil {
+		return w, err
+	}
+	w.URL, w.SecretSet = sec.URL, sec.Secret != ""
+	if withSecret {
+		w.Secret = sec.Secret
+	}
+	return w, nil
+}
+
+// PutWebhook stores the webhook settings; the URL and the key are encrypted.
+// An empty Secret keeps the stored key; clearSecret removes it.
+func (s *Store) PutWebhook(ctx context.Context, w model.WebhookSettings, clearSecret bool) (model.WebhookSettings, error) {
+	cur, err := s.GetWebhook(ctx, true)
+	if err != nil {
+		return w, err
+	}
+	sec := webhookSecret{URL: w.URL, Secret: cur.Secret}
+	if w.Secret != "" {
+		sec.Secret = w.Secret
+	}
+	if clearSecret {
+		sec.Secret = ""
+	}
+	enc, err := s.kr.EncryptString(string(js(sec)), "settings|"+keyWebhook)
+	if err != nil {
+		return w, err
+	}
+	w.URL, w.Secret, w.SecretSet = "", "", false
+	if err := s.putSetting(ctx, keyWebhook, w, enc); err != nil {
+		return w, err
+	}
+	return s.GetWebhook(ctx, false)
 }

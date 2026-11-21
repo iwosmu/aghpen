@@ -617,6 +617,8 @@ var namedActions = map[string][2]string{
 	"POST /api/v1/emergency-stop/release":      {"safety.emergency_stop_release", "safety"},
 	"PUT /api/v1/settings/defectdojo":          {"integration.defectdojo.update", "integration"},
 	"POST /api/v1/settings/defectdojo/test":    {"integration.defectdojo.test", "integration"},
+	"PUT /api/v1/settings/webhook":             {"integration.webhook.update", "integration"},
+	"POST /api/v1/settings/webhook/test":       {"integration.webhook.test", "integration"},
 	"POST /api/v1/findings/export/defectdojo":  {"finding.export.defectdojo", "finding"},
 	"POST /api/v1/runs/{id}/export/defectdojo": {"run.export.defectdojo", "run"},
 	"POST /api/v1/import/results":              {"result.import", "result"},
