@@ -1,0 +1,32 @@
+# Held-out batch 1: chosen after the tuning batches and never used for tuning. Scanned once, at the end.
+services:
+  wikijs:
+    image: requarks/wiki:3.5.0
+    ports: ["23000:3000"]
+  vaultwarden:
+    image: vaultwarden/server:1.37.5-alpine
+    ports: ["8443:80"]
+  gotify:
+    image: gotify/server:3.1.1
+    ports: ["18800:80"]
+  filebrowser:
+    image: filebrowser/filebrowser:v2.63.23
+    ports: ["8090:80"]
+  syncthing:
+    image: syncthing/syncthing:2.1.7
+    ports: ["8384:8384"]
+  adguard:
+    image: adguard/adguardhome:v0.107.80
+    ports: ["43000:3000"]
+  kanboard:
+    image: kanboard/kanboard:v1.2.58
+    ports: ["18180:80"]
+  freshrss:
+    image: freshrss/freshrss:1.30.4-alpine
+    ports: ["80:80"]
+  etherpad:
+    image: etherpad/etherpad:3.3.21
+    ports: ["9001:9001"]
+  heimdall:
+    image: linuxserver/heimdall:2.8.4
+    ports: ["48080:80"]
