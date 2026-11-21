@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useAction, usePage } from '../api/hooks';
+import { useAction, useItem, usePage } from '../api/hooks';
 import { del, patch, post, upload } from '../api/client';
-import type { Scope, Target, TargetPreview } from '../api/types';
+import type { SafetyPolicy, Scope, Target, TargetPreview } from '../api/types';
 import { t, plural } from '../i18n';
 import { cx, fmtInt } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
+import { isLockRefusal } from '../lib/lock';
+import { Icon } from '../ui/Icon';
 import { Button, Dialog, Empty, ErrorState, Field, IconButton, InlineError, PageHeader, Panel, Select, SkeletonRows, Spinner, Tabs, Tags } from '../ui/kit';
 import { PassivePanel } from './Passive';
 import { DataTable, Pager, type Col } from '../ui/table';
@@ -18,12 +20,24 @@ function kindLabel(k: string): string {
   return k === 'cidr' ? 'CIDR' : k === 'range' ? t('zakres', 'range') : k === 'domain' ? t('domena', 'domain') : 'IP';
 }
 
+/** One line about the operator lock, shown where targets are entered. */
+export function OperatorLockNote({ networks }: { networks: string[] | null | undefined }) {
+  if (!networks?.length) return null;
+  return (
+    <p className="flex items-start gap-1.5 text-xs text-ink-2" data-testid="lock-note">
+      <Icon name="lock" size={13} className="mt-px flex-none text-ink-3" />
+      <span>{t('Zablokowane przez operatora wdrożenia: skanowanie tylko w ', 'Locked by the deployment operator: scanning only inside ')}<span className="mono text-ink">{networks.join(', ')}</span>{t('. Zakres spoza tej granicy zostanie odrzucony; nie poszerzy jej żaden użytkownik, także administrator.', '. A range outside this boundary is refused; no user, an administrator included, can widen it.')}</span>
+    </p>
+  );
+}
+
 export function PreviewReport({ p, pending }: { p: TargetPreview; pending?: boolean }) {
   const cell = (n: number, label: string, glyph: 'check' | 'x' | 'ring' | 'dashring', tone: 'new' | 'gone' | 'expected' | 'changed') => (
     <div className="flex items-center gap-2 border-b border-rule py-1.5 sm:border-b-0 sm:border-r sm:px-3 sm:first:pl-0 sm:last:border-r-0">
       <Glyph name={glyph} tone={n ? tone : 'expected'} /><span className="num text-base font-medium">{fmtInt(n)}</span><span className="text-xs text-ink-2">{label}</span>
     </div>
   );
+  const locked = p.invalid.filter((l) => isLockRefusal(l.reason)).length;
   return (
     <div className={cx('border border-rule bg-panel p-3', pending && 'opacity-60')} data-testid="target-preview" aria-live="polite">
       <div className="grid sm:flex sm:flex-wrap">
@@ -33,13 +47,22 @@ export function PreviewReport({ p, pending }: { p: TargetPreview; pending?: bool
         {cell(p.excluded, plural(p.excluded, ['adres wykluczony polityką', 'adresy wykluczone polityką', 'adresów wykluczonych polityką'], ['address excluded by the policy', 'addresses excluded by the policy']), 'dashring', 'changed')}
       </div>
       <p className="mt-2 border-t border-rule pt-2 text-sm">{t('Do zakresu trafi ', 'The scope gains ')}<span className="num text-base font-semibold">{fmtInt(p.address_count)}</span> {plural(p.address_count, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}.</p>
+      {locked ? (
+        <p className="mt-2 flex items-start gap-1.5 border-t border-rule pt-2 text-sm text-ink" data-testid="preview-lock">
+          <Icon name="lock" size={14} className="mt-0.5 flex-none text-ink-2" />
+          <span><span className="num font-semibold">{fmtInt(locked)}</span> {plural(locked, ['wpis leży', 'wpisy leżą', 'wpisów leży'], ['entry lies', 'entries lie'])} {t('poza blokadą operatora wdrożenia', 'outside the deployment operator lock')}: {plural(locked, ['nie trafi', 'nie trafią', 'nie trafi'], ['it stays out of the scope', 'they stay out of the scope'])}{t(' do zakresu. Tej granicy nie poszerzy żaden użytkownik.', '. No user can widen this boundary.')}</span>
+        </p>
+      ) : null}
       {p.invalid.length ? (
         <ul className="mt-2 max-h-[150px] overflow-auto border-t border-rule">
-          {p.invalid.map((l) => (
-            <li key={l.line} className="grid grid-cols-[64px_minmax(0,1fr)] gap-x-2 border-b border-rule py-1 text-xs sm:grid-cols-[64px_minmax(0,150px)_minmax(0,1fr)]">
-              <span className="num text-ink-3">{t('wiersz', 'line')} {l.line}</span><span className="mono truncate text-ink">{l.value}</span><span className="col-span-2 text-danger sm:col-span-1">{l.reason}</span>
-            </li>
-          ))}
+          {p.invalid.map((l, i) => {
+            const lock = isLockRefusal(l.reason);
+            return (
+              <li key={i} className="grid grid-cols-[64px_minmax(0,1fr)] gap-x-2 border-b border-rule py-1 text-xs sm:grid-cols-[64px_minmax(0,150px)_minmax(0,1fr)]" data-lock={lock || undefined}>
+                <span className="num text-ink-3">{lock ? <span className="inline-flex items-center gap-1 text-ink-2"><Icon name="lock" size={12} />{t('blokada', 'lock')}</span> : l.line > 0 ? t('wiersz', 'line') + ' ' + l.line : '–'}</span><span className="mono truncate text-ink">{l.value}</span><span className="col-span-2 text-danger sm:col-span-1">{l.reason}</span>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
       {p.valid.length ? (
@@ -50,6 +73,7 @@ export function PreviewReport({ p, pending }: { p: TargetPreview; pending?: bool
 }
 
 function AddTargets({ scope }: { scope: Scope }) {
+  const safety = useItem<SafetyPolicy>('/settings/safety', undefined, { staleTime: 60_000 });
   const [tab, setTab] = useState('manual');
   const [text, setText] = useState('');
   const debounced = useDebounced(text, 300);
@@ -77,8 +101,9 @@ function AddTargets({ scope }: { scope: Scope }) {
         <div className="mt-3 grid gap-4 lg:grid-cols-2">
           <div>
             <Field label={t('Cele, jeden w wierszu', 'Targets, one per line')} hint={t('Adres IP, CIDR, zakres a-b albo domena. Tekst po # jest komentarzem.', 'An IP address, CIDR, range a-b or a domain. Text after # is a comment.')}>
-              <textarea className="field mono" rows={8} spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} placeholder={'10.20.48.0/24\n10.30.6.10-10.30.6.40\nlab.uczelnia.example'} />
+              <textarea className="field mono" rows={8} spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} placeholder={'10.20.48.0/24\n10.30.6.10-10.30.6.40\nlab.uczelnia.example'} data-testid="targets-text" />
             </Field>
+            <div className="mt-2"><OperatorLockNote networks={safety.data?.operator_networks} /></div>
             <div className="mt-2 flex items-center gap-2">
               <Button variant="primary" icon="plus" busy={add.isPending} disabled={!p || p.valid.length === 0 || stale || !text.trim()} onClick={() => add.mutate(undefined)}>
                 {p && p.valid.length && text.trim() ? t('Dodaj ' + p.valid.length + ' ' + plural(p.valid.length, ['cel', 'cele', 'celów'], ['', '']), 'Add ' + p.valid.length + ' ' + (p.valid.length === 1 ? 'target' : 'targets')) : t('Dodaj cele', 'Add targets')}

@@ -60,6 +60,8 @@ export interface SafetyPolicy {
   allowed_ports: string; denied_ports: string; exclusions: string[]; allowed_methods: string[];
   emergency_stop: boolean; user_agent: string; updated_at: string;
   allowed_networks?: string[] | null;
+  /** Operator lock (CZUJKA_ALLOWED_NETWORKS), read only; empty = no lock. */
+  operator_networks?: string[] | null;
 }
 
 export interface DiscoveryOpts {

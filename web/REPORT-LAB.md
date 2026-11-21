@@ -95,3 +95,21 @@ Backend observations:
 | 5. Interest | No change: waiting for the recalibration. | – |
 | 6. Login, empty product, viewer | Login: one line under the heading: what Czujka does and that it only detects (GET and HEAD, never tries to log in). Empty product checked as `viewer` on a fresh stack. Every page crawled as `viewer` on the lab stack: 0 responses 401/403, 0 toasts; edit forms show "Tylko odczyt…"; `/setup` now redirects a role without create/configure/run rights to the dashboard. | `83-before-login-*` → `83-after-login-1440/390`; `84-after-empty-product-viewer-1440/390`; `viewer_*` |
 | 7. Demo mode | `?present=1` (or Shift+P) zooms the UI one step (×1.125) for 1080p; `?present=0` turns it off. The safety strip stays. There is no dev chrome to hide. At 1920 × 1080 the normal UI already records cleanly; present mode fills the width better. | `98-normal-1920-dashboard`, `98-present-1920-dashboard`, `98-present-1920-time` |
+
+## 10. Operator lock (CZUJKA_ALLOWED_NETWORKS, b89755f)
+
+Checked on the czui stack restarted with `CZUJKA_ALLOWED_NETWORKS=10.66.0.0/16`.
+
+| Place | What the UI shows | Screenshot |
+| --- | --- | --- |
+| Safety page | A locked block "Zablokowane przez operatora wdrożenia" with the lock networks above the editable allowed networks, and one sentence: no user, an administrator included, can widen it. A live warning names entries outside the lock before saving. A refused save (422) shows the reason next to the field, in Polish. | `lock-1-safety-refused` |
+| Top safety strip | Lock icon and `10.66.0.0/16` in the chip; the tooltip names the lock and says no user can widen it. | visible in every screenshot |
+| Wizard, network step | One line about the lock under the ranges; the live preview counts and marks entries outside the lock ("blokada"). | `lock-2-wizard-preview` |
+| Target preview (Cele) | Same lock line and marking in `PreviewReport`. | `lock-3-targets-preview` |
+| Ad-hoc run | New dialog "Skan wybranych adresów" on Przebiegi (`POST /runs/adhoc`; there was no UI for it). It marks addresses outside the lock as you type, and shows the 422 refusal as "Zablokowane przez operatora wdrożenia" plus the per-address reason. | `lock-4-adhoc-refused` |
+
+Backend observations:
+
+1. A policy saved before the lock keeps `allowed_networks` outside it (here `127.0.0.0/8`). Every later `PUT /settings/safety` answers 422 until an administrator removes that entry, even a change of `max_pps` only; the wizard's limits step also sends the whole policy and gets the same 422. The UI warns about such entries, but the server could flag or drop them at start.
+2. `/targets/preview` gives `line: 0` for entries dropped by the policy or the lock. The UI used the line as a React key; fixed in the UI, and it shows "–" instead of "wiersz 0".
+3. The 422 texts of `PUT /settings/safety` and `POST /runs/adhoc` are English; the UI translates the lock cases (`lib/lock.ts`, tested).

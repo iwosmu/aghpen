@@ -249,12 +249,16 @@ function SafetyChip({ policy }: { policy: SafetyPolicy | undefined }) {
   if (!policy) return null;
   const probe = health.data?.probe;
   const pm = probeModeLabel(probe?.mode);
+  const op = policy.operator_networks ?? [];
+  const title = t('Polityka bezpieczeństwa skanowania', 'Scan safety policy')
+    + (op.length ? '. ' + t('Blokada operatora wdrożenia: skanowanie tylko w ' + op.join(', ') + '. Żaden użytkownik, także administrator, nie może jej poszerzyć.', 'Deployment operator lock: scanning only inside ' + op.join(', ') + '. No user, an administrator included, can widen it.') : '');
   return (
     <Link
       to="/admin?tab=safety" className="hidden items-center gap-1.5 text-xs text-ink-2 hover:text-ink lg:inline-flex"
-      title={t('Polityka bezpieczeństwa skanowania', 'Scan safety policy')}
+      title={title} data-testid="safety-chip"
     >
       <Icon name="shield" size={14} className="text-st-new" />
+      {op.length ? <><span className="inline-flex items-center gap-1" data-testid="safety-chip-lock"><Icon name="lock" size={12} className="text-ink-3" /><span className="mono text-ink">{op.length === 1 ? op[0] : op.length + ' ' + t('sieci', 'networks')}</span></span><span className="text-ink-3">·</span></> : null}
       <span>{t('limit', 'cap')} <span className="num text-ink">{fmtInt(policy.max_pps)}</span> pps</span>
       <span className="text-ink-3">·</span>
       <span className="mono text-ink">{(policy.allowed_methods ?? []).join('/') || 'GET/HEAD'}</span>

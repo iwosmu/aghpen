@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useAction, useItem, usePage } from '../api/hooks';
-import { del, patch, post, put } from '../api/client';
+import { ApiError, del, patch, post, put } from '../api/client';
 import type { AuditEntry, DefectDojoSettings, DojoPullResult, DojoScopeMapping, DojoSyncResult, DojoTestResult, Permission, PermissionInfo, Role, SafetyPolicy, Scope, User } from '../api/types';
 import { t, getLang, plural } from '../i18n';
 import { cx, fmtDateTime, fmtInt, fmtRelative } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
+import { lockMessage, outsideLock } from '../lib/lock';
 import { Button, Check, Dialog, ErrorState, Field, IconButton, InlineError, PageHeader, Panel, ReadOnlyNote, Select, SkeletonRows, Tabs } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 import { DataTable, FilterBar, FilterField, Pager, SearchField, type Col } from '../ui/table';
@@ -203,6 +204,9 @@ function SafetyTab() {
       <span className="relative block"><input type="number" min={1} className="field num pr-14" disabled={!canManage} value={f[k]} onChange={(e) => setF({ ...f, [k]: Number(e.target.value) })} /><span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-ink-3">{suffix}</span></span>
     </Field>
   );
+  const op = q.data.operator_networks ?? [];
+  const outside = outsideLock(lines(nets), op);
+  const lockErr = save.error instanceof ApiError && save.error.status === 422 ? lockMessage(save.error.message, getLang()) : null;
   const dirty = JSON.stringify(lines(excl)) !== JSON.stringify(q.data.exclusions ?? []) || JSON.stringify(lines(nets)) !== JSON.stringify(q.data.allowed_networks ?? [])
     || JSON.stringify({ ...f, exclusions: null, allowed_networks: null }) !== JSON.stringify({ ...q.data, exclusions: null, allowed_networks: null });
   return (
@@ -221,9 +225,21 @@ function SafetyTab() {
           <Field label={t('Zabronione porty', 'Denied ports')} hint={t('np. 9100: surowy port drukarek', 'for example 9100: the raw printer port')}><input className="field mono" disabled={!canManage} value={f.denied_ports} onChange={(e) => setF({ ...f, denied_ports: e.target.value })} /></Field>
         </div>
         <div className="mt-3">
-          <Field label={t('Dozwolone sieci', 'Allowed networks')} hint={nets.trim() ? t('Czujka skanuje tylko adresy z tych sieci. Cel spoza nich zostanie odrzucony przy dodawaniu, imporcie i starcie skanu.', 'Czujka scans only addresses in these networks. A target outside them is refused when it is added, imported or planned.') : t('Puste = bez ograniczenia. Wpisz CIDR-y (jeden w wierszu), aby Czujka nie wyszła poza swoje sieci nawet przez pomyłkę.', 'Empty = no limit. Enter CIDRs (one per line) so that Czujka never leaves its networks, even by mistake.')}>
-            <textarea className="field mono" rows={3} disabled={!canManage} value={nets} onChange={(e) => setNets(e.target.value)} placeholder={'10.66.0.0/16\n149.156.0.0/16'} data-testid="allowed-networks" />
+          {op.length ? (
+            <div className="mb-3 border border-rule bg-sunk px-3 py-2.5" data-testid="operator-lock">
+              <p className="flex items-center gap-1.5 text-sm font-medium text-ink"><Icon name="lock" size={14} className="text-ink-2" />{t('Zablokowane przez operatora wdrożenia', 'Locked by the deployment operator')}</p>
+              <p className="mt-1.5 flex flex-wrap gap-1.5">{op.map((n) => <span key={n} className="mono border border-rule-strong px-1.5 py-0.5 text-sm text-ink">{n}</span>)}</p>
+              <p className="mt-1.5 max-w-[72ch] text-xs text-ink-2">{t('Operator ustawił tę granicę przy wdrożeniu (CZUJKA_ALLOWED_NETWORKS). Żaden użytkownik, także administrator, nie może jej poszerzyć; dozwolone sieci poniżej mogą ją tylko zawęzić.', 'The operator set this boundary at deployment (CZUJKA_ALLOWED_NETWORKS). No user, an administrator included, can widen it; the allowed networks below can only narrow it.')}</p>
+            </div>
+          ) : null}
+          <Field label={t('Dozwolone sieci', 'Allowed networks')} hint={op.length && !nets.trim() ? t('Puste = cała sieć z blokady operatora.', 'Empty = the whole network of the operator lock.') : nets.trim() ? t('Czujka skanuje tylko adresy z tych sieci. Cel spoza nich zostanie odrzucony przy dodawaniu, imporcie i starcie skanu.', 'Czujka scans only addresses in these networks. A target outside them is refused when it is added, imported or planned.') : t('Puste = bez ograniczenia. Wpisz CIDR-y (jeden w wierszu), aby Czujka nie wyszła poza swoje sieci nawet przez pomyłkę.', 'Empty = no limit. Enter CIDRs (one per line) so that Czujka never leaves its networks, even by mistake.')}>
+            <textarea className="field mono" rows={3} disabled={!canManage} value={nets} onChange={(e) => setNets(e.target.value)} placeholder={'10.66.0.0/16\n149.156.0.0/16'} data-testid="allowed-networks" aria-invalid={outside.length > 0 || Boolean(lockErr)} />
           </Field>
+          {lockErr ? (
+            <p role="alert" className="mt-1.5 flex items-start gap-1.5 text-xs text-danger" data-testid="allowed-lock-error"><Icon name="lock" size={14} className="mt-px flex-none" /><span>{lockErr}</span></p>
+          ) : outside.length ? (
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs text-st-changed" data-testid="allowed-outside-lock"><Icon name="lock" size={14} className="mt-px flex-none" /><span>{t('Poza blokadą operatora: ', 'Outside the operator lock: ')}<span className="mono">{outside.join(', ')}</span>{t('. Serwer odrzuci zapis polityki, dopóki te wpisy tu są.', '. The server refuses to save the policy while these entries are here.')}</span></p>
+          ) : null}
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label={t('Wykluczenia (nigdy nie skanowane)', 'Exclusions (never scanned)')} hint={t('adres albo CIDR, jeden w wierszu', 'an address or a CIDR, one per line')}><textarea className="field mono" rows={5} disabled={!canManage} value={excl} onChange={(e) => setExcl(e.target.value)} /></Field>
@@ -238,7 +254,7 @@ function SafetyTab() {
             </div>
           </div>
         </div>
-        <div className="mt-3"><InlineError error={save.error} /></div>
+        <div className="mt-3">{lockErr ? <p className="text-xs text-danger">{t('Polityka nie została zapisana: popraw dozwolone sieci.', 'The policy was not saved: fix the allowed networks.')}</p> : <InlineError error={save.error} />}</div>
         <p className="mt-3 text-2xs text-ink-3">{t('Ostatnia zmiana:', 'Last change:')} <span className="num">{fmtDateTime(q.data.updated_at)}</span></p>
       </Panel>
 
