@@ -167,7 +167,17 @@ juror() { # stack: what a juror sees with the default profile on target $TARGET
     if [ "$(echo "$s" | jq -r '.state // ""')" = open ]; then found=$((found + 1)); row "juror:$1" "$port" open "found with the default profile" "" 1 "$(echo "$s" | jq -r '[.name, .product, .version] | map(select(. != null and . != "")) | join(" ")')"
     else row "juror:$1" "$port" open "found with the default profile" "" 0 "not in run $RUN"; fi
   done
-  JUROR+=("$(printf '%s\t%s/%s\t%s\t%s\t%s' "$1" "$found" "$total" "${FIRSTSVC:-?}" "$RUNSECS" "$RUN")")
+  # Every port the stack publishes (docker ps, Czujka's own containers excluded), ranges expanded.
+  local pub open miss extra ok
+  pub=$(docker ps --format '{{.Names}} {{.Ports}}' | grep -v '^czujka-' | grep -oE '0\.0\.0\.0:[0-9]+(-[0-9]+)?->' | sed 's/0\.0\.0\.0://; s/->//' \
+    | awk -F- '{ e = ($2 == "") ? $1 : $2; for (p = $1; p <= e; p++) print p }' | sort -u)
+  open=$(echo "$SV" | jq -r '.items[] | select(.proto == "tcp" and .state == "open") | .port' | sort -u)
+  miss=$(comm -23 <(echo "$pub") <(echo "$open") | tr '\n' ' ')
+  extra=$(comm -13 <(echo "$pub") <(echo "$open") | tr '\n' ' ')
+  local npub nfound; npub=$(echo "$pub" | grep -c .); nfound=$(comm -12 <(echo "$pub") <(echo "$open") | grep -c .)
+  [ -z "${miss// /}" ] && ok=1 || ok=0
+  row "juror:$1" all open "every published port, default profile" "" $ok "$nfound/$npub found${miss:+; missing: $miss}${extra:+; other open ports: $extra}"
+  JUROR+=("$(printf '%s\t%s/%s\t%s\t%s\t%s' "$1" "$nfound" "$npub" "${FIRSTSVC:-?}" "$RUNSECS" "$RUN")")
 }
 truth() { # stack
   # awk keeps empty columns (read with a tab IFS would merge them); \x1f is not whitespace.
@@ -287,7 +297,7 @@ printf '%s\n' "${TABLE[@]}" | awk -F'\t' '{print $1}' | sed 's/ (.*//' | sort | 
 echo "PASS: $PASSES  FAIL: $FAILS  GAP: $GAPS  GAP CLOSED: $CLOSED"
 if [ ${#JUROR[@]} -gt 0 ]; then
   echo "Default profile on target $TARGET (the juror flow), per stack:"
-  printf '  %-16s %-14s %-20s %-18s %s\n' stack "template ports" "first service (s)" "run finished (s)" run
+  printf '  %-16s %-14s %-20s %-18s %s\n' stack "published found" "first service (s)" "run finished (s)" run
   printf '%s\n' "${JUROR[@]}" | while IFS=$'\t' read -r a b c d e; do printf '  %-16s %-14s %-20s %-18s %s\n' "$a" "$b" "$c" "$d" "$e"; done
 fi
 rm -f "$JAR" "$JAR.pol" "$JAR".first.*
