@@ -19,7 +19,7 @@ import (
 // Before the calibration: service interest 100; five findings, all with
 // interest 100 (login-plain-http, interesting-cookie x2, interesting-header
 // x2), because every finding copied the capped service score.
-// After: service interest 80; three findings: login-plain-http 50 (with the
+// After: service interest 75 (sum 80, compressed above 70); three findings: login-plain-http 50 (with the
 // evidence of the signature "login form over plain HTTP"), headers 11,
 // cookies 10.
 func TestDojoLoginCalibration(t *testing.T) {
@@ -35,8 +35,8 @@ func TestDojoLoginCalibration(t *testing.T) {
 	for _, w := range why {
 		t.Logf("service reason %3d %s %s", w.Points, w.Code, w.Text)
 	}
-	if score != 80 {
-		t.Errorf("service interest %d, want 80", score)
+	if score != 75 {
+		t.Errorf("service interest %d, want 75 (sum 80)", score)
 	}
 	fs := DeriveFindings(FindingInput{IP: "127.0.0.1", Services: []FindingService{{Result: s, Interest: score}}})
 	got := map[string]model.Finding{}

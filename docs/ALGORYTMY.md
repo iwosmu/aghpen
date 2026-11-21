@@ -317,7 +317,9 @@ Jak analiza używa pewności:
 
 ## 5. Ocena ciekawości (0–100)
 
-Ocena odpowiada na pytanie „na co analityk powinien spojrzeć najpierw". Jest sumą punktów z jednej tabeli, obciętą do 100. Każdy składnik trafia do listy powodów (`interest_why`), więc analityk widzi, skąd wzięła się liczba.
+Ocena odpowiada na pytanie „na co analityk powinien spojrzeć najpierw". Jest sumą punktów z jednej tabeli. Do 70 ocena równa się sumie. Powyżej 70 suma jest ściskana w stronę 100: `ocena = 70 + 30 · (1 − e^(−(suma − 70)/50))`, najwyżej 99 (`CompressInterest`). Każdy składnik trafia do listy powodów (`interest_why`), więc analityk widzi, skąd wzięła się liczba.
+
+Dlaczego krzywa, a nie obcięcie: w laboratorium pięć najciekawszych usług miało ocenę 100 (strona wydziału, blog WordPress, Tomcat, phpMyAdmin, Adminer), więc ranking nic nie mówił. Z krzywą suma 100 daje 84, suma 140 daje 92, suma 200 daje 97. Większa suma zawsze daje wyższą ocenę.
 
 | Kod | Punkty | Powód |
 | --- | --- | --- |
@@ -361,10 +363,10 @@ Przykład z laboratorium: strona logowania DefectDojo pod `http://127.0.0.1:1808
 
 | | Przed kalibracją | Po kalibracji |
 | --- | --- | --- |
-| ocena usługi | 100 = sygnatura DefectDojo 40 + sygnatura „logowanie po HTTP" 40 + `login-plain-http` 25 + brak CSP 11 + ciasteczko 4, obcięte do 100 | 80 = sygnatura DefectDojo 40 + `login-plain-http` 25 + słabe sygnały 15 (brak CSP 11, ciasteczko 4) |
+| ocena usługi | 100 = sygnatura DefectDojo 40 + sygnatura „logowanie po HTTP" 40 + `login-plain-http` 25 + brak CSP 11 + ciasteczko 4, obcięte do 100 | 75 = suma 80 (sygnatura DefectDojo 40 + `login-plain-http` 25 + słabe sygnały 15: brak CSP 11, ciasteczko 4) po krzywej |
 | obserwacje | 5, każda z oceną 100: logowanie po HTTP, nagłówek „logowanie po HTTP", nagłówek „brak CSP", ciasteczko `csrftoken`, ciasteczko „sesja frameworka" | 3: logowanie po HTTP **50** (z dowodami obu źródeł), nagłówki HTTP **11**, ciasteczka **10** |
 
-Przykład z raportu przykładowego: nowa usługa Jenkins na porcie 8080 ma 89 punktów = panel administracyjny (30) + narzędzie deweloperskie (20) + sygnatura Jenkins (19) + nowa ekspozycja (15) + nagłówek ujawniający wersję (5).
+Przykład z raportu przykładowego: nowa usługa Jenkins na porcie 8080 ma sumę 89 punktów (ocena 79 po krzywej) = panel administracyjny (30) + narzędzie deweloperskie (20) + sygnatura Jenkins (19) + nowa ekspozycja (15) + nagłówek ujawniający wersję (5).
 
 ## 6. Grupowanie podobnych usług
 

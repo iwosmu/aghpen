@@ -92,7 +92,7 @@ _i jeszcze 7 obserwacji o niższym priorytecie; pełna lista jest w aplikacji._
 
 | Adres | Usługa | Dlaczego | Ciekawość |
 | --- | --- | --- | ---: |
-| `10.66.3.17:8080` | ci.kampus.example · Jetty 10.0.20 · „Dashboard \[Jenkins\]” | Panel administracyjny dostępny z sieci (+30); Narzędzie deweloperskie (CI, repozytorium, monitoring) (+20); i 3 inne powody | 89 |
+| `10.66.3.17:8080` | ci.kampus.example · Jetty 10.0.20 · „Dashboard \[Jenkins\]” | Panel administracyjny dostępny z sieci (+30); Narzędzie deweloperskie (CI, repozytorium, monitoring) (+20); i 3 inne powody | 79 |
 | `10.66.3.40:80` | HP LaserJet http config · „HP LaserJet Pro M404dn” | Urządzenie IoT (+20); Nowa ekspozycja od ostatniego skanu (+15); i 1 inny powód | 44 |
 | `10.66.3.90:6379` | cache-01.kampus.example · Redis key-value store 7.2.4 | Baza danych dostępna z sieci: Redis key-value store 7.2.4 (+25); Nowa ekspozycja od ostatniego skanu (+15) | 40 |
 | `10.66.1.20:80` | dziekanat.kampus.example · Apache httpd 2.4.62 · „Dziekanat – logowanie” | Strona logowania bez szyfrowania (HTTP) (+25); Strona logowania bez nagłówków bezpieczeństwa: brak Content-Security-Policy / X… (+5); i 1 inny powód | 35 |
