@@ -70,7 +70,7 @@ const SHOTS = [
   { id: "unstable", caption: "Rytm hosta i ponowne sprawdzenia",
     vo: "Ten host odpowiada nieregularnie. Czujka zna jego rytm tygodnia, więc cisza w zwykłej porze nie jest alarmem. Gdy milknie poza rytmem, sprawdza ponownie tylko ten adres." },
   { id: "time", caption: "Oś czasu",
-    vo: "Wehikuł czasu pokazuje sieć taką, jaka była po dowolnym przebiegu, i to, co od tamtej pory zniknęło albo się zmieniło." },
+    vo: "Oś czasu pokazuje sieć taką, jaka była po dowolnym skanie, i to, co od tamtej pory zniknęło albo się zmieniło." },
   { id: "rules", caption: "Reguła i sygnatura z przykładu",
     vo: "Reguła mówi, czego w sieci być nie może, i sprawdza się po każdym skanie bez pakietów. Z jednej usługi Czujka proponuje sygnaturę i testuje ją na historii." },
   { id: "stop", caption: "Stop awaryjny",

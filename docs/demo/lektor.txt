@@ -14,7 +14,7 @@ Drugi skan porównuje się z pierwszym: nowe hosty, zniknięte usługi, zmienion
 Ten host odpowiada nieregularnie. Czujka zna jego rytm tygodnia, więc cisza w zwykłej porze nie jest alarmem. Gdy milknie poza rytmem, sprawdza ponownie tylko ten adres.
 
 [1:17–1:34] time (17.6 s; 20 słów ≈ 8.7 s przy 2,3 słowa/s)
-Wehikuł czasu pokazuje sieć taką, jaka była po dowolnym przebiegu, i to, co od tamtej pory zniknęło albo się zmieniło.
+Oś czasu pokazuje sieć taką, jaka była po dowolnym skanie, i to, co od tamtej pory zniknęło albo się zmieniło.
 
 [1:34–1:54] rules (19.9 s; 27 słów ≈ 11.7 s przy 2,3 słowa/s)
 Reguła mówi, czego w sieci być nie może, i sprawdza się po każdym skanie bez pakietów. Z jednej usługi Czujka proponuje sygnaturę i testuje ją na historii.

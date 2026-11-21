@@ -41,7 +41,7 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 
 **[ALGORYTMY.md](ALGORYTMY.md): algorytmy.** Odpowiedzi na trzy pytania z zadania: jak raportować zmianę, jak określić pewność identyfikacji technologii, po jakim czasie uznać host za nieaktywny. Model dostępności hosta ze wzorami i zmierzonymi scenariuszami, reguły szumu w porównaniu przebiegów, tabela wag zmian, tabela punktów oceny ciekawości, grupowanie usług, klucze obserwacji, raport z przebiegu.
 
-**Funkcje czasu.** Model rytmu hosta: `ALGORYTMY.md` §2. Wehikuł czasu (`/timeline`) i ponowne sprawdzenia (`/reprobe/plan`, `/settings/reprobe`): trasy i definicje w `API.md`, kod w `internal/timeline` i `internal/reprobe`.
+**Funkcje czasu.** Model rytmu hosta: `ALGORYTMY.md` §2. Oś czasu (`/timeline`) i ponowne sprawdzenia (`/reprobe/plan`, `/settings/reprobe`): trasy i definicje w `API.md`, kod w `internal/timeline` i `internal/reprobe`.
 
 **[SIGNATURES.md](SIGNATURES.md): sygnatury.** Język sygnatur w YAML: pola, 14 typów reguł, dopasowania, forma skrócona. Tryb bezpieczny walidatora z przykładami odrzuceń. Liczenie pewności. Silnik dopasowań, „miękkie 404”, retro-hunt. Biblioteka wbudowana (386 sygnatur). Kolektor HTTP/TLS. Narzędzie `fpprobe` i wyniki z laboratorium.
 
