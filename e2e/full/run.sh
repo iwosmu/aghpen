@@ -95,14 +95,15 @@ mem_sampler() { # samples the memory of the Czujka container every 2 s while $TM
 mem_max() { # the largest sample in MiB
   awk '{v=$1; u=v; gsub(/[0-9.]/,"",u); gsub(/[^0-9.]/,"",v); if(u=="GiB")v*=1024; if(u=="KiB")v/=1024; if(u=="B")v/=1048576; if(v>m)m=v} END{printf "%.1f", m}' "$TMP/mem.txt"
 }
-follow() { # run id: follows the SSE stream until the "done" event
+follow() { # run id: follows the SSE stream until the final event ("done" or "paused"); sets FINAL
   local id=$1 ev="" counts="" n=0 last=""
+  FINAL=""
   while IFS= read -r line; do
     case "$line" in
       "event: "*) ev=${line#event: }; n=$((n + 1)); counts="$counts $ev" ;;
       "data: "*)
         if [ "$ev" = progress ]; then last=${line#data: }; fi
-        if [ "$ev" = done ]; then last=${line#data: }; break; fi ;;
+        if [ "$ev" = done ] || [ "$ev" = paused ]; then last=${line#data: }; FINAL=$ev; break; fi ;;
     esac
   done < <(curl -sS -N --max-time "${2:-1200}" -b "$JAR" "$API/runs/$id/events")
   echo "  SSE: $n events ($(echo $counts | tr ' ' '\n' | sort | uniq -c | awk '{printf "%s=%s ", $2, $1}'))"
@@ -348,8 +349,78 @@ checkge "scan packets were flowing before the stop" "$BEFORE" 1
 check "no IP packet (SYN, ICMP, HTTP) to the target network later than 1 s after the stop" "$IP_LATE" "0"
 check "run paused by the emergency stop" "$(api GET /runs/$RS | jq -r '"\(.status) \(.pause_reason)"')" "paused emergency_stop"
 check "a new run is refused while the stop is active" "$(status_of POST /runs "{\"profile_id\":$SP}")" "409"
+follow "$RS" 20 >/dev/null
+check "the SSE stream of the stopped run ends with paused (resumable), not done" "$FINAL" "paused"
 api POST /emergency-stop/release | jq -c '{emergency_stop}'
 api POST /runs/$RS/cancel | jq -c '{id, status}'
+
+step "19. Part 3: manual entry, findings files, DefectDojo settings, allowed networks, ad-hoc run, run notes, import scope, rotate-key"
+# Manual entry: a host with a service, then one more service; both stay open.
+MH=$(api POST /hosts "$(jq -nc --arg ip "$P.3.200" '{ip:$ip, hostnames:["reczny.kampus.test"], services:[{port:8080, name:"http", product:"Jetty", title:"Panel"}]}')")
+MHID=$(echo "$MH" | jq -r .host.id)
+check "manual entry: host stored through a manual-entry run" "$(echo "$MH" | jq -r '"\(.run.trigger) \(.run.status) \(.host.status)"')" "manual-entry completed up"
+api POST /hosts/$MHID/services '{"port":22,"name":"ssh","product":"OpenSSH"}' >/dev/null
+check "manual entry: both services open" "$(api GET /hosts/$MHID/services | jq -r '[.[] | select(.state == "open") | .port] | sort | map(tostring) | join(",")')" "22,8080"
+check "manual entry: a bad address is refused" "$(status_of POST /hosts '{"ip":"nie-adres"}')" "422"
+# Findings: export in DefectDojo Generic JSON and CSV, import a foreign file, import the export again.
+curl -sS -b "$JAR" -o $TMP/f.dojo.json $API/export/findings.dojo.json
+curl -sS -b "$JAR" -o $TMP/f.dojo.csv $API/export/findings.dojo.csv
+check "findings export (DefectDojo Generic JSON) has every finding" "$(jq '.findings | length' $TMP/f.dojo.json)" "$(api GET "/findings?limit=1" | jq .total)"
+FI=$(upload /import/findings $TMP/f.dojo.json)
+check "own DefectDojo export imports again without duplicates" "$(echo "$FI" | jq -r '"created=\(.created) format=\(.format)"')" "created=0 format=dojo-generic-json"
+FC=$(upload /import/findings $TMP/f.dojo.csv)
+check "own DefectDojo CSV export imports again without duplicates" "$(echo "$FC" | jq -r .created)" "0"
+jq -nc --arg ip "$P.0.10" '{findings:[{title:"Audyt: panel bez MFA", severity:"High", description:"z audytu zewnętrznego", active:true, endpoints:[{host:$ip, port:80}]}]}' > $TMP/ext.json
+FE=$(upload /import/findings $TMP/ext.json)
+check "foreign DefectDojo Generic finding imported onto the known host" "$(echo "$FE" | jq -r '"created=\(.created) hosts_created=\(.hosts_created)"')" "created=1 hosts_created=0"
+# DefectDojo: per-scope mapping and status sync are stored and validated; pull without a server is refused.
+DD=$(api PUT /settings/defectdojo "$(jq -nc --argjson s "$SCOPE" '{enabled:false, status_sync:true, scope_mappings:[{scope_id:$s, product_type_name:"Kampus", product_name:"Laboratorium", engagement_name:"Czujka e2e"}]}')")
+check "DefectDojo scope mapping stored" "$(echo "$DD" | jq -r '"\(.status_sync) \(.scope_mappings[0].product_name)"')" "true Laboratorium"
+check "DefectDojo mapping of a missing scope is refused" "$(status_of PUT /settings/defectdojo '{"scope_mappings":[{"scope_id":999999,"product_name":"x"}]}')" "422"
+check "DefectDojo status pull without a configured server" "$(status_of POST /defectdojo/pull)" "409"
+# host_missing in the dashboard headline; down_after_misses for a host that is down.
+check "dashboard headline has hosts_missing" "$(api GET /dashboard | jq -r '.headline.hosts_missing | type')" "number"
+RH=$(api GET "/hosts?limit=100" | jq -r --arg ip "$P.1.30" '[.items[] | select(.ip == $ip)][0].id')
+checkge "down_after_misses of the silent redis host" "$(api GET /hosts/$RH/availability | jq .down_after_misses)" 1
+# Allowed networks: a target outside them is refused at entry with a reason.
+api PUT /settings/safety "$(api GET /settings/safety | jq -c --arg n "$P.0.0/22" '.allowed_networks = [$n]')" >/dev/null
+PV=$(api POST /targets/preview '{"text":"192.0.2.0/24"}')
+check "a target outside the allowed networks is refused with a Polish reason" "$(echo "$PV" | jq -r '[.invalid[]? | select(.reason | test("dozwolon"))] | length')" "1"
+check "an ad-hoc run outside the allowed networks is refused" "$(status_of POST /runs/adhoc "{\"profile_id\":$PROFILE,\"addresses\":[\"192.0.2.10\"],\"ports\":\"80\"}")" "422"
+# Ad-hoc run (re-probe) of one address and one port through the normal engine.
+HT0=$(api GET "/hosts?limit=1&status=up" | jq .total)
+AH=$(api POST /runs/adhoc "$(jq -nc --argjson p "$PROFILE" --arg ip "$P.0.10" '{profile_id:$p, addresses:[$ip], ports:"80", reason:"e2e re-probe"}')")
+AHID=$(echo "$AH" | jq -r .id)
+wait_done "$AHID" 300
+AHR=$(api GET /runs/$AHID)
+check "ad-hoc run: trigger, status, one host up" "$(echo "$AHR" | jq -r '"\(.trigger) \(.status) \(.stats.hosts_up)"')" "reprobe completed 1"
+check "ad-hoc run reports no other host missing" "$(api GET "/changes?run_id=$AHID&limit=200" | jq '[.items[] | select(.kind == "host_missing" or .kind == "host_gone" or .kind == "service_gone")] | length')" "0"
+check "ad-hoc run keeps the live host count" "$(api GET "/hosts?limit=1&status=up" | jq .total)" "$HT0"
+# Run note and label.
+api PATCH /runs/$RUN2 '{"note":"drugi przebieg po zmianach w laboratorium","label":"e2e-zmiany"}' >/dev/null
+check "run note and label searchable" "$(api GET "/runs?q=e2e-zmiany" | jq -r '.items[0].id')" "$RUN2"
+# Import into a scope: the answering host becomes a target of that scope.
+SC2=$(api POST /scopes '{"name":"Import e2e"}' | jq -r .id)
+printf '<?xml version="1.0"?><nmaprun scanner="nmap" start="1700000000"><host><status state="up" reason="syn-ack"/><address addr="%s" addrtype="ipv4"/><ports><port protocol="tcp" portid="443"><state state="open" reason="syn-ack"/><service name="https"/></port></ports></host><host><status state="down" reason="no-response"/><address addr="%s" addrtype="ipv4"/></host><runstats><finished time="1700000100"/></runstats></nmaprun>' "$P.3.201" "$P.1.30" > $TMP/scope.xml
+SI2=$(curl -sS -b "$JAR" -H "X-CSRF-Token: $CSRF" -F "file=@$TMP/scope.xml" -F "scope_id=$SC2" "$API/import/results")
+check "import into a scope: targets added, down host counted" "$(echo "$SI2" | jq -r '"targets=\(.targets) hosts=\(.hosts) hosts_down=\(.hosts_down) skipped=\(.skipped)"')" "targets=1 hosts=1 hosts_down=1 skipped=0"
+check "import into a scope: the host is in the scope" "$(api GET "/hosts?scope_id=$SC2" | jq -r '.items[0].ip')" "$P.3.201"
+# UDP profile fields are validated against the allow-list.
+check "UDP port outside the allow-list refused" "$(status_of PATCH /profiles/$PROFILE '{"udp":{"enabled":true,"ports":"22"}}')" "422"
+check "UDP ports of the allow-list accepted" "$(status_of PATCH /profiles/$PROFILE '{"udp":{"enabled":true,"ports":"53,161"}}')" "200"
+api PATCH /profiles/$PROFILE '{"udp":{"enabled":false}}' >/dev/null
+# rotate-key rewrites the key file; after a restart every encrypted value still reads.
+K0=$(docker exec $CZ sha256sum /var/lib/czujka/master.key | cut -c1-16)
+BODY0=$(api GET /services/$NGINX_SVC | jq -r '.latest.http.body_excerpt // "" | length')
+docker exec $CZ czujka rotate-key 2>&1 | sed 's/^/  | /' | tail -6
+K1=$(docker exec $CZ sha256sum /var/lib/czujka/master.key | cut -c1-16)
+check "rotate-key rewrote the key file" "$([ "$K0" != "$K1" ] && echo changed || echo same)" "changed"
+check "rotate-key kept the retired key next to it" "$(docker exec $CZ sh -c 'wc -l < /var/lib/czujka/master.key.old' | tr -d ' ')" "1"
+docker restart $CZ >/dev/null
+for i in $(seq 1 60); do [ "$(docker inspect -f '{{.State.Health.Status}}' $CZ)" = healthy ] && break; sleep 2; done
+LOGIN=$(curl -sS -c "$JAR" -H "Content-Type: application/json" -d "{\"email\":\"$ADMIN\",\"password\":\"$ADMIN_PW\"}" $API/auth/login)
+CSRF=$(echo "$LOGIN" | jq -r .csrf_token)
+check "after rotate-key and a restart: encrypted HTTP body still reads" "$(api GET /services/$NGINX_SVC | jq -r '.latest.http.body_excerpt // "" | length')" "$BODY0"
 
 step "18. Measurements"
 rm -f "$TMP/mem.on"; sleep 2
