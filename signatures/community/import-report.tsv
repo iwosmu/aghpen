@@ -1,8 +1,8 @@
 source	projectdiscovery/nuclei-templates@1ad258956016afba455d4284539812eb24be690a
 templates	59403
 converted	4273
-kept (default set)	3464
-opt-in (disabled, own path)	803
+kept (default set)	1835
+opt-in (disabled, own path)	2432
 dropped: not passive / unsupported: wyrażenie DSL nuclei „regex	53269
 dropped: technology already in the hand-written library	642
 dropped: not passive / unsupported: szablon nuclei używa pola „payloads”	247
@@ -162,6 +162,6 @@ dropped: not passive / unsupported: ścieżka „{{BaseURL}}/owa/auth/logon.aspx
 dropped: not passive / unsupported: ścieżka „{{BaseURL}}/puppet-ca/v1/certificate_request/{{randstr}}�	1
 group favicons	517
 group installers	40
-group opt-in	803
+group opt-in	2432
 group panels	432
-group technologies	2475
+group technologies	846

@@ -592,9 +592,11 @@ commit `1ad25895`). Licencja i polecenie odtworzenia są w `signatures/community
 | podział | szablon z nazwanymi matcherami (`tech-detect`, `favicon-detect`) daje jedną sygnaturę na technologię |
 | konwersja | konwerter z punktu 14.4 i tryb bezpieczny; odrzucone: DSL inne niż skrót ikony, `payloads`, `raw`, zmienne, niebezpieczne ścieżki |
 | koszt | w zestawie domyślnym tylko reguły na stronie głównej, przekierowaniach, ikonie i ścieżkach, które biblioteka już pobiera: zero nowych żądań |
-| opt-in | szablony z własną ścieżką są w `signatures/community/opt-in/` (nie są wbudowane); włącza się je przez wgranie pliku jako sygnatur własnych |
+| opt-in | szablony z własną ścieżką i 1600 sygnatur FingerprintHub (głównie produkty regionalne; podwajały czas dopasowania) są w `signatures/community/opt-in/` (nie są wbudowane); włącza się je przez wgranie pliku jako sygnatur własnych |
+| koszt dopasowania | `BenchmarkMatch` kontra `BenchmarkMatchHandWritten`: import dodaje 30–90 % czasu na usługę (zmierzone pod obciążeniem maszyny); test przepustowości pilnuje granicy 3 ms albo 2,5 × czas samej biblioteki ręcznej |
 | pierwszeństwo | import, który nazywa technologię znaną bibliotece ręcznej, jest pomijany (nasze wygrywają) |
 | szum | pomijane: biblioteki front-endu, CDN, czcionki, analityka; sygnatury bez wzorca dłuższego niż 7 znaków |
+| samoopis | gdy żadna sygnatura nie nazywa aplikacji, silnik bierze jej własną nazwę: `meta application-name`, `og:site_name`, `generator`, tytuł „Sign in · X” / „X - Login” / „Log in to X”; technologia z pewnością 0,4 i źródłem `self-described`; słowa ogólne („Login”, „Welcome”, „Dashboard”), nazwy hostów i adresy nigdy nie stają się produktem; wersja z tytułu, generatora, nagłówka `Server`/`X-Powered-By` z tą nazwą albo z `?ver=` zgodnego w co najmniej dwóch lokalnych zasobach |
 | ocena | `-eval` uruchamia kandydatów na zapisanych wynikach laboratorium (70 hostów) i zoo; każda sygnatura, która trafia wbrew opisowi prawdy, trafia do `denylist.tsv` |
 | metadane | pole `source`: repozytorium, commit, plik, id szablonu, licencja; tag `nuclei-templates` |
 

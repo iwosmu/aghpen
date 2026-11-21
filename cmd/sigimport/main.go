@@ -330,6 +330,11 @@ func one(tpl []byte, rel, dir, commit string, ours map[string]string, ourPaths m
 			optIn = true
 		}
 	}
+	// FingerprintHub: 1600 mostly regional products; it doubled the matcher's
+	// time for little on a university network. Opt-in.
+	if strings.Contains(rel, "fingerprinthub") {
+		optIn = true
+	}
 	d.ID = shortID(upstream)
 	d.Name = tech
 	d.Technology = ""

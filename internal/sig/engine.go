@@ -475,6 +475,7 @@ func (e *Engine) MatchHost(svc *model.ServiceResult, hostnames ...string) ([]mod
 		}
 	}
 	techs = mergeTechnologies(st, svc, matches, hit)
+	techs = addSelfDescribed(svc, techs)
 	classSet := map[string]bool{}
 	for _, m := range matches {
 		for _, c := range m.Classes {
