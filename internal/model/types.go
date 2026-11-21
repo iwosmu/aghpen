@@ -564,6 +564,12 @@ const (
 	ClassRemoteAccess = "remote-access"
 	ClassDirListing   = "directory-listing"
 	ClassErrorPage    = "error-page"
+	// ClassInstallPage: an unfinished installer anyone can complete (Gitea
+	// install form, WordPress wp-admin/install.php).
+	ClassInstallPage = "install-page"
+	// ClassUnauthControlAPI: a control API that answers without
+	// authentication (Toxiproxy API, Traefik api.insecure, Docker API on 2375).
+	ClassUnauthControlAPI = "unauth-control-api"
 )
 
 type Cookie struct {

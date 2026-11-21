@@ -24,7 +24,7 @@ services:
     ports: !reset []
     extra_hosts: !reset []
     environment:
-      CZUJKA_DB_URL: postgres://czujka:${CZUJKA_DB_PASSWORD:-czujka-internal-network-only}@127.0.0.1:${CZUJKA_DB_HOST_PORT:-55432}/czujka?sslmode=disable
+      CZUJKA_DB_URL: postgres://czujka@127.0.0.1:${CZUJKA_DB_HOST_PORT:-55432}/czujka?sslmode=disable
       CZUJKA_LISTEN: ${CZUJKA_BIND:-127.0.0.1}:${CZUJKA_PORT:-8080}
       CZUJKA_HOST_GATEWAY: "off"
       CZUJKA_PUBLISHED_PORT: ${CZUJKA_PORT:-8080}

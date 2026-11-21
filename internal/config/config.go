@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -69,6 +70,13 @@ func FromEnv(get func(string) string) (Config, error) {
 		CookieSecure:  strings.ToLower(str(get, "CZUJKA_COOKIE_SECURE", "auto")),
 		LogFormat:     strings.ToLower(str(get, "CZUJKA_LOG_FORMAT", "json")),
 		HostGateway:   strings.TrimSpace(get("CZUJKA_HOST_GATEWAY")),
+	}
+	if f := strings.TrimSpace(get("CZUJKA_DB_PASSWORD_FILE")); f != "" && c.DBURL != "" {
+		u, err := withPasswordFile(c.DBURL, f)
+		if err != nil {
+			return c, err
+		}
+		c.DBURL = u
 	}
 	for _, k := range strings.Split(get("CZUJKA_MASTER_KEY_OLD"), ",") {
 		if k = strings.TrimSpace(k); k != "" {
@@ -191,4 +199,24 @@ func boolean(get func(string) string, key string, def bool) (bool, error) {
 		return false, fmt.Errorf("%s must be true or false, got %q", key, v)
 	}
 	return b, nil
+}
+
+// withPasswordFile puts the password from file into the database URL. The
+// compose stack writes that file into a volume on its first start, so the
+// repository holds no database password.
+func withPasswordFile(dbURL, file string) (string, error) {
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		return "", fmt.Errorf("CZUJKA_DB_PASSWORD_FILE: %w", err)
+	}
+	pw := strings.TrimSpace(string(raw))
+	if pw == "" {
+		return "", fmt.Errorf("CZUJKA_DB_PASSWORD_FILE: %s is empty", file)
+	}
+	u, err := url.Parse(dbURL)
+	if err != nil || u.User == nil {
+		return "", fmt.Errorf("CZUJKA_DB_PASSWORD_FILE: CZUJKA_DB_URL needs the form postgres://user@host/db")
+	}
+	u.User = url.UserPassword(u.User.Username(), pw)
+	return u.String(), nil
 }

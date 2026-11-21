@@ -93,6 +93,7 @@ var validClasses = map[string]bool{
 	model.ClassAdminPanel: true, model.ClassLogin: true, model.ClassStaging: true, model.ClassIoT: true,
 	model.ClassDefaultPage: true, model.ClassAPI: true, model.ClassDevTool: true, model.ClassDatabase: true,
 	model.ClassRemoteAccess: true, model.ClassDirListing: true, model.ClassErrorPage: true,
+	model.ClassInstallPage: true, model.ClassUnauthControlAPI: true,
 }
 
 // Def is one parsed signature, before compilation.

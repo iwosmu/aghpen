@@ -2,10 +2,13 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/runner"
@@ -221,7 +224,45 @@ func (s *Server) previewAt(r *http.Request, valid []model.Target, invalid []mode
 		}
 	}
 	p.Excluded = s.targets.Excluded(p.Valid, policy.Exclusions)
+	s.domainAddresses(r.Context(), p.Valid)
 	return p, nil
+}
+
+// maxPreviewLookups bounds the DNS lookups of one preview.
+const maxPreviewLookups = 50
+
+// domainAddresses sets maps_to of the domain targets of a preview to the IPv4
+// addresses the engine scans them on (A records; an AAAA answer is not
+// scanned). A name that does not resolve keeps maps_to empty.
+func (s *Server) domainAddresses(ctx context.Context, ts []model.Target) {
+	lookup := s.lookup
+	if lookup == nil {
+		lookup = runner.DefaultLookup
+	}
+	var wg sync.WaitGroup
+	n := 0
+	for i := range ts {
+		if ts[i].Kind != model.TargetDomain || ts[i].MapsTo != "" || n >= maxPreviewLookups {
+			continue
+		}
+		n++
+		wg.Add(1)
+		go func(t *model.Target) {
+			defer wg.Done()
+			c, cancel := context.WithTimeout(ctx, 3*time.Second)
+			defer cancel()
+			addrs, err := lookup(c, t.Value)
+			if err != nil {
+				return
+			}
+			var parts []string
+			for _, a := range runner.IPv4Of(addrs) {
+				parts = append(parts, a.String())
+			}
+			t.MapsTo = strings.Join(parts, ", ")
+		}(&ts[i])
+	}
+	wg.Wait()
 }
 
 // save stores the valid targets of a preview in a scope.
@@ -230,8 +271,15 @@ func (s *Server) saveTargets(r *http.Request, scopeID int64, p model.TargetPrevi
 	if err != nil {
 		return p, err
 	}
+	shown := map[string]string{}
+	for _, t := range p.Valid {
+		shown[t.Value] = t.MapsTo
+	}
 	for i := range saved {
-		saved[i].MapsTo = targets.MapsTo(saved[i].Value)
+		saved[i].MapsTo = shown[saved[i].Value]
+		if m := targets.MapsTo(saved[i].Value); m != "" {
+			saved[i].MapsTo = m
+		}
 	}
 	p.Valid = saved
 	p.Duplicates += dup
