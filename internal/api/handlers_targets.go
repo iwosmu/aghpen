@@ -451,6 +451,20 @@ func (s *Server) updateTarget(w http.ResponseWriter, r *http.Request) {
 			t.Kind, t.Value, t.Addresses = parsed.Kind, parsed.Value, parsed.Addresses
 		}
 	}
+	_, newValue := patch["value"]
+	_, switched := patch["enabled"]
+	if err == nil && (newValue || (switched && t.Enabled)) {
+		// The same allowed-networks and operator-lock check as creation
+		// (security review H1): a new value, or a target switched on again.
+		var p model.TargetPreview
+		if p, err = s.preview(r, []model.Target{t}, nil); err == nil && len(p.Valid) == 0 {
+			reason := "cel poza dozwolonymi sieciami"
+			if len(p.Invalid) > 0 {
+				reason = p.Invalid[0].Reason
+			}
+			err = invalid("value: %s: %s", t.Value, reason)
+		}
+	}
 	if err == nil {
 		t, err = s.st.UpdateTarget(r.Context(), t)
 	}
