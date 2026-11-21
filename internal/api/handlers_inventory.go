@@ -561,7 +561,7 @@ func (s *Server) exportDojo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !settings.Enabled || settings.URL == "" || settings.APIKey == "" {
-		writeErr(w, http.StatusConflict, "conflict", "DefectDojo is not configured: set the URL and the API key and enable the integration")
+		writeErr(w, http.StatusConflict, "conflict", "DefectDojo nie jest skonfigurowane. Podaj adres i klucz API na stronie Administracja.")
 		return
 	}
 	f := store.FindingFilter{IDs: in.IDs, ListOpts: store.ListOpts{Limit: 1000}}
@@ -596,8 +596,7 @@ func (s *Server) exportDojo(w http.ResponseWriter, r *http.Request) {
 		// The import went through and DefectDojo stopped answering before the
 		// read that confirms it. No raw transport error for the analyst.
 		writeErrDetails(w, http.StatusBadGateway, "dojo_unconfirmed",
-			"Wysłano, nie potwierdzono: powtórz eksport. DefectDojo przyjął dane, ale przestał odpowiadać przed potwierdzeniem. "+
-				"Ponowny eksport albo pobranie statusów połączy te obserwacje po kluczu, bez duplikatów.", res)
+			"DefectDojo nie potwierdził eksportu. Powtórz eksport.", res)
 		return
 	}
 	if err != nil {

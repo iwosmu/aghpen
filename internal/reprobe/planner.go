@@ -174,10 +174,10 @@ func Build(in Input) Plan {
 		ActiveReprobe: in.ActiveReprobe, Probes: []Probe{}, Skipped: []Skip{}, Settings: s}
 	switch {
 	case !s.Enabled:
-		plan.Blocked = "Ponowne sondowanie jest wyłączone w ustawieniach."
+		plan.Blocked = "Ponowne sprawdzanie jest wyłączone."
 		return plan
 	case in.Policy.EmergencyStop:
-		plan.Blocked = "Wyłącznik awaryjny jest włączony: Czujka nie wysyła żadnych sond."
+		plan.Blocked = "Stop awaryjny jest włączony."
 		return plan
 	}
 	excl := parseExclusions(in.Policy.Exclusions)
@@ -227,17 +227,13 @@ func Build(in Input) Plan {
 			}
 			wAt, ok := sched.NextAllowed(at, c.Windows, tz)
 			if !ok {
-				plan.Skipped = append(plan.Skipped, Skip{c.HostID, c.IP, "Profil hosta nie ma żadnego otwartego okna skanowania."})
+				plan.Skipped = append(plan.Skipped, Skip{c.HostID, c.IP, "Profil skanu tego hosta nie ma okna czasowego."})
 				continue
 			}
 			p.Kind, p.Step, p.Steps, p.NotBefore = KindConfirm, k+1, len(steps), wAt
-			p.Reason = fmt.Sprintf("Host nie odpowiedział w skanie o %s. Potwierdzenie %d z %d, %d min po pierwszym braku: szybki werdykt, czy host wrócił, czy jest nieaktywny.",
-				c.StreakStart.In(tz).Format("02.01 15:04"), k+1, len(steps), steps[k])
-			if young {
-				p.Reason += fmt.Sprintf(" Host ma %d %s, więc jego rytm nie jest jeszcze znany: krótkie odstępy.", n, plural(n, "obserwację", "obserwacje", "obserwacji"))
-			}
+			p.Reason = fmt.Sprintf("Nie odpowiada od %s. Sprawdzenie %d z %d.", c.StreakStart.In(tz).Format("02.01 15:04"), k+1, len(steps))
 			if wAt.After(at) {
-				p.Reason += fmt.Sprintf(" Przesunięte do okna skanowania (start %s).", wAt.In(tz).Format("02.01 15:04"))
+				p.Reason += fmt.Sprintf(" Przesunięte do okna czasowego (start %s).", wAt.In(tz).Format("02.01 15:04"))
 			}
 			plan.Probes = append(plan.Probes, p)
 			continue
@@ -245,7 +241,7 @@ func Build(in Input) Plan {
 
 		// Likely-up rule: unstable or expected-offline hosts with a known rhythm.
 		if n < analyze.MinObsForExpected {
-			plan.Skipped = append(plan.Skipped, Skip{c.HostID, c.IP, fmt.Sprintf("Za mało obserwacji (%d), żeby znać rytm hosta; czeka na pełny skan.", n)})
+			plan.Skipped = append(plan.Skipped, Skip{c.HostID, c.IP, fmt.Sprintf("Za mało obserwacji (%d). Czeka na pełny skan.", n)})
 			continue
 		}
 		rates := analyze.UpRates(c.Buckets)
@@ -273,16 +269,15 @@ func Build(in Input) Plan {
 			}
 			ls := start.In(loc)
 			p.Kind, p.NotBefore = KindLikelyUp, wAt
-			what := "odpowiada nieregularnie"
+			what := "niestabilny"
 			if c.Status == model.HostExpectedOffline {
-				what = "nie odpowiada zgodnie ze swoim rytmem"
+				what = "poza godzinami"
 			}
-			p.Reason = fmt.Sprintf("Host %s. Zwykle odpowiada w %s %02d:00–%02d:00 (model: %d%%); sonda na początku tej godziny.",
-				what, dayNames[ls.Weekday()], ls.Hour(), (ls.Hour()+1)%24, int(rates[b]*100+0.5))
+			p.Reason = fmt.Sprintf("Host %s. Zwykle aktywny %s %02d:00–%02d:00.", what, dayNames[ls.Weekday()], ls.Hour(), (ls.Hour()+1)%24)
 			found = true
 		}
 		if !found {
-			plan.Skipped = append(plan.Skipped, Skip{c.HostID, c.IP, "W najbliższym tygodniu brak godziny, w której host zwykle odpowiada i okno skanowania jest otwarte."})
+			plan.Skipped = append(plan.Skipped, Skip{c.HostID, c.IP, "W tym tygodniu brak godziny, w której host jest zwykle aktywny, a okno czasowe otwarte."})
 			continue
 		}
 		plan.Probes = append(plan.Probes, p)
@@ -308,7 +303,7 @@ func Build(in Input) Plan {
 		}
 	}
 	if in.ActiveReprobe && plan.DueNow > 0 {
-		plan.Blocked = "Poprzednie sondowanie jeszcze trwa; następne zacznie się po nim."
+		plan.Blocked = "Poprzednie sprawdzenie jeszcze trwa."
 	}
 	return plan
 }

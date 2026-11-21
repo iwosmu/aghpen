@@ -35,6 +35,10 @@ var clock = DefaultClock
 func init() {
 	if c, err := ClockFromEnv(os.Getenv); err == nil {
 		clock = c
+		if !c.IsDefault() {
+			// The pattern texts do not name the clock; the log does.
+			fmt.Fprintf(os.Stderr, "czujka: availability clock %s\n", c)
+		}
 	} else {
 		fmt.Fprintf(os.Stderr, "czujka: availability clock: %v; using 1h buckets over 1 week\n", err)
 	}

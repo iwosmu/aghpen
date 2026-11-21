@@ -172,15 +172,15 @@ func TestFindingsOpen(t *testing.T) {
 }
 
 func TestDiffSentencesPolishPlural(t *testing.T) {
-	s := diffSentences(AtDiff{ServicesGoneSince: 12, ServicesNewSince: 3, HostsDownSince: 1, HostsNewSince: 22})
+	s := diffSentences(AtDiff{ServicesGoneSince: 12, ServicesNewSince: 3, HostsDownSince: 1, HostsNewSince: 22, FindingsOpenedSince: 2, FindingsClosedSince: 1})
 	joined := strings.Join(s, " | ")
-	for _, want := range []string{"12 usług, które wtedy istniały, dziś nie odpowiada.", "3 usługi są dziś otwarte, a wtedy ich nie było.",
-		"1 host odpowiadał wtedy, a dziś nie jest aktywny.", "22 hosty pojawiły się później."} {
+	for _, want := range []string{"Usługi, które zniknęły: 12.", "Nowe usługi: 3.",
+		"Hosty dziś nieaktywne: 1.", "Nowe hosty: 22.", "Nowe znaleziska: 2. Zamknięte znaleziska: 1."} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("missing %q in %q", want, joined)
 		}
 	}
-	if got := diffSentences(AtDiff{}); len(got) != 1 || !strings.Contains(got[0], "nie zmienił") {
+	if got := diffSentences(AtDiff{}); len(got) != 1 || got[0] != "Bez zmian od tamtej chwili." {
 		t.Errorf("empty diff: %v", got)
 	}
 	if plural(1, "a", "b", "c") != "a" || plural(3, "a", "b", "c") != "b" || plural(13, "a", "b", "c") != "c" || plural(24, "a", "b", "c") != "b" || plural(25, "a", "b", "c") != "c" {

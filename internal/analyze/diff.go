@@ -229,14 +229,14 @@ type differ struct {
 	unreachable int
 }
 
-func (d *differ) add(h *HostSnapshot, svc *model.ServiceResult, kind model.ChangeKind, sev model.Severity, field string, before, after any, expected bool, summary string) {
+func (d *differ) add(h *HostSnapshot, svc *model.ServiceResult, kind model.ChangeKind, sev model.Severity, field string, before, after any, expected bool, detail map[string]any) {
 	if expected {
 		sev = model.SevInfo
 	}
 	pid := d.prevID
 	c := model.Change{
 		RunID: d.cur.RunID, PrevRunID: &pid, At: d.cur.At, Kind: kind, Severity: sev,
-		HostID: h.HostID, IP: h.IP, Summary: summary, Field: field, Before: before, After: after, Expected: expected,
+		HostID: h.HostID, IP: h.IP, Field: field, Before: before, After: after, Expected: expected, Detail: detail,
 	}
 	if svc != nil {
 		c.Port = svc.Port
@@ -244,6 +244,7 @@ func (d *differ) add(h *HostSnapshot, svc *model.ServiceResult, kind model.Chang
 			c.ServiceID = &id
 		}
 	}
+	c.Summary = ChangeSummary(c)
 	d.out = append(d.out, c)
 }
 
@@ -258,9 +259,9 @@ func svcKey(s *model.ServiceResult) string {
 func isOpen(s *model.ServiceResult) bool { return s.State == "" || s.State == "open" }
 
 func (d *differ) host(prev, cur *HostSnapshot) {
-	patternNote := ""
+	var pattern map[string]any
 	if cur.Pattern != "" {
-		patternNote = " (" + cur.Pattern + ")"
+		pattern = map[string]any{DetailPattern: cur.Pattern}
 	}
 	wasDown := prev != nil && prev.Status == model.HostDown
 	known := prev != nil && prev.Status != model.HostUnknown && prev.Status != ""
@@ -270,42 +271,38 @@ func (d *differ) host(prev, cur *HostSnapshot) {
 
 	switch {
 	case cur.Up && !known:
-		d.add(cur, nil, model.ChangeHostNew, model.SevLow, "status", nil, string(model.HostUp), false,
-			fmt.Sprintf("Nowy host %s%s", cur.IP, openPortsNote(cur.Services)))
+		d.add(cur, nil, model.ChangeHostNew, model.SevLow, "status", nil, string(model.HostUp), false, portsDetail(cur.Services))
 	case cur.Up && wasDown:
-		d.add(cur, nil, model.ChangeHostBack, model.SevLow, "status", string(prev.Status), string(model.HostUp), false,
-			fmt.Sprintf("Host %s znów odpowiada po zgłoszeniu jako nieaktywny", cur.IP))
+		d.add(cur, nil, model.ChangeHostBack, model.SevLow, "status", string(prev.Status), string(model.HostUp), false, nil)
 	case cur.Up && prev.Status == model.HostExpectedOffline:
-		d.add(cur, nil, model.ChangeHostBack, model.SevInfo, "status", string(prev.Status), string(model.HostUp), true,
-			fmt.Sprintf("Host %s znów odpowiada, zgodnie z profilem dostępności%s", cur.IP, patternNote))
+		d.add(cur, nil, model.ChangeHostBack, model.SevInfo, "status", string(prev.Status), string(model.HostUp), true, pattern)
 	case cur.Up && prev.Status == model.HostUnstable && !prev.Up:
 		// It was silent (host_missing or unstable) and answers again, for
 		// example to a confirmation probe: say so instead of going back to
 		// "up" without a trace.
 		// A host known to answer irregularly (the rule that marks its misses
 		// as expected) comes back as expected too: no alarm for a flapper.
-		irregular := cur.Observations >= MinObsForExpected && cur.Stability > 0 && cur.Stability < FlakyStability
-		d.add(cur, nil, model.ChangeHostBack, model.SevInfo, "status", string(prev.Status), string(model.HostUp), irregular,
-			fmt.Sprintf("Host %s znów odpowiada po chwilowym braku odpowiedzi", cur.IP))
+		d.add(cur, nil, model.ChangeHostBack, model.SevInfo, "status", chainStatus(prev), string(model.HostUp), irregular(cur), nil)
 	case !cur.Up && known && cur.Status == model.HostDown && !wasDown:
-		d.add(cur, nil, model.ChangeHostGone, model.SevMedium, "status", string(prev.Status), string(model.HostDown), false, goneSummary(cur))
+		d.add(cur, nil, model.ChangeHostGone, model.SevMedium, "status", chainStatus(prev), string(model.HostDown), false, goneDetail(cur))
 		d.servicesGone(cur, prev)
 	case !cur.Up && known && cur.Status == model.HostExpectedOffline && prev.Status != model.HostExpectedOffline && !wasDown:
-		d.add(cur, nil, model.ChangeHostGone, model.SevInfo, "status", string(prev.Status), string(model.HostExpectedOffline), true,
-			fmt.Sprintf("Host %s nie odpowiada, zgodnie z profilem dostępności%s", cur.IP, patternNote))
+		d.add(cur, nil, model.ChangeHostGone, model.SevInfo, "status", chainStatus(prev), string(model.HostExpectedOffline), true, pattern)
 	case !cur.Up && known && cur.Status == model.HostUnstable && prev.Status != model.HostUnstable && !wasDown:
-		if cur.Observations >= MinObsForExpected && cur.Stability > 0 && cur.Stability < FlakyStability {
-			d.add(cur, nil, model.ChangeHostUnstable, model.SevInfo, "status", string(prev.Status), string(model.HostUnstable), true,
-				fmt.Sprintf("Host %s nie odpowiedział; odpowiada nieregularnie (w ok. %d%% skanów)%s", cur.IP, int(cur.Stability*100+0.5), patternNote))
+		if irregular(cur) {
+			detail := map[string]any{DetailStabilityPct: int(cur.Stability*100 + 0.5)}
+			if cur.Pattern != "" {
+				detail[DetailPattern] = cur.Pattern
+			}
+			d.add(cur, nil, model.ChangeHostUnstable, model.SevInfo, "status", chainStatus(prev), string(model.HostUnstable), true, detail)
 		} else if prev.Up {
 			n := openCount(prev.Services)
 			d.unreachable += n
-			d.add(cur, nil, model.ChangeHostMissing, model.SevMedium, "status", string(model.HostUp), "missing", false, missingSummary(cur, prev.Services))
+			d.add(cur, nil, model.ChangeHostMissing, model.SevMedium, "status", string(model.HostUp), StatusMissing, false, missingDetail(cur, prev.Services))
 			d.servicesUnreachable(cur, prev)
 		} else {
 			d.unreachable += openCount(prev.Services)
-			d.add(cur, nil, model.ChangeHostUnstable, model.SevLow, "status", string(prev.Status), string(model.HostUnstable), false,
-				fmt.Sprintf("Host %s nie odpowiedział w porze, w której zwykle odpowiada; jeszcze nie jest zgłoszony jako nieaktywny", cur.IP))
+			d.add(cur, nil, model.ChangeHostUnstable, model.SevLow, "status", chainStatus(prev), StatusMissing, false, nil)
 		}
 	}
 
@@ -378,8 +375,7 @@ func (d *differ) host(prev, cur *HostSnapshot) {
 		if c, ok := curSvc[svcKey(p)]; ok && c.State != "" {
 			after = c.State
 		}
-		d.add(cur, p, model.ChangeServiceGone, model.SevLow, "state", "open", after, false,
-			fmt.Sprintf("Usługa %s zniknęła%s", addr(cur.IP, p.Port), productNote(p)))
+		d.add(cur, p, model.ChangeServiceGone, model.SevLow, "state", "open", after, false, productDetail(p))
 	}
 }
 
@@ -399,8 +395,7 @@ func (d *differ) serviceNew(h *HostSnapshot, s *model.ServiceResult) {
 	if isSensitive(s) {
 		sev = model.SevMedium
 	}
-	d.add(h, s, model.ChangeServiceNew, sev, "state", nil, "open", false,
-		fmt.Sprintf("Nowa usługa %s%s", addr(h.IP, s.Port), productNote(s)))
+	d.add(h, s, model.ChangeServiceNew, sev, "state", nil, "open", false, productDetail(s))
 }
 
 func (d *differ) service(h *HostSnapshot, p, c *model.ServiceResult) {
@@ -409,14 +404,11 @@ func (d *differ) service(h *HostSnapshot, p, c *model.ServiceResult) {
 	// Product and version. A missing value on either side is not a change.
 	switch {
 	case p.Product != "" && c.Product != "" && !strings.EqualFold(p.Product, c.Product):
-		d.add(h, c, model.ChangeServiceChanged, model.SevMedium, "product", productVersion(p), productVersion(c), false,
-			fmt.Sprintf("Zmiana produktu %s: %s → %s", at, productVersion(p), productVersion(c)))
+		d.add(h, c, model.ChangeServiceChanged, model.SevMedium, "product", productVersion(p), productVersion(c), false, nil)
 	case p.Version != "" && c.Version != "" && p.Version != c.Version && strings.EqualFold(p.Product, c.Product):
-		d.add(h, c, model.ChangeServiceChanged, model.SevLow, "version", p.Version, c.Version, false,
-			fmt.Sprintf("Zmiana wersji %s: %s → %s", at, productVersion(p), productVersion(c)))
+		d.add(h, c, model.ChangeServiceChanged, model.SevLow, "version", p.Version, c.Version, false, map[string]any{DetailProduct: c.Product})
 	case p.Product == "" && c.Product == "" && p.Name != "" && c.Name != "" && p.Name != c.Name && versionMeasured(p) == versionMeasured(c):
-		d.add(h, c, model.ChangeServiceChanged, model.SevLow, "name", p.Name, c.Name, false,
-			fmt.Sprintf("Zmiana usługi %s: %s → %s", at, p.Name, c.Name))
+		d.add(h, c, model.ChangeServiceChanged, model.SevLow, "name", p.Name, c.Name, false, nil)
 	}
 
 	httpComparable := p.HTTP != nil && c.HTTP != nil && c.HTTP.Error == "" && p.HTTP.Error == ""
@@ -431,15 +423,14 @@ func (d *differ) service(h *HostSnapshot, p, c *model.ServiceResult) {
 	}
 	if p.TLS != nil && c.TLS != nil && p.TLS.SHA256 != "" && c.TLS.SHA256 != "" && p.TLS.SHA256 != c.TLS.SHA256 {
 		sev := model.SevLow
-		note := ""
+		var detail map[string]any
 		switch {
 		case c.TLS.Expired:
-			sev, note = model.SevMedium, ", nowy certyfikat jest przeterminowany"
+			sev, detail = model.SevMedium, map[string]any{DetailExpired: true}
 		case c.TLS.SelfSigned && !p.TLS.SelfSigned:
-			sev, note = model.SevMedium, ", nowy certyfikat jest samopodpisany"
+			sev, detail = model.SevMedium, map[string]any{DetailSelfSigned: true}
 		}
-		d.add(h, c, model.ChangeCert, sev, "tls.sha256", certBrief(p.TLS), certBrief(c.TLS), false,
-			fmt.Sprintf("Nowy certyfikat TLS %s: %s, ważny do %s%s", at, orDash(c.TLS.SubjectCN), c.TLS.NotAfter.UTC().Format("2006-01-02"), note))
+		d.add(h, c, model.ChangeCert, sev, "tls.sha256", certBrief(p.TLS), certBrief(c.TLS), false, detail)
 	}
 }
 
@@ -487,14 +478,11 @@ func (d *differ) techs(h *HostSnapshot, p, c *model.ServiceResult, at string) {
 		b, inCur := ct[n]
 		switch {
 		case !inPrev:
-			d.add(h, c, model.ChangeTechNew, model.SevLow, "technologies", nil, techLabel(b), false,
-				fmt.Sprintf("Nowa technologia na %s: %s", at, techLabel(b)))
+			d.add(h, c, model.ChangeTechNew, model.SevLow, "technologies", nil, techLabel(b), false, nil)
 		case !inCur:
-			d.add(h, c, model.ChangeTechGone, model.SevInfo, "technologies", techLabel(a), nil, false,
-				fmt.Sprintf("Technologia %s nie jest już widoczna na %s", techLabel(a), at))
+			d.add(h, c, model.ChangeTechGone, model.SevInfo, "technologies", techLabel(a), nil, false, nil)
 		case a.Version != "" && b.Version != "" && a.Version != b.Version:
-			d.add(h, c, model.ChangeTechVersion, model.SevLow, "technologies."+b.Name, a.Version, b.Version, false,
-				fmt.Sprintf("Zmiana wersji %s na %s: %s → %s", b.Name, at, a.Version, b.Version))
+			d.add(h, c, model.ChangeTechVersion, model.SevLow, "technologies."+b.Name, a.Version, b.Version, false, nil)
 		}
 	}
 }
@@ -510,31 +498,20 @@ func (d *differ) classes(h *HostSnapshot, p, c *model.ServiceResult, at string) 
 			sev = model.SevMedium
 		}
 	}
-	var parts []string
-	if len(added) > 0 {
-		parts = append(parts, "teraz: "+strings.Join(classNames(added), ", "))
-	}
-	if len(removed) > 0 {
-		parts = append(parts, "już nie: "+strings.Join(classNames(removed), ", "))
-	}
-	d.add(h, c, model.ChangeClass, sev, "classes", sortedCopy(p.Classes), sortedCopy(c.Classes), false,
-		fmt.Sprintf("Zmiana klasy usługi %s (%s)", at, strings.Join(parts, "; ")))
+	d.add(h, c, model.ChangeClass, sev, "classes", sortedCopy(p.Classes), sortedCopy(c.Classes), false, nil)
 }
 
 func (d *differ) http(h *HostSnapshot, p, c *model.ServiceResult, at string) {
 	ph, ch := p.HTTP, c.HTTP
 	statusChanged := ph.Status != ch.Status && ph.Status != 0 && ch.Status != 0
 	if statusChanged {
-		d.add(h, c, model.ChangeHTTPStatus, model.SevLow, "http.status", ph.Status, ch.Status, false,
-			fmt.Sprintf("Zmiana kodu HTTP %s: %d → %d", at, ph.Status, ch.Status))
+		d.add(h, c, model.ChangeHTTPStatus, model.SevLow, "http.status", ph.Status, ch.Status, false, nil)
 	}
 	if pt, ct := squash(ph.Title), squash(ch.Title); pt != ct {
-		d.add(h, c, model.ChangeTitle, model.SevInfo, "http.title", pt, ct, false,
-			fmt.Sprintf("Zmiana tytułu strony %s: %s → %s", at, quote(pt), quote(ct)))
+		d.add(h, c, model.ChangeTitle, model.SevInfo, "http.title", pt, ct, false, nil)
 	}
 	if pr, cr := redirectTarget(ph), redirectTarget(ch); pr != cr {
-		d.add(h, c, model.ChangeRedirect, model.SevLow, "http.final_url", pr, cr, false,
-			fmt.Sprintf("Zmiana przekierowania %s: %s → %s", at, orNone(pr), orNone(cr)))
+		d.add(h, c, model.ChangeRedirect, model.SevLow, "http.final_url", pr, cr, false, nil)
 	}
 
 	// Header set: names only, volatile names ignored; values of a few identifying headers.
@@ -554,16 +531,7 @@ func (d *differ) http(h *HostSnapshot, p, c *model.ServiceResult, at string) {
 				sev = model.SevLow
 			}
 		}
-		var parts []string
-		if len(added) > 0 {
-			parts = append(parts, "dodano "+strings.Join(added, ", "))
-		}
-		if len(removed) > 0 {
-			parts = append(parts, "usunięto "+strings.Join(removed, ", "))
-		}
-		parts = append(parts, valueNotes...)
-		d.add(h, c, model.ChangeHeaders, sev, "http.headers", pn, cn, false,
-			fmt.Sprintf("Zmiana nagłówków %s: %s", at, strings.Join(parts, "; ")))
+		d.add(h, c, model.ChangeHeaders, sev, "http.headers", pn, cn, false, listDetail(DetailValues, valueNotes))
 	}
 
 	// Cookie set: names and flags, never values.
@@ -585,16 +553,7 @@ func (d *differ) http(h *HostSnapshot, p, c *model.ServiceResult, at string) {
 	}
 	sort.Strings(flagNotes)
 	if len(cAdded)+len(cRemoved)+len(flagNotes) > 0 {
-		var parts []string
-		if len(cAdded) > 0 {
-			parts = append(parts, "dodano "+strings.Join(cAdded, ", "))
-		}
-		if len(cRemoved) > 0 {
-			parts = append(parts, "usunięto "+strings.Join(cRemoved, ", "))
-		}
-		parts = append(parts, flagNotes...)
-		d.add(h, c, model.ChangeCookies, sev, "http.cookies", keys(pc), keys(cc), false,
-			fmt.Sprintf("Zmiana ciasteczek %s: %s", at, strings.Join(parts, "; ")))
+		d.add(h, c, model.ChangeCookies, sev, "http.cookies", keys(pc), keys(cc), false, listDetail(DetailFlags, flagNotes))
 	}
 
 	// Strong content change. A status change already explains a new body.
@@ -602,11 +561,10 @@ func (d *differ) http(h *HostSnapshot, p, c *model.ServiceResult, at string) {
 		if dist, ok := SimhashDistance(ph.BodySimhash, ch.BodySimhash); ok {
 			if dist >= ContentChangeDistance {
 				d.add(h, c, model.ChangeContent, model.SevInfo, "http.body_simhash", ph.BodySimhash, ch.BodySimhash, false,
-					fmt.Sprintf("Treść strony %s zmieniła się wyraźnie (odległość simhash %d/64)", at, dist))
+					map[string]any{DetailDistance: dist})
 			}
 		} else if ph.BodySHA256 != "" && ch.BodySHA256 != "" && ph.BodySHA256 != ch.BodySHA256 && lengthChanged(ph.BodyLength, ch.BodyLength) {
-			d.add(h, c, model.ChangeContent, model.SevInfo, "http.body_length", ph.BodyLength, ch.BodyLength, false,
-				fmt.Sprintf("Treść strony %s zmieniła się wyraźnie (rozmiar %d → %d bajtów)", at, ph.BodyLength, ch.BodyLength))
+			d.add(h, c, model.ChangeContent, model.SevInfo, "http.body_length", ph.BodyLength, ch.BodyLength, false, nil)
 		}
 	}
 }
@@ -664,28 +622,6 @@ func productNote(s *model.ServiceResult) string {
 		return " (" + v + ")"
 	}
 	return ""
-}
-
-func openPortsNote(svcs []model.ServiceResult) string {
-	var ports []int
-	for i := range svcs {
-		if isOpen(&svcs[i]) {
-			ports = append(ports, svcs[i].Port)
-		}
-	}
-	if len(ports) == 0 {
-		return ""
-	}
-	sort.Ints(ports)
-	strs := make([]string, 0, len(ports))
-	for i, p := range ports {
-		if i == 8 {
-			strs = append(strs, "…")
-			break
-		}
-		strs = append(strs, strconv.Itoa(p))
-	}
-	return fmt.Sprintf(" (otwarte porty: %s)", strings.Join(strs, ", "))
 }
 
 func isSensitive(s *model.ServiceResult) bool {
@@ -933,60 +869,90 @@ func (d *differ) servicesGone(cur, prev *HostSnapshot) {
 	}
 	sort.SliceStable(gone, func(i, j int) bool { return gone[i].Port < gone[j].Port })
 	for _, p := range gone {
-		d.add(cur, p, model.ChangeServiceGone, model.SevLow, "state", "open", "host-down",
-			false, fmt.Sprintf("Usługa %s zniknęła%s: host zgłoszony jako nieaktywny", addr(cur.IP, p.Port), productNote(p)))
+		d.add(cur, p, model.ChangeServiceGone, model.SevLow, "state", "open", "host-down", false, productDetail(p))
 	}
 }
 
-// goneSummary is the sentence of host_gone.
-func goneSummary(h *HostSnapshot) string {
+// irregular reports a host known to answer irregularly: its misses are
+// expected and stay out of the headline.
+func irregular(h *HostSnapshot) bool {
+	return h.Observations >= MinObsForExpected && h.Stability > 0 && h.Stability < FlakyStability
+}
+
+// chainStatus is the host state the before value of a host change names. A
+// host that was silent in its scan and is not known to answer irregularly is
+// stored as unstable, but the previous change said "missing": the chain
+// continues from there.
+func chainStatus(h *HostSnapshot) string {
+	if !h.Up && h.Status == model.HostUnstable && !irregular(h) {
+		return StatusMissing
+	}
+	return string(h.Status)
+}
+
+// goneDetail keeps the model's view of a host reported inactive.
+func goneDetail(h *HostSnapshot) map[string]any {
+	d := map[string]any{}
 	if h.Rule > 0 {
-		return fmt.Sprintf("Host %s zgłoszony jako nieaktywny: brak odpowiedzi w %d %s z rzędu (reguła profilu: zgłoszenie po %d %s)",
-			h.IP, h.Rule, plural(h.Rule, "przebiegu", "przebiegach", "przebiegach"), h.Rule, plural(h.Rule, "braku", "brakach", "brakach"))
+		d[DetailRule] = h.Rule
 	}
-	s := fmt.Sprintf("Host %s zgłoszony jako nieaktywny: nie odpowiada w godzinach, w których zwykle odpowiadał", h.IP)
 	if h.PAlive > 0 {
-		s += "; model: p_alive " + decimalPL(h.PAlive)
+		d[DetailPAlive] = h.PAlive
 	}
-	return s
+	return d
 }
 
-// missingSummary is the sentence of host_missing, with the model's view.
-func missingSummary(h *HostSnapshot, had []model.ServiceResult) string {
-	prev := "w poprzednim przebiegu odpowiadał"
+// missingDetail keeps what a silent host had and the model's view of it.
+func missingDetail(h *HostSnapshot, had []model.ServiceResult) map[string]any {
+	d := map[string]any{}
 	var list []string
 	for i := range had {
 		if s := &had[i]; isOpen(s) {
 			list = append(list, serviceLabel(s))
 		}
 	}
-	if n := len(list); n > 0 {
-		shown := list
-		if n > 6 {
-			shown = append(append([]string{}, list[:6]...), fmt.Sprintf("i %d innych", n-6))
-		}
-		prev += fmt.Sprintf(" i miał %d %s: %s", n, plural(n, "otwartą usługę", "otwarte usługi", "otwartych usług"), strings.Join(shown, ", "))
+	if len(list) > 0 {
+		d[DetailOpenServices] = len(list)
+		d[DetailServices] = list
 	}
-	s := fmt.Sprintf("Host %s nie odpowiada (niepotwierdzone): %s; ", h.IP, prev)
-	var parts []string
 	if h.PAlive > 0 {
-		parts = append(parts, "p_alive "+decimalPL(h.PAlive))
+		d[DetailPAlive] = h.PAlive
 	}
-	switch {
-	case h.MissesToDown == 1:
-		parts = append(parts, "zgłoszenie nieaktywności po kolejnym braku")
-	case h.MissesToDown > 1 && h.MissesToDown < DownAfterHorizon:
-		parts = append(parts, fmt.Sprintf("zgłoszenie nieaktywności po %d kolejnych brakach", h.MissesToDown))
-	case h.MissesToDown >= DownAfterHorizon:
-		parts = append(parts, "zgłoszenie nieaktywności dopiero po wielu kolejnych brakach")
-	}
-	if len(parts) == 0 {
-		parts = append(parts, "jeszcze nie zgłoszony jako nieaktywny")
+	if h.MissesToDown > 0 {
+		d[DetailMissesToDown] = h.MissesToDown
 	}
 	if h.Rule > 0 {
-		parts = append(parts, fmt.Sprintf("reguła profilu: %d %s z rzędu", h.Rule, plural(h.Rule, "brak", "braki", "braków")))
+		d[DetailRule] = h.Rule
 	}
-	return s + "model: " + strings.Join(parts, ", ")
+	return d
+}
+
+func portsDetail(svcs []model.ServiceResult) map[string]any {
+	var ports []int
+	for i := range svcs {
+		if isOpen(&svcs[i]) {
+			ports = append(ports, svcs[i].Port)
+		}
+	}
+	if len(ports) == 0 {
+		return nil
+	}
+	sort.Ints(ports)
+	return map[string]any{DetailPorts: ports}
+}
+
+func productDetail(s *model.ServiceResult) map[string]any {
+	if v := productVersion(s); v != "" {
+		return map[string]any{DetailProduct: v}
+	}
+	return nil
+}
+
+func listDetail(key string, list []string) map[string]any {
+	if len(list) == 0 {
+		return nil
+	}
+	return map[string]any{key: list}
 }
 
 // plural picks the Polish form for n: one, few (2-4, not 12-14), many.
@@ -1015,8 +981,11 @@ func (d *differ) servicesUnreachable(cur, prev *HostSnapshot) {
 		if !isOpen(s) {
 			continue
 		}
-		d.add(cur, s, model.ChangeServiceUnreachable, model.SevLow, "state", "open", "unknown", false,
-			fmt.Sprintf("Usługa %s:%d%s nie odpowiada (niepotwierdzone): host nie odpowiedział w tym przebiegu", cur.IP, s.Port, nameNote(s)))
+		var detail map[string]any
+		if n := strings.TrimSpace(s.Name + " " + s.Product); n != "" {
+			detail = map[string]any{DetailName: n}
+		}
+		d.add(cur, s, model.ChangeServiceUnreachable, model.SevLow, "state", "open", "unknown", false, detail)
 		if id, ok := prev.ServiceIDs[svcKey(s)]; ok {
 			d.out[len(d.out)-1].ServiceID = &id
 		}
@@ -1037,13 +1006,4 @@ func serviceLabel(s *model.ServiceResult) string {
 		out += " " + s.Product
 	}
 	return out
-}
-
-// nameNote is " (ssh OpenSSH)", or "" when the service has no name.
-func nameNote(s *model.ServiceResult) string {
-	n := strings.TrimSpace(s.Name + " " + s.Product)
-	if n == "" {
-		return ""
-	}
-	return " (" + n + ")"
 }

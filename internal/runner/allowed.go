@@ -166,9 +166,9 @@ func FilterAllowed(ctx context.Context, targets []model.Target, policy model.Saf
 func OperatorReason(why string) string {
 	const policy = "dozwolonymi sieciami polityki bezpieczeństwa"
 	if strings.Contains(why, policy) {
-		return strings.ReplaceAll(why, policy, "sieciami, do których operator ograniczył skanowanie (CZUJKA_ALLOWED_NETWORKS; blokady nie zmieni żaden użytkownik)")
+		return strings.ReplaceAll(why, policy, "blokadą operatora")
 	}
-	return why + " (blokada operatora: CZUJKA_ALLOWED_NETWORKS)"
+	return why + " (blokada operatora)"
 }
 
 // PrefixInside reports whether p lies wholly inside one of nets.

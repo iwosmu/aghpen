@@ -153,7 +153,7 @@ func (t *Timeline) run(w http.ResponseWriter, r *http.Request, p *params) (AtRun
 	}
 	run, err := t.ResolveRun(r.Context(), id, at)
 	if errors.Is(err, ErrNotFound) {
-		writeErr(w, http.StatusNotFound, "not_found", "brak przeanalizowanego przebiegu dla tego punktu w czasie")
+		writeErr(w, http.StatusNotFound, "not_found", "brak przeanalizowanego skanu dla tego punktu w czasie")
 		return run, false
 	}
 	if err != nil {

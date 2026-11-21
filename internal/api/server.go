@@ -247,7 +247,7 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.As(err, new(*runner.ActiveRunError)):
 		var a *runner.ActiveRunError
 		errors.As(err, &a)
-		writeErrDetails(w, http.StatusConflict, "run_active", fmt.Sprintf("Ten profil ma już aktywny przebieg #%d (w kolejce, trwający albo wstrzymany). Wstrzymaj, wznów albo anuluj go, zanim uruchomisz nowy.", a.RunID), map[string]int64{"run_id": a.RunID})
+		writeErrDetails(w, http.StatusConflict, "run_active", fmt.Sprintf("Ten profil ma już skan #%d. Zakończ albo anuluj go przed nowym.", a.RunID), map[string]int64{"run_id": a.RunID})
 	case errors.Is(err, auth.ErrLastAdmin), errors.Is(err, store.ErrConflict), errors.Is(err, runner.ErrActiveRun), errors.Is(err, runner.ErrBadState):
 		writeErr(w, http.StatusConflict, "conflict", msg)
 	case errors.Is(err, auth.ErrForbidden), errors.Is(err, auth.ErrBuiltinRole):

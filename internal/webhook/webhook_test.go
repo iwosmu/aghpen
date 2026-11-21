@@ -49,8 +49,8 @@ func TestBuildSelectsAndLinks(t *testing.T) {
 	if p.Counts["service_new"] != 1 || p.Counts["findings_new"] != 1 {
 		t.Errorf("counts %v", p.Counts)
 	}
-	for _, want := range []string{"*Czujka: przebieg #12 przeanalizowany* (profil dmz)", "nowe usługi: 1", "• [wysoka] Panel administracyjny: Jenkins (10.0.0.1:8080) https://czujka.example/hosts/1",
-		"• [średnia] Nowa usługa 10.0.0.1:8080 (Jenkins) https://czujka.example/services/9", "Przebieg: https://czujka.example/runs/12"} {
+	for _, want := range []string{"*Czujka: skan #12 przeanalizowany* (profil dmz)", "nowa usługa: 1", "nowe znaleziska: 1", "• [wysoka] Panel administracyjny: Jenkins (10.0.0.1:8080) https://czujka.example/hosts/1",
+		"• [średnia] Nowa usługa 10.0.0.1:8080 (Jenkins) https://czujka.example/services/9", "Skan: https://czujka.example/runs/12"} {
 		if !strings.Contains(p.Text, want) {
 			t.Errorf("text %q\nmissing %q", p.Text, want)
 		}

@@ -236,7 +236,7 @@ func TestImportFindingsInvalidRowsHavePolishReasons(t *testing.T) {
 	if err != nil || len(out) != 1 || rep.Skipped != 5 || len(rep.Invalid) != 5 {
 		t.Fatalf("%v out=%d %+v", err, len(out), rep)
 	}
-	want := []string{"brak tytułu", "nieznana waga", "niepoprawna data", "nie można ustalić hosta", "powtórzona obserwacja"}
+	want := []string{"brak tytułu", "nieznana waga", "niepoprawna data", "nie można ustalić hosta", "powtórzone znalezisko"}
 	for i, w := range want {
 		if !strings.Contains(rep.Invalid[i].Reason, w) {
 			t.Errorf("row %d reason %q, want %q", rep.Invalid[i].Line, rep.Invalid[i].Reason, w)

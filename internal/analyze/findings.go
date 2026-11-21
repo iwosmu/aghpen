@@ -209,13 +209,13 @@ func (b *findingBuilder) derive() {
 	if has(model.ClassAdminPanel) {
 		ev, sig, name := b.classEvidence(model.ClassAdminPanel)
 		b.add(FindingAdminPanel, sig, "Panel administracyjny: "+what(name),
-			"Pod tym adresem odpowiada panel administracyjny. Czujka stwierdza tylko jego obecność; nie próbuje się logować. Sprawdź, czy panel musi być dostępny z tej sieci.",
+			"Pod tym adresem odpowiada panel administracyjny. Sprawdź, czy musi być dostępny z tej sieci.",
 			withBase(ev), sig)
 	}
 	if has(model.ClassLogin) && isPlainHTTP(s) {
 		ev, sig, name := b.classEvidence(model.ClassLogin)
-		b.add(FindingLoginPlainHTTP, "", "Logowanie przez nieszyfrowane HTTP: "+what(name),
-			"Strona logowania jest serwowana bez TLS. Dane logowania przesyłane tą drogą można podsłuchać w sieci.",
+		b.add(FindingLoginPlainHTTP, "", "Logowanie bez szyfrowania (HTTP): "+what(name),
+			"Strona logowania działa bez TLS. Hasło można podsłuchać w sieci.",
 			withBase(ev), sig)
 	}
 	if has(model.ClassStaging) {
@@ -226,25 +226,25 @@ func (b *findingBuilder) derive() {
 				break
 			}
 		}
-		b.add(FindingStaging, "", "Środowisko testowe lub staging: "+what(name),
-			"Usługa wygląda na środowisko testowe, deweloperskie lub staging. Takie środowiska często mają słabszą konfigurację i dane testowe.",
+		b.add(FindingStaging, "", "Środowisko testowe: "+what(name),
+			"Usługa wygląda na środowisko testowe. Sprawdź, czy musi być dostępna z tej sieci.",
 			withBase(ev), sig)
 	}
 	if ok, ev := isDebugPage(s); ok {
 		b.add(FindingDebugPage, "", "Strona diagnostyczna lub tryb debug: "+what(""),
-			"Usługa pokazuje stronę diagnostyczną albo działa w trybie debug. Taka strona może ujawniać konfigurację i ścieżki aplikacji.",
+			"Strona może ujawniać konfigurację i ścieżki aplikacji.",
 			withBase(ev), "")
 	}
 	if has(model.ClassIoT) {
 		ev, sig, name := b.classEvidence(model.ClassIoT)
 		b.add(FindingIoT, sig, "Urządzenie IoT: "+what(name),
-			"Pod tym adresem odpowiada urządzenie IoT (kamera, drukarka, router, sterownik). Sprawdź, czy jego interfejs musi być dostępny z tej sieci.",
+			"Pod tym adresem odpowiada urządzenie IoT. Sprawdź, czy jego interfejs musi być dostępny z tej sieci.",
 			withBase(ev), sig)
 	}
 	if has(model.ClassDevTool) {
 		ev, sig, name := b.classEvidence(model.ClassDevTool)
 		b.add(FindingDevTool, sig, "Narzędzie deweloperskie: "+what(name),
-			"Pod tym adresem odpowiada narzędzie deweloperskie (CI, repozytorium kodu, monitoring). Takie narzędzia mają dostęp do kodu i sekretów.",
+			"Pod tym adresem odpowiada narzędzie deweloperskie. Takie narzędzia mają dostęp do kodu i sekretów.",
 			withBase(ev), sig)
 	}
 	// A web tool for databases (phpMyAdmin, Adminer, pgAdmin) is an admin
@@ -254,13 +254,13 @@ func (b *findingBuilder) derive() {
 	if has(model.ClassDatabase) && s.HTTP == nil {
 		ev, sig, _ := b.classEvidence(model.ClassDatabase)
 		b.add(FindingDatabase, "", "Baza danych dostępna z sieci: "+firstNonEmpty(productVersion(s), "port "+fmt.Sprint(s.Port)),
-			"Port bazy danych przyjmuje połączenia z sieci, z której wykonano skan. Czujka nie próbuje się łączyć ani logować.",
+			"Port bazy danych przyjmuje połączenia z sieci, z której wykonano skan.",
 			withBase(ev), sig)
 	}
 	if has(model.ClassRemoteAccess) {
 		ev, sig, _ := b.classEvidence(model.ClassRemoteAccess)
 		b.add(FindingRemoteAccess, "", "Usługa zdalnego dostępu: "+firstNonEmpty(productVersion(s), s.Name),
-			"Usługa zdalnego dostępu przyjmuje połączenia z sieci, z której wykonano skan. Czujka nie próbuje się logować.",
+			"Usługa zdalnego dostępu przyjmuje połączenia z sieci, z której wykonano skan.",
 			withBase(ev), sig)
 	}
 	if has(model.ClassDirListing) {
@@ -286,7 +286,7 @@ func (b *findingBuilder) derive() {
 				fmt.Sprintf("Certyfikat TLS stracił ważność %s.", t.NotAfter.UTC().Format("2006-01-02")), certEv, "")
 		case !t.NotAfter.IsZero() && days <= CertExpiringDays:
 			b.add(FindingCertExpiring, "", "Certyfikat TLS wkrótce wygaśnie: "+orDash(t.SubjectCN),
-				fmt.Sprintf("Certyfikat TLS wygasa %s (zostało %d dni).", t.NotAfter.UTC().Format("2006-01-02"), days), certEv, "")
+				fmt.Sprintf("Certyfikat TLS wygasa %s (za %d %s).", t.NotAfter.UTC().Format("2006-01-02"), days, plural(days, "dzień", "dni", "dni")), certEv, "")
 		}
 		if t.SelfSigned {
 			b.add(FindingSelfSigned, "", "Samopodpisany certyfikat TLS: "+orDash(t.SubjectCN),
@@ -305,15 +305,15 @@ func (b *findingBuilder) derive() {
 				names[i] = strings.TrimPrefix(e.Where, "header:")
 			}
 			b.add(FindingHeader, "", "Nagłówki ujawniają szczegóły oprogramowania: "+strings.Join(names, ", "),
-				"Odpowiedź HTTP zawiera nagłówki, które ujawniają oprogramowanie, jego wersję lub środowisko.", ev, "")
+				evidenceText(ev), ev, "")
 		}
 		if ev := cookieEvidence(s.HTTP.Cookies, isTLS(s)); len(ev) > 0 {
 			names := make([]string, len(ev))
 			for i, e := range ev {
 				names[i] = strings.TrimPrefix(e.Where, "cookie:")
 			}
-			b.add(FindingCookie, "", "Interesujące ciasteczka: "+strings.Join(names, ", "),
-				"Usługa ustawia ciasteczka, które wskazują technologię albo są sesyjne i nie mają flag bezpieczeństwa. Wartości ciasteczek nie są pokazywane.", ev, "")
+			b.add(FindingCookie, "", "Ciasteczka: "+strings.Join(names, ", "),
+				"Ciasteczka wskazują technologię albo są sesyjne bez flag Secure i HttpOnly.", ev, "")
 		}
 	}
 
@@ -333,17 +333,17 @@ func (b *findingBuilder) derive() {
 		}
 		switch {
 		case m.Category == model.CatHeader:
-			b.add(FindingHeader, m.Signature, "Interesujący nagłówek: "+name,
-				"Sygnatura wykryła charakterystyczny nagłówek HTTP.", m.Evidence, m.Signature, m.Tags...)
+			b.add(FindingHeader, m.Signature, "Nagłówek: "+name,
+				evidenceText(m.Evidence), m.Evidence, m.Signature, m.Tags...)
 		case m.Category == model.CatCookie:
-			b.add(FindingCookie, m.Signature, "Interesujące ciasteczko: "+name,
-				"Sygnatura wykryła charakterystyczne ciasteczko. Wartość ciasteczka nie jest pokazywana.", m.Evidence, m.Signature, m.Tags...)
+			b.add(FindingCookie, m.Signature, "Ciasteczko: "+name,
+				evidenceText(m.Evidence), m.Evidence, m.Signature, m.Tags...)
 		case len(m.Classes) > 0 && !custom:
 			// Already reported through its class.
 		case custom || m.Interest >= SignatureFindingMinInterest:
 			title := "Dopasowanie sygnatury: " + strings.TrimSpace(name+" "+m.Version)
 			b.add(FindingSignature, m.Signature, title,
-				fmt.Sprintf("Sygnatura „%s” pasuje do tej usługi (pewność %.0f%%). Sygnatury wykrywają obecność cech, nie podatności.", m.Signature, m.Confidence*100),
+				fmt.Sprintf("Sygnatura „%s” pasuje do tej usługi (pewność %.0f%%).", m.Signature, m.Confidence*100),
 				m.Evidence, m.Signature, m.Tags...)
 		}
 	}
@@ -354,6 +354,23 @@ func (b *findingBuilder) derive() {
 			"Usługa nie była widoczna w poprzednich skanach. Sprawdź, czy jej wystawienie jest zamierzone.",
 			b.baseEvidence(), "")
 	}
+}
+
+// evidenceText lists the evidence as data: "X-Powered-By: PHP/7.4.3" for a
+// header, the name only for a cookie (never its value).
+func evidenceText(ev []model.Evidence) string {
+	var parts []string
+	for _, e := range ev {
+		switch {
+		case strings.HasPrefix(e.Where, "header:"):
+			parts = append(parts, strings.TrimPrefix(e.Where, "header:")+": "+e.Snippet)
+		case strings.HasPrefix(e.Where, "cookie:"):
+			parts = append(parts, strings.TrimPrefix(e.Where, "cookie:"))
+		case e.Snippet != "":
+			parts = append(parts, e.Snippet)
+		}
+	}
+	return strings.Join(clipList(dedupSorted(sortedCopy(parts)), 6), "; ")
 }
 
 func hostOf(s *model.ServiceResult) string {

@@ -157,7 +157,7 @@ func TestStabilityScenarios(t *testing.T) {
 		p.Add(model.HostObservation{At: next, Up: true}, warsaw)
 		a := Assess(p, warsaw)
 		t.Logf("random host pattern: %q stability=%.2f down_after=%d", a.Pattern, a.Stability, a.DownAfterMisses)
-		if !strings.Contains(a.Pattern, "bez wzorca dobowego") {
+		if !strings.Contains(a.Pattern, "bez wzorca") {
 			t.Errorf("pattern = %q", a.Pattern)
 		}
 		as := missRun(t, "random 50% host", &p, next.Add(6*time.Hour), 6*time.Hour, 8)
@@ -272,12 +272,12 @@ func TestPattern(t *testing.T) {
 	}{
 		{"too little data", mk(8, time.Hour, officeHours), ""},
 		{"office hours, hourly scans, 3 weeks", mk(3*168, time.Hour, officeHours), "zwykle aktywny pn–pt 08–16"},
-		{"always on", mk(100, 6*time.Hour, func(time.Time) bool { return true }), "odpowiada stale (100% skanów)"},
+		{"always on", mk(100, 6*time.Hour, func(time.Time) bool { return true }), "aktywny stale (100% skanów)"},
 		{"every day 08-16", mk(3*168, time.Hour, func(t time.Time) bool { return t.Hour() >= 8 && t.Hour() < 16 }), "zwykle aktywny codziennie 08–16"},
 		{"night host", mk(3*168, time.Hour, func(t time.Time) bool { return t.Hour() >= 22 || t.Hour() < 6 }), "zwykle aktywny codziennie 22–06"},
 		{"weekend only", mk(3*168, time.Hour, func(t time.Time) bool { return t.Weekday() == time.Saturday || t.Weekday() == time.Sunday }), "zwykle aktywny sb–nd"},
-		{"one week of office hours names hours only", mk(168, time.Hour, func(t time.Time) bool { return t.Hour() >= 8 && t.Hour() < 16 }), "zwykle aktywny w godz. 08–16"},
-		{"random half", mk(3*168, time.Hour, func(time.Time) bool { return rng.Intn(2) == 0 }), "odpowiada w ok. 50% skanów, bez wzorca dobowego"},
+		{"one week of office hours names hours only", mk(168, time.Hour, func(t time.Time) bool { return t.Hour() >= 8 && t.Hour() < 16 }), "zwykle aktywny 08–16"},
+		{"random half", mk(3*168, time.Hour, func(time.Time) bool { return rng.Intn(2) == 0 }), "aktywny w ok. 50% skanów, bez wzorca"},
 		{"never up", mk(50, time.Hour, func(time.Time) bool { return false }), ""},
 	}
 	for _, c := range cases {

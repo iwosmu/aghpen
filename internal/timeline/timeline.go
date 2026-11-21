@@ -699,32 +699,31 @@ func count(n int, one, few, many string) string {
 	return strconv.Itoa(n) + " " + plural(n, one, few, many)
 }
 
-// diffSentences writes the banner of a snapshot.
+// diffSentences writes the banner of a snapshot: one "label: count" per line.
 func diffSentences(d AtDiff) []string {
 	var s []string
-	if d.ServicesGoneSince > 0 {
-		s = append(s, count(d.ServicesGoneSince, "usługa", "usługi", "usług")+", "+plural(d.ServicesGoneSince, "która", "które", "które")+
-			" wtedy "+plural(d.ServicesGoneSince, "istniała", "istniały", "istniały")+", dziś nie "+plural(d.ServicesGoneSince, "odpowiada", "odpowiadają", "odpowiada")+".")
+	line := func(n int, label string) {
+		if n > 0 {
+			s = append(s, label+": "+strconv.Itoa(n)+".")
+		}
 	}
-	if d.ServicesNewSince > 0 {
-		s = append(s, count(d.ServicesNewSince, "usługa", "usługi", "usług")+" "+plural(d.ServicesNewSince, "jest", "są", "jest")+
-			" dziś otwarte, a wtedy "+plural(d.ServicesNewSince, "jej", "ich", "ich")+" nie było.")
+	line(d.ServicesGoneSince, "Usługi, które zniknęły")
+	line(d.ServicesNewSince, "Nowe usługi")
+	line(d.ServicesChanged, "Zmienione usługi")
+	line(d.HostsDownSince, "Hosty dziś nieaktywne")
+	line(d.HostsNewSince, "Nowe hosty")
+	var f []string
+	if d.FindingsOpenedSince > 0 {
+		f = append(f, "Nowe znaleziska: "+strconv.Itoa(d.FindingsOpenedSince)+".")
 	}
-	if d.ServicesChanged > 0 {
-		s = append(s, count(d.ServicesChanged, "usługa zmieniła", "usługi zmieniły", "usług zmieniło")+" od tamtej pory produkt, wersję albo tytuł.")
+	if d.FindingsClosedSince > 0 {
+		f = append(f, "Zamknięte znaleziska: "+strconv.Itoa(d.FindingsClosedSince)+".")
 	}
-	if d.HostsDownSince > 0 {
-		s = append(s, count(d.HostsDownSince, "host", "hosty", "hostów")+" "+plural(d.HostsDownSince, "odpowiadał", "odpowiadały", "odpowiadało")+
-			" wtedy, a dziś nie "+plural(d.HostsDownSince, "jest", "są", "jest")+" aktywn"+plural(d.HostsDownSince, "y", "e", "ych")+".")
-	}
-	if d.HostsNewSince > 0 {
-		s = append(s, count(d.HostsNewSince, "host pojawił", "hosty pojawiły", "hostów pojawiło")+" się później.")
-	}
-	if d.FindingsOpenedSince > 0 || d.FindingsClosedSince > 0 {
-		s = append(s, "Obserwacje od tamtej pory: "+strconv.Itoa(d.FindingsOpenedSince)+" nowych, "+strconv.Itoa(d.FindingsClosedSince)+" rozwiązanych.")
+	if len(f) > 0 {
+		s = append(s, strings.Join(f, " "))
 	}
 	if len(s) == 0 {
-		s = append(s, "Od tamtej pory inwentarz się nie zmienił.")
+		s = append(s, "Bez zmian od tamtej chwili.")
 	}
 	return s
 }

@@ -27,19 +27,20 @@ func TestTwoPassMissingHost(t *testing.T) {
 		wantKinds   []string
 		wantStatus  model.HostStatus
 		wantSummary string
+		wantDetail  map[string]any
 		missing     int
 		gone        int
 		unreachable int
 		svcGone     int
 	}{
 		{"model decides, one earlier run", 1, 0, []string{"host_missing", "service_unreachable", "service_unreachable", "service_unreachable"}, model.HostUnstable,
-			"nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 3 otwarte usługi: 22/tcp ssh OpenSSH, 80/tcp http nginx, 8080/tcp http Jenkins; model: p_alive 0,", 1, 0, 3, 0},
+			"Host 10.66.3.17 nie odpowiada (niepotwierdzone), miał 3 otwarte usługi", map[string]any{DetailOpenServices: 3, DetailServices: "22/tcp ssh OpenSSH,80/tcp http nginx,8080/tcp http Jenkins"}, 1, 0, 3, 0},
 		{"model decides, long stable history", 40, 0, []string{"host_missing", "service_unreachable", "service_unreachable", "service_unreachable"}, model.HostUnstable,
-			"zgłoszenie nieaktywności po kolejnym braku", 1, 0, 3, 0},
+			"nie odpowiada (niepotwierdzone)", map[string]any{DetailMissesToDown: 1}, 1, 0, 3, 0},
 		{"rule N=1", 1, 1, []string{"host_gone", "service_gone", "service_gone", "service_gone"}, model.HostDown,
-			"brak odpowiedzi w 1 przebiegu z rzędu (reguła profilu: zgłoszenie po 1 braku)", 0, 1, 0, 3},
+			"Host 10.66.3.17 nieaktywny, nie odpowiada od 1 skanu", map[string]any{DetailRule: 1}, 0, 1, 0, 3},
 		{"rule N=2", 1, 2, []string{"host_missing", "service_unreachable", "service_unreachable", "service_unreachable"}, model.HostUnstable,
-			"zgłoszenie nieaktywności po kolejnym braku, reguła profilu: 2 braki z rzędu", 1, 0, 3, 0},
+			"nie odpowiada (niepotwierdzone)", map[string]any{DetailMissesToDown: 1, DetailRule: 2}, 1, 0, 3, 0},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -68,6 +69,22 @@ func TestTwoPassMissingHost(t *testing.T) {
 			t.Logf("p_alive=%.3f down_after=%d: %s", a.PAlive, a.DownAfterMisses, cs[0].Summary)
 			if !strings.Contains(cs[0].Summary, c.wantSummary) {
 				t.Errorf("summary %q, want it to contain %q", cs[0].Summary, c.wantSummary)
+			}
+			// The model's view stays in the detail, out of the summary.
+			if strings.Contains(cs[0].Summary, "p_alive") || strings.Contains(cs[0].Summary, "model") {
+				t.Errorf("summary carries a model measure: %q", cs[0].Summary)
+			}
+			if p, _ := cs[0].Detail[DetailPAlive].(float64); p <= 0 {
+				t.Errorf("detail p_alive = %v", cs[0].Detail[DetailPAlive])
+			}
+			for k, want := range c.wantDetail {
+				got := cs[0].Detail[k]
+				if l, ok := got.([]string); ok {
+					got = strings.Join(l, ",")
+				}
+				if got != want {
+					t.Errorf("detail[%s] = %v, want %v", k, got, want)
+				}
 			}
 			if cs[0].Severity != model.SevMedium {
 				t.Errorf("severity %s", cs[0].Severity)

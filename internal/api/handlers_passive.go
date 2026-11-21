@@ -173,7 +173,7 @@ func (s *Server) passiveCT(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := s.d.Passive.CT(r.Context())
 	if errors.Is(err, passive.ErrExternalDisabled) {
-		writeErr(w, http.StatusConflict, "disabled", "crt.sh is turned off; an administrator can turn it on in PUT /settings/passive")
+		writeErr(w, http.StatusConflict, "disabled", "crt.sh jest wyłączone. Administrator włącza je na stronie Administracja.")
 		return
 	}
 	if err != nil {

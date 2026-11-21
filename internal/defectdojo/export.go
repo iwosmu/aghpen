@@ -86,7 +86,7 @@ type UnconfirmedError struct {
 }
 
 func (e *UnconfirmedError) Error() string {
-	return fmt.Sprintf("%s (DefectDojo przyjął %d obserwacji, ale nie odpowiedział na odczyt kontrolny: %v)", MsgUnconfirmed, e.Sent, e.Cause)
+	return fmt.Sprintf("%s (DefectDojo przyjął znaleziska: %d, ale nie odpowiedział na odczyt kontrolny: %v)", MsgUnconfirmed, e.Sent, e.Cause)
 }
 
 func (e *UnconfirmedError) Unwrap() error { return e.Cause }
@@ -183,7 +183,7 @@ func (c *Client) ExportFindings(ctx context.Context, t Target, findings []model.
 	for _, f := range findings {
 		switch {
 		case strings.TrimSpace(f.Key) == "":
-			fail("obserwacja %q nie ma klucza i nie może być wyeksportowana", f.Title)
+			fail("znalezisko %q nie ma klucza i nie może być wyeksportowane", f.Title)
 		case seen[f.Key]:
 		default:
 			seen[f.Key] = true
@@ -215,7 +215,7 @@ func (c *Client) ExportFindings(ctx context.Context, t Target, findings []model.
 				out.Result.Failed++
 			}
 			if len(out.Result.Errors) < 50 {
-				out.Result.Errors = append(out.Result.Errors, fmt.Sprintf("import %d obserwacji nie powiódł się: %v", len(batch), err))
+				out.Result.Errors = append(out.Result.Errors, fmt.Sprintf("import znalezisk (%d) nie powiódł się: %v", len(batch), err))
 			}
 			if testID == 0 {
 				return out, err // the test does not exist; nothing more can be done
@@ -246,7 +246,7 @@ func (c *Client) ExportFindings(ctx context.Context, t Target, findings []model.
 		for _, f := range fresh {
 			df, ok := after[f.Key]
 			if !ok {
-				fail("DefectDojo nie utworzył obserwacji %s", f.Key)
+				fail("DefectDojo nie utworzył znaleziska %s", f.Key)
 				continue
 			}
 			out.Result.Exported++
@@ -254,7 +254,7 @@ func (c *Client) ExportFindings(ctx context.Context, t Target, findings []model.
 			// The import keeps most fields; status flags that the import ignores are set here.
 			if patch := diffPatch(f, df, true); len(patch) > 0 {
 				if err := c.sendJSON(ctx, http.MethodPatch, fmt.Sprintf("findings/%d/", df.ID), patch, nil); err != nil {
-					fail("nie można ustawić statusu obserwacji %s: %v", f.Key, err)
+					fail("nie można ustawić statusu znaleziska %s: %v", f.Key, err)
 				}
 			}
 		}
@@ -269,7 +269,7 @@ func (c *Client) ExportFindings(ctx context.Context, t Target, findings []model.
 		ref := FindingRef{ID: df.ID, URL: fmt.Sprintf("%s/finding/%d", c.web(), df.ID)}
 		if patch := diffPatch(f, df, false); len(patch) > 0 {
 			if err := c.sendJSON(ctx, http.MethodPatch, fmt.Sprintf("findings/%d/", df.ID), patch, nil); err != nil {
-				fail("nie można zaktualizować obserwacji %s (DefectDojo #%d): %v", f.Key, df.ID, err)
+				fail("nie można zaktualizować znaleziska %s (DefectDojo #%d): %v", f.Key, df.ID, err)
 				continue
 			}
 			out.Patched++
