@@ -135,3 +135,28 @@ func TestLoopbackTargetCheckedAsDockerHost(t *testing.T) {
 		t.Error("localhost maps to 172.17.0.1, outside 10.0.0.0/8: must be refused")
 	}
 }
+
+// Docker Desktop answers host.docker.internal with IPv6 first. The name is
+// scanned on its IPv4 address, so only that address is checked.
+func TestDomainCheckedOnItsIPv4Address(t *testing.T) {
+	lookup := func(_ context.Context, host string) ([]netip.Addr, error) {
+		switch host {
+		case "host.docker.internal":
+			return []netip.Addr{netip.MustParseAddr("fdc4:f303:9324::254"), netip.MustParseAddr("192.168.65.254")}, nil
+		case "v6only.example.org":
+			return []netip.Addr{netip.MustParseAddr("2001:db8::7")}, nil
+		}
+		return nil, errors.New("no such host")
+	}
+	lock := []netip.Prefix{netip.MustParsePrefix("192.168.65.254/32")}
+	if ok, why := TargetAllowed(context.Background(), model.Target{Kind: model.TargetDomain, Value: "host.docker.internal"}, lock, lookup); !ok {
+		t.Fatalf("dual-stack name with an allowed IPv4 address refused: %s", why)
+	}
+	ok, why := TargetAllowed(context.Background(), model.Target{Kind: model.TargetDomain, Value: "v6only.example.org"}, []netip.Prefix{netip.MustParsePrefix("2001:db8::/32")}, lookup)
+	if ok || !strings.Contains(why, "IPv4") {
+		t.Fatalf("a name without an IPv4 address is not scanned: ok=%v %q", ok, why)
+	}
+	if got := IPv4Of([]netip.Addr{netip.MustParseAddr("::ffff:10.0.0.1"), netip.MustParseAddr("10.0.0.1"), netip.MustParseAddr("::1")}); len(got) != 1 || got[0].String() != "10.0.0.1" {
+		t.Fatalf("IPv4Of = %v", got)
+	}
+}

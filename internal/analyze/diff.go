@@ -115,6 +115,7 @@ type DiffOptions struct {
 var sensitiveClasses = map[string]bool{
 	model.ClassAdminPanel: true, model.ClassDatabase: true, model.ClassRemoteAccess: true,
 	model.ClassDevTool: true, model.ClassIoT: true, model.ClassLogin: true,
+	model.ClassInstallPage: true, model.ClassUnauthControlAPI: true,
 }
 
 // volatileHeaders are header names that change between two requests to the
@@ -867,6 +868,7 @@ var classPL = map[string]string{
 	model.ClassIoT: "urządzenie IoT", model.ClassDefaultPage: "strona domyślna", model.ClassAPI: "API",
 	model.ClassDevTool: "narzędzie deweloperskie", model.ClassDatabase: "baza danych", model.ClassRemoteAccess: "zdalny dostęp",
 	model.ClassDirListing: "listing katalogu", model.ClassErrorPage: "strona błędu",
+	model.ClassInstallPage: "niedokończona instalacja", model.ClassUnauthControlAPI: "API sterujące bez logowania",
 }
 
 func classNames(cs []string) []string {
