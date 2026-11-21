@@ -114,6 +114,8 @@ Punkt API: `GET /export/runs/{id}.{json,csv,xml}`. Eksport jest strumieniowy: ho
 | CSV | jeden wiersz na usługę, kolumny z rozdz. 1.2 | arkusz kalkulacyjny, szybki przegląd |
 | XML | nmap XML | DefectDojo, typ skanu „Nmap Scan"; inne narzędzia czytające nmap |
 
+Stan na 2026-11-21: trasa `/export/runs/{id}.csv` w API używa jeszcze własnego, krótszego nagłówka (18 kolumn: `run_id,ip,hostnames,up,reason,observed_at,port,proto,state,name,product,version,tunnel,http_status,title,url,technologies,classes`). Eksport JSON tej trasy to tablica rekordów `HostResult` bez koperty. Importer czyta oba układy CSV i oba kształty JSON. Poniżej nagłówek eksportera `internal/interchange` (narzędzie `dojoprobe convert -to csv`).
+
 Nagłówek CSV (stała kolejność):
 
 ```text
