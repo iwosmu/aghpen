@@ -60,6 +60,13 @@
   --seq-4: #6da7ec;
   --seq-5: #b7d3f6;
   --shadow: 0 8px 24px -8px rgb(0 0 0 / 0.6);
+  /* the one primary action and the focus ring: warm off-white on night */
+  --primary: #e9e5da;
+  --primary-hover: #ffffff;
+  --primary-press: #d6d1c3;
+  --primary-ink: #0a0e15;
+  --focus: #e9e5da;
+  --card-shadow: 0 0 0 1px rgb(255 255 255 / 0.035) inset, 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 18px 40px -24px rgb(0 0 0 / 0.75);
 }
 :root[data-theme="light"] {
   color-scheme: light;
@@ -101,6 +108,12 @@
   --seq-4: #1c5cab;
   --seq-5: #0d366b;
   --shadow: 0 8px 24px -10px rgb(22 27 36 / 0.28);
+  --primary: #161b24;
+  --primary-hover: #2a3140;
+  --primary-press: #000000;
+  --primary-ink: #f4f1e9;
+  --focus: #161b24;
+  --card-shadow: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 14px 32px -22px rgb(22 27 36 / 0.35);
 }
 
 @theme inline {
@@ -131,6 +144,11 @@
   --color-st-gone-wash: var(--st-gone-wash);
   --color-st-changed-wash: var(--st-changed-wash);
   --color-st-unstable-wash: var(--st-unstable-wash);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-press: var(--primary-press);
+  --color-primary-ink: var(--primary-ink);
+  --color-focus: var(--focus);
   --color-danger: var(--danger);
   --color-danger-solid: var(--danger-solid);
   --color-danger-ink: var(--danger-ink);
@@ -150,9 +168,9 @@
   --text-xl: 27px;
   --text-xl--line-height: 34px;
   --radius-xs: 1px;
-  --radius-sm: 2px;
-  --radius-md: 2px;
-  --radius-lg: 2px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -171,13 +189,13 @@
   body { min-height: 100dvh; margin: 0; }
   ::selection { background: var(--accent); color: var(--accent-ink); }
   * { caret-color: var(--accent); }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  :focus-visible { outline: 1.5px solid var(--focus); outline-offset: 2px; }
   a { color: inherit; text-decoration: none; }
   button { cursor: pointer; }
   button:disabled { cursor: not-allowed; }
   h1, h2, h3 { text-wrap: balance; }
   input, select, textarea, button { font: inherit; color: inherit; }
-  input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; }
+  input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); width: 15px; height: 15px; }
   table { border-collapse: collapse; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-thumb { background: var(--rule-strong); border: 3px solid transparent; background-clip: content-box; }
@@ -191,13 +209,16 @@
   .link:hover { text-decoration: underline; }
   .label { font-size: 12px; line-height: 16px; color: var(--ink-3); }
   .field {
-    height: 30px; width: 100%; padding: 0 8px; background: var(--raised); border: 1px solid var(--rule-strong);
-    border-radius: 2px; color: var(--ink); font-size: 13px;
+    height: 34px; width: 100%; padding: 0 10px; background: var(--sunk); border: 1px solid var(--rule-strong);
+    border-radius: 6px; color: var(--ink); font-size: 13px; transition: border-color 150ms;
   }
-  textarea.field { height: auto; padding: 6px 8px; line-height: 18px; }
+  textarea.field { height: auto; padding: 8px 10px; line-height: 18px; }
+  select.field { appearance: none; padding-right: 28px; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%238d93a0' stroke-width='1.5'/></svg>"); background-repeat: no-repeat; background-position: right 10px center; }
+  .card { background: var(--panel); border-radius: 10px; box-shadow: var(--card-shadow); }
   .field::placeholder { color: var(--ink-3); }
   .field:hover { border-color: var(--ink-3); }
-  .field:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+  .field:focus-visible { outline: 1.5px solid var(--focus); outline-offset: 1px; border-color: transparent; }
+  .field:-webkit-autofill { -webkit-text-fill-color: var(--ink); -webkit-box-shadow: 0 0 0 100px var(--sunk) inset; transition: background-color 9999s; }
   .field[aria-invalid="true"] { border-color: var(--danger); }
   .field:disabled { opacity: 0.55; }
   .hatch {
@@ -211,7 +232,7 @@
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 .skeleton {
   background: linear-gradient(90deg, var(--raised) 25%, var(--rule) 50%, var(--raised) 75%);
-  background-size: 200% 100%; animation: shimmer 1.6s linear infinite; border-radius: 2px;
+  background-size: 200% 100%; animation: shimmer 1.6s linear infinite; border-radius: 4px;
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
@@ -251,14 +272,37 @@ html[data-present] { zoom: 1.125; }
   from { transform: translate3d(-4%, -3%, 0) scale(1); }
   to { transform: translate3d(4%, 3%, 0) scale(1.1); }
 }
-/* the rhythm card: one sweep, hour by hour, that stops on the alarm hour */
-.rhythm-sweep { background: rgb(233 229 218 / 0.16); box-shadow: 0 0 24px 4px rgb(110 163 242 / 0.25); animation: rhythm-sweep 4.2s steps(10, jump-none) 0.8s 1 both, rhythm-fade 0.9s ease-out 5.2s 1 forwards; pointer-events: none; }
-@keyframes rhythm-sweep { from { transform: translateX(0); } to { transform: translateX(calc(1000% + 20px)); } }
-@keyframes rhythm-fade { to { opacity: 0; } }
-.rhythm-alarm-ring { animation: rhythm-ring 1.6s var(--ease-out-expo) 5s 1 both; }
-@keyframes rhythm-ring { from { box-shadow: 0 0 0 0 rgb(229 85 106 / 0.85); } to { box-shadow: 0 0 0 14px rgb(229 85 106 / 0); } }
 @media (prefers-reduced-motion: reduce) {
   .night-field::before { animation: none; }
-  .rhythm-sweep { display: none; }
-  .rhythm-alarm-ring { animation: none; }
 }
+
+/* ---------- The login form: one glass surface on the night field. ---------- */
+.login-glass {
+  background: rgb(255 255 255 / 0.045);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2);
+  border-radius: 18px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06) inset, 0 40px 80px -30px rgb(0 0 0 / 0.85);
+}
+.login-field {
+  height: 50px; width: 100%; padding: 0 16px; font-size: 16px; color: var(--ink);
+  background: rgb(6 10 17 / 0.55); border: 1px solid rgb(255 255 255 / 0.10); border-radius: 10px;
+  transition: border-color 150ms, background-color 150ms;
+}
+.login-field:hover { border-color: rgb(255 255 255 / 0.22); }
+.login-field:focus-visible { outline: 1.5px solid #e9e5da; outline-offset: 2px; border-color: rgb(255 255 255 / 0.28); background: rgb(6 10 17 / 0.75); }
+.login-field[aria-invalid="true"] { border-color: #f2907f; }
+.login-field:-webkit-autofill, .login-field:-webkit-autofill:hover, .login-field:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink); caret-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 100px #0c121c inset; box-shadow: 0 0 0 100px #0c121c inset;
+  transition: background-color 9999s ease-out 0s;
+}
+.login-submit {
+  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 50px;
+  border-radius: 10px; background: #e9e5da; color: #0a0e15; font-size: 15px; font-weight: 600;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.5) inset, 0 14px 30px -14px rgb(233 229 218 / 0.45);
+  transition: background-color 150ms, transform 120ms;
+}
+.login-submit:hover { background: #ffffff; }
+.login-submit:active { transform: translateY(1px) scale(0.995); background: #d9d4c7; }
+.login-submit:focus-visible { outline: 1.5px solid #e9e5da; outline-offset: 3px; }
+.login-submit:disabled { opacity: 0.7; cursor: progress; }

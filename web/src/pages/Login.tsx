@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { post, setCsrfToken, ApiError } from '../api/client';
 import type { Session } from '../api/types';
 import { t, setLang, getLang } from '../i18n';
-import { Button, Field, InlineError } from '../ui/kit';
+import { Button } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 import { RhythmFigure } from '../viz/RhythmFigure';
 
@@ -48,9 +48,9 @@ export default function Login() {
   };
 
   const numbers: [string, string][] = [
-    ['154/155', t('otwartych portów znalezionych', 'open ports found')],
-    ['13 min', t('pełny skan sieci\u00a0/16', 'full scan of a\u00a0/16')],
-    ['0', t('sekund ponad limit pakietów', 'seconds over the packet cap')],
+    ['154/155', t('portów', 'ports')],
+    ['17 min', t('sieć\u00a0/16', 'a\u00a0/16 network')],
+    ['0', t('fałszywych zmian', 'false changes')],
   ];
 
   return (
@@ -62,47 +62,44 @@ export default function Login() {
           <Button variant="ghost" size="sm" icon="globe" onClick={() => setLang(lang === 'pl' ? 'en' : 'pl')}>{lang === 'pl' ? 'English' : 'Polski'}</Button>
         </header>
 
-        <main className="grid flex-1 content-center gap-10 py-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-center lg:gap-14 lg:py-6 2xl:gap-24">
+        <div className="flex flex-1 flex-col justify-center gap-10 py-8 lg:gap-12 lg:py-6 2xl:gap-20">
+        <main className="grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-center lg:gap-14 2xl:gap-24">
           <div>
-            <p className="mono flex items-center gap-3 text-2xs uppercase tracking-[0.2em] text-accent">
-              <span className="h-px w-8 flex-none bg-accent" aria-hidden="true" />
-              {t('Attack surface intelligence · CBI AGH · HackNation 2026', 'Attack surface intelligence · CBI AGH · HackNation 2026')}
-            </p>
-            <p className="font-display mt-5 text-[clamp(44px,5vw,100px)] leading-[0.98] tracking-[-0.012em] text-ink">
-              {lang === 'pl'
-                ? <><span className="block">Adres milczy o&nbsp;3&nbsp;w&nbsp;nocy.</span><span className="block max-w-[13ch] text-ink-2">Wyłączony na noc czy <em className="text-[#f2907f]">zniknął</em>?</span></>
-                : <><span className="block">An address is silent at&nbsp;3&nbsp;a.m.</span><span className="block max-w-[15ch] text-ink-2">Switched off for the night, or <em className="text-[#f2907f]">gone</em>?</span></>}
-            </p>
-            <p className="mt-5 max-w-[50ch] text-base text-ink-2">
-              {t('Czujka zna rytm każdego hosta w sieci. Cisza zgodna z rytmem nie budzi alarmu; cisza poza nim jest sprawdzana ponownie i zgłaszana.', 'Czujka knows the rhythm of every host on the network. A silence that fits it raises no alarm; a silence outside it is checked again and reported.')}
+            <p className="font-display max-w-[12ch] text-[clamp(56px,7.4vw,148px)] leading-[0.92] tracking-[-0.015em] text-ink">
+              {lang === 'pl' ? <>Co zmieniło się w&nbsp;<em className="text-ink-2">sieci</em>.</> : <>What changed on the <em className="text-ink-2">network</em>.</>}
             </p>
 
-            <section className="mt-8 max-w-[560px] border border-rule bg-panel/95 p-5 shadow-[0_30px_60px_-28px_rgb(0_0_0/0.9)] sm:p-6" aria-labelledby="login-title">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <h1 id="login-title" className="text-lg font-semibold">{t('Logowanie', 'Sign in')}</h1>
-                <p className="text-xs text-ink-3" data-testid="login-about">{t('Tylko wykrywa: GET i HEAD, bez logowania do usług.', 'It only detects: GET and HEAD, no logins to services.')}</p>
-              </div>
-              {expired && !error ? (
-                <p role="status" data-testid="session-expired" className="mt-4 flex items-start gap-2 border border-rule bg-sunk px-3 py-2 text-xs text-ink-2">
-                  <Icon name="clock" size={14} className="mt-px flex-none text-ink-3" />
-                  {t('Sesja wygasła. Zaloguj się ponownie, a wrócisz do tej samej strony.', 'The session has expired. Sign in again and you return to the same page.')}
-                </p>
-              ) : null}
-              <form onSubmit={submit} className="mt-4 grid gap-3 sm:grid-cols-2" noValidate>
-                <Field label={t('Adres e-mail', 'E-mail address')}>
-                  <input className="field h-10 px-3 text-base" type="email" name="email" autoComplete="username" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={missing && !email ? true : undefined} />
-                </Field>
-                <Field label={t('Hasło', 'Password')}>
-                  <input className="field h-10 px-3 text-base" type="password" name="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} aria-invalid={missing && !password ? true : undefined} />
-                </Field>
-                <div className="sm:col-span-2" data-testid="login-error"><InlineError error={error} /></div>
-                <button type="submit" disabled={busy} className="flex h-11 w-full items-center justify-center gap-2 rounded-sm bg-accent text-base font-semibold text-accent-ink shadow-[0_10px_24px_-10px_rgb(110_163_242/0.6)] transition-colors duration-150 hover:bg-accent-strong focus-visible:outline-offset-2 disabled:opacity-60 sm:col-span-2">
-                  {busy ? t('Logowanie…', 'Signing in…') : t('Zaloguj się', 'Sign in')}
-                  <Icon name="arrowRight" />
+            <section className="login-glass mt-10 w-full lg:mt-12 max-w-[420px] p-6 sm:p-7" aria-labelledby="login-title">
+              <h1 id="login-title" className="sr-only">{t('Logowanie', 'Sign in')}</h1>
+              <form onSubmit={submit} className="grid gap-4" noValidate>
+                <label className="grid gap-2">
+                  <span className="mono text-2xs uppercase tracking-[0.16em] text-ink-3">{t('Adres e-mail', 'E-mail address')}</span>
+                  <input className="login-field" aria-label={t('Adres e-mail', 'E-mail address')} type="email" name="email" autoComplete="username" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={missing && !email ? true : undefined} />
+                </label>
+                <label className="grid gap-2">
+                  <span className="mono text-2xs uppercase tracking-[0.16em] text-ink-3">{t('Hasło', 'Password')}</span>
+                  <input className="login-field" aria-label={t('Hasło', 'Password')} type="password" name="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} aria-invalid={missing && !password ? true : undefined} />
+                </label>
+                <button type="submit" disabled={busy} className="login-submit group mt-2">
+                  <span>{busy ? t('Logowanie…', 'Signing in…') : t('Zaloguj się', 'Sign in')}</span>
+                  <Icon name="arrowRight" className="transition-transform duration-200 ease-out group-hover:translate-x-1" />
                 </button>
+                <div data-testid="login-error" aria-live="polite" className="empty:hidden">
+                  {error ? (
+                    <p role="alert" className="flex items-start gap-2.5 text-sm text-ink-2">
+                      <span className="mt-[6px] block h-2 w-2 flex-none rounded-full bg-[#f2907f]" aria-hidden="true" />
+                      <span>{errorText(error)}</span>
+                    </p>
+                  ) : expired ? (
+                    <p role="status" data-testid="session-expired" className="flex items-start gap-2.5 text-sm text-ink-2">
+                      <Icon name="clock" size={14} className="mt-[3px] flex-none text-ink-3" />
+                      {t('Sesja wygasła. Zaloguj się ponownie, a wrócisz do tej samej strony.', 'The session has expired. Sign in again and you return to the same page.')}
+                    </p>
+                  ) : null}
+                </div>
               </form>
               {fixtures ? (
-                <div className="mt-5 border border-rule p-3 text-xs text-ink-2" data-testid="fixture-accounts">
+                <div className="mt-5 border-t border-white/10 pt-4 text-xs text-ink-2" data-testid="fixture-accounts">
                   <p className="mb-1.5 font-medium text-ink">{t('Tryb deweloperski: dane z fixtures', 'Development mode: fixture data')}</p>
                   <p className="mb-2 text-ink-3">{t('Konta testowe, hasło dla każdego: czujka', 'Test accounts, the password for each: czujka')}</p>
                   <ul className="space-y-1">
@@ -118,14 +115,14 @@ export default function Login() {
           </div>
 
           <div className="lg:pl-2">
-            <div className="lg:rotate-[-1.2deg] lg:translate-y-2">
-              <RhythmFigure compact={false} />
+            <div>
+              <RhythmFigure />
             </div>
           </div>
         </main>
 
-        <footer className="grid gap-6 border-t border-white/10 pt-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-14 2xl:gap-24">
-          <ul className="grid grid-cols-3 gap-4 sm:gap-8" data-testid="login-numbers">
+        <footer className="border-t border-white/10 pt-6">
+          <ul className="grid max-w-[880px] grid-cols-3 gap-4 sm:gap-10" data-testid="login-numbers">
             {numbers.map(([k, v]) => (
               <li key={k}>
                 <span className="font-display block text-[clamp(30px,3vw,52px)] leading-none text-ink">{k}</span>
@@ -133,14 +130,16 @@ export default function Login() {
               </li>
             ))}
           </ul>
-          <div className="flex flex-col justify-end gap-2 lg:items-end lg:text-right">
-            <p className="mono text-2xs uppercase tracking-[0.16em] text-ink-2" data-testid="login-proofs">GET / HEAD · pps ≤ {t('limit', 'cap')} · AES-256-GCM</p>
-            <p className="text-2xs text-ink-3">{t('Liczby z pomiarów w laboratorium 70 kontenerów (docs/WYNIKI.md).', 'Numbers measured in the 70-container lab (docs/WYNIKI.md).')}</p>
-          </div>
         </footer>
+        </div>
       </div>
     </div>
   );
+}
+
+function errorText(e: unknown): string {
+  if (e instanceof Error && e.message) return e.message;
+  return t('Logowanie nie powiodło się. Spróbuj ponownie.', 'Sign-in failed. Try again.');
 }
 
 function Brand() {
