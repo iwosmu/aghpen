@@ -207,7 +207,7 @@ Also in this round: a service name is never empty (fallback "nierozpoznana"); Cz
 
 ## 15. One machine in a dind "jury machine": staged full range, partial result, fixes
 
-Where: a `docker:28-dind` container (`czui-dind`). Czujka (image built from `iwosmu/czujka-accuracy` with this branch merged) and the target containers run inside it. Only Czujka's UI is published, to 127.0.0.1:18640 on the Mac. `localhost` maps to the dind bridge gateway 172.18.0.1, so no scan reaches the Mac. Targets: nginx :8787, Python HTTP with a set delay :9090, redis :6379, httpd :8080; dind's own docker :2375 and Czujka :18080 also answer.
+Where: a `docker:28-dind` container (`czui-dind`). Czujka (image built from this branch after merging the coordinator's a5a3025: gated engine 4d39252 with staged results) and the target containers run inside it. Only Czujka's UI is published, to 127.0.0.1:18640 on the Mac. `localhost` maps to the dind bridge gateway 172.18.0.1, so no scan reaches the Mac. Targets: nginx :8787, Python HTTP with a set delay :9090, redis :6379, httpd :8080; dind's own docker :2375 and Czujka :18080 also answer.
 
 **Fresh install, measured with Playwright (`dind-pl-1..5`, `dind-en-1..5`), the same in PL and EN:**
 
@@ -217,10 +217,10 @@ Where: a `docker:28-dind` container (`czui-dind`). Czujka (image built from `iwo
 | "Ten komputer (localhost)": "localhost = host Dockera 172.18.0.1" | 1.5 s | 1 |
 | "Uruchom skan": run page | 2.2 s | 2 |
 | Passes line and partial note ("najczęstsze porty: gotowe · pełny zakres 1-65535: 1%") | 4.5 s | 2 |
-| First services on screen (4 rows) | 12.6 s | 2 |
+| First services on screen (2 rows: redis, Czujka) | 11.1 s | 2 |
 | Run done, 6 services, full range 1-65535 done | 119 s | 2 |
 
-Where the 10 s to the first row go (API polled every 0.4 s): the top-ports pass ends 2.3 s after the start; `/services?run_id` gives the first rows at 8.5 s, after the HTTP fingerprinting of that pass. The UI polled every 3 s; it now polls a one-host live run every 1.5 s. Rows keep their arrival order while the run is live (0 order changes in both runs; one remount had moved a row before the per-run order cache).
+Where the 9 s from the click to the first row go (API polled every 0.4 s, engine branch before the merge): the top-ports pass ends 2.3 s after the start; `/services?run_id` gives the first rows at 8.5 s, after the HTTP fingerprinting of that pass. Before the merge the UI showed them at 12.6 s with a 3 s poll; with a5a3025 and a 1.5 s poll it shows them at 11.1 s. The engine worker measured 4.1 s on its own one-IP host; in this dind it is about 9 s after the click. Rows keep their arrival order while the run is live (0 order changes in both runs; one remount had moved a row before the per-run order cache).
 
 **Partial result.** While the full-range pass runs, the run page and the dashboard say "Skan trwa: sprawdzono najczęstsze porty, pełny zakres 1-65535 w toku (N%). Wynik nie jest jeszcze ostateczny; zmiany i zniknięte usługi pokażą się po końcu skanu." The live table shows the state of this run ("otwarta"), not the inventory state. Changes exist only after the run ends. The dashboard box of a one-host run counts open services instead of "0% adresów" and hides "pozostało 0 s".
 
