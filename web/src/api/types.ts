@@ -59,6 +59,7 @@ export interface SafetyPolicy {
   max_pps: number; max_http_rps: number; max_per_host_rps: number; max_paths_per_host: number;
   allowed_ports: string; denied_ports: string; exclusions: string[]; allowed_methods: string[];
   emergency_stop: boolean; user_agent: string; updated_at: string;
+  allowed_networks?: string[] | null;
 }
 
 export interface DiscoveryOpts {
@@ -118,7 +119,9 @@ export interface ScanRun {
   trigger: string; created_by: number | null; created_at: string; started_at: string | null;
   finished_at: string | null; window_end: string | null; resume_at: string | null; stats: RunStats;
   summary: RunDiffSummary | null; error: string; import_file: string;
+  note?: string; label?: string; ad_hoc?: AdHocScope | null;
 }
+export interface AdHocScope { profile_id: number; addresses: string[]; ports: string; reason: string }
 
 export type ChunkStatus = 'pending' | 'running' | 'done' | 'deferred' | 'failed';
 
@@ -249,12 +252,19 @@ export interface SignatureImportReport {
 export interface DefectDojoSettings {
   enabled: boolean; url: string; api_key?: string; api_key_set: boolean; product_name: string;
   engagement_name: string; product_type_name: string; verify_tls: boolean; auto_export: boolean; min_interest: number;
+  status_sync?: boolean; scope_mappings?: DojoScopeMapping[] | null;
 }
+export interface DojoScopeMapping { scope_id: number; product_type_name: string; product_name: string; engagement_name: string }
+export interface DojoPullUpdate { finding_id: number; key: string; dojo_id: number; from: string; to: string; dojo_changed_at: string | null; reason: string }
+export interface DojoPullResult { checked: number; updates: DojoPullUpdate[] | null; conflicts: DojoPullUpdate[] | number | null; missing: unknown; errors: unknown; applied: number }
+export interface DojoSyncResult { closed: number; reopened: number; skipped: number; errors: unknown }
+export interface FindingsImportReport { format: string; findings: number; skipped: number; invalid: InvalidLine[] | null; created: number; updated: number; hosts_created: number; run_id: number | null }
+export interface ManualEntryResult { run: ScanRun; host: Host }
 export interface DojoTestResult { ok: boolean; message: string; version: string }
 export interface DojoExportResult { exported: number; updated: number; failed: number; test_id: number; test_url: string; errors: string[] | null }
 export interface ImportReport {
   format: string; run_id: number | null; hosts: number; services: number; targets: number; skipped: number;
-  invalid: InvalidLine[] | null;
+  invalid: InvalidLine[] | null; hosts_down?: number;
 }
 
 export interface CountPoint { at: string; run_id: number; hosts: number; services: number; changes: number; findings: number }
@@ -264,6 +274,7 @@ export interface Headline {
   addresses_in_scope: number; hosts_up: number; hosts_unstable: number; hosts_down: number; services_open: number;
   web_services: number; findings_open: number; findings_high: number; changes_unacked: number;
   new_since_last_run: number; gone_since_last_run: number; admin_panels: number; staging_envs: number;
+  hosts_missing?: number;
 }
 
 export interface Dashboard {
@@ -298,3 +309,59 @@ export interface PassiveResult {
 }
 export interface PassiveSettings { crtsh_enabled: boolean }
 export interface HostEvent { ip: string; up: boolean; services: number }
+
+// ---------- time machine and re-probing (docs/API-time.md) ----------
+export interface RunPoint {
+  run_id: number; at: string; trigger: string; status: string; profile_name: string;
+  hosts_up: number; hosts_missing: number; hosts_down: number; services_open: number; services_unknown: number; findings_open: number;
+  probed: number; probed_up: number; changes: number; changes_expected: number; changes_by_kind: Record<string, number> | null;
+}
+export interface Timeline { runs: RunPoint[]; from: string; to: string; took_ms: number }
+export interface AtHost { id: number; ip: string; hostnames: string[]; label: string; status: string; up: boolean; observed_at: string; run_id: number; status_now: string; open_ports: number[] }
+export interface AtService {
+  id: number; host_id: number; ip: string; port: number; proto: string; state: string; name: string; product: string; version: string;
+  title: string; http_status: number; tls: boolean; technologies: string[]; classes: string[]; observed_at: string; run_id: number; state_now: string; changed_since: boolean;
+}
+export interface AtFinding { id: number; key: string; type: string; title: string; severity: string; interest: number; host_id: number; ip: string; port: number; first_seen: string; last_seen: string; first_run_id: number; last_run_id: number; status_now: string }
+export interface DiffToNow {
+  services_gone_since: number; services_new_since: number; services_changed: number; hosts_down_since: number; hosts_up_since: number;
+  hosts_new_since: number; findings_opened_since: number; findings_closed_since: number; sentences: string[];
+}
+export interface SnapshotSummary {
+  hosts_up: number; hosts_missing: number; hosts_down: number; services_open: number; services_unknown: number; findings_open: number;
+  findings_by_severity: Record<string, number> | null; diff_to_now: DiffToNow;
+}
+export interface Snapshot { run: RunPoint; summary: SnapshotSummary; hosts: Page<AtHost>; services: Page<AtService>; findings: Page<AtFinding>; took_ms: number }
+export interface LifeInterval { state: string; status: string; from: string; to: string; from_run: number; to_run: number; observations: number; ongoing: boolean }
+export interface ServiceLane { service_id: number; port: number; proto: string; name: string; state_now: string; intervals: LifeInterval[]; versions: { at: string; run_id: number; before: string; after: string }[] | null }
+export interface HostLife { host_id: number; ip: string; status_now: string; first_seen: string; last_seen: string; host: LifeInterval[]; services: ServiceLane[] }
+export interface FieldHistory { field: string; values: { value: string; from: string; to: string; from_run: number; to_run: number; observations: number }[] }
+export interface ServiceHistory { service_id: number; host_id: number; ip: string; port: number; proto: string; observations: number; changed: FieldHistory[]; unchanged: Record<string, string> | null }
+export interface ReprobeSettings { enabled: boolean; budget_per_hour: number; backoff_minutes: number[]; likely_up_rate: number; max_ports_per_host: number }
+export interface ReprobeProbe { host_id: number; ip: string; ports: number[] | string | null; not_before: string; kind: 'confirm' | 'likely-up'; step: number; steps: number; reason: string; profile_id: number }
+export interface ReprobeSkip { host_id: number; ip: string; reason: string }
+export interface ReprobePlan {
+  generated_at: string; enabled: boolean; blocked: string; budget_per_hour: number; used_last_hour: number; due_now: number;
+  active_reprobe: unknown; probes: ReprobeProbe[] | null; skipped: ReprobeSkip[] | null; settings: ReprobeSettings;
+}
+
+// ---------- exposure rules and signature suggest (docs/API-policy.md) ----------
+export interface ExposureRule {
+  id: number; slug: string; name: string; severity: string; description: string; yaml: string; enabled: boolean; builtin: boolean;
+  author: string; violations: number; last_eval_at: string | null; created_at: string; updated_at: string;
+}
+export interface RuleIssue { level: string; path: string; message: string; safety: boolean }
+export interface RuleValidation { ok: boolean; issues: RuleIssue[] }
+export interface RuleViolation {
+  rule: string; rule_name: string; severity: string; subject: string; key: string; host_id: number; ip: string; service_id: number;
+  port: number; proto: string; url: string; title: string; summary: string; interest: number; storable: boolean;
+}
+export interface RuleDryRun { validation: RuleValidation; total: number; truncated: boolean; hosts: number; services: number; took_ms: number; condition: string; message: string; violations: RuleViolation[] | null }
+export interface SuggestRule { kind: string; feature: string; rule: string; weight: number; df: number; others: number; explanation: string }
+export interface Suggestion {
+  ok: boolean; message: string; service_id: number; target: string; slug: string; name: string; yaml: string;
+  rules: SuggestRule[] | null; rejected: { kind: string; value: string; reason: string }[] | null;
+  validation: { ok: boolean; issues: RuleIssue[] } | null;
+  retro_hunt: { scanned: number; total_hits: number; packets_sent: number; hits: unknown[] | null } | null;
+  matches_target: boolean; other_matches: number; took_ms: number;
+}

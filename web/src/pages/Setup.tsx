@@ -137,9 +137,8 @@ export default function Setup() {
     let id = profile!.id;
     if (outside) {
       // The window of the cyclic profile is closed now: the first scan runs from a one-off copy without windows, so it starts at once.
-      // udp is left out while it is off: the server does not accept the field yet (see web/REPORT-LAB.md).
-      const { id: _drop, next_run_at: _n, last_run_id: _l, created_at: _c, updated_at: _u, udp: _udp, ...rest } = profile!;
-      void _drop; void _n; void _l; void _c; void _u; void _udp;
+      const { id: _drop, next_run_at: _n, last_run_id: _l, created_at: _c, updated_at: _u, ...rest } = profile!;
+      void _drop; void _n; void _l; void _c; void _u;
       const once = await post<ScanProfile>('/profiles', { ...rest, name: netName.trim() + t(': pierwszy przegląd', ': first scan'), schedule: scheduleFor('manual') });
       id = once.id;
     }

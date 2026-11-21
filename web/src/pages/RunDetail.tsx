@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useAction, useItem } from '../api/hooks';
-import { post } from '../api/client';
+import { patch, post } from '../api/client';
 import type { Chunk, MapBlock, RunMap, SafetyPolicy, ScanProfile, ScanRun } from '../api/types';
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtTime } from '../lib/format';
 import { useLiveRun } from '../lib/hooks';
-import { Button, Dialog, ErrorState, PageHeader, Panel, SkeletonRows } from '../ui/kit';
+import { Button, Dialog, ErrorState, Field, InlineError, PageHeader, Panel, SkeletonRows } from '../ui/kit';
+import { triggerLabel } from './Runs';
 import { Icon } from '../ui/Icon';
 import { ChunkStatusMark, Glyph, RunStatusMark } from '../ui/marks';
 import { AddressMap } from '../viz/AddressMap';
@@ -93,7 +94,7 @@ export default function RunDetail() {
       <PageHeader
         back={{ to: '/runs', label: t('Przebiegi skanów', 'Scan runs') }}
         title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{t('Przebieg', 'Run')} <span className="num">#{run.id}</span></span><span className="text-base font-normal"><RunStatusMark status={run.status} pauseReason={run.pause_reason} /></span></span>}
-        sub={<>{run.profile_id ? <Link to={'/profiles/' + run.profile_id} className="link">{run.profile_name}</Link> : run.profile_name} · {run.trigger === 'schedule' ? t('z harmonogramu', 'from the schedule') : run.trigger === 'import' ? t('import pliku', 'file import') : t('uruchomiony ręcznie', 'started by hand')} · {fmtDateTime(run.started_at)}
+        sub={<>{run.profile_id ? <Link to={'/profiles/' + run.profile_id} className="link">{run.profile_name}</Link> : run.profile_name} · {run.trigger === 'schedule' ? t('z harmonogramu', 'from the schedule') : run.trigger === 'import' ? t('import pliku', 'file import') : run.trigger === 'manual' ? t('uruchomiony ręcznie', 'started by hand') : triggerLabel(run.trigger)} · {fmtDateTime(run.started_at)}
           {isLive ? <span className="ml-2 inline-flex items-center gap-1 text-xs text-ink-3"><span className={cx('inline-block h-1.5 w-1.5 rounded-full', connected ? 'bg-st-new' : 'bg-st-changed')} />{connected ? t('na żywo', 'live') : t('łączenie…', 'connecting…')}</span> : null}</>}
         readOnly={!canRun && (isLive || run.status === 'paused')}
         actions={canRun ? (
@@ -113,6 +114,7 @@ export default function RunDetail() {
       />
 
       <div className="space-y-4 p-4 sm:p-6">
+        <RunNote run={run} canEdit={canRun} />
         {run.error ? (
           <div role="alert" className="flex items-start gap-2 border border-danger/60 bg-st-gone-wash px-3 py-2 text-sm">
             <Icon name="alert" className="mt-0.5 text-danger" /><span><span className="font-medium">{t('Skan zakończył się błędem.', 'The scan failed.')}</span> <span className="mono text-xs">{run.error}</span></span>
@@ -258,6 +260,33 @@ export default function RunDetail() {
         footer={<><Button onClick={() => setConfirmCancel(false)}>{t('Wróć', 'Back')}</Button><Button variant="dangerSolid" busy={act.isPending} onClick={() => act.mutate('cancel', { onSuccess: () => setConfirmCancel(false) })}>{t('Anuluj skan', 'Cancel the scan')}</Button></>}
       >
         <p className="text-sm">{t('Wyniki z gotowych podgrup zostają. Pozostałe adresy nie będą sprawdzone, a anulowanego skanu nie da się wznowić.', 'Results of the finished chunks stay. The remaining addresses are not probed, and a cancelled scan cannot be resumed.')}</p>
+      </Dialog>
+    </div>
+  );
+}
+
+/** Analyst note and label of a run (PATCH /runs/{id}). */
+function RunNote({ run, canEdit }: { run: ScanRun; canEdit: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState(run.label ?? '');
+  const [note, setNote] = useState(run.note ?? '');
+  const save = useAction(() => patch<ScanRun>('/runs/' + run.id, { label: label.trim(), note: note.trim() }), {
+    invalidate: ['/runs/' + run.id, '/runs'], silent: true, success: t('Notatka zapisana', 'Note saved'), onSuccess: () => setOpen(false),
+  });
+  const has = Boolean(run.label || run.note);
+  if (!has && !canEdit) return null;
+  return (
+    <div className="flex flex-wrap items-start gap-x-3 gap-y-1 text-sm" data-testid="run-note">
+      {run.label ? <span className="border border-rule-strong px-1.5 py-0.5 text-xs font-medium">{run.label}</span> : null}
+      {run.note ? <p className="max-w-[90ch] whitespace-pre-wrap text-ink-2">{run.note}</p> : null}
+      {canEdit ? <button type="button" className="link text-xs" onClick={() => { setLabel(run.label ?? ''); setNote(run.note ?? ''); setOpen(true); }}>{has ? t('Zmień notatkę', 'Edit the note') : t('Dodaj notatkę lub etykietę', 'Add a note or a label')}</button> : null}
+      <Dialog open={open} onClose={() => setOpen(false)} width={520} title={t('Notatka do przebiegu #' + run.id, 'Note on run #' + run.id)}
+        footer={<><Button onClick={() => setOpen(false)}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="check" busy={save.isPending} disabled={label.length > 100 || note.length > 4000} onClick={() => save.mutate(undefined)}>{t('Zapisz', 'Save')}</Button></>}>
+        <div className="space-y-3">
+          <Field label={t('Etykieta', 'Label')} hint={t('jedna linia, do 100 znaków, np. „po migracji VLAN”', 'one line, up to 100 characters, for example "after the VLAN move"')}><input className="field" value={label} maxLength={100} onChange={(e) => setLabel(e.target.value.replace(/\n/g, ' '))} data-testid="run-label" /></Field>
+          <Field label={t('Notatka', 'Note')} hint={t('do 4000 znaków; wyszukiwarka listy przebiegów przeszukuje też notatki', 'up to 4000 characters; the run list search also looks in notes')}><textarea className="field" rows={4} value={note} maxLength={4000} onChange={(e) => setNote(e.target.value)} data-testid="run-note-text" /></Field>
+          <InlineError error={save.error} />
+        </div>
       </Dialog>
     </div>
   );

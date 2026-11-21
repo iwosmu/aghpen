@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useAction, useItem, usePage } from '../api/hooks';
 import { del, patch, post, put } from '../api/client';
-import type { AuditEntry, DefectDojoSettings, DojoTestResult, Permission, PermissionInfo, Role, SafetyPolicy, User } from '../api/types';
+import type { AuditEntry, DefectDojoSettings, DojoPullResult, DojoScopeMapping, DojoSyncResult, DojoTestResult, Permission, PermissionInfo, Role, SafetyPolicy, Scope, User } from '../api/types';
 import { t, getLang, plural } from '../i18n';
 import { cx, fmtDateTime, fmtInt, fmtRelative } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
@@ -189,9 +189,11 @@ function SafetyTab() {
   const q = useItem<SafetyPolicy>('/settings/safety');
   const [f, setF] = useState<SafetyPolicy | null>(null);
   const [excl, setExcl] = useState('');
+  const [nets, setNets] = useState('');
   const [confirmStop, setConfirmStop] = useState(false);
-  useEffect(() => { if (q.data) { setF(q.data); setExcl((q.data.exclusions ?? []).join('\n')); } }, [q.data]);
-  const save = useAction(() => put<SafetyPolicy>('/settings/safety', { ...f, exclusions: excl.split('\n').map((x) => x.trim()).filter(Boolean) }), { invalidate: ['/settings/safety', '/dashboard', '/audit'], silent: true, success: t('Polityka zapisana', 'Policy saved') });
+  useEffect(() => { if (q.data) { setF(q.data); setExcl((q.data.exclusions ?? []).join('\n')); setNets((q.data.allowed_networks ?? []).join('\n')); } }, [q.data]);
+  const lines = (s: string) => s.split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
+  const save = useAction(() => put<SafetyPolicy>('/settings/safety', { ...f, exclusions: lines(excl), allowed_networks: lines(nets) }), { invalidate: ['/settings/safety', '/dashboard', '/audit'], silent: true, success: t('Polityka zapisana', 'Policy saved') });
   const stop = useAction(() => post<SafetyPolicy>('/emergency-stop'), { invalidate: ['/settings/safety', '/dashboard', '/runs', '/audit'], onSuccess: () => setConfirmStop(false) });
   const release = useAction(() => post<SafetyPolicy>('/emergency-stop/release'), { invalidate: ['/settings/safety', '/dashboard', '/audit'], success: t('Blokada zwolniona', 'The stop is released') });
   if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
@@ -201,7 +203,8 @@ function SafetyTab() {
       <span className="relative block"><input type="number" min={1} className="field num pr-14" disabled={!canManage} value={f[k]} onChange={(e) => setF({ ...f, [k]: Number(e.target.value) })} /><span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-ink-3">{suffix}</span></span>
     </Field>
   );
-  const dirty = JSON.stringify({ ...f, exclusions: excl.split('\n').map((x) => x.trim()).filter(Boolean) }) !== JSON.stringify(q.data);
+  const dirty = JSON.stringify(lines(excl)) !== JSON.stringify(q.data.exclusions ?? []) || JSON.stringify(lines(nets)) !== JSON.stringify(q.data.allowed_networks ?? [])
+    || JSON.stringify({ ...f, exclusions: null, allowed_networks: null }) !== JSON.stringify({ ...q.data, exclusions: null, allowed_networks: null });
   return (
     <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <Panel title={t('Polityka bezpieczeństwa skanowania', 'Scan safety policy')} actions={canManage ? <Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!dirty} onClick={() => save.mutate(undefined)}>{t('Zapisz politykę', 'Save the policy')}</Button> : undefined}>
@@ -216,6 +219,11 @@ function SafetyTab() {
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label={t('Dozwolone porty', 'Allowed ports')} hint={t('puste = wszystkie', 'empty = all')}><input className="field mono" disabled={!canManage} value={f.allowed_ports} onChange={(e) => setF({ ...f, allowed_ports: e.target.value })} /></Field>
           <Field label={t('Zabronione porty', 'Denied ports')} hint={t('np. 9100: surowy port drukarek', 'for example 9100: the raw printer port')}><input className="field mono" disabled={!canManage} value={f.denied_ports} onChange={(e) => setF({ ...f, denied_ports: e.target.value })} /></Field>
+        </div>
+        <div className="mt-3">
+          <Field label={t('Dozwolone sieci', 'Allowed networks')} hint={nets.trim() ? t('Czujka skanuje tylko adresy z tych sieci. Cel spoza nich zostanie odrzucony przy dodawaniu, imporcie i starcie skanu.', 'Czujka scans only addresses in these networks. A target outside them is refused when it is added, imported or planned.') : t('Puste = bez ograniczenia. Wpisz CIDR-y (jeden w wierszu), aby Czujka nie wyszła poza swoje sieci nawet przez pomyłkę.', 'Empty = no limit. Enter CIDRs (one per line) so that Czujka never leaves its networks, even by mistake.')}>
+            <textarea className="field mono" rows={3} disabled={!canManage} value={nets} onChange={(e) => setNets(e.target.value)} placeholder={'10.66.0.0/16\n149.156.0.0/16'} data-testid="allowed-networks" />
+          </Field>
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label={t('Wykluczenia (nigdy nie skanowane)', 'Exclusions (never scanned)')} hint={t('adres albo CIDR, jeden w wierszu', 'an address or a CIDR, one per line')}><textarea className="field mono" rows={5} disabled={!canManage} value={excl} onChange={(e) => setExcl(e.target.value)} /></Field>
@@ -263,9 +271,19 @@ function DojoTab() {
   useEffect(() => { if (q.data) setF(q.data); }, [q.data]);
   const save = useAction(() => put<DefectDojoSettings>('/settings/defectdojo', { ...f, ...(key ? { api_key: key } : {}) }), { invalidate: ['/settings/defectdojo', '/audit'], silent: true, success: t('Ustawienia zapisane', 'Settings saved'), onSuccess: () => setKey('') });
   const run = useAction(() => post<DojoTestResult>('/settings/defectdojo/test', { url: f?.url, verify_tls: f?.verify_tls, ...(key ? { api_key: key } : {}) }), { silent: true, onSuccess: setTest });
+  const scopes = usePage<Scope>('/scopes', { limit: 200 });
+  const [pull, setPull] = useState<DojoPullResult | null>(null);
+  const [sync, setSync] = useState<DojoSyncResult | null>(null);
+  const pullRun = useAction((apply: boolean) => post<DojoPullResult>('/defectdojo/pull' + (apply ? '?apply=true' : '')), { silent: true, invalidate: ['/findings'], onSuccess: setPull });
+  const syncRun = useAction(() => post<DojoSyncResult>('/defectdojo/sync'), { silent: true, invalidate: ['/findings'], onSuccess: setSync });
   if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
   if (!f || !q.data) return <SkeletonRows rows={8} />;
   const dirty = key !== '' || JSON.stringify(f) !== JSON.stringify(q.data);
+  const maps = f.scope_mappings ?? [];
+  const setMap = (i: number, m: Partial<DojoScopeMapping>) => setF({ ...f, scope_mappings: maps.map((x, j) => (j === i ? { ...x, ...m } : x)) });
+  const scopeOpts = (scopes.data?.items ?? []).map((s) => ({ value: String(s.id), label: s.name }));
+  const freeScope = (scopes.data?.items ?? []).find((s) => !maps.some((m) => m.scope_id === s.id));
+  const count = (x: unknown) => (Array.isArray(x) ? x.length : typeof x === 'number' ? x : 0);
   return (
     <div className="max-w-[860px] p-4 sm:p-6">
       <Panel title="DefectDojo" actions={<Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!dirty} onClick={() => save.mutate(undefined)}>{t('Zapisz ustawienia', 'Save the settings')}</Button>}>
@@ -295,6 +313,45 @@ function DojoTab() {
           ) : <span className="text-xs text-ink-3">{t('Test używa wartości z formularza, także niezapisanych.', 'The test uses the values in the form, saved or not.')}</span>}
         </div>
         <div className="mt-2"><InlineError error={save.error ?? run.error} /></div>
+
+        <div className="mt-4 border-t border-rule pt-3" data-testid="dojo-mappings">
+          <p className="text-sm font-medium">{t('Produkt DefectDojo dla zakresu', 'DefectDojo product per scope')}</p>
+          <p className="mb-2 text-xs text-ink-3">{t('Znaleziska hosta z danego zakresu trafiają do jego produktu i zaangażowania. Puste pole bierze wartość ogólną z góry. Pozostałe zakresy idą do produktu ogólnego.', 'Findings of a host in a scope go to that scope\'s product and engagement. An empty field takes the general value above. Other scopes go to the general product.')}</p>
+          {maps.length ? (
+            <ul className="space-y-2">
+              {maps.map((m, i) => (
+                <li key={i} className="grid items-end gap-2 sm:grid-cols-[180px_repeat(3,minmax(0,1fr))_auto]">
+                  <Field label={t('Zakres', 'Scope')}><Select value={String(m.scope_id)} onChange={(v) => setMap(i, { scope_id: Number(v) })} options={scopeOpts} /></Field>
+                  <Field label={t('Typ produktu', 'Product type')}><input className="field" value={m.product_type_name} placeholder={f.product_type_name} onChange={(e) => setMap(i, { product_type_name: e.target.value })} /></Field>
+                  <Field label={t('Produkt', 'Product')}><input className="field" value={m.product_name} placeholder={f.product_name} onChange={(e) => setMap(i, { product_name: e.target.value })} /></Field>
+                  <Field label={t('Zaangażowanie', 'Engagement')}><input className="field" value={m.engagement_name} placeholder={f.engagement_name} onChange={(e) => setMap(i, { engagement_name: e.target.value })} /></Field>
+                  <IconButton icon="x" label={t('Usuń mapowanie', 'Remove the mapping')} onClick={() => setF({ ...f, scope_mappings: maps.filter((_, j) => j !== i) })} />
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <Button size="sm" icon="plus" className="mt-2" disabled={!freeScope} onClick={() => freeScope && setF({ ...f, scope_mappings: [...maps, { scope_id: freeScope.id, product_type_name: '', product_name: '', engagement_name: '' }] })}>{t('Dodaj mapowanie zakresu', 'Add a scope mapping')}</Button>
+        </div>
+
+        <div className="mt-4 border-t border-rule pt-3">
+          <p className="text-sm font-medium">{t('Synchronizacja statusów', 'Status sync')}</p>
+          <Check checked={Boolean(f.status_sync)} onChange={(v) => setF({ ...f, status_sync: v })} label={t('Po każdym skanie: zamknij w DefectDojo to, co Czujka rozwiązała, otwórz ponownie to, co widzi znowu, i pobierz zmiany statusów z DefectDojo', 'After each scan: close in DefectDojo what Czujka resolved, reopen what it sees again, and pull status changes from DefectDojo')} />
+          <p className="mt-1 text-xs text-ink-3">{t('Status ustawiony przez analityka w Czujce wygrywa: różnicę pokazujemy jako konflikt, nie nadpisujemy.', 'A status that an analyst set in Czujka wins: a difference shows as a conflict and is not overwritten.')}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button size="sm" icon="download" busy={pullRun.isPending && !pullRun.variables} disabled={!q.data.api_key_set} onClick={() => pullRun.mutate(false)} data-testid="dojo-pull">{t('Sprawdź statusy w DefectDojo', 'Check the statuses in DefectDojo')}</Button>
+            {pull && (pull.updates ?? []).length ? <Button size="sm" variant="primary" icon="check" busy={pullRun.isPending && pullRun.variables === true} onClick={() => pullRun.mutate(true)}>{t('Zastosuj ' + (pull.updates ?? []).length + ' zmian', 'Apply ' + (pull.updates ?? []).length + ' changes')}</Button> : null}
+            <Button size="sm" icon="upload" busy={syncRun.isPending} disabled={!q.data.api_key_set} onClick={() => syncRun.mutate(undefined)}>{t('Wyślij statusy do DefectDojo', 'Push the statuses to DefectDojo')}</Button>
+          </div>
+          {!q.data.api_key_set ? <p className="mt-1 text-xs text-ink-3">{t('Najpierw zapisz adres i klucz API.', 'Save the URL and the API key first.')}</p> : null}
+          <InlineError error={pullRun.error ?? syncRun.error} />
+          {pull ? (
+            <div className="mt-2 border border-rule p-2 text-sm" data-testid="dojo-pull-result">
+              <p>{t('Sprawdzono ' + fmtInt(pull.checked) + ' znalezisk: ' + (pull.updates ?? []).length + ' zmian do przyjęcia, ' + count(pull.conflicts) + ' konfliktów, ' + count(pull.missing) + ' brakujących w DefectDojo.', 'Checked ' + fmtInt(pull.checked) + ' findings: ' + (pull.updates ?? []).length + ' changes to take, ' + count(pull.conflicts) + ' conflicts, ' + count(pull.missing) + ' missing in DefectDojo.')}{pull.applied ? ' ' + t('Zastosowano: ' + pull.applied + '.', 'Applied: ' + pull.applied + '.') : ''}</p>
+              {(pull.updates ?? []).slice(0, 8).map((x) => <p key={x.finding_id} className="mono text-xs text-ink-2">#{x.finding_id} {x.from} → {x.to} <span className="text-ink-3">{x.reason}</span></p>)}
+            </div>
+          ) : null}
+          {sync ? <p className="mt-2 text-sm" data-testid="dojo-sync-result">{t('Zamknięte: ' + sync.closed + ', ponownie otwarte: ' + sync.reopened + ', pominięte: ' + sync.skipped + (count(sync.errors) ? ', błędy: ' + count(sync.errors) : '') + '.', 'Closed: ' + sync.closed + ', reopened: ' + sync.reopened + ', skipped: ' + sync.skipped + (count(sync.errors) ? ', errors: ' + count(sync.errors) : '') + '.')}</p> : null}
+        </div>
       </Panel>
     </div>
   );

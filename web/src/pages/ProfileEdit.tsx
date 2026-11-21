@@ -106,8 +106,7 @@ const UDP_ALLOW = '53,123,137,161,500,1900,5353';
 
 /** The request body. UDP off with no ports is the server default, so it is left out: a server that does not know the field yet still saves the profile. */
 function profileBody(p: ScanProfile): Partial<ScanProfile> {
-  const { udp, ...rest } = p;
-  return udp.enabled || udp.ports.trim() ? { ...rest, udp } : rest;
+  return p;
 }
 
 function discoveryModes(): { id: DiscoveryMode; label: string; text: string }[] {
