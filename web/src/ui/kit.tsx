@@ -71,7 +71,7 @@ export function Spinner() {
 // ---------- Layout pieces ----------
 export function PageHeader({ title, sub, actions, readOnly, back }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode; readOnly?: boolean; back?: { to: string; label: string } }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-rule px-4 pb-3 pt-4 sm:px-6">
+    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-rule/70 px-4 pb-4 pt-5 sm:px-6 lg:px-8">
       <div className="min-w-0">
         {back ? (
           <Link to={back.to} className="mb-1 inline-flex items-center gap-1 text-xs text-ink-3 hover:text-ink">

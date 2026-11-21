@@ -89,7 +89,7 @@ function NoStory({ run }: { run: ScanRun }) {
   const s = run.summary;
   if (!s) return null;
   const n = s.hosts_new + s.hosts_gone + s.hosts_back + s.services_new + s.services_gone + s.services_changed + (s.services_returned ?? 0) + (s.responses_slower ?? 0) + (s.hosts_missing ?? 0);
-  return n === 0 ? <p className="text-base text-ink-2" data-testid="run-story-none">{t('Bez zmian względem poprzedniego przebiegu.', 'No change since the previous run.')}</p> : null;
+  return n === 0 ? <p className="font-display text-[28px] leading-tight text-ink sm:text-[32px]" data-testid="run-story-none">{t('Bez zmian względem poprzedniego przebiegu.', 'No change since the previous run.')}</p> : null;
 }
 
 function Fact({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
@@ -197,7 +197,7 @@ export default function RunDetail() {
         )}
       />
 
-      <div className="space-y-4 p-4 sm:p-6">
+      <div className="space-y-5 p-4 sm:p-6 lg:px-8">
         <RunNote run={run} canEdit={canRun} />
         {run.error ? (
           <div role="alert" className="flex items-start gap-2 border border-danger/60 bg-st-gone-wash px-3 py-2 text-sm">
@@ -227,9 +227,9 @@ export default function RunDetail() {
         ) : null}
 
         {run.status === 'completed' && run.summary?.prev_run_id ? (
-          <section className="border border-rule bg-panel px-3 py-2.5" data-testid="run-story-panel">
-            <h2 className="mb-1 text-xs text-ink-3">{t('Względem przebiegu', 'Compared with run')} <Link to={'/runs/' + run.summary.prev_run_id} className="num link">#{run.summary.prev_run_id}</Link> · <Link to={'/changes/compare?from=' + run.summary.prev_run_id + '&to=' + run.id} className="link">{t('porównanie', 'comparison')}</Link></h2>
-            <RunStory runId={run.id} />
+          <section className="py-1" data-testid="run-story-panel">
+            <h2 className="mb-2 text-xs text-ink-3">{t('Względem przebiegu', 'Compared with run')} <Link to={'/runs/' + run.summary.prev_run_id} className="num link">#{run.summary.prev_run_id}</Link> · <Link to={'/changes/compare?from=' + run.summary.prev_run_id + '&to=' + run.id} className="link">{t('porównanie', 'comparison')}</Link></h2>
+            <RunStory runId={run.id} className="space-y-1.5 [&_li]:text-lg" />
             <NoStory run={run} />
           </section>
         ) : null}
@@ -243,18 +243,18 @@ export default function RunDetail() {
           </div>
         ) : null}
         {s.notes && s.notes.length > 0 ? (
-          <div data-testid="run-notes" className="border border-rule bg-panel px-3 py-2 text-sm text-ink-2">
+          <div data-testid="run-notes" className="card px-4 py-3 text-sm text-ink-2">
             {s.notes.map((n) => <span key={n} className="block">{runNoteText(n)}</span>)}
           </div>
         ) : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="border border-rule bg-panel p-3">
+          <section className="card p-4 sm:p-5">
             <div className="flex items-baseline justify-between gap-3">
               {small && isLive ? (
-                <span><span className="num text-xl font-semibold">{fmtInt(s.services_open)}</span> <span className="text-sm text-ink-2">{plural(s.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['open service', 'open services'])} {t('do tej pory', 'so far')}</span></span>
+                <span><span className="font-display text-[44px] leading-none">{fmtInt(s.services_open)}</span> <span className="text-sm text-ink-2">{plural(s.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['open service', 'open services'])} {t('do tej pory', 'so far')}</span></span>
               ) : (
-                <span><span className="num text-xl font-semibold">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów sprawdzonych', 'of addresses probed')}</span></span>
+                <span><span className="font-display text-[44px] leading-none">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów sprawdzonych', 'of addresses probed')}</span></span>
               )}
               <span className="num text-sm text-ink-2">{fmtInt(s.addresses_done)} / {fmtInt(s.addresses_total)}</span>
             </div>
@@ -262,12 +262,12 @@ export default function RunDetail() {
             <RunPasses passes={s.passes} className="mt-1.5" />
             <PartialNote run={run} className="mt-2" />
             {run.status === 'running' && runningChunks > 0 ? (
-              <p className="mt-1.5 flex items-center gap-2 text-xs text-ink-2" data-testid="run-phase">
-                <span className="bar-active inline-block h-1.5 w-4" aria-hidden="true" />
+              <p className="mt-2.5 flex items-center gap-2.5 text-sm text-ink" data-testid="run-phase">
+                <span className="bar-active inline-block h-1.5 w-5 flex-none rounded-full" aria-hidden="true" />
                 {small ? smallPhaseText(s) : phaseText(s, runningChunks, runningAddrs)}
               </p>
             ) : null}
-            <dl className="mt-3 grid grid-cols-2 gap-y-3 sm:grid-cols-4">
+            <dl className="mt-4 grid grid-cols-2 gap-y-3 border-t border-rule/70 pt-4 sm:grid-cols-4">
               <Fact label={run.status === 'completed' ? t('Czas trwania', 'Duration') : t('Czas aktywny', 'Active time')}><span className="num">{fmtDuration(s.elapsed_sec)}</span></Fact>
               <Fact label={t('Pozostało (ETA)', 'Remaining (ETA)')}><span className="num">{isLive || run.status === 'paused' ? (run.status === 'analyzing' ? t('analiza', 'analysing') : s.eta_sec > 0 ? fmtDuration(s.eta_sec) : '–') : '–'}</span></Fact>
               <Fact label={t('Podgrupy', 'Chunks')}><span className="num">{s.chunks_done} / {s.chunks_total}</span></Fact>
@@ -278,8 +278,8 @@ export default function RunDetail() {
               <Fact label={t('Ponowione próby', 'Retried hosts')}><span className="num">{fmtInt(s.retried)}</span></Fact>
             </dl>
           </section>
-          <section className="border border-rule bg-panel p-3">
-            <h2 className="mb-2 text-sm font-semibold">{t('Tempo skanowania', 'Scan rate')}</h2>
+          <section className="card p-4 sm:p-5">
+            <h2 className="mb-3 text-sm font-semibold">{t('Tempo skanowania', 'Scan rate')}</h2>
             {policyCap ? <RateGauge current={isLive ? s.current_pps : 0} cap={cap} policyCap={policyCap} basis={isLive ? s.current_pps_basis : undefined} /> : <div className="skeleton h-12" />}
             <p className="mt-2 text-xs text-ink-2">{t('Średnio', 'Average')} <span className="num text-ink">{fmtInt(s.avg_pps)}</span> pps. {profile.data && profile.data.rate.max_pps > policyCap ? t('Profil prosi o ' + fmtInt(profile.data.rate.max_pps) + ' pps, polityka bezpieczeństwa obcina do ' + fmtInt(policyCap) + '.', 'The profile asks for ' + fmtInt(profile.data.rate.max_pps) + ' pps, the safety policy cuts it to ' + fmtInt(policyCap) + '.') : null}</p>
           </section>
