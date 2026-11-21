@@ -65,7 +65,7 @@ function Handover({ d }: { d: Dash }) {
           ) : t('Nic nie wymaga pilnej uwagi.', 'Nothing needs urgent attention.')}
           {' '}
           <span className="text-ink-2">
-            {t('Skan', 'Run')} <Link to={'/runs/' + run.id} className="num link">#{run.id}</Link> {t('zakończony', 'finished')} {fmtRelative(run.finished_at)}.
+            {t('Skan', 'Run')} <Link to={'/runs/' + run.id} className="num link">#{run.id}</Link>{run.profile_name ? <> ({run.profile_name})</> : null} {t('zakończony', 'finished')} {fmtRelative(run.finished_at)}.
           </span>
         </span>
       </p>

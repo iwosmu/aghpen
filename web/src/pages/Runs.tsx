@@ -21,7 +21,12 @@ export function StartRunDialog({ open, onClose, profileId }: { open: boolean; on
   const profiles = usePage<ScanProfile>('/profiles', { limit: 100 }, open);
   const [pid, setPid] = useState<string>(profileId ? String(profileId) : '');
   const navigate = useNavigate();
-  const chosen = pid || (profiles.data?.items[0] ? String(profiles.data.items[0].id) : '');
+  // Default to the first profile that can run: enabled and with at least one scope.
+  const items = profiles.data?.items ?? [];
+  const firstReady = items.find((p) => p.enabled && (p.scope_ids ?? []).length > 0) ?? items[0];
+  const chosen = pid || (firstReady ? String(firstReady.id) : '');
+  const chosenProfile = items.find((p) => String(p.id) === chosen);
+  const noScope = Boolean(chosenProfile && (chosenProfile.scope_ids ?? []).length === 0);
   const start = useAction((id: number) => post<ScanRun>('/runs', { profile_id: id }), {
     invalidate: ['/runs', '/dashboard'], silent: true,
     onSuccess: (run) => { onClose(); navigate('/runs/' + run.id); },
@@ -31,14 +36,14 @@ export function StartRunDialog({ open, onClose, profileId }: { open: boolean; on
       open={open} onClose={onClose} title={t('Uruchom skan', 'Start a scan')} width={560}
       footer={<>
         <Button onClick={onClose}>{t('Anuluj', 'Cancel')}</Button>
-        <Button variant="primary" icon="play" busy={start.isPending} disabled={!chosen} onClick={() => start.mutate(Number(chosen))}>{t('Uruchom', 'Start')}</Button>
+        <Button variant="primary" icon="play" busy={start.isPending} disabled={!chosen || noScope} onClick={() => start.mutate(Number(chosen))}>{t('Uruchom', 'Start')}</Button>
       </>}
     >
       <label className="block">
         <span className="label mb-1 block">{t('Profil skanu', 'Scan profile')}</span>
-        <Select value={chosen} onChange={setPid} options={(profiles.data?.items ?? []).map((p) => ({ value: String(p.id), label: p.name }))} />
+        <Select value={chosen} onChange={setPid} options={items.map((p) => ({ value: String(p.id), label: p.name + ((p.scope_ids ?? []).length === 0 ? t(' (bez zakresu)', ' (no scope)') : '') }))} />
       </label>
-      {chosen ? <div className="mt-4"><p className="label mb-1.5">{t('Budżet ruchu przed startem', 'Traffic budget before the start')}</p><EstimateBox profileId={Number(chosen)} /></div> : null}
+      {noScope ? <p className="mt-3 text-sm text-ink-2">{t('Ten profil nie ma przypisanego zakresu, więc nie ma czego skanować. ', 'This profile has no scope, so there is nothing to scan. ')}<Link to={'/profiles/' + chosen} className="link">{t('Przypisz zakres w profilu', 'Assign a scope in the profile')}</Link>.</p> : chosen ? <div className="mt-4"><p className="label mb-1.5">{t('Budżet ruchu przed startem', 'Traffic budget before the start')}</p><EstimateBox profileId={Number(chosen)} /></div> : null}
       <div className="mt-3"><InlineError error={start.error} /></div>
     </Dialog>
   );
