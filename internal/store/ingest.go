@@ -291,6 +291,74 @@ func (s *Store) IngestHosts(ctx context.Context, results []model.HostResult, opt
 		return nil
 	}
 	sort.Strings(order) // stable lock order
+	return s.Tx(ctx, func(tx *Store) error { return tx.ingest(ctx, byIP, order, scopes, now, opt) })
+}
+
+// prevObs is the observation of a host that the same run already stored (a
+// chunk reported again, a retry pass, a resumed run that probes the address again).
+type prevObs struct {
+	up bool
+	at time.Time
+}
+
+// runRepeats returns, by address, the observations that the runs of the
+// results already stored. One run keeps one observation per host
+// (analyze.ObservationKey): a repeat never adds a second row, a second
+// histogram count or a second obs_total.
+func (s *Store) runRepeats(ctx context.Context, byIP map[string]*model.HostResult, order []string) (map[string]prevObs, error) {
+	type key struct {
+		IP    string `json:"ip"`
+		RunID int64  `json:"run_id"`
+	}
+	keys := make([]key, 0, len(order))
+	for _, ip := range order {
+		if r := byIP[ip]; r.RunID != 0 {
+			keys = append(keys, key{ip, r.RunID})
+		}
+	}
+	out := map[string]prevObs{}
+	if len(keys) == 0 {
+		return out, nil
+	}
+	rows, err := s.db.Query(ctx, `SELECT host(h.ip), bool_or(o.up), min(o.at) FROM jsonb_to_recordset($1::jsonb) AS d(ip inet, run_id bigint)
+		JOIN hosts h ON h.ip = d.ip JOIN host_observations o ON o.host_id = h.id AND o.run_id = d.run_id GROUP BY h.ip`, js(keys))
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var ip string
+		var p prevObs
+		if err := rows.Scan(&ip, &p.up, &p.at); err != nil {
+			return nil, err
+		}
+		if a, err := netip.ParseAddr(ip); err == nil {
+			ip = a.Unmap().String()
+		}
+		out[ip] = p
+	}
+	return out, mapErr(rows.Err())
+}
+
+func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, order []string, scopes *scopeMatcher, now time.Time, opt SinkOptions) error {
+	repeats, err := tx.runRepeats(ctx, byIP, order)
+	if err != nil {
+		return err
+	}
+	if len(repeats) > 0 {
+		// A repeat that answers nothing adds nothing: the run already has its observation.
+		kept := order[:0]
+		for _, ip := range order {
+			if _, ok := repeats[ip]; ok && !byIP[ip].Up {
+				continue
+			}
+			kept = append(kept, ip)
+		}
+		order = kept
+		if len(order) == 0 {
+			return nil
+		}
+	}
 
 	hostsIn := make([]hostIn, 0, len(order))
 	for _, ip := range order {
@@ -303,7 +371,7 @@ func (s *Store) IngestHosts(ctx context.Context, results []model.HostResult, opt
 			At: r.ObservedAt.UTC(), OSGuess: r.OSGuess, MAC: r.MAC, Vendor: r.Vendor, Source: opt.Source, RunID: r.RunID})
 	}
 
-	return s.Tx(ctx, func(tx *Store) error {
+	{
 		// 1. hosts
 		rows, err := tx.db.Query(ctx, hostUpsert, js(hostsIn))
 		if err != nil {
@@ -346,6 +414,14 @@ func (s *Store) IngestHosts(ctx context.Context, results []model.HostResult, opt
 			Proto  string `json:"proto"`
 		}
 		var closed []closedPort
+		type repeatIn struct {
+			HostID int64   `json:"host_id"`
+			RunID  int64   `json:"run_id"`
+			WasUp  bool    `json:"was_up"`
+			Bucket int     `json:"bucket"`
+			RTTMs  float64 `json:"rtt_ms"`
+		}
+		var repeatFix []repeatIn
 
 		for _, ip := range order {
 			r := byIP[ip]
@@ -363,14 +439,18 @@ func (s *Store) IngestHosts(ctx context.Context, results []model.HostResult, opt
 				}
 			}
 			hostIDs = append(hostIDs, id)
-			o := hostObsIn{HostID: id, RunID: r.RunID, At: r.ObservedAt.UTC(), Up: r.Up, RTTMs: r.RTTMs, Attempts: max(r.Attempts, 1), Reason: r.Reason,
-				Bucket: hourBucket(r.ObservedAt, tx.loc)}
-			if r.Up {
-				o.UpN = 1
+			if p, ok := repeats[ip]; ok {
+				repeatFix = append(repeatFix, repeatIn{HostID: id, RunID: r.RunID, WasUp: p.up, Bucket: hourBucket(p.at, tx.loc), RTTMs: r.RTTMs})
 			} else {
-				o.DownN = 1
+				o := hostObsIn{HostID: id, RunID: r.RunID, At: r.ObservedAt.UTC(), Up: r.Up, RTTMs: r.RTTMs, Attempts: max(r.Attempts, 1), Reason: r.Reason,
+					Bucket: hourBucket(r.ObservedAt, tx.loc)}
+				if r.Up {
+					o.UpN = 1
+				} else {
+					o.DownN = 1
+				}
+				hostObs = append(hostObs, o)
 			}
-			hostObs = append(hostObs, o)
 			present = append(present, presence{id, r.Up, r.RunID})
 
 			seen := map[svcKey]bool{}
@@ -435,14 +515,30 @@ func (s *Store) IngestHosts(ctx context.Context, results []model.HostResult, opt
 			pend[i].in = &svcIn[i]
 		}
 
-		if _, err := tx.db.Exec(ctx, `WITH d AS (SELECT * FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, run_id bigint, at timestamptz, up boolean,
+		if len(hostObs) > 0 {
+			if _, err := tx.db.Exec(ctx, `WITH d AS (SELECT * FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, run_id bigint, at timestamptz, up boolean,
 				rtt_ms float8, attempts int, reason text, bucket int, up_n int, down_n int)),
 			ins AS (INSERT INTO host_observations (host_id, run_id, at, up, rtt_ms, attempts, reason)
 				SELECT host_id, run_id, at, up, rtt_ms, attempts, reason FROM d)
 			INSERT INTO host_availability (host_id, bucket, up, down)
 			SELECT host_id, bucket, sum(up_n), sum(down_n) FROM d GROUP BY host_id, bucket
 			ON CONFLICT (host_id, bucket) DO UPDATE SET up = host_availability.up + EXCLUDED.up, down = host_availability.down + EXCLUDED.down`, js(hostObs)); err != nil {
-			return mapErr(err)
+				return mapErr(err)
+			}
+		}
+
+		if len(repeatFix) > 0 {
+			// The host upsert counted the repeat as one more observation: undo
+			// that, and turn a stored miss of this run into an answer.
+			if _, err := tx.db.Exec(ctx, `WITH d AS (SELECT * FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, run_id bigint, was_up boolean, bucket int, rtt_ms float8)),
+				h AS (UPDATE hosts x SET obs_total = GREATEST(x.obs_total - 1, 1), obs_up = GREATEST(x.obs_up - CASE WHEN d.was_up THEN 1 ELSE 0 END, 0),
+					stability = GREATEST(x.obs_up - CASE WHEN d.was_up THEN 1 ELSE 0 END, 0)::float8 / GREATEST(x.obs_total - 1, 1)
+					FROM d WHERE x.id = d.host_id),
+				o AS (UPDATE host_observations x SET up = true, rtt_ms = d.rtt_ms FROM d WHERE NOT d.was_up AND x.host_id = d.host_id AND x.run_id = d.run_id)
+				UPDATE host_availability x SET up = x.up + 1, down = GREATEST(x.down - 1, 0) FROM d
+				WHERE NOT d.was_up AND x.host_id = d.host_id AND x.bucket = d.bucket`, js(repeatFix)); err != nil {
+				return mapErr(err)
+			}
 		}
 
 		// 3. services
@@ -470,6 +566,16 @@ func (s *Store) IngestHosts(ctx context.Context, results []model.HostResult, opt
 		if len(closed) > 0 {
 			if _, err := tx.db.Exec(ctx, `UPDATE services s SET state = 'gone' FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, port int, proto text)
 				WHERE s.host_id = d.host_id AND s.port = d.port AND s.proto = d.proto AND s.state <> 'gone'`, js(closed)); err != nil {
+				return mapErr(err)
+			}
+		}
+		if !opt.MarkMissing {
+			// Partial data (an import, a manual entry, a re-probe): a host that is
+			// down has services in an unknown state; an answering host keeps the
+			// services the data does not list (absence is not proof).
+			if _, err := tx.db.Exec(ctx, `UPDATE services s SET state = 'unknown'
+				FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, up boolean, run_id bigint)
+				WHERE s.host_id = d.host_id AND NOT d.up AND s.state IN ('open', 'filtered')`, js(present)); err != nil {
 				return mapErr(err)
 			}
 		}
@@ -533,7 +639,7 @@ func (s *Store) IngestHosts(ctx context.Context, results []model.HostResult, opt
 
 		// 5. per-host aggregates used by the list filters
 		return tx.refreshHostAggregates(ctx, hostIDs)
-	})
+	}
 }
 
 // refreshHostAggregates recomputes service_count, open_ports and technologies of the given hosts.

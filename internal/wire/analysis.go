@@ -180,6 +180,14 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 		}
 	}
 
+	// The profile of the run gives the per-profile model rule
+	// (retry.down_after_misses) and the ports the run probed.
+	prof, hasProf := a.runProfile(ctx, run)
+	var aopt analyze.AssessOptions
+	if hasProf {
+		aopt = analyze.OptionsFor(prof)
+	}
+
 	// 1. Stability model. The ingest already added the observation of this run
 	// to the histogram and to the observation list; Assess reads that state.
 	assess := make(map[int64]analyze.Assessment, len(hosts))
@@ -203,7 +211,7 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 					nObs[id] += c.Up + c.Down
 				}
 			}
-			assess[id] = analyze.Assess(p, a.loc)
+			assess[id] = analyze.AssessWith(p, a.loc, aopt)
 		}
 	}
 
@@ -247,8 +255,9 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 		h := &hosts[i]
 		as := assess[h.HostID]
 		obsStatus = append(obsStatus, store.ObsStatus{HostID: h.HostID, Status: string(as.Status)})
-		cur.Hosts = append(cur.Hosts, analyze.HostSnapshot{HostID: h.HostID, IP: h.IP, Up: h.Up, Status: as.Status, Pattern: as.Pattern,
-			Stability: as.Stability, Observations: nObs[h.HostID], Services: h.Services, ServiceIDs: h.ServiceIDs})
+		hs := analyze.HostSnapshot{HostID: h.HostID, IP: h.IP, Up: h.Up, Services: h.Services, ServiceIDs: h.ServiceIDs}
+		hs.SetAssessment(as, nObs[h.HostID])
+		cur.Hosts = append(cur.Hosts, hs)
 		if p, ok := prevHosts[h.HostID]; ok && prev != nil {
 			prev.Hosts = append(prev.Hosts, analyze.HostSnapshot{HostID: h.HostID, IP: h.IP, Up: p.Up, Status: statusOr(p.Status, p.Up), Services: prevSvcs[h.HostID]})
 		}
@@ -256,10 +265,8 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 	// Scope of the ports: an explicit port list of the profile limits "gone".
 	// An imported file is a full view of the hosts it lists.
 	var opts analyze.DiffOptions
-	if run.ProfileID != nil {
-		if p, err := a.st.GetProfile(ctx, *run.ProfileID); err == nil {
-			opts.PortInScope = a.portScope(ctx, p)
-		}
+	if hasProf {
+		opts.PortInScope = a.portScope(ctx, prof)
 	}
 	changes, dsum := analyze.Diff(prev, cur, opts)
 	sum = dsum
@@ -268,12 +275,18 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 	}
 	newSvc := map[string]bool{} // host id | port/proto
 	var goneIDs []int64
+	upNow := map[int64]bool{}
+	for i := range hosts {
+		upNow[hosts[i].HostID] = hosts[i].Up
+	}
 	for _, c := range changes {
 		switch c.Kind {
 		case model.ChangeServiceNew:
 			newSvc[strconv.FormatInt(c.HostID, 10)+"|"+strconv.Itoa(c.Port)] = true
 		case model.ChangeServiceGone:
-			if c.ServiceID != nil {
+			// Gone only when the host answered and the port did not; the
+			// services of a silent host are unknown (the ingest sets that).
+			if c.ServiceID != nil && upNow[c.HostID] {
 				goneIDs = append(goneIDs, *c.ServiceID)
 			}
 		}
@@ -311,7 +324,7 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 			hc = max(hc, crit[id])
 		}
 		_, known := prevHosts[h.HostID]
-		in := analyze.FindingInput{HostID: h.HostID, IP: h.IP, Hostnames: h.Hostnames, RunID: runID, At: h.ObservedAt}
+		in := analyze.FindingInput{HostID: h.HostID, IP: h.IP, Hostnames: h.Hostnames, RunID: runID, At: h.ObservedAt, ScopeCriticality: hc}
 		var scores []int
 		for j := range h.Services {
 			sv := h.Services[j]
@@ -356,7 +369,7 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 	if err := a.st.InsertChanges(ctx, changes); err != nil {
 		return nil, err
 	}
-	if run.Trigger == "import" { // a scan marks missing services at ingest
+	if partialData(run.Trigger) { // a profile scan marks missing services at ingest
 		if err := a.st.MarkServicesGone(ctx, goneIDs); err != nil {
 			return nil, err
 		}
@@ -366,7 +379,7 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 	}
 	// A finding of an answering host that this run no longer derives is resolved.
 	// Only findings that no analyst has triaged change (store.ResolveFindings).
-	if len(upHosts) > 0 {
+	if len(upHosts) > 0 && run.Trigger != "manual-entry" { // a manual entry adds facts, it does not prove absence
 		var stale []int64
 		err := a.st.EachFinding(ctx, store.FindingFilter{HostIDs: upHosts, Status: []string{string(model.FindingNew)}}, func(f *model.Finding) error {
 			if f.Manual || derived[f.Key] || f.LastRunID >= runID {
@@ -393,6 +406,35 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 		a.Auto.AutoExport(ctx, runID)
 	}
 	return &sum, nil
+}
+
+// partialData is true for runs whose results do not cover every port of the
+// hosts they list: imports, manual entries and re-probes. Their ingest does
+// not mark unreported services; the analysis marks the ones it reports gone.
+func partialData(trigger string) bool {
+	return trigger == "import" || trigger == "manual-entry" || trigger == "reprobe"
+}
+
+// runProfile returns the profile whose options a run used, with the ports of
+// an ad-hoc run in place of the profile ports.
+func (a *Analysis) runProfile(ctx context.Context, run model.ScanRun) (model.ScanProfile, bool) {
+	var id int64
+	switch {
+	case run.AdHoc != nil:
+		id = run.AdHoc.ProfileID
+	case run.ProfileID != nil:
+		id = *run.ProfileID
+	default:
+		return model.ScanProfile{}, false
+	}
+	p, err := a.st.GetProfile(ctx, id)
+	if err != nil {
+		return model.ScanProfile{}, false
+	}
+	if run.AdHoc != nil && strings.TrimSpace(run.AdHoc.Ports) != "" {
+		p.Ports = run.AdHoc.Ports
+	}
+	return p, true
 }
 
 // groupKeys returns the grouping key of every open service, the size of each
@@ -487,10 +529,8 @@ func (a *Analysis) Diff(ctx context.Context, fromRunID, toRunID int64) (model.Di
 		return rep, err
 	}
 	var opts analyze.DiffOptions
-	if rep.To.ProfileID != nil {
-		if p, err := a.st.GetProfile(ctx, *rep.To.ProfileID); err == nil {
-			opts.PortInScope = a.portScope(ctx, p)
-		}
+	if p, ok := a.runProfile(ctx, rep.To); ok {
+		opts.PortInScope = a.portScope(ctx, p)
 	}
 	rep.Changes, rep.Summary = analyze.Diff(&from, to, opts)
 	if rep.Changes == nil {
@@ -499,7 +539,34 @@ func (a *Analysis) Diff(ctx context.Context, fromRunID, toRunID int64) (model.Di
 	return rep, nil
 }
 
-// DownAfterMisses tells how many more misses in a row would report the host inactive.
+// DownAfterMisses tells how many more misses in a row would report the host
+// inactive, under the rule of the profile that probed the host last. For a
+// host that is already down it gives the threshold that reported it: the
+// profile rule, or the number of misses in a row after which p_alive fell
+// below analyze.DownThreshold.
 func (a *Analysis) DownAfterMisses(p model.AvailabilityProfile) int {
-	return analyze.DownAfterMisses(analyze.Profile{Buckets: p.Buckets, Recent: oldestFirst(p.Recent)}, a.loc)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var opt analyze.AssessOptions
+	recent := oldestFirst(p.Recent)
+	if n := len(recent); n > 0 && recent[n-1].RunID != 0 {
+		if run, err := a.st.GetRun(ctx, recent[n-1].RunID); err == nil {
+			if prof, ok := a.runProfile(ctx, run); ok {
+				opt = analyze.OptionsFor(prof)
+			}
+		}
+	}
+	as := analyze.AssessWith(analyze.Profile{Buckets: p.Buckets, Recent: recent}, a.loc, opt)
+	if as.Status != model.HostDown {
+		return as.DownAfterMisses
+	}
+	if as.Rule > 0 {
+		return as.Rule
+	}
+	for i, s := range as.Steps {
+		if s.PAlive < analyze.DownThreshold {
+			return i + 1
+		}
+	}
+	return max(as.ConsecutiveMisses, 1)
 }

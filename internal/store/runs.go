@@ -108,7 +108,7 @@ func (s *Store) NextScheduledRun(ctx context.Context) (*time.Time, error) {
 // ---------- runs ----------
 
 const runCols = `r.id, r.profile_id, r.profile_name, r.status, r.pause_reason, r.trigger, r.created_by, r.created_at, r.started_at,
-  r.finished_at, r.window_end, r.resume_at, r.stats, r.summary, r.error, r.import_file`
+  r.finished_at, r.window_end, r.resume_at, r.stats, r.summary, r.error, r.import_file, r.note, r.label, r.ad_hoc`
 
 // ActiveStatuses are the run states that count as "active" for the one-run-per-profile rule.
 var ActiveStatuses = []string{string(model.RunQueued), string(model.RunRunning), string(model.RunAnalyzing), string(model.RunPaused)}
@@ -134,7 +134,7 @@ func (s *Store) ListRuns(ctx context.Context, f RunFilter) (model.Page[model.Sca
 		w.add("r.trigger = ?", f.Trigger)
 	}
 	if f.Q != "" {
-		w.add("r.profile_name ILIKE ? OR r.import_file ILIKE ?", like(f.Q), like(f.Q))
+		w.add("r.profile_name ILIKE ? OR r.import_file ILIKE ? OR r.label ILIKE ? OR r.note ILIKE ?", like(f.Q), like(f.Q), like(f.Q), like(f.Q))
 	}
 	order := orderBy(f.Sort, map[string]string{"id": "r.id", "created_at": "r.created_at", "started_at": "r.started_at", "finished_at": "r.finished_at", "status": "r.status", "profile_name": "r.profile_name"}, "r.id DESC", "")
 	return listPage[model.ScanRun](ctx, s.db, runCols, "runs r", w, order, f.ListOpts, nil)
@@ -154,9 +154,15 @@ func (s *Store) CreateRun(ctx context.Context, r model.ScanRun) (model.ScanRun, 
 		r.Trigger = "manual"
 	}
 	var id int64
-	err := s.db.QueryRow(ctx, `INSERT INTO runs (profile_id, profile_name, status, pause_reason, trigger, created_by, started_at, window_end, stats, import_file)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10) RETURNING id`,
-		r.ProfileID, r.ProfileName, string(r.Status), r.PauseReason, r.Trigger, r.CreatedBy, r.StartedAt, r.WindowEnd, js(r.Stats), r.ImportFile).Scan(&id)
+	var adHoc []byte
+	if r.AdHoc != nil {
+		adHoc = js(r.AdHoc)
+	}
+	err := s.db.QueryRow(ctx, `INSERT INTO runs (profile_id, profile_name, status, pause_reason, trigger, created_by, started_at, window_end, stats, import_file,
+		note, label, ad_hoc)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13::jsonb) RETURNING id`,
+		r.ProfileID, r.ProfileName, string(r.Status), r.PauseReason, r.Trigger, r.CreatedBy, r.StartedAt, r.WindowEnd, js(r.Stats), r.ImportFile,
+		r.Note, r.Label, adHoc).Scan(&id)
 	if err != nil {
 		return r, mapErr(err)
 	}
@@ -179,6 +185,18 @@ func (s *Store) SaveRun(ctx context.Context, r model.ScanRun) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// SetRunNote stores the analyst note and label of a run.
+func (s *Store) SetRunNote(ctx context.Context, id int64, note, label string) (model.ScanRun, error) {
+	tag, err := s.db.Exec(ctx, `UPDATE runs SET note = $2, label = $3 WHERE id = $1`, id, note, label)
+	if err != nil {
+		return model.ScanRun{}, mapErr(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return model.ScanRun{}, ErrNotFound
+	}
+	return s.GetRun(ctx, id)
 }
 
 // UpdateRunStats stores the progress counters of a run.

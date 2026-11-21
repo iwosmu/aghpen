@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/iwosmu/aghpen/internal/model"
+	"github.com/iwosmu/aghpen/internal/runner"
 )
 
 // ---------- signatures ----------
@@ -303,6 +304,17 @@ func (s *Server) putSafety(w http.ResponseWriter, r *http.Request) {
 		}
 		in.Exclusions = ex
 	}
+	if err == nil {
+		nets, perr := runner.ParseAllowed(in.AllowedNetworks)
+		if perr != nil {
+			err = invalid("allowed_networks: %v", perr)
+		} else {
+			in.AllowedNetworks = make([]string, 0, len(nets))
+			for _, n := range nets {
+				in.AllowedNetworks = append(in.AllowedNetworks, n.String())
+			}
+		}
+	}
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -389,6 +401,17 @@ func (s *Server) putDojo(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	if in.ScopeMappings == nil {
+		in.ScopeMappings = []model.DojoScopeMapping{}
+	}
+	seenScope := map[int64]bool{}
+	for _, m := range in.ScopeMappings {
+		if _, err := s.st.GetScope(r.Context(), m.ScopeID); err != nil || seenScope[m.ScopeID] {
+			s.fail(w, r, invalid("scope_mappings: scope %d does not exist or is mapped twice", m.ScopeID))
+			return
+		}
+		seenScope[m.ScopeID] = true
+	}
 	keyChanged := in.APIKey != ""
 	d, err := s.st.PutDefectDojo(r.Context(), in)
 	if err != nil {
@@ -458,6 +481,17 @@ func (s *Server) importResults(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	auditSet(r, "", "", nil, map[string]any{"file": name, "bytes": len(data)})
+	scopeID, err := parseScopeID(r.FormValue("scope_id"))
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if scopeID != 0 {
+		if _, err := s.st.GetScope(r.Context(), scopeID); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity, "validation", fmt.Sprintf("scope %d does not exist", scopeID))
+			return
+		}
+	}
 	if s.d.Importer == nil {
 		notWired(w, "the result importer (internal/interchange)")
 		return
@@ -480,16 +514,30 @@ func (s *Server) importResults(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, rep)
 		return
 	}
+	if scopeID != 0 {
+		// The answering hosts that the scope does not cover yet become targets of
+		// the scope, so the ingest assigns them to it (and later scans see them).
+		added, refused, err := s.addImportToScope(r, scopeID, hosts)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		rep.Targets = added
+		rep.Invalid = append(rep.Invalid, refused...)
+	}
 	run, err := s.d.Runner.Import(r.Context(), name, hosts, userID(r))
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	rep.RunID, rep.Hosts = &run.ID, len(hosts)
+	rep.RunID, rep.Hosts = &run.ID, 0
 	for _, h := range hosts {
+		if h.Up {
+			rep.Hosts++ // down hosts are in rep.HostsDown (Importer); a known one is a miss for the model
+		}
 		rep.Services += len(h.Services)
 	}
-	auditSet(r, "", "", run.ID, map[string]any{"format": format, "hosts": rep.Hosts, "services": rep.Services})
+	auditSet(r, "", "", run.ID, map[string]any{"format": format, "hosts": rep.Hosts, "hosts_down": rep.HostsDown, "services": rep.Services, "scope_id": scopeID, "targets_added": rep.Targets})
 	writeJSON(w, http.StatusCreated, rep)
 }
 
@@ -744,16 +792,16 @@ func (s *Server) exportRun(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if s.d.Exporter == nil && format == "xml" {
-		notWired(w, "the nmap XML exporter (internal/interchange)")
-		return
+	exp := s.d.Exporter
+	if exp == nil {
+		exp = interchangeExporter{}
 	}
-	if s.d.Exporter != nil {
+	{
 		// The exchange formats: nmap XML, Czujka JSON (lossless HostResult records) and CSV. They import again.
 		ctype := map[string]string{"xml": "application/xml; charset=utf-8", "json": "application/json; charset=utf-8", "csv": "text/csv; charset=utf-8"}[format]
 		w.Header().Set("Content-Type", ctype)
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="czujka-run-%d.%s"`, id, format))
-		out, err := s.d.Exporter.RunWriter(w, format, run)
+		out, err := exp.RunWriter(w, format, run)
 		if err != nil {
 			s.fail(w, r, err)
 			return
@@ -771,38 +819,6 @@ func (s *Server) exportRun(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			s.log.Error("run export failed", "run", id, "format", format, "err", err)
 		}
-		return
-	}
-	rw := newRowWriter(w, fmt.Sprintf("run-%d", id), format, []string{"run_id", "ip", "hostnames", "up", "reason", "observed_at", "port", "proto", "state",
-		"name", "product", "version", "tunnel", "http_status", "title", "url", "technologies", "classes"})
-	err = s.st.EachRunResult(r.Context(), id, func(h *model.HostResult) error {
-		clean(h)
-		if format == "json" {
-			return rw.write(h, nil)
-		}
-		head := []string{strconv.FormatInt(h.RunID, 10), h.IP, strings.Join(h.Hostnames, " "), strconv.FormatBool(h.Up), h.Reason, ts(h.ObservedAt)}
-		if len(h.Services) == 0 {
-			return rw.write(nil, func() []string { return append(head, make([]string, 12)...) })
-		}
-		for i := range h.Services {
-			sv := &h.Services[i]
-			status, title, u := "", "", ""
-			if sv.HTTP != nil {
-				status, title, u = strconv.Itoa(sv.HTTP.Status), sv.HTTP.Title, sv.HTTP.URL
-			}
-			if err := rw.write(nil, func() []string {
-				return append(append([]string{}, head...), strconv.Itoa(sv.Port), sv.Proto, sv.State, sv.Name, sv.Product, sv.Version, sv.Tunnel, status, title, u,
-					techList(sv.Technologies), strings.Join(sv.Classes, " "))
-			}); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	rw.close()
-	auditSet(r, "", "", nil, map[string]any{"rows": rw.n})
-	if err != nil {
-		s.log.Error("run export failed", "run", id, "err", err)
 	}
 }
 

@@ -28,6 +28,7 @@ type Server struct {
 	st      *store.Store
 	log     *slog.Logger
 	targets TargetParser
+	lookup  runner.LookupFunc
 	handler http.Handler
 	mux     chi.Routes
 }
@@ -43,7 +44,7 @@ func New(d Deps) *Server {
 	if d.Version == "" {
 		d.Version = "dev"
 	}
-	s := &Server{d: d, st: d.Store, log: d.Logger, targets: d.TargetParser}
+	s := &Server{d: d, st: d.Store, log: d.Logger, targets: d.TargetParser, lookup: d.Lookup}
 	if s.targets == nil {
 		s.targets = BasicTargetParser{}
 	}
@@ -58,7 +59,7 @@ func (s *Server) routes() http.Handler {
 	r := chi.NewRouter()
 	s.mux = r
 	r.Use(s.recoverer, s.securityHeaders)
-	can := func(p model.Permission) func(http.Handler) http.Handler { return auth.Require(p, s.authFail) }
+	can := s.Guard()
 	session := auth.RequireSession(s.authFail)
 
 	r.Route("/api/v1", func(r chi.Router) {
@@ -170,6 +171,10 @@ func (s *Server) routes() http.Handler {
 		r.With(can(model.PermIntegrations)).Get("/settings/defectdojo", s.getDojo)
 		r.With(can(model.PermIntegrations)).Put("/settings/defectdojo", s.putDojo)
 		r.With(can(model.PermIntegrations)).Post("/settings/defectdojo/test", s.testDojo)
+		s.routesPart3(r, can)
+		for _, m := range s.d.Mounts {
+			r.Mount(m.Pattern, m.Router(can))
+		}
 	})
 	r.Get("/healthz", s.healthz) // for container health checks
 	r.NotFound(s.serveUI)
@@ -185,9 +190,13 @@ type apiError struct {
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
+	b, err := encodeJSON(v)
+	if err != nil {
+		b, status = []byte(`{"error":{"code":"internal","message":"the response could not be encoded"}}`), http.StatusInternalServerError
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	_, _ = w.Write(append(b, '\n'))
 }
 
 func writeErr(w http.ResponseWriter, status int, code, msg string) {

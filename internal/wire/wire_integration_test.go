@@ -141,13 +141,13 @@ func TestImportAnalysisDiffAndRoundTrip(t *testing.T) {
 	for _, c := range ch2.Items {
 		t.Logf("change %-16s %-8s %s:%d %s (expected=%v) before=%v after=%v", c.Kind, c.Severity, c.IP, c.Port, c.Summary, c.Expected, c.Before, c.After)
 	}
-	for _, want := range []string{"service_changed 172.31.250.2:80", "service_new 172.31.250.4:22", "service_gone 172.31.250.3:80", "host_unstable 172.31.250.5:0"} {
+	for _, want := range []string{"service_changed 172.31.250.2:80", "service_new 172.31.250.4:22", "service_gone 172.31.250.3:80", "host_missing 172.31.250.5:0"} {
 		if got[want] == 0 {
 			t.Errorf("missing change %q; got %v", want, got)
 		}
 	}
 	sum := run2.Summary
-	if sum == nil || sum.PrevRunID == nil || *sum.PrevRunID != run1.ID || sum.ServicesNew != 1 || sum.ServicesGone != 1 || sum.ServicesChanged < 1 || sum.HostsUnstable != 1 {
+	if sum == nil || sum.PrevRunID == nil || *sum.PrevRunID != run1.ID || sum.ServicesNew != 1 || sum.ServicesGone != 1 || sum.ServicesChanged < 1 || sum.HostsMissing != 1 {
 		t.Fatalf("summary of run 2: %+v", sum)
 	}
 	// The override and the notes survive; the observed value is recorded beside the override.
@@ -315,7 +315,8 @@ func TestPartialRunsAndStability(t *testing.T) {
 			switch c.Kind {
 			case model.ChangeHostGone:
 				gone++
-			case model.ChangeHostUnstable:
+			case model.ChangeHostUnstable, model.ChangeHostMissing:
+				// A host that answered in the previous run and is silent now is host_missing (analyze.Diff).
 				unstable++
 			}
 		}

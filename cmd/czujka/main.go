@@ -31,6 +31,7 @@ import (
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/runner"
 	"github.com/iwosmu/aghpen/internal/store"
+	"path/filepath"
 )
 
 var version = "dev"
@@ -99,9 +100,19 @@ func newLogger(cfg config.Config) *slog.Logger {
 
 // open loads the configuration and the keyring, connects to the database and waits until it answers.
 func open(ctx context.Context, withOldKeys bool) (config.Config, *store.Store, *slog.Logger, error) {
+	return openWith(ctx, withOldKeys, nil)
+}
+
+// openWith is open with a hook that may change the configuration first.
+func openWith(ctx context.Context, withOldKeys bool, mutate func(*config.Config) error) (config.Config, *store.Store, *slog.Logger, error) {
 	cfg, err := config.Load()
 	if err != nil {
 		return cfg, nil, nil, err
+	}
+	if mutate != nil {
+		if err := mutate(&cfg); err != nil {
+			return cfg, nil, nil, err
+		}
 	}
 	log := newLogger(cfg)
 	if err := cfg.RequireDB(); err != nil {
@@ -312,15 +323,61 @@ func userCmd(args []string) error {
 	return nil
 }
 
+// rotateKey re-wraps every data key under a new master key.
+//
+//   - CZUJKA_MASTER_KEY set: that is the new key; the old ones come from
+//     CZUJKA_MASTER_KEY_OLD. With CZUJKA_MASTER_KEY_FILE also set, the new key
+//     is written to the file after the rotation, so a restart that reads the
+//     file works without a manual step.
+//   - Only CZUJKA_MASTER_KEY_FILE set: the key in the file is the old key, a
+//     new key is generated, the data keys are re-wrapped and the file is
+//     replaced (atomically) with the new key.
 func rotateKey() error {
 	ctx := context.Background()
-	cfg, st, log, err := open(ctx, true)
+	var newKey, fileKey string
+	cfg, st, log, err := openWith(ctx, true, func(c *config.Config) error {
+		if c.MasterKeyFile != "" {
+			if b, err := os.ReadFile(c.MasterKeyFile); err == nil {
+				fileKey = strings.TrimSpace(string(b))
+			} else if !errors.Is(err, os.ErrNotExist) || c.MasterKey == "" {
+				return fmt.Errorf("read the key file %s: %w", c.MasterKeyFile, err)
+			}
+		}
+		if c.MasterKey != "" || c.MasterKeyFile == "" {
+			newKey = c.MasterKey
+			if fileKey != "" && fileKey != newKey {
+				c.OldMasterKeys = append(c.OldMasterKeys, fileKey)
+			}
+			return nil
+		}
+		var err error
+		if newKey, err = crypto.GenerateKey(); err != nil {
+			return err
+		}
+		c.MasterKey, c.OldMasterKeys = newKey, append(c.OldMasterKeys, fileKey)
+		return nil
+	})
 	if err != nil {
 		return err
 	}
 	defer st.Close()
 	if len(cfg.OldMasterKeys) == 0 {
-		log.Warn("CZUJKA_MASTER_KEY_OLD is empty: only values that are already under the current key can be read")
+		log.Warn("no old master key (CZUJKA_MASTER_KEY_OLD, the key file or its .old file): only values that are already under the current key can be read")
+	}
+	// The key files change before the data does: the retired key goes to
+	// <file>.old first, then the new key replaces the file. A crash at any point,
+	// or a server that still runs with the old key and writes under it, leaves
+	// every value readable after a restart (LoadKeyring reads both files).
+	if cfg.MasterKeyFile != "" && newKey != "" && fileKey != newKey {
+		if fileKey != "" {
+			if err := crypto.AppendOldKey(cfg.MasterKeyFile, fileKey); err != nil {
+				return fmt.Errorf("keep the old key in %s.old: %w", cfg.MasterKeyFile, err)
+			}
+		}
+		if err := writeKeyFile(cfg.MasterKeyFile, newKey); err != nil {
+			return fmt.Errorf("write the new key to %s (nothing was re-wrapped): %w", cfg.MasterKeyFile, err)
+		}
+		fmt.Printf("key file %s now holds the new master key; the old one is kept in %s.old\n", cfg.MasterKeyFile, cfg.MasterKeyFile)
 	}
 	before, err := st.KeyUsage(ctx)
 	if err != nil {
@@ -348,7 +405,7 @@ func rotateKey() error {
 	if len(after) > 1 {
 		return errors.New("some values are still under an old key")
 	}
-	fmt.Println("done: remove CZUJKA_MASTER_KEY_OLD and restart czujka with the new key")
+	fmt.Println("done: restart czujka so it encrypts with the new key (run rotate-key again after the restart to re-wrap what the old process wrote meanwhile)")
 	return nil
 }
 
@@ -374,4 +431,32 @@ func healthcheck() error {
 		return fmt.Errorf("unhealthy: HTTP %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// writeKeyFile replaces a key file atomically: a temporary file in the same
+// directory with mode 0600, fsync, then rename.
+func writeKeyFile(path, key string) error {
+	dir := filepath.Dir(path)
+	f, err := os.CreateTemp(dir, ".master-key-*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	defer os.Remove(tmp)
+	if err := f.Chmod(0o600); err != nil {
+		f.Close()
+		return err
+	}
+	if _, err := f.WriteString(strings.TrimSpace(key) + "\n"); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
