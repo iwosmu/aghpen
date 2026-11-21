@@ -832,6 +832,11 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 	for i := range res.Services {
 		s := &res.Services[i]
 		d, ok := detected[s.Port]
+		if !ok && s.Proto == "tcp" && s.HTTP != nil {
+			// version detection was stopped by the HTTP answer: the name so
+			// far is the port table's guess (3000 is "ppp"), the page is a fact
+			s.Name = ""
+		}
 		if !ok || s.Proto != "tcp" {
 			continue
 		}

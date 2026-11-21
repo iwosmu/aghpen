@@ -908,7 +908,7 @@ type slowSV struct{ *fakeNet }
 func (s slowSV) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*probe.Result, error) {
 	for _, hp := range req.Hosts {
 		for _, p := range hp.Ports {
-			if p == 80 {
+			if p == 80 || p == 8080 {
 				select {
 				case <-ctx.Done():
 					return nil, context.Cause(ctx)
@@ -921,7 +921,7 @@ func (s slowSV) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*pro
 }
 
 func TestQuickPathHTTPStopsSlowVersionDetection(t *testing.T) {
-	netw := slowSV{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 80}}}}
+	netw := slowSV{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 80, 8080}}}}
 	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
 	plan := basePlan("10.7.0.5")
 	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
@@ -936,7 +936,7 @@ func TestQuickPathHTTPStopsSlowVersionDetection(t *testing.T) {
 		t.Errorf("run took %v: the HTTP answer must stop version detection on port 80", d)
 	}
 	h := sink.host("10.7.0.5")
-	if h == nil || len(h.Services) != 2 {
+	if h == nil || len(h.Services) != 3 {
 		t.Fatalf("host = %+v", h)
 	}
 	for _, s := range h.Services {
@@ -945,7 +945,7 @@ func TestQuickPathHTTPStopsSlowVersionDetection(t *testing.T) {
 			if s.Name != "ssh" || s.Product != "OpenSSH" || s.HTTP != nil {
 				t.Errorf("ssh = %+v", s)
 			}
-		case 80:
+		case 80, 8080: // 8080: the port table says "unknown" here (nmap says "ppp" for 3000), the page says http
 			if s.Name != "http" || s.HTTP == nil {
 				t.Errorf("http = %+v", s)
 			}
