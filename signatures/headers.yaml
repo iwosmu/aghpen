@@ -1,0 +1,207 @@
+# Czujka: interesujące nagłówki odpowiedzi HTTP. Każda sygnatura jest ustaleniem, nie technologią.
+
+- id: header-version-powered-by
+  name: Wersja oprogramowania w X-Powered-By
+  category: header
+  description: Nagłówek X-Powered-By podaje dokładną wersję oprogramowania. Ułatwia dobór znanych podatności.
+  interest: 20
+  match:
+    rules:
+      - {type: header, name: X-Powered-By, regex: '[a-z][/ ]v?[0-9]+\.[0-9]+', weight: 0.9}
+
+- id: header-version-server
+  name: Wersja oprogramowania w Server
+  category: header
+  description: Nagłówek Server podaje dokładną wersję serwera.
+  interest: 15
+  match:
+    rules:
+      - {type: header, name: Server, regex: '[a-z)][/ (]v?[0-9]+\.[0-9]+', weight: 0.9}
+
+- id: header-aspnet-version
+  name: X-AspNet-Version
+  category: header
+  description: Nagłówki X-AspNet-Version albo X-AspNetMvc-Version ujawniają wersję platformy .NET.
+  interest: 25
+  match:
+    rules:
+      - {type: header, name: X-AspNet-Version, exists: true, weight: 0.95}
+      - {type: header, name: X-AspNetMvc-Version, exists: true, weight: 0.95}
+
+- id: header-debug
+  name: Nagłówek debugowania
+  category: header
+  description: Odpowiedź zawiera nagłówek debugowania (X-Debug-Token, X-Debug-Info). Aplikacja działa w trybie deweloperskim.
+  interest: 60
+  classes: [staging]
+  match:
+    rules:
+      - {type: header, name_regex: '^X-Debug', exists: true, weight: 0.95}
+      - {type: header, name_regex: '^X-(ChromeLogger-Data|ChromePhp-Data|Wf-Protocol-1|Clockwork-Id|Whoops)$', exists: true, weight: 0.95}
+
+- id: header-backend-leak
+  name: Nagłówek ujawnia serwer zaplecza
+  category: header
+  description: Nagłówek odpowiedzi podaje nazwę serwera zaplecza albo węzła (X-Backend-Server, X-Served-By, X-Upstream).
+  interest: 35
+  match:
+    rules:
+      - {type: header, name_regex: '^X-(Backend|Backend-Server|Backend-Host|Served-By|Server-Name|Upstream|Upstream-Addr|Real-Server|Origin-Server|Node|Node-Name|Hostname|Host-Name|Pod-Name|Instance-Id|Machine|Server-Id|App-Server|Forwarded-Server)$', exists: true, weight: 0.9}
+
+- id: header-internal-ip
+  name: Prywatny adres IP w nagłówku
+  category: header
+  description: Nagłówek odpowiedzi zawiera adres z sieci prywatnej (RFC 1918). Ujawnia adresację sieci wewnętrznej.
+  interest: 40
+  match:
+    rules:
+      - {type: header, name_regex: '^(X-|Via$|Server$|WWW-Authenticate$)', regex: '(?:^|[^0-9.])(?:10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3}|172\.(?:1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[0-9]{1,3})(?:[^0-9.]|$)', weight: 0.9}
+
+- id: header-cors-wildcard-credentials
+  name: CORS – dowolne źródło z poświadczeniami
+  category: header
+  description: Serwer zezwala na żądania z dowolnego źródła (Access-Control-Allow-Origin „*”) i jednocześnie na przesyłanie poświadczeń. To błąd konfiguracji CORS.
+  interest: 55
+  match:
+    condition: all
+    rules:
+      - {type: header, name: Access-Control-Allow-Origin, equals: '*', weight: 0.7}
+      - {type: header, name: Access-Control-Allow-Credentials, equals: 'true', weight: 0.8}
+
+- id: header-cors-wildcard
+  name: CORS – dowolne źródło
+  category: header
+  description: Serwer zezwala na odczyt odpowiedzi z dowolnego źródła (Access-Control-Allow-Origin „*”).
+  interest: 10
+  match:
+    rules:
+      - {type: header, name: Access-Control-Allow-Origin, equals: '*', weight: 0.9}
+
+- id: header-cors-null-origin
+  name: CORS – źródło null
+  category: header
+  description: Serwer zezwala na źródło „null”, które można uzyskać z ramki w piaskownicy.
+  interest: 40
+  match:
+    rules:
+      - {type: header, name: Access-Control-Allow-Origin, equals: 'null', weight: 0.9}
+
+- id: header-login-no-csp
+  name: Strona logowania bez Content-Security-Policy
+  category: header
+  description: Strona z polem hasła nie wysyła nagłówka Content-Security-Policy.
+  interest: 15
+  match:
+    condition: all
+    rules:
+      - {type: body, regex: '<input\b[^>]{0,400}\btype\s*=\s*["'']?password', weight: 0.5}
+      - {type: header, name: Content-Security-Policy, absent: true, weight: 0.5}
+
+- id: header-login-no-frame-protection
+  name: Strona logowania bez ochrony przed osadzeniem
+  category: header
+  description: Strona z polem hasła nie ma X-Frame-Options ani dyrektywy frame-ancestors (ryzyko clickjackingu).
+  interest: 25
+  match:
+    condition: all
+    rules:
+      - {type: body, regex: '<input\b[^>]{0,400}\btype\s*=\s*["'']?password', weight: 0.5}
+      - {type: header, name: X-Frame-Options, absent: true, weight: 0.5}
+      - {type: header, name: Content-Security-Policy, contains: 'frame-ancestors', not: true}
+
+- id: header-login-no-hsts
+  name: Strona logowania HTTPS bez HSTS
+  category: header
+  description: Strona logowania po HTTPS nie wysyła Strict-Transport-Security.
+  interest: 20
+  match:
+    condition: all
+    rules:
+      - {type: url, regex: '^https://', weight: 0.3}
+      - {type: body, regex: '<input\b[^>]{0,400}\btype\s*=\s*["'']?password', weight: 0.5}
+      - {type: header, name: Strict-Transport-Security, absent: true, weight: 0.5}
+
+- id: header-login-over-http
+  name: Formularz logowania po nieszyfrowanym HTTP
+  category: header
+  description: Strona z polem hasła jest podawana po HTTP. Hasło idzie przez sieć otwartym tekstem.
+  interest: 55
+  classes: [login]
+  match:
+    condition: all
+    rules:
+      - {type: url, regex: '^http://', weight: 0.4}
+      - {type: body, regex: '<input\b[^>]{0,400}\btype\s*=\s*["'']?password', weight: 0.8}
+
+- id: header-basic-auth-http
+  name: Uwierzytelnianie Basic po nieszyfrowanym HTTP
+  category: header
+  description: Usługa żąda uwierzytelniania Basic po HTTP. Hasło idzie przez sieć w kodowaniu base64.
+  interest: 55
+  classes: [login]
+  match:
+    condition: all
+    rules:
+      - {type: url, regex: '^http://', weight: 0.4}
+      - {type: header, name: WWW-Authenticate, regex: '^Basic\b', weight: 0.8}
+
+- id: header-ntlm-auth
+  name: Uwierzytelnianie NTLM / Negotiate
+  category: header
+  description: Usługa oferuje uwierzytelnianie zintegrowane Windows. Odpowiedź NTLM może ujawnić nazwę domeny i hosta.
+  interest: 40
+  classes: [login]
+  match:
+    rules:
+      - {type: header, name: WWW-Authenticate, regex: '^(?:NTLM|Negotiate)\b', weight: 0.9}
+
+- id: header-auth-realm
+  name: Realm uwierzytelniania
+  category: header
+  description: Nagłówek WWW-Authenticate podaje nazwę chronionego zasobu (realm). Często zdradza rodzaj urządzenia albo aplikacji.
+  interest: 15
+  classes: [login]
+  match:
+    rules:
+      - {type: header, name: WWW-Authenticate, regex: 'realm="[^"]{2,}"', weight: 0.8}
+
+- id: header-via-proxy
+  name: Nagłówek Via
+  category: header
+  description: Nagłówek Via podaje pośredniczące serwery proxy i ich oprogramowanie.
+  interest: 10
+  match:
+    rules:
+      - {type: header, name: Via, exists: true, weight: 0.8}
+
+- id: header-x-generator
+  name: Nagłówek X-Generator
+  category: header
+  description: Nagłówek X-Generator podaje system, który wygenerował stronę.
+  interest: 10
+  match:
+    rules:
+      - {type: header, name: X-Generator, exists: true, weight: 0.9}
+
+- id: header-hsts-missing
+  name: HTTPS bez HSTS
+  category: header
+  description: Usługa HTTPS nie wysyła Strict-Transport-Security.
+  interest: 5
+  match:
+    condition: all
+    rules:
+      - {type: url, regex: '^https://', weight: 0.5}
+      - {type: status, status: [200], weight: 0.3}
+      - {type: header, name: Strict-Transport-Security, absent: true, weight: 0.5}
+
+- id: header-deprecated-tls-redirect
+  name: Przekierowanie z HTTPS na HTTP
+  category: header
+  description: Usługa HTTPS przekierowuje na adres nieszyfrowany.
+  interest: 35
+  match:
+    condition: all
+    rules:
+      - {type: url, regex: '^https://', weight: 0.4}
+      - {type: redirect, regex: '^http://', weight: 0.8}

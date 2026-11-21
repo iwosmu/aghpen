@@ -838,6 +838,12 @@ type RetroHuntResult struct {
 	Hits        []RetroHit `json:"hits"`
 	TookMs      int64      `json:"took_ms"`
 	PacketsSent int        `json:"packets_sent"` // always 0: retro-hunt reads stored data only
+	// MissingPaths lists the extra paths the signature needs that at least one
+	// checked observation never fetched; Incomplete counts those observations.
+	// Path rules could not match there. Notes explains it in Polish.
+	MissingPaths []string `json:"missing_paths"`
+	Incomplete   int      `json:"incomplete"`
+	Notes        []string `json:"notes"`
 }
 
 // ---------- Integrations ----------

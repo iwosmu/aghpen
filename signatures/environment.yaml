@@ -1,0 +1,305 @@
+# Czujka: znaczniki środowisk testowych i deweloperskich, strony debugowania, wycieki diagnostyczne.
+
+- id: staging-hostname
+  name: Nazwa hosta środowiska testowego
+  category: environment
+  description: Nazwa hosta zawiera znacznik środowiska testowego albo deweloperskiego (dev, test, staging, uat, qa, preprod, sandbox, demo, beta).
+  interest: 45
+  classes: [staging]
+  match:
+    rules:
+      - {type: hostname, regex: '(^|[.\-_])(dev|devel|develop|development|test|tst|testing|stage|staging|stg|uat|qa|preprod|pre-prod|sandbox|demo|beta|alpha|acc|canary|lab)[0-9]{0,2}([.\-_])', weight: 0.8}
+
+- id: staging-certificate
+  name: Certyfikat środowiska testowego
+  category: environment
+  description: Nazwa w certyfikacie TLS zawiera znacznik środowiska testowego albo deweloperskiego.
+  interest: 45
+  classes: [staging]
+  match:
+    rules:
+      - {type: tls, field: subject, regex: '(^|[.\-_*])(dev|devel|development|test|tst|testing|stage|staging|stg|uat|qa|preprod|pre-prod|sandbox|demo|beta)[0-9]{0,2}[.\-_]', weight: 0.8}
+      - {type: tls, field: subject, regex: '^(localhost|localhost\.localdomain|example\.com|test|TestCertificate|snakeoil|ubuntu|debian)$|Fake LE Intermediate|\(STAGING\)', weight: 0.6}
+      - {type: tls, field: issuer, regex: '\(STAGING\)|Fake LE |mkcert development|Test CA|Development CA|minica root', weight: 0.8}
+
+- id: staging-title
+  name: Tytuł strony środowiska testowego
+  category: environment
+  description: Tytuł strony mówi, że to środowisko testowe, deweloperskie albo demonstracyjne.
+  interest: 45
+  classes: [staging]
+  match:
+    rules:
+      - {type: title, regex: '\b(staging|pre-?prod(?:uction)?|sandbox|uat)\b|\b(test|dev|development|demo|qa)\s+(environment|server|instance|system|site)\b|\[(test|dev|staging|uat|demo)\]|środowisko\s+(testowe|deweloperskie|rozwojowe|demonstracyjne)|wersja\s+(testowa|demonstracyjna)|serwer\s+testowy', weight: 0.8}
+
+- id: environment-header
+  name: Nagłówek środowiska
+  category: environment
+  description: Nagłówek odpowiedzi podaje środowisko inne niż produkcyjne (X-Environment, X-Env, X-App-Env).
+  interest: 50
+  classes: [staging]
+  match:
+    rules:
+      - {type: header, name_regex: '^X-(Environment|Env|App-Env|App-Environment|Stage|Deploy-Env|Deployment-Environment|Environment-Name)$', regex: '^(dev|devel|development|test|testing|stage|staging|stg|uat|qa|preprod|pre-prod|sandbox|demo|local|debug)[0-9]{0,2}$', weight: 0.95}
+
+- id: django-debug
+  name: Django – tryb DEBUG
+  category: environment
+  technology: Django
+  description: Django działa z DEBUG = True. Strony błędów pokazują konfigurację, ścieżki i fragmenty kodu.
+  tags: [python, debug]
+  interest: 80
+  classes: [staging, error-page]
+  match:
+    rules:
+      - {type: body, regex: 'You''re seeing this error because you have <code>DEBUG = True</code>', weight: 0.95}
+      - {type: body, contains_all: ['Using the URLconf defined in', 'Django tried these URL patterns'], weight: 0.95}
+      - {type: body, contains: 'id="djDebug"', weight: 0.9}
+
+- id: django-default-page
+  name: Django – strona startowa
+  category: environment
+  technology: Django
+  description: Świeży projekt Django bez własnych widoków, z włączonym DEBUG.
+  tags: [python]
+  interest: 50
+  classes: [default-page, staging]
+  match:
+    rules:
+      - {type: body, regex: 'The install worked successfully! Congratulations!|It worked!</h1>\s*<h2>Congratulations on your first Django-powered page', weight: 0.95}
+
+- id: laravel-debug
+  name: Laravel – strona błędu debug (Ignition / Whoops)
+  category: environment
+  technology: Laravel
+  description: Laravel działa z APP_DEBUG=true. Strona błędu pokazuje ślad stosu, zmienne środowiska i zapytania.
+  tags: [php, debug]
+  interest: 85
+  classes: [staging, error-page]
+  match:
+    rules:
+      - {type: body, regex: 'window\.ignite\s*\(|<title>🧨|ignition-(?:ui|report)|facade/ignition|spatie/laravel-ignition', weight: 0.95}
+      - {type: body, regex: 'Whoops, looks like something went wrong\.|class="Whoops container"|filp/whoops', weight: 0.9}
+      - {type: body, contains_all: ['Illuminate\', 'vendor/laravel/framework'], weight: 0.9}
+
+- id: symfony-profiler
+  name: Symfony – profiler i pasek debugowania
+  category: environment
+  technology: Symfony
+  description: Symfony działa w środowisku dev. Profiler pokazuje żądania, konfigurację i zapytania.
+  tags: [php, debug]
+  interest: 85
+  classes: [staging]
+  match:
+    rules:
+      - {type: header, name: X-Debug-Token-Link, exists: true, weight: 0.95}
+      - {type: header, name: X-Debug-Token, exists: true, weight: 0.9}
+      - {type: body, regex: 'class="sf-toolbar|id="sfwdt|Symfony Profiler|sf-dump', weight: 0.9}
+      - {type: path, path: /_profiler/, status: [200], regex: 'Symfony Profiler|sf-toolbar|_profiler', weight: 0.95}
+
+- id: phpinfo
+  name: phpinfo()
+  category: environment
+  technology: PHP
+  description: Strona phpinfo() jest dostępna publicznie. Pokazuje wersje, ścieżki, moduły i zmienne środowiska.
+  tags: [php, debug]
+  interest: 75
+  classes: [staging]
+  match:
+    rules:
+      - {type: title, regex: '^phpinfo\(\)|^PHP [0-9.]+ - phpinfo\(\)', weight: 0.95}
+      - {type: body, contains_all: ['PHP Version', 'System', 'Configure Command'], weight: 0.9}
+      - {type: path, path: /phpinfo.php, status: [200], contains_all: ['phpinfo()', 'PHP Version'], weight: 0.95}
+      - {type: path, path: /info.php, status: [200], contains_all: ['phpinfo()', 'PHP Version'], weight: 0.95}
+  version:
+    - {type: body, regex: 'PHP Version ([0-9]+\.[0-9]+\.[0-9]+)'}
+    - {type: path, path: /phpinfo.php, regex: 'PHP Version ([0-9]+\.[0-9]+\.[0-9]+)'}
+    - {type: path, path: /info.php, regex: 'PHP Version ([0-9]+\.[0-9]+\.[0-9]+)'}
+
+- id: spring-actuator
+  name: Spring Boot Actuator
+  category: environment
+  technology: Spring Boot
+  description: Punkty końcowe Actuatora są dostępne bez logowania. Lista pokazuje, co jeszcze jest wystawione (env, heapdump, loggers).
+  tags: [java, debug]
+  interest: 75
+  classes: [api]
+  match:
+    rules:
+      - {type: path, path: /actuator, status: [200], contains_all: ['"_links"', '/actuator/health'], weight: 0.95}
+
+- id: spring-actuator-sensitive
+  name: Spring Boot Actuator – wrażliwe punkty końcowe
+  category: environment
+  technology: Spring Boot
+  description: Indeks Actuatora wymienia wrażliwe punkty końcowe (env, heapdump, loggers, mappings, configprops). Czujka ich nie pobiera.
+  tags: [java, debug]
+  interest: 90
+  classes: [api]
+  match:
+    condition: all
+    rules:
+      - {type: path, path: /actuator, status: [200], contains: '"_links"', weight: 0.6}
+      - {type: path, path: /actuator, status: [200], regex: '/actuator/(?:env|heapdump|threaddump|loggers|mappings|configprops|beans|jolokia|gateway)"', weight: 0.9}
+
+- id: werkzeug-debugger
+  name: Werkzeug – debugger
+  category: environment
+  technology: Werkzeug
+  description: Aplikacja Flask działa z włączonym debuggerem Werkzeug. Konsola debuggera pozwala wykonać kod.
+  tags: [python, debug]
+  interest: 95
+  classes: [staging, error-page]
+  match:
+    rules:
+      - {type: body, regex: 'Werkzeug Debugger|__debugger__|The debugger caught an exception in your WSGI application', weight: 0.95}
+
+- id: rails-debug
+  name: Rails – strona błędu w trybie development
+  category: environment
+  technology: Ruby on Rails
+  description: Rails działa w trybie development. Strona błędu pokazuje ślad stosu i trasy.
+  tags: [ruby, debug]
+  interest: 80
+  classes: [staging, error-page]
+  match:
+    rules:
+      - {type: title, regex: '^Action Controller: Exception caught|^Ruby on Rails: Welcome aboard', weight: 0.95}
+      - {type: body, regex: 'Rails\.root:|<h2[^>]*>Routing Error</h2>|rails-default-error-page', weight: 0.8}
+
+- id: aspnet-yellow-screen
+  name: ASP.NET – szczegółowa strona błędu
+  category: environment
+  technology: ASP.NET
+  description: ASP.NET pokazuje szczegółową stronę błędu (customErrors wyłączone) ze śladem stosu i wersją platformy.
+  tags: [dotnet, debug]
+  interest: 70
+  classes: [staging, error-page]
+  match:
+    rules:
+      - {type: body, regex: '<title>[^<]{0,200}</title>[\s\S]{0,600}Server Error in ''[^'']*'' Application', weight: 0.9}
+      - {type: body, contains_all: ['Stack Trace:', 'Version Information:', 'Microsoft .NET Framework Version'], weight: 0.95}
+      - {type: body, regex: 'DeveloperExceptionPage|<h1 class="text-danger">An unhandled exception occurred while processing the request', weight: 0.95}
+  version:
+    - {type: body, regex: 'ASP\.NET Version:\s*([0-9.]+)'}
+
+- id: stack-trace
+  name: Ślad stosu w odpowiedzi
+  category: environment
+  description: Odpowiedź zawiera ślad stosu albo komunikat błędu interpretera. Ujawnia ścieżki plików i budowę aplikacji.
+  tags: [debug]
+  interest: 60
+  classes: [error-page]
+  match:
+    rules:
+      - {type: body, regex: 'Traceback \(most recent call last\):', weight: 0.9}
+      - {type: body, regex: '\bat [a-z0-9_.$]+\.[A-Za-z0-9_$<>]+\([A-Za-z0-9_]+\.java:[0-9]+\)', weight: 0.9}
+      - {type: body, regex: '<b>(?:Fatal error|Warning|Notice|Parse error|Deprecated)</b>:\s+.{1,300} in <b>[^<]+\.php</b> on line <b>[0-9]+</b>', weight: 0.9}
+      - {type: body, regex: 'goroutine [0-9]+ \[running\]:|panic: runtime error:', weight: 0.9}
+      - {type: body, regex: '(?:SQLSTATE\[[0-9A-Z]+\]|You have an error in your SQL syntax|ORA-[0-9]{5}:|PG::[A-Za-z]+Error|Unclosed quotation mark after the character string)', weight: 0.8}
+      - {type: body, regex: '<pre>[A-Za-z]*Error: [^\n]{1,200}\n\s+at [^\n]+\(/[^\n]+\.js:[0-9]+:[0-9]+\)', weight: 0.9}
+
+- id: tomcat-stack-trace
+  name: Tomcat – strona błędu z wersją
+  category: environment
+  technology: Apache Tomcat
+  description: Domyślna strona błędu Tomcata ujawnia wersję serwera.
+  tags: [java]
+  interest: 30
+  classes: [error-page]
+  match:
+    rules:
+      - {type: body, regex: '<h1>HTTP Status [0-9]{3} [–-] [^<]+</h1>[\s\S]{0,900}<h3>Apache Tomcat/([0-9.]+)</h3>', weight: 0.95, version_group: 1}
+
+- id: go-pprof
+  name: Go pprof
+  category: environment
+  technology: false
+  description: Punkt diagnostyczny Go /debug/pprof/ jest dostępny publicznie. Pozwala pobrać profile pamięci i procesora.
+  tags: [go, debug]
+  interest: 75
+  match:
+    rules:
+      - {type: path, path: /debug/pprof/, status: [200], contains_all: ['Types of profiles available', 'goroutine'], weight: 0.95}
+
+- id: nginx-stub-status
+  name: nginx – stub_status
+  category: environment
+  technology: nginx
+  description: Strona stanu nginx jest dostępna publicznie.
+  interest: 35
+  match:
+    rules:
+      - {type: path, path: /nginx_status, status: [200], regex: '^Active connections: [0-9]+', weight: 0.95}
+
+- id: directory-listing
+  name: Lista plików katalogu
+  category: environment
+  description: Serwer pokazuje listę plików katalogu głównego zamiast strony.
+  interest: 60
+  classes: [directory-listing]
+  match:
+    rules:
+      - {type: title, regex: '^Index of /|^Directory listing for /', weight: 0.9}
+      - {type: body, regex: '<h1>Index of /[^<]*</h1>|<h1>Directory listing for /|\[To Parent Directory\]', weight: 0.9}
+
+- id: dev-server
+  name: Serwer deweloperski frontendu
+  category: environment
+  technology: false
+  description: Strona jest serwowana przez serwer deweloperski (Vite, webpack-dev-server, Create React App) z kodem źródłowym i mapami.
+  tags: [nodejs, debug]
+  interest: 60
+  classes: [staging]
+  match:
+    rules:
+      - {type: body, regex: '<script type="module" src="/@vite/client">|/@react-refresh', weight: 0.95}
+      - {type: body, regex: 'webpack-dev-server|/webpack-dev-server\.js|__webpack_hmr', weight: 0.9}
+      - {type: header, name: X-Powered-By, regex: 'webpack-dev-server|Vite', weight: 0.9}
+
+- id: framework-default-page
+  name: Strona startowa frameworka
+  category: environment
+  technology: false
+  description: Aplikacja pokazuje stronę startową frameworka (Laravel, Symfony, Create React App, Vue, Rails). Wdrożenie nie zostało dokończone.
+  interest: 40
+  classes: [default-page]
+  match:
+    rules:
+      - {type: title, regex: '^(?:React App|Vite \+ (?:React|Vue|Svelte)(?: \+ TS)?|Welcome to Symfony!|Welcome to your Vue\.js App)$', weight: 0.8}
+      - {type: body, regex: 'Laravel has an incredibly rich ecosystem|Welcome to <strong>Symfony</strong>|Edit <code>src/App\.(?:js|tsx)</code> and save to reload', weight: 0.9}
+
+- id: placeholder-page
+  name: Strona zastępcza
+  category: environment
+  technology: false
+  description: Strona „w budowie” albo strona zastępcza hostingu.
+  interest: 20
+  classes: [default-page]
+  match:
+    rules:
+      - {type: title, regex: '^(?:Under Construction|Coming Soon|Site (?:is )?under construction|Strona w budowie|Witryna w budowie|Default Web Site Page|Welcome to CentOS|Test Page for the Nginx HTTP Server|Apache2 Test Page)', weight: 0.8}
+
+- id: source-map-header
+  name: Nagłówek mapy źródeł
+  category: environment
+  description: Odpowiedź wskazuje mapę źródeł (SourceMap). Mapy źródeł odsłaniają oryginalny kod aplikacji.
+  tags: [debug]
+  interest: 30
+  match:
+    rules:
+      - {type: header, name_regex: '^(SourceMap|X-SourceMap)$', exists: true, weight: 0.9}
+
+- id: xdebug
+  name: Xdebug
+  category: environment
+  technology: false
+  description: Rozszerzenie debugowania PHP Xdebug jest włączone na serwerze.
+  tags: [php, debug]
+  interest: 70
+  classes: [staging]
+  match:
+    rules:
+      - {type: header, name_regex: '^X-Xdebug-', exists: true, weight: 0.95}
+      - {type: body, regex: 'class=.xdebug-error|xdebug-var-dump', weight: 0.9}
+      - {type: cookie, name: XDEBUG_SESSION, weight: 0.9}

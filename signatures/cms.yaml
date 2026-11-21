@@ -1,0 +1,642 @@
+# Czujka: sygnatury systemów CMS, portali, wiki, forów i poczty webowej.
+# Składnia: docs/SIGNATURES.md. Hasze favicon policzono z prawdziwych instancji (cmd/fpprobe/testlab).
+
+- id: wordpress
+  name: WordPress
+  category: cms
+  description: System zarządzania treścią WordPress.
+  tags: [php, blog]
+  interest: 10
+  cpe: cpe:2.3:a:wordpress:wordpress
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: generator, regex: '^WordPress(?: ([0-9.]+))?', weight: 0.9, version_group: 1}
+      - {type: body, regex: '/wp-(?:content|includes)/', weight: 0.6}
+      - {type: header, name: Link, contains: 'api.w.org', weight: 0.8}
+      - {type: header, name: X-Pingback, contains: 'xmlrpc.php', weight: 0.7}
+      - {type: header, name: X-Redirect-By, equals: WordPress, weight: 0.9}
+      - {type: cookie, name_regex: '^(wordpress_|wp-settings-|wp_woocommerce_)', weight: 0.7}
+      - {type: path, path: /wp-login.php, status: [200], contains: 'user_login', weight: 0.9}
+      - {type: path, path: /robots.txt, status: [200], contains: '/wp-admin/', weight: 0.6}
+  version:
+    - {type: body, regex: 'wp-emoji-release\.min\.js\?ver=([0-9.]+)'}
+
+- id: wordpress-login
+  name: WordPress – strona logowania
+  category: cms
+  technology: WordPress
+  description: Dostępny publicznie formularz logowania wp-login.php.
+  tags: [php, login]
+  interest: 30
+  classes: [login, admin-panel]
+  match:
+    rules:
+      - {type: path, path: /wp-login.php, status: [200], contains_all: ['user_login', 'wp-submit'], weight: 0.95}
+      - {type: body, contains_all: ['id="loginform"', 'wp-submit'], weight: 0.9}
+
+- id: joomla
+  name: Joomla
+  category: cms
+  description: System zarządzania treścią Joomla!.
+  tags: [php]
+  interest: 10
+  cpe: cpe:2.3:a:joomla:joomla\!
+  implies: [PHP]
+  aliases: ['Joomla!']
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: generator, regex: '^Joomla!(?: ([0-9.]+))?', weight: 0.9, version_group: 1}
+      - {type: body, regex: '/media/(?:system|jui|vendor/joomla[a-z-]*)/', weight: 0.5}
+      - {type: body, regex: 'option=com_(?:content|users|contact)', weight: 0.5}
+      - {type: path, path: /administrator/, status: [200], regex: 'joomla|mod-login-username', weight: 0.9}
+      - {type: path, path: /robots.txt, status: [200], contains_all: ['/administrator/', '/components/'], weight: 0.7}
+      - {type: favicon, mmh3: [1627330242], weight: 0.9}
+
+- id: joomla-installer
+  name: Joomla – niedokończona instalacja
+  category: cms
+  technology: Joomla
+  description: Instalator Joomla jest dostępny publicznie. Kto pierwszy go ukończy, przejmuje witrynę.
+  interest: 70
+  classes: [admin-panel]
+  match:
+    condition: all
+    rules:
+      - {type: title, contains: 'Joomla Installer', weight: 0.9}
+      - {type: url, contains: '/installation/', weight: 0.6}
+
+- id: drupal
+  name: Drupal
+  category: cms
+  description: System zarządzania treścią Drupal.
+  tags: [php]
+  interest: 10
+  cpe: cpe:2.3:a:drupal:drupal
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: generator, regex: '^Drupal(?: ([0-9.]+))?', weight: 0.9, version_group: 1}
+      - {type: header, name: X-Generator, regex: '^Drupal(?: ([0-9.]+))?', weight: 0.9, version_group: 1}
+      - {type: header, name_regex: '^X-Drupal-(Cache|Dynamic-Cache|Route-Normalizer)', exists: true, weight: 0.8}
+      - {type: body, regex: 'drupal-settings-json|Drupal\.settings|/sites/(?:default|all)/(?:files|themes|modules)/|/core/misc/drupal', weight: 0.7}
+      - {type: path, path: /user/login, status: [200], regex: 'drupal|name="form_id" value="user_login', weight: 0.8}
+      - {type: favicon, mmh3: [1015329088], weight: 0.9}
+
+- id: drupal-installer
+  name: Drupal – niedokończona instalacja
+  category: cms
+  technology: Drupal
+  description: Instalator Drupala (core/install.php) jest dostępny publicznie.
+  interest: 70
+  classes: [admin-panel]
+  match:
+    condition: all
+    rules:
+      - {type: url, contains: '/core/install.php', weight: 0.7}
+      - {type: body, regex: 'install-page|Choose language|Drupal', weight: 0.7}
+
+- id: typo3
+  name: TYPO3
+  category: cms
+  description: System zarządzania treścią TYPO3.
+  tags: [php]
+  interest: 10
+  cpe: cpe:2.3:a:typo3:typo3
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: generator, regex: '^TYPO3(?: CMS)?(?: ([0-9.]+))?', weight: 0.9, version_group: 1}
+      - {type: body, regex: '/typo3(?:conf|temp)/|This website is powered by TYPO3', weight: 0.7}
+      - {type: path, path: /typo3/, status: [200], regex: 'TYPO3 CMS Login|typo3-login', weight: 0.9}
+
+- id: moodle
+  name: Moodle
+  category: cms
+  description: Platforma e-learningowa Moodle, typowa dla uczelni.
+  tags: [php, e-learning, uczelnia]
+  interest: 20
+  cpe: cpe:2.3:a:moodle:moodle
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name: MoodleSession, weight: 0.9}
+      - {type: cookie, name_regex: '^MoodleSession', weight: 0.8}
+      - {type: body, regex: '/theme/yui_combo\.php|M\.cfg\s*=|/lib/javascript\.php|yui-moodlesimple', weight: 0.8}
+      - {type: meta, name: keywords, regex: '^moodle', weight: 0.7}
+      - {type: favicon, mmh3: [-438482901], weight: 0.9}
+      - {type: path, path: /login/index.php, status: [200], regex: 'MoodleSession|moodle|logintoken', weight: 0.8}
+
+- id: mediawiki
+  name: MediaWiki
+  category: cms
+  description: Silnik wiki MediaWiki.
+  tags: [php, wiki]
+  interest: 10
+  cpe: cpe:2.3:a:mediawiki:mediawiki
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: generator, regex: '^MediaWiki(?: ([0-9.]+))?', weight: 0.9, version_group: 1}
+      - {type: title, regex: '^MediaWiki ([0-9.]+)$', weight: 0.8, version_group: 1}
+      - {type: body, regex: 'mw-content-text|wgPageName|/load\.php\?[^"'']*modules=|/resources/assets/mediawiki\.png|/mw-config/index\.php', weight: 0.7}
+      - {type: cookie, name: mw_installer_session, weight: 0.8}
+
+- id: mediawiki-not-configured
+  name: MediaWiki – brak konfiguracji
+  category: cms
+  technology: MediaWiki
+  description: MediaWiki bez pliku LocalSettings.php. Instalator jest dostępny publicznie.
+  interest: 60
+  match:
+    rules:
+      - {type: body, contains_all: ['LocalSettings.php not found', '/mw-config/'], weight: 0.95}
+
+- id: dokuwiki
+  name: DokuWiki
+  category: cms
+  description: Silnik wiki DokuWiki.
+  tags: [php, wiki]
+  interest: 10
+  cpe: cpe:2.3:a:dokuwiki:dokuwiki
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: generator, regex: '^DokuWiki', weight: 0.9}
+      - {type: cookie, name: DokuWiki, weight: 0.8}
+      - {type: body, regex: '/lib/exe/(?:css|js|opensearch|indexer)\.php|id="dokuwiki__', weight: 0.7}
+      - {type: favicon, mmh3: [-630493013], weight: 0.9}
+  version:
+    - {type: meta, name: generator, regex: 'DokuWiki Release ([0-9]{4}-[0-9]{2}-[0-9]{2}[a-z]?)'}
+
+- id: ghost
+  name: Ghost
+  category: cms
+  description: Platforma blogowa Ghost.
+  tags: [nodejs, blog]
+  interest: 10
+  cpe: cpe:2.3:a:ghost:ghost
+  implies: [Node.js]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: generator, regex: '^Ghost(?: ([0-9.]+))?', weight: 0.9, version_group: 1}
+      - {type: header, name: X-Ghost-Cache-Status, exists: true, weight: 0.8}
+      - {type: body, regex: '/ghost/api/|ghost-(?:portal|search)|content="Ghost', weight: 0.6}
+      - {type: favicon, mmh3: [-927719618], weight: 0.6}
+
+- id: magento
+  name: Magento
+  category: cms
+  description: Platforma sklepu internetowego Magento / Adobe Commerce.
+  tags: [php, e-commerce]
+  interest: 15
+  cpe: cpe:2.3:a:magento:magento
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name_regex: '^X-Magento-', exists: true, weight: 0.9}
+      - {type: cookie, name_regex: '^(mage-cache-storage|mage-messages|X-Magento-Vary|form_key)$', weight: 0.7}
+      - {type: body, regex: 'Mage\.Cookies|/static/version[0-9]+/frontend/|mage/cookies|/skin/frontend/|text/x-magento-init', weight: 0.8}
+
+- id: prestashop
+  name: PrestaShop
+  category: cms
+  description: Platforma sklepu internetowego PrestaShop.
+  tags: [php, e-commerce]
+  interest: 15
+  cpe: cpe:2.3:a:prestashop:prestashop
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: generator, regex: '^PrestaShop', weight: 0.9}
+      - {type: header, name: Powered-By, contains: 'PrestaShop', weight: 0.9}
+      - {type: cookie, name_regex: '^PrestaShop-', weight: 0.9}
+      - {type: body, regex: 'var prestashop\s*=|/modules/ps_[a-z]+/|prestashop\.(?:urls|page)', weight: 0.7}
+
+- id: nextcloud
+  name: Nextcloud
+  category: cms
+  description: Chmura plików Nextcloud.
+  tags: [php, pliki]
+  interest: 25
+  classes: [login]
+  cpe: cpe:2.3:a:nextcloud:nextcloud_server
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: path, path: /status.php, status: [200], regex: '"productname"\s*:\s*"Nextcloud"', weight: 0.95}
+      - {type: cookie, name_regex: '^nc_sameSiteCookie(lax|strict)$', weight: 0.8}
+      - {type: body, regex: 'apple-itunes-app" content="app-id=1125420102|/core/img/favicon(?:-touch)?\.(?:ico|png)|Nextcloud', weight: 0.5}
+      - {type: favicon, mmh3: [167837543], weight: 0.9}
+  version:
+    - {type: path, path: /status.php, regex: '"versionstring"\s*:\s*"([0-9.]+)'}
+
+- id: owncloud
+  name: ownCloud
+  category: cms
+  description: Chmura plików ownCloud.
+  tags: [php, pliki]
+  interest: 25
+  classes: [login]
+  cpe: cpe:2.3:a:owncloud:owncloud
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: path, path: /status.php, status: [200], regex: '"productname"\s*:\s*"ownCloud"', weight: 0.95}
+      - {type: body, regex: 'data-requesttoken[^>]*>[\s\S]{0,400}ownCloud|/core/img/favicon\.ico[\s\S]{0,300}ownCloud|<title>\s*ownCloud', weight: 0.7}
+      - {type: title, regex: '^\s*ownCloud\s*$', weight: 0.7}
+  version:
+    - {type: path, path: /status.php, regex: '"versionstring"\s*:\s*"([0-9.]+)'}
+
+- id: roundcube
+  name: Roundcube Webmail
+  category: cms
+  description: Poczta webowa Roundcube.
+  tags: [php, poczta]
+  interest: 30
+  classes: [login]
+  cpe: cpe:2.3:a:roundcube:webmail
+  implies: [PHP]
+  aliases: [Roundcube]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name: roundcube_sessid, weight: 0.9}
+      - {type: title, contains: 'Roundcube Webmail', weight: 0.8}
+      - {type: body, regex: 'rcmail\.(?:set_env|init)|skins/(?:elastic|larry)/', weight: 0.7}
+      - {type: favicon, mmh3: [-1754690812], weight: 0.9}
+
+- id: confluence
+  name: Atlassian Confluence
+  category: cms
+  description: Wiki zespołowe Atlassian Confluence.
+  tags: [java, wiki]
+  interest: 35
+  cpe: cpe:2.3:a:atlassian:confluence_server
+  aliases: [Confluence]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: X-Confluence-Request-Time, exists: true, weight: 0.9}
+      - {type: meta, name: confluence-base-url, exists: true, weight: 0.9}
+      - {type: body, regex: 'com-atlassian-confluence|id="com-atlassian-confluence"|ajs-version-number', weight: 0.8}
+      - {type: title, regex: ' - Confluence$', weight: 0.6}
+  version:
+    - {type: meta, name: ajs-version-number, regex: '^([0-9.]+)'}
+    - {type: body, regex: 'Atlassian Confluence ([0-9.]+)'}
+
+- id: jira
+  name: Atlassian Jira
+  category: cms
+  description: System zgłoszeń Atlassian Jira.
+  tags: [java, zgloszenia]
+  interest: 35
+  cpe: cpe:2.3:a:atlassian:jira
+  aliases: [Jira]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: application-name, equals: JIRA, weight: 0.9}
+      - {type: cookie, name: atlassian.xsrf.token, weight: 0.7}
+      - {type: body, regex: 'jira-webapp-dist|JIRA\.Dialogs|id="jira"|data-name="jira"', weight: 0.7}
+      - {type: header, name: X-AREQUESTID, exists: true, weight: 0.5}
+  version:
+    - {type: body, regex: 'data-name="jira" data-version="([0-9.]+)"'}
+    - {type: body, regex: 'name="ajs-version-number" content="([0-9.]+)"'}
+
+- id: discourse
+  name: Discourse
+  category: cms
+  description: Forum dyskusyjne Discourse.
+  tags: [ruby, forum]
+  interest: 10
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: generator, regex: '^Discourse(?: ([0-9a-z.\-]+))?', weight: 0.9, version_group: 1}
+      - {type: header, name_regex: '^X-Discourse-', exists: true, weight: 0.9}
+      - {type: body, regex: 'discourse-application|data-discourse-setup', weight: 0.7}
+
+- id: phpbb
+  name: phpBB
+  category: cms
+  description: Forum dyskusyjne phpBB.
+  tags: [php, forum]
+  interest: 10
+  cpe: cpe:2.3:a:phpbb:phpbb
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name_regex: '^phpbb[0-9]?_[a-z0-9]+_(sid|u|k)$', weight: 0.9}
+      - {type: body, regex: 'Powered by <a href="https?://www\.phpbb\.com/"|phpBB Limited|id="phpbb"', weight: 0.8}
+
+- id: bookstack
+  name: BookStack
+  category: cms
+  description: Wiki dokumentacyjne BookStack.
+  tags: [php, wiki]
+  interest: 15
+  implies: [PHP, Laravel]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name: bookstack_session, weight: 0.9}
+      - {type: body, regex: 'base-url" content="[^"]*"[\s\S]{0,400}BookStack|/dist/styles\.css\?version=v[0-9.]+', weight: 0.5}
+      - {type: title, contains: 'BookStack', weight: 0.6}
+
+- id: wikijs
+  name: Wiki.js
+  category: cms
+  description: Silnik wiki Wiki.js.
+  tags: [nodejs, wiki]
+  interest: 10
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, regex: 'window\.siteConfig\s*=|/_assets/js/(?:app|runtime)\.js|content="Wiki\.js', weight: 0.7}
+      - {type: meta, name: generator, contains: 'Wiki.js', weight: 0.9}
+
+- id: redmine
+  name: Redmine
+  category: cms
+  description: System zarządzania projektami Redmine.
+  tags: [ruby, zgloszenia]
+  interest: 25
+  cpe: cpe:2.3:a:redmine:redmine
+  implies: [Ruby on Rails]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name: _redmine_session, weight: 0.9}
+      - {type: meta, name: description, equals: Redmine, weight: 0.8}
+      - {type: body, regex: 'Powered by <a href="https?://www\.redmine\.org/">Redmine</a>', weight: 0.9}
+
+- id: opencart
+  name: OpenCart
+  category: cms
+  description: Platforma sklepu internetowego OpenCart.
+  tags: [php, e-commerce]
+  interest: 15
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name: OCSESSID, weight: 0.9}
+      - {type: body, regex: 'catalog/view/(?:theme|javascript)/|index\.php\?route=(?:common|product)/', weight: 0.7}
+
+- id: strapi
+  name: Strapi
+  category: cms
+  description: Headless CMS Strapi.
+  tags: [nodejs, api]
+  interest: 20
+  implies: [Node.js]
+  match:
+    rules:
+      - {type: header, name: X-Powered-By, contains: 'Strapi', weight: 0.95}
+
+- id: umbraco
+  name: Umbraco
+  category: cms
+  description: System zarządzania treścią Umbraco (.NET).
+  tags: [dotnet]
+  interest: 10
+  cpe: cpe:2.3:a:umbraco:umbraco_cms
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: X-Umbraco-Version, regex: '([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: body, regex: '/umbraco/(?:assets|lib|backoffice)/|/media/[0-9]{4}/', weight: 0.4}
+      - {type: meta, name: generator, contains: 'umbraco', weight: 0.9}
+
+- id: dnn
+  name: DNN (DotNetNuke)
+  category: cms
+  description: System zarządzania treścią DNN (DotNetNuke).
+  tags: [dotnet]
+  interest: 10
+  cpe: cpe:2.3:a:dnnsoftware:dotnetnuke
+  aliases: [DotNetNuke]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name_regex: '^(\.DOTNETNUKE|dnn_IsMobile|DotNetNukeAnonymous)$', weight: 0.9}
+      - {type: header, name: X-Compressed-By, contains: 'DotNetNuke', weight: 0.9}
+      - {type: meta, name: generator, contains: 'DotNetNuke', weight: 0.9}
+      - {type: body, regex: '/DesktopModules/|dnn\.js|DNNPlatform', weight: 0.5}
+
+- id: sharepoint
+  name: Microsoft SharePoint
+  category: cms
+  description: Portal Microsoft SharePoint.
+  tags: [dotnet, microsoft]
+  interest: 30
+  cpe: cpe:2.3:a:microsoft:sharepoint_server
+  aliases: [SharePoint]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: MicrosoftSharePointTeamServices, regex: '([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: header, name_regex: '^(SPRequestGuid|X-SharePointHealthScore|SPIisLatency|SPRequestDuration)$', exists: true, weight: 0.9}
+      - {type: meta, name: generator, contains: 'Microsoft SharePoint', weight: 0.9}
+
+- id: plone
+  name: Plone
+  category: cms
+  description: System zarządzania treścią Plone (Python, Zope).
+  tags: [python]
+  interest: 10
+  cpe: cpe:2.3:a:plone:plone
+  match:
+    rules:
+      - {type: meta, name: generator, regex: '^Plone', weight: 0.9}
+      - {type: body, regex: 'portal_css/|plone-(?:logged-in|toolbar)|\+\+plone\+\+', weight: 0.5}
+
+- id: liferay
+  name: Liferay Portal
+  category: cms
+  description: Portal korporacyjny Liferay.
+  tags: [java]
+  interest: 25
+  cpe: cpe:2.3:a:liferay:liferay_portal
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: Liferay-Portal, regex: 'Liferay[^0-9]*([0-9.]+)?', weight: 0.95, version_group: 1}
+      - {type: cookie, name_regex: '^(GUEST_LANGUAGE_ID|COOKIE_SUPPORT|LFR_SESSION_STATE_[0-9]+)$', weight: 0.6}
+      - {type: body, regex: 'Liferay\.(?:Browser|ThemeDisplay|currentURL)', weight: 0.8}
+
+- id: matomo
+  name: Matomo
+  category: cms
+  description: Analityka webowa Matomo (dawniej Piwik) – panel logowania.
+  tags: [php, analityka]
+  interest: 25
+  classes: [login]
+  cpe: cpe:2.3:a:matomo:matomo
+  aliases: [Piwik]
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: 'Sign in - (?:Matomo|Piwik)|Zaloguj - Matomo', weight: 0.8}
+      - {type: cookie, name: MATOMO_SESSID, weight: 0.9}
+      - {type: body, regex: 'piwik\.broadcast|plugins/CoreHome/images/favicon|content="Matomo', weight: 0.7}
+      - {type: meta, name: generator, regex: '^(Matomo|Piwik)', weight: 0.9}
+
+- id: osticket
+  name: osTicket
+  category: cms
+  description: System zgłoszeń osTicket.
+  tags: [php, zgloszenia]
+  interest: 20
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name: OSTSESSID, weight: 0.9}
+      - {type: body, regex: 'powered by osTicket|osticket\.com|id="ost-|scp/css/', weight: 0.6}
+
+- id: glpi
+  name: GLPI
+  category: cms
+  description: System inwentaryzacji IT i helpdesku GLPI.
+  tags: [php, itsm]
+  interest: 40
+  classes: [login]
+  cpe: cpe:2.3:a:glpi-project:glpi
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name_regex: '^glpi_[0-9a-f]{20,}', weight: 0.9}
+      - {type: title, regex: '^GLPI\b|GLPI - (?:Authentication|Uwierzytelnianie)', weight: 0.8}
+      - {type: body, regex: 'GLPI Copyright|glpi-project\.org|/pics/fd_logo\.png', weight: 0.6}
+  version:
+    - {type: body, regex: 'GLPI (?:version )?([0-9]+\.[0-9]+(?:\.[0-9]+)?) Copyright'}
+
+- id: squirrelmail
+  name: SquirrelMail
+  category: cms
+  description: Poczta webowa SquirrelMail (projekt nierozwijany).
+  tags: [php, poczta]
+  interest: 40
+  classes: [login]
+  cpe: cpe:2.3:a:squirrelmail:squirrelmail
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^SquirrelMail', weight: 0.8}
+      - {type: cookie, name: SQMSESSID, weight: 0.9}
+      - {type: body, regex: 'SquirrelMail version ([0-9.]+)', weight: 0.9, version_group: 1}
+
+- id: horde
+  name: Horde Groupware
+  category: cms
+  description: Poczta webowa i praca grupowa Horde.
+  tags: [php, poczta]
+  interest: 35
+  classes: [login]
+  cpe: cpe:2.3:a:horde:groupware
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name: Horde, weight: 0.8}
+      - {type: body, regex: 'horde_login|/horde/(?:themes|js)/|HordeCore', weight: 0.7}
+      - {type: title, regex: 'Horde :: |Horde Login', weight: 0.6}
+
+- id: snappymail
+  name: SnappyMail / RainLoop
+  category: cms
+  description: Poczta webowa SnappyMail albo RainLoop.
+  tags: [php, poczta]
+  interest: 30
+  classes: [login]
+  aliases: [RainLoop, SnappyMail]
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, regex: 'rainloop/v/[0-9.]+/|snappymail/v/[0-9.]+/|id="rl-app"|window\.rainloop', weight: 0.9}
+      - {type: title, regex: '^(RainLoop|SnappyMail) Webmail', weight: 0.7}
+  version:
+    - {type: body, regex: '(?:rainloop|snappymail)/v/([0-9.]+)/'}
+
+- id: mattermost
+  name: Mattermost
+  category: cms
+  description: Komunikator zespołowy Mattermost.
+  tags: [go, komunikator]
+  interest: 25
+  cpe: cpe:2.3:a:mattermost:mattermost_server
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: X-Version-Id, regex: '^([0-9]+\.[0-9]+\.[0-9]+)', weight: 0.6, version_group: 1}
+      - {type: title, equals: Mattermost, weight: 0.6}
+      - {type: body, regex: 'content="Mattermost"|mattermost-(?:webapp|desktop)|To use Mattermost, please enable JavaScript', weight: 0.6}
+
+- id: rocketchat
+  name: Rocket.Chat
+  category: cms
+  description: Komunikator zespołowy Rocket.Chat.
+  tags: [nodejs, komunikator]
+  interest: 25
+  cpe: cpe:2.3:a:rocket.chat:rocket.chat
+  implies: [Node.js]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: X-Instance-ID, exists: true, weight: 0.4}
+      - {type: body, regex: 'content="Rocket\.Chat"|rocketchat|Rocket\.Chat', weight: 0.7}
+      - {type: title, equals: Rocket.Chat, weight: 0.7}
+
+- id: zimbra
+  name: Zimbra Collaboration
+  category: cms
+  description: Poczta i praca grupowa Zimbra – panel logowania, typowy dla uczelni.
+  tags: [java, poczta, uczelnia]
+  interest: 40
+  classes: [login]
+  cpe: cpe:2.3:a:zimbra:collaboration
+  aliases: [Zimbra]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: 'Zimbra Web Client|Zimbra (?:Administration|Collaboration)', weight: 0.9}
+      - {type: cookie, name: ZM_TEST, weight: 0.9}
+      - {type: body, regex: 'ZLoginPanel|/zimbra/(?:js|css|img)/|zimbraMail|ZmSkin', weight: 0.8}
+
+- id: owa
+  name: Microsoft Outlook Web App
+  category: cms
+  description: Poczta webowa Microsoft Exchange (OWA).
+  tags: [microsoft, poczta]
+  interest: 45
+  classes: [login]
+  cpe: cpe:2.3:a:microsoft:exchange_server
+  aliases: [Outlook Web App, Microsoft Exchange]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: X-OWA-Version, regex: '([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: redirect, regex: '/owa/auth/logon\.aspx', weight: 0.9}
+      - {type: header, name: X-FEServer, exists: true, weight: 0.6}
+      - {type: body, regex: '/owa/auth/[0-9.]+/themes/|Outlook Web App|id="owaLogoContainer"', weight: 0.8}
+  version:
+    - {type: body, regex: '/owa/auth/([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/'}

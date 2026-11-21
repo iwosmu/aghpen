@@ -1,0 +1,451 @@
+# Czujka: usługi inne niż HTTP, rozpoznawane po banerze albo po wyniku nmap (nazwa, produkt, wersja).
+
+- id: openssh
+  name: OpenSSH
+  category: other
+  description: Serwer SSH OpenSSH.
+  tags: [ssh]
+  interest: 15
+  classes: [remote-access]
+  cpe: cpe:2.3:a:openbsd:openssh
+  match:
+    rules:
+      - {type: banner, regex: '^SSH-[0-9.]+-OpenSSH[_-]([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:p[0-9]+)?)', weight: 0.95, version_group: 1}
+      - {type: service, field: product, regex: '^OpenSSH', weight: 0.9}
+  version:
+    - {type: service, field: version, regex: '^([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:p[0-9]+)?)'}
+
+- id: dropbear
+  name: Dropbear SSH
+  category: other
+  description: Lekki serwer SSH Dropbear, typowy dla routerów i urządzeń wbudowanych.
+  tags: [ssh, wbudowany]
+  interest: 30
+  classes: [remote-access, iot]
+  cpe: cpe:2.3:a:dropbear_ssh_project:dropbear_ssh
+  aliases: ['Dropbear sshd']
+  match:
+    rules:
+      - {type: banner, regex: '^SSH-[0-9.]+-dropbear(?:_([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: service, field: product, regex: '^Dropbear', weight: 0.9}
+
+- id: ssh-protocol-1
+  name: SSH w wersji protokołu 1
+  category: other
+  technology: false
+  description: Serwer SSH przyjmuje przestarzały protokół SSH-1 (baner SSH-1.x). Protokół ma znane słabości kryptograficzne.
+  tags: [ssh]
+  interest: 70
+  classes: [remote-access]
+  match:
+    rules:
+      - {type: banner, regex: '^SSH-1\.(?:5|99)-', weight: 0.95}
+
+- id: telnet
+  name: Telnet
+  category: other
+  technology: false
+  description: Usługa Telnet. Przesyła hasła i polecenia bez szyfrowania.
+  tags: [telnet]
+  interest: 70
+  classes: [remote-access]
+  match:
+    rules:
+      - {type: service, field: name, regex: '^telnets?$', weight: 0.9}
+
+- id: rdp
+  name: Pulpit zdalny (RDP)
+  category: other
+  description: Usługa pulpitu zdalnego Microsoft RDP.
+  tags: [rdp, microsoft]
+  interest: 60
+  classes: [remote-access]
+  technology: Microsoft Terminal Services
+  aliases: ['Microsoft Terminal Services', 'xrdp']
+  match:
+    rules:
+      - {type: service, field: name, regex: '^(?:ms-wbt-server|rdp)$', weight: 0.9}
+      - {type: service, field: product, regex: 'Terminal Services|xrdp', weight: 0.9}
+
+- id: vnc
+  name: VNC
+  category: other
+  description: Zdalny pulpit VNC.
+  tags: [vnc]
+  interest: 65
+  classes: [remote-access]
+  match:
+    rules:
+      - {type: banner, regex: '^RFB ([0-9]{3}\.[0-9]{3})', weight: 0.95}
+      - {type: service, field: name, regex: '^vnc', weight: 0.9}
+
+- id: vsftpd
+  name: vsftpd
+  category: other
+  description: Serwer FTP vsftpd.
+  tags: [ftp]
+  interest: 30
+  cpe: cpe:2.3:a:vsftpd_project:vsftpd
+  match:
+    rules:
+      - {type: banner, regex: '\(vsFTPd ([0-9.]+)\)', weight: 0.95, version_group: 1}
+      - {type: service, field: product, regex: '^vsftpd', weight: 0.9}
+
+- id: proftpd
+  name: ProFTPD
+  category: other
+  description: Serwer FTP ProFTPD.
+  tags: [ftp]
+  interest: 30
+  cpe: cpe:2.3:a:proftpd:proftpd
+  match:
+    rules:
+      - {type: banner, regex: 'ProFTPD(?: ([0-9.]+[a-z]?))? Server', weight: 0.95, version_group: 1}
+      - {type: service, field: product, regex: '^ProFTPD', weight: 0.9}
+
+- id: pure-ftpd
+  name: Pure-FTPd
+  category: other
+  description: Serwer FTP Pure-FTPd.
+  tags: [ftp]
+  interest: 30
+  match:
+    rules:
+      - {type: banner, regex: 'Pure-FTPd', weight: 0.95}
+      - {type: service, field: product, regex: '^Pure-FTPd', weight: 0.9}
+
+- id: ftp-generic
+  name: FTP
+  category: other
+  technology: false
+  description: Usługa FTP. Przesyła hasła i pliki bez szyfrowania.
+  tags: [ftp]
+  interest: 35
+  match:
+    rules:
+      - {type: service, field: name, equals: ftp, weight: 0.8}
+      - {type: banner, regex: '^220[ -].*(?:FTP|FileZilla|Microsoft FTP Service)', weight: 0.8}
+
+- id: postfix
+  name: Postfix
+  category: other
+  description: Serwer poczty Postfix.
+  tags: [smtp, poczta]
+  interest: 15
+  cpe: cpe:2.3:a:postfix:postfix
+  aliases: ['Postfix smtpd']
+  match:
+    rules:
+      - {type: banner, regex: '^220 .*ESMTP Postfix', weight: 0.95}
+      - {type: service, field: product, regex: '^Postfix', weight: 0.9}
+
+- id: exim
+  name: Exim
+  category: other
+  description: Serwer poczty Exim.
+  tags: [smtp, poczta]
+  interest: 20
+  cpe: cpe:2.3:a:exim:exim
+  aliases: ['Exim smtpd']
+  match:
+    rules:
+      - {type: banner, regex: '^220 .*ESMTP Exim ([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: service, field: product, regex: '^Exim', weight: 0.9}
+
+- id: exchange-smtp
+  name: Microsoft Exchange (SMTP)
+  category: other
+  technology: Microsoft Exchange
+  description: Serwer poczty Microsoft Exchange.
+  tags: [smtp, poczta, microsoft]
+  interest: 30
+  cpe: cpe:2.3:a:microsoft:exchange_server
+  aliases: ['Microsoft Exchange smtpd']
+  match:
+    rules:
+      - {type: banner, regex: 'Microsoft ESMTP MAIL Service', weight: 0.95}
+      - {type: service, field: product, regex: '^Microsoft Exchange', weight: 0.9}
+
+- id: dovecot
+  name: Dovecot
+  category: other
+  description: Serwer IMAP/POP3 Dovecot.
+  tags: [imap, poczta]
+  interest: 15
+  cpe: cpe:2.3:a:dovecot:dovecot
+  aliases: ['Dovecot imapd', 'Dovecot pop3d']
+  match:
+    rules:
+      - {type: banner, regex: 'Dovecot(?: \([A-Za-z]+\))? ready', weight: 0.95}
+      - {type: service, field: product, regex: '^Dovecot', weight: 0.9}
+
+- id: mysql
+  name: MySQL
+  category: database
+  description: Serwer baz danych MySQL dostępny w sieci.
+  tags: [baza-danych]
+  interest: 60
+  cpe: cpe:2.3:a:oracle:mysql
+  match:
+    rules:
+      - {type: service, field: product, regex: '^MySQL', weight: 0.9}
+      - {type: banner, regex: '^.{0,8}([0-9]+\.[0-9]+\.[0-9]+)[^\x00]*\x00[\s\S]*mysql_native_password', weight: 0.6, version_group: 1}
+      - {type: banner, regex: 'is not allowed to connect to this MySQL server', weight: 0.95}
+  version:
+    - {type: service, field: version, regex: '^([0-9]+\.[0-9]+\.[0-9]+)'}
+
+- id: mariadb
+  name: MariaDB
+  category: database
+  description: Serwer baz danych MariaDB dostępny w sieci.
+  tags: [baza-danych]
+  interest: 60
+  cpe: cpe:2.3:a:mariadb:mariadb
+  match:
+    rules:
+      - {type: service, field: product, regex: '^MariaDB', weight: 0.9}
+      - {type: banner, regex: '([0-9]+\.[0-9]+\.[0-9]+)-MariaDB', weight: 0.95, version_group: 1}
+      - {type: service, field: version, regex: '([0-9]+\.[0-9]+\.[0-9]+)-MariaDB', weight: 0.9, version_group: 1}
+
+- id: postgresql
+  name: PostgreSQL
+  category: database
+  description: Serwer baz danych PostgreSQL dostępny w sieci.
+  tags: [baza-danych]
+  interest: 60
+  cpe: cpe:2.3:a:postgresql:postgresql
+  aliases: ['PostgreSQL DB']
+  match:
+    rules:
+      - {type: service, field: product, regex: '^PostgreSQL', weight: 0.9}
+      - {type: service, field: name, equals: postgresql, weight: 0.8}
+  version:
+    - {type: service, field: version, regex: '^([0-9]+(?:\.[0-9]+)*)'}
+
+- id: mssql
+  name: Microsoft SQL Server
+  category: database
+  description: Serwer baz danych Microsoft SQL Server dostępny w sieci.
+  tags: [baza-danych, microsoft]
+  interest: 65
+  cpe: cpe:2.3:a:microsoft:sql_server
+  match:
+    rules:
+      - {type: service, field: product, regex: '^Microsoft SQL Server', weight: 0.9}
+      - {type: service, field: name, regex: '^ms-sql-[sm]$', weight: 0.8}
+
+- id: oracle-db
+  name: Oracle Database (TNS)
+  category: database
+  description: Nasłuch Oracle TNS dostępny w sieci.
+  tags: [baza-danych, oracle]
+  interest: 65
+  cpe: cpe:2.3:a:oracle:database_server
+  aliases: ['Oracle TNS listener']
+  match:
+    rules:
+      - {type: service, field: name, regex: '^oracle(?:-tns)?$', weight: 0.8}
+      - {type: service, field: product, regex: '^Oracle TNS', weight: 0.9}
+
+- id: mongodb
+  name: MongoDB
+  category: database
+  description: Serwer MongoDB dostępny w sieci. Starsze instalacje nie wymagają uwierzytelniania.
+  tags: [baza-danych]
+  interest: 75
+  cpe: cpe:2.3:a:mongodb:mongodb
+  match:
+    rules:
+      - {type: service, field: product, regex: '^MongoDB', weight: 0.9}
+      - {type: service, field: name, regex: '^mongo(?:db|d)$', weight: 0.8}
+      - {type: body, contains: 'It looks like you are trying to access MongoDB over HTTP on the native driver port', weight: 0.95}
+
+- id: redis
+  name: Redis
+  category: database
+  description: Serwer Redis dostępny w sieci. Domyślnie nie wymaga hasła.
+  tags: [baza-danych]
+  interest: 80
+  cpe: cpe:2.3:a:redis:redis
+  aliases: ['Redis key-value store']
+  match:
+    rules:
+      - {type: service, field: product, regex: '^Redis', weight: 0.9}
+      - {type: service, field: name, equals: redis, weight: 0.8}
+      - {type: banner, regex: '^-(?:NOAUTH|DENIED Redis|ERR (?:wrong number of arguments|unknown command))', weight: 0.9}
+
+- id: memcached
+  name: Memcached
+  category: database
+  description: Serwer Memcached dostępny w sieci. Nie ma uwierzytelniania i bywa używany do ataków wzmocnionych.
+  tags: [baza-danych]
+  interest: 75
+  cpe: cpe:2.3:a:memcached:memcached
+  match:
+    rules:
+      - {type: service, field: product, regex: '^Memcached', weight: 0.9}
+      - {type: service, field: name, regex: '^memcached?$', weight: 0.8}
+
+- id: samba
+  name: Samba / SMB
+  category: other
+  description: Udostępnianie plików SMB (Samba albo Windows).
+  tags: [smb, pliki]
+  interest: 50
+  cpe: cpe:2.3:a:samba:samba
+  aliases: ['Samba smbd']
+  match:
+    rules:
+      - {type: service, field: product, regex: '^Samba', weight: 0.9}
+      - {type: service, field: name, regex: '^(?:microsoft-ds|netbios-ssn)$', weight: 0.6}
+
+- id: ldap
+  name: LDAP
+  category: other
+  technology: false
+  description: Usługa katalogowa LDAP albo Active Directory dostępna w sieci.
+  tags: [ldap]
+  interest: 50
+  classes: [database]
+  match:
+    rules:
+      - {type: service, field: name, regex: '^(?:ldap|ldaps|ldapssl|globalcatLDAP)', weight: 0.8}
+
+- id: bind
+  name: ISC BIND
+  category: other
+  description: Serwer DNS ISC BIND.
+  tags: [dns]
+  interest: 15
+  cpe: cpe:2.3:a:isc:bind
+  match:
+    rules:
+      - {type: service, field: product, regex: '^ISC BIND', weight: 0.9}
+
+- id: mqtt
+  name: MQTT
+  category: other
+  technology: false
+  description: Broker MQTT (często Mosquitto), typowy dla IoT. Bez uwierzytelniania pozwala czytać i wysyłać komunikaty urządzeń.
+  tags: [iot, kolejki]
+  interest: 60
+  classes: [iot]
+  match:
+    rules:
+      - {type: service, field: name, regex: '^(?:mqtt|secure-mqtt)$', weight: 0.8}
+      - {type: service, field: product, regex: 'Mosquitto|MQTT', weight: 0.9}
+
+- id: rtsp
+  name: RTSP (strumień wideo)
+  category: iot
+  technology: false
+  description: Usługa strumieniowania RTSP, typowa dla kamer i rejestratorów.
+  tags: [kamera]
+  interest: 50
+  match:
+    rules:
+      - {type: service, field: name, equals: rtsp, weight: 0.8}
+      - {type: banner, regex: '^RTSP/1\.0 ', weight: 0.9}
+
+- id: ics-protocol
+  name: Protokół przemysłowy (Modbus, S7, BACnet, DNP3, EtherNet/IP)
+  category: iot
+  technology: false
+  description: Usługa protokołu automatyki przemysłowej albo budynkowej dostępna w sieci. Te protokoły nie mają uwierzytelniania.
+  tags: [ics]
+  interest: 90
+  match:
+    rules:
+      - {type: service, field: name, regex: '^(?:modbus|iso-tsap|s7comm|bacnet|dnp3?|enip|EtherNet-IP-[12]|fox|omron-fins|iec-104|opcua|codesys|pcworx|proconos|hart-ip)', weight: 0.85}
+
+- id: rsync
+  name: rsync
+  category: other
+  description: Demon rsync dostępny w sieci. Moduły bez hasła pozwalają pobierać pliki.
+  tags: [pliki]
+  interest: 55
+  match:
+    rules:
+      - {type: banner, regex: '^@RSYNCD: ([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: service, field: name, equals: rsync, weight: 0.8}
+
+- id: jdwp
+  name: Java Debug Wire Protocol
+  category: environment
+  description: Port debugowania Javy (JDWP) dostępny w sieci. Pozwala wykonać kod w maszynie wirtualnej.
+  tags: [java, debug]
+  interest: 100
+  classes: [staging]
+  match:
+    rules:
+      - {type: banner, regex: '^JDWP-Handshake', weight: 0.95}
+      - {type: service, field: name, equals: jdwp, weight: 0.9}
+
+- id: winbox
+  name: MikroTik Winbox
+  category: iot
+  technology: MikroTik RouterOS
+  description: Port zarządzania MikroTik Winbox.
+  tags: [router]
+  interest: 60
+  classes: [remote-access]
+  match:
+    rules:
+      - {type: service, field: name, equals: winbox, weight: 0.8}
+      - {type: service, field: product, regex: 'MikroTik WinBox', weight: 0.9}
+
+- id: ajp
+  name: Apache JServ Protocol (AJP)
+  category: app-server
+  technology: Apache Tomcat
+  description: Port AJP Tomcata dostępny w sieci. Powinien być osiągalny tylko dla serwera WWW (podatność Ghostcat w starych wersjach).
+  tags: [java]
+  interest: 60
+  match:
+    rules:
+      - {type: service, field: name, regex: '^ajp1[23]$', weight: 0.8}
+
+- id: snmp
+  name: SNMP
+  category: other
+  technology: false
+  description: Agent SNMP dostępny w sieci.
+  tags: [snmp]
+  interest: 45
+  match:
+    rules:
+      - {type: service, field: name, equals: snmp, weight: 0.8}
+
+- id: nfs-rpc
+  name: NFS / rpcbind
+  category: other
+  technology: false
+  description: Usługi RPC albo NFS dostępne w sieci.
+  tags: [pliki]
+  interest: 50
+  match:
+    rules:
+      - {type: service, field: name, regex: '^(?:nfs|nfs_acl|rpcbind|mountd)$', weight: 0.8}
+
+- id: x11
+  name: X11
+  category: other
+  technology: false
+  description: Serwer X11 dostępny w sieci.
+  interest: 70
+  classes: [remote-access]
+  match:
+    rules:
+      - {type: service, field: name, regex: '^X11', weight: 0.8}
+
+- id: sip
+  name: SIP
+  category: other
+  technology: false
+  description: Usługa telefonii SIP.
+  tags: [voip]
+  interest: 35
+  match:
+    rules:
+      - {type: service, field: name, regex: '^sips?$', weight: 0.8}
+      - {type: banner, regex: '^SIP/2\.0 ', weight: 0.9}

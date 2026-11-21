@@ -1,0 +1,115 @@
+# Czujka: interesujące ciasteczka. Dowód nigdy nie zawiera wartości ciasteczka, tylko jego nazwę, długość i flagi.
+
+- id: cookie-session-no-secure
+  name: Ciasteczko sesji bez flagi Secure na HTTPS
+  category: cookie
+  description: Ciasteczko sesji ustawione po HTTPS nie ma flagi Secure. Przeglądarka może je wysłać po nieszyfrowanym HTTP.
+  interest: 40
+  match:
+    condition: all
+    rules:
+      - {type: url, regex: '^https://', weight: 0.3}
+      - {type: cookie, name_regex: '(?:sess|sid$|session|auth|token|login|jwt|^PHPSESSID$|^JSESSIONID|^ASP\.NET_SessionId$|^connect\.sid$|^laravel_session$)', secure: false, weight: 0.8}
+
+- id: cookie-session-no-httponly
+  name: Ciasteczko sesji bez flagi HttpOnly
+  category: cookie
+  description: Ciasteczko sesji nie ma flagi HttpOnly. Skrypt na stronie może je odczytać (skutek XSS jest wtedy większy).
+  interest: 35
+  match:
+    rules:
+      - {type: cookie, name_regex: '(?:sess|sid$|session|auth|^PHPSESSID$|^JSESSIONID|^ASP\.NET_SessionId$|^connect\.sid$|^laravel_session$)', http_only: false, weight: 0.8}
+
+- id: cookie-jwt
+  name: Token JWT w ciasteczku
+  category: cookie
+  description: Wartość ciasteczka ma postać tokenu JWT. Treść tokenu jest czytelna dla każdego, kto go przechwyci.
+  interest: 35
+  match:
+    rules:
+      - {type: cookie, regex: '^(?:Bearer(?:%20|\+| ))?eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*$', weight: 0.9}
+
+- id: cookie-samesite-none-insecure
+  name: Ciasteczko SameSite=None bez Secure
+  category: cookie
+  description: Ciasteczko ma SameSite=None, ale nie ma flagi Secure. Przeglądarki odrzucają takie ciasteczka, a konfiguracja jest błędna.
+  interest: 20
+  match:
+    rules:
+      - {type: cookie, same_site: none, secure: false, weight: 0.8}
+
+- id: cookie-bigip
+  name: Ciasteczko F5 BIG-IP
+  category: cookie
+  technology: F5 BIG-IP
+  description: Ciasteczko BIGipServer koduje adres IP i port serwera zaplecza za load balancerem F5.
+  interest: 40
+  match:
+    rules:
+      - {type: cookie, name_regex: '^BIGipServer', weight: 0.9}
+
+- id: cookie-shiro-rememberme
+  name: Ciasteczko rememberMe (Apache Shiro)
+  category: cookie
+  technology: Apache Shiro
+  description: Odpowiedź ustawia rememberMe=deleteMe. To znak frameworka Apache Shiro.
+  tags: [java]
+  interest: 50
+  cpe: cpe:2.3:a:apache:shiro
+  match:
+    rules:
+      - {type: cookie, name: rememberMe, equals: deleteMe, weight: 0.9}
+      - {type: header, name: Set-Cookie, contains: 'rememberMe=deleteMe', weight: 0.9}
+
+- id: cookie-backend-route
+  name: Ciasteczko trasy do serwera zaplecza
+  category: cookie
+  description: Ciasteczko load balancera (SERVERID, ROUTEID, AWSALB, BALANCEID) wskazuje serwer zaplecza obsługujący sesję.
+  interest: 20
+  match:
+    rules:
+      - {type: cookie, name_regex: '^(SERVERID|ROUTEID|BALANCEID|SRVNAME|SRV|AWSALB|AWSALBCORS|AWSELB|X-Mapping-[a-z]+|ApplicationGatewayAffinity|ARRAffinity)$', weight: 0.85}
+
+- id: cookie-waf
+  name: Ciasteczko zapory aplikacyjnej
+  category: cookie
+  description: Ciasteczko ustawione przez zaporę aplikacyjną albo usługę anty-DDoS (Imperva, F5 ASM, Cloudflare, Barracuda, Citrix).
+  interest: 10
+  match:
+    rules:
+      - {type: cookie, name_regex: '^(incap_ses_|visid_incap_|nlbi_|__cf_bm$|cf_clearance$|TS[0-9a-f]{6,}$|barra_counter_session$|BNI__BARRACUDA_LB_COOKIE$|citrix_ns_id$|AL_SESS|ak_bmsc$|bm_sv$)', weight: 0.85}
+
+- id: cookie-language-framework
+  name: Ciasteczko sesji frameworka
+  category: cookie
+  description: Nazwa ciasteczka sesji zdradza technologię aplikacji (PHP, Java, ASP.NET, Laravel, Express, Django, Rails).
+  interest: 5
+  match:
+    rules:
+      - {type: cookie, name_regex: '^(PHPSESSID|JSESSIONID.*|ASP\.NET_SessionId|ASPSESSIONID[A-Z]+|\.AspNetCore\..+|laravel_session|connect\.sid|csrftoken|sessionid|_[a-z0-9_]+_session|CFID|CFTOKEN|ci_session|CAKEPHP|PLAY_SESSION|symfony|rack\.session)$', weight: 0.8}
+
+- id: coldfusion
+  name: Adobe ColdFusion
+  category: app-server
+  description: Serwer aplikacji Adobe ColdFusion (ciasteczka CFID i CFTOKEN).
+  tags: [java]
+  interest: 45
+  cpe: cpe:2.3:a:adobe:coldfusion
+  aliases: [ColdFusion]
+  match:
+    condition: all
+    rules:
+      - {type: cookie, name: CFID, weight: 0.7}
+      - {type: cookie, name: CFTOKEN, weight: 0.7}
+
+- id: bitrix
+  name: 1C-Bitrix
+  category: cms
+  description: System zarządzania treścią 1C-Bitrix.
+  tags: [php]
+  interest: 15
+  implies: [PHP]
+  match:
+    rules:
+      - {type: header, name: X-Powered-CMS, contains: 'Bitrix', weight: 0.95}
+      - {type: cookie, name_regex: '^BITRIX_SM_', weight: 0.9}

@@ -1,0 +1,1221 @@
+# Czujka: panele administracyjne, narzędzia deweloperskie, monitoring, bazy danych z interfejsem HTTP.
+# Hasze favicon policzono z prawdziwych instancji (cmd/fpprobe/testlab).
+
+- id: phpmyadmin
+  name: phpMyAdmin
+  category: panel
+  description: Panel administracyjny baz MySQL/MariaDB phpMyAdmin.
+  tags: [php, baza-danych]
+  interest: 60
+  classes: [admin-panel, login, database]
+  cpe: cpe:2.3:a:phpmyadmin:phpmyadmin
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name_regex: '^(phpMyAdmin|pma_lang|pmaUser-[0-9]+)', weight: 0.9}
+      - {type: title, regex: '^phpMyAdmin', weight: 0.8}
+      - {type: body, regex: 'name="pma_username"|pmahomme|phpmyadmin\.css\.php|PMA_commonParams', weight: 0.8}
+      - {type: favicon, mmh3: [-476231906], weight: 0.9}
+      - {type: path, path: /phpmyadmin/, status: [200], regex: 'name="pma_username"|pmahomme|PMA_commonParams', weight: 0.9}
+      - {type: path, path: /pma/, status: [200], regex: 'name="pma_username"|pmahomme|PMA_commonParams', weight: 0.9}
+  version:
+    - {type: body, regex: '(?:\.css|\.js)\?v=([0-9]+\.[0-9]+\.[0-9]+)'}
+    - {type: body, regex: 'PMA_VERSION:"([0-9.]+)"'}
+
+- id: adminer
+  name: Adminer
+  category: panel
+  description: Jednoplikowy panel baz danych Adminer.
+  tags: [php, baza-danych]
+  interest: 60
+  classes: [admin-panel, login, database]
+  cpe: cpe:2.3:a:adminer:adminer
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: ' - Adminer$', weight: 0.9}
+      - {type: cookie, name_regex: '^adminer_(sid|key|permanent|version)$', weight: 0.9}
+      - {type: body, regex: 'adminer\.org|name="auth\[driver\]"', weight: 0.8}
+      - {type: favicon, mmh3: [-519503050], weight: 0.9}
+      - {type: path, path: /adminer.php, status: [200], regex: 'adminer\.org[\s\S]{0,300}class=.version|name="auth\[driver\]"', weight: 0.9}
+  version:
+    - {type: body, regex: 'class=.version.[^>]*>([0-9.]+)<'}
+    - {type: body, regex: '[?&;]version=([0-9]+\.[0-9]+\.[0-9]+)'}
+
+- id: phppgadmin
+  name: phpPgAdmin
+  category: panel
+  description: Panel administracyjny PostgreSQL phpPgAdmin.
+  tags: [php, baza-danych]
+  interest: 60
+  classes: [admin-panel, database]
+  implies: [PHP]
+  match:
+    rules:
+      - {type: title, equals: phpPgAdmin, weight: 0.9}
+      - {type: cookie, name: PPA_ID, weight: 0.9}
+
+- id: pgadmin
+  name: pgAdmin
+  category: panel
+  description: Panel administracyjny PostgreSQL pgAdmin 4.
+  tags: [python, baza-danych]
+  interest: 60
+  classes: [admin-panel, login, database]
+  cpe: cpe:2.3:a:pgadmin:pgadmin_4
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^pgAdmin 4', weight: 0.9}
+      - {type: cookie, name: pga4_session, weight: 0.9}
+      - {type: body, regex: 'pgadmin4?/static|pgAdmin\.Browser', weight: 0.6}
+
+- id: mongo-express
+  name: Mongo Express
+  category: panel
+  description: Panel administracyjny MongoDB, często bez uwierzytelniania.
+  tags: [nodejs, baza-danych]
+  interest: 75
+  classes: [admin-panel, database]
+  match:
+    rules:
+      - {type: title, regex: 'Mongo Express$', weight: 0.9}
+      - {type: cookie, name: mongo-express, weight: 0.9}
+
+- id: redis-commander
+  name: Redis Commander
+  category: panel
+  description: Panel administracyjny Redis, często bez uwierzytelniania.
+  tags: [nodejs, baza-danych]
+  interest: 75
+  classes: [admin-panel, database]
+  match:
+    rules:
+      - {type: title, regex: '^Redis Commander', weight: 0.9}
+
+- id: grafana
+  name: Grafana
+  category: panel
+  description: Panele monitoringu Grafana.
+  tags: [go, monitoring]
+  interest: 35
+  classes: [login]
+  cpe: cpe:2.3:a:grafana:grafana
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, equals: Grafana, weight: 0.6}
+      - {type: body, regex: 'window\.grafanaBootData|grafana-app|public/build/grafana\.', weight: 0.8}
+      - {type: favicon, mmh3: [2123863676], weight: 0.9}
+      - {type: cookie, name_regex: '^grafana_(session|sess|user)', weight: 0.9}
+      - {type: path, path: /api/health, status: [200], regex: '"database"\s*:\s*"[a-z]+"', weight: 0.9}
+  version:
+    - {type: path, path: /api/health, regex: '"version"\s*:\s*"([0-9][0-9a-z.\-+]*)"'}
+    - {type: body, regex: '"version"\s*:\s*"([0-9]+\.[0-9]+\.[0-9]+)"'}
+
+- id: kibana
+  name: Kibana
+  category: panel
+  description: Interfejs Elastic Kibana.
+  tags: [nodejs, monitoring]
+  interest: 50
+  cpe: cpe:2.3:a:elastic:kibana
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: kbn-name, exists: true, weight: 0.9}
+      - {type: header, name: kbn-version, regex: '([0-9.]+)', weight: 0.9, version_group: 1}
+      - {type: header, name: kbn-license-sig, exists: true, weight: 0.9}
+      - {type: body, regex: 'kbn-injected-metadata|kbnLoadingMessage|kibanaWelcomeView', weight: 0.9}
+      - {type: redirect, regex: '/app/(?:kibana|home)|/spaces/enter', weight: 0.6}
+  version:
+    - {type: body, regex: '&quot;version&quot;:&quot;([0-9.]+)&quot;'}
+
+- id: elasticsearch
+  name: Elasticsearch
+  category: database
+  description: Silnik wyszukiwania Elasticsearch z dostępnym interfejsem HTTP.
+  tags: [java, baza-danych]
+  interest: 70
+  classes: [api]
+  cpe: cpe:2.3:a:elastic:elasticsearch
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, contains: 'You Know, for Search', weight: 0.95}
+      - {type: header, name: X-elastic-product, equals: Elasticsearch, weight: 0.95}
+      - {type: header, name: WWW-Authenticate, regex: 'realm="security"', weight: 0.5}
+  version:
+    - {type: body, regex: '"number"\s*:\s*"([0-9.]+)"'}
+
+- id: opensearch
+  name: OpenSearch
+  category: database
+  description: Silnik wyszukiwania OpenSearch albo OpenSearch Dashboards.
+  tags: [java, baza-danych]
+  interest: 60
+  match:
+    rules:
+      - {type: body, contains: 'The OpenSearch Project', weight: 0.95}
+      - {type: title, equals: 'OpenSearch Dashboards', weight: 0.9}
+      - {type: header, name: osd-name, exists: true, weight: 0.9}
+  version:
+    - {type: body, regex: '"number"\s*:\s*"([0-9.]+)"'}
+
+- id: jenkins
+  name: Jenkins
+  category: devops
+  description: Serwer CI/CD Jenkins.
+  tags: [java, ci]
+  interest: 55
+  classes: [dev-tool]
+  cpe: cpe:2.3:a:jenkins:jenkins
+  implies: [Java]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: X-Jenkins, regex: '^([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: header, name: X-Hudson, exists: true, weight: 0.8}
+      - {type: header, name: X-Jenkins-Session, exists: true, weight: 0.9}
+      - {type: favicon, mmh3: [81586312], weight: 0.9}
+      - {type: body, regex: 'Dashboard \[Jenkins\]|hudson\.model\.Hudson|jenkins-head-icon', weight: 0.8}
+
+- id: jenkins-open
+  name: Jenkins bez logowania
+  category: devops
+  technology: Jenkins
+  description: Panel Jenkinsa odpowiada kodem 200 bez logowania. Zadania i konfiguracja mogą być czytelne dla każdego.
+  interest: 85
+  classes: [dev-tool, admin-panel]
+  match:
+    condition: all
+    rules:
+      - {type: header, name: X-Jenkins, exists: true, weight: 0.9}
+      - {type: status, status: [200], weight: 0.3}
+      - {type: title, regex: 'Dashboard \[Jenkins\]|\[Jenkins\]$', weight: 0.8}
+
+- id: gitlab
+  name: GitLab
+  category: devops
+  description: Platforma repozytoriów i CI GitLab.
+  tags: [ruby, git]
+  interest: 45
+  classes: [dev-tool, login]
+  cpe: cpe:2.3:a:gitlab:gitlab
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name: _gitlab_session, weight: 0.95}
+      - {type: header, name: X-Gitlab-Meta, exists: true, weight: 0.9}
+      - {type: body, regex: 'gon\.gitlab_url|content="GitLab"|gitlab-logo|/assets/webpack/', weight: 0.7}
+      - {type: title, regex: 'GitLab', weight: 0.5}
+      - {type: redirect, contains: '/users/sign_in', weight: 0.5}
+
+- id: gitea
+  name: Gitea
+  category: devops
+  description: Lekki serwer repozytoriów Git Gitea.
+  tags: [go, git]
+  interest: 40
+  classes: [dev-tool]
+  cpe: cpe:2.3:a:gitea:gitea
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name: i_like_gitea, weight: 0.8}
+      - {type: meta, name: author, contains: 'Gitea - Git with a cup of tea', weight: 0.9}
+      - {type: title, contains: 'Gitea: Git with a cup of tea', weight: 0.9}
+      - {type: favicon, mmh3: [-1266910437], weight: 0.9}
+      - {type: path, path: /api/v1/version, status: [200], regex: '^\{"version":"([0-9][^"]*)"\}', weight: 0.8, version_group: 1}
+  version:
+    - {type: body, regex: 'appVer:\s*[''"]([0-9][0-9a-z.\-+]*)[''"]'}
+    - {type: body, regex: 'Powered by Gitea[\s\S]{0,80}?Version:\s*([0-9][0-9a-z.\-+]*)'}
+
+- id: gitea-installer
+  name: Gitea – niedokończona instalacja
+  category: devops
+  technology: Gitea
+  description: Strona instalatora Gitea jest dostępna. Kto ją wypełni, zostaje administratorem serwera.
+  interest: 80
+  classes: [dev-tool, admin-panel]
+  match:
+    rules:
+      - {type: title, regex: '^Installation - Gitea', weight: 0.95}
+
+- id: forgejo
+  name: Forgejo
+  category: devops
+  description: Serwer repozytoriów Git Forgejo.
+  tags: [go, git]
+  interest: 40
+  classes: [dev-tool]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: meta, name: author, contains: 'Forgejo', weight: 0.9}
+      - {type: title, contains: 'Forgejo', weight: 0.7}
+      - {type: body, regex: 'Powered by Forgejo|forgejo\.org', weight: 0.7}
+
+- id: gogs
+  name: Gogs
+  category: devops
+  description: Serwer repozytoriów Git Gogs.
+  tags: [go, git]
+  interest: 40
+  classes: [dev-tool]
+  cpe: cpe:2.3:a:gogs:gogs
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name: i_like_gogs, weight: 0.95}
+      - {type: meta, name: author, contains: 'Gogs', weight: 0.8}
+
+- id: portainer
+  name: Portainer
+  category: devops
+  description: Panel zarządzania kontenerami Portainer.
+  tags: [go, docker]
+  interest: 65
+  classes: [admin-panel, dev-tool]
+  cpe: cpe:2.3:a:portainer:portainer
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, equals: Portainer, weight: 0.7}
+      - {type: body, regex: 'ng-app="@?portainer|content="Portainer\.io"', weight: 0.9}
+      - {type: favicon, mmh3: [-845890009], weight: 0.9}
+
+- id: portainer-uninitialized
+  name: Portainer – brak konta administratora
+  category: devops
+  technology: Portainer
+  description: Portainer czeka na utworzenie konta administratora albo zablokował się po upływie czasu na inicjalizację.
+  interest: 80
+  classes: [admin-panel]
+  match:
+    rules:
+      - {type: url, regex: '/timeout\.html$', required: true, weight: 0.5}
+      - {type: body, contains: 'portainer', weight: 0.6}
+
+- id: proxmox
+  name: Proxmox VE
+  category: panel
+  description: Platforma wirtualizacji Proxmox Virtual Environment.
+  tags: [wirtualizacja]
+  interest: 65
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:a:proxmox:virtual_environment
+  aliases: [Proxmox]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: ' - Proxmox (?:Virtual Environment|Backup Server|Mail Gateway)$', weight: 0.95}
+      - {type: header, name: Server, regex: '^pve-api-daemon', weight: 0.95}
+      - {type: body, regex: 'PVE\.UserName|/pve2/(?:css|ext6|js)/|proxmoxlib\.js', weight: 0.9}
+
+- id: rabbitmq
+  name: RabbitMQ Management
+  category: panel
+  description: Panel zarządzania brokerem RabbitMQ.
+  tags: [erlang, kolejki]
+  interest: 50
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:a:vmware:rabbitmq
+  aliases: [RabbitMQ]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, equals: 'RabbitMQ Management', weight: 0.95}
+      - {type: favicon, mmh3: [-1015107330], weight: 0.9}
+      - {type: body, regex: 'js/management-ejs\.js|rabbitmq', weight: 0.6}
+
+- id: traefik-dashboard
+  name: Traefik – panel
+  category: devops
+  technology: Traefik
+  description: Panel Traefika jest dostępny bez logowania. Pokazuje routery, usługi i adresy zaplecza.
+  interest: 65
+  classes: [admin-panel, dev-tool]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: url, contains: '/dashboard/', weight: 0.4}
+      - {type: title, regex: '^Traefik(?: Proxy)?$', weight: 0.7}
+      - {type: favicon, mmh3: [1752131761], weight: 0.9}
+
+- id: prometheus
+  name: Prometheus
+  category: devops
+  description: System monitoringu Prometheus. Interfejs nie ma własnego logowania.
+  tags: [go, monitoring]
+  interest: 50
+  classes: [dev-tool]
+  cpe: cpe:2.3:a:prometheus:prometheus
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^Prometheus Time Series Collection and Processing Server', weight: 0.95}
+      - {type: favicon, mmh3: [-1449038499], weight: 0.9}
+      - {type: path, path: /api/v1/status/buildinfo, status: [200], regex: '"status"\s*:\s*"success"[\s\S]{0,80}"version"', weight: 0.9}
+  version:
+    - {type: path, path: /api/v1/status/buildinfo, regex: '"version"\s*:\s*"([0-9][0-9a-z.\-+]*)"'}
+
+- id: prometheus-exporter
+  name: Eksporter Prometheus
+  category: devops
+  description: Eksporter metryk (node_exporter i podobne). Metryki ujawniają szczegóły systemu.
+  tags: [monitoring]
+  interest: 35
+  classes: [dev-tool]
+  match:
+    rules:
+      - {type: title, regex: '^(?:Node|Blackbox|Windows|MySQL|Postgres|Redis|SNMP|Process|Nginx|Apache|HAProxy|Elasticsearch|MongoDB|Kafka|JMX|cAdvisor)[ _]?Exporter', weight: 0.9}
+      - {type: body, regex: '<a href=["'']/?metrics["'']>Metrics</a>', weight: 0.8}
+      - {type: title, equals: 'Prometheus Pushgateway', weight: 0.9}
+
+- id: alertmanager
+  name: Alertmanager
+  category: devops
+  description: Prometheus Alertmanager.
+  tags: [go, monitoring]
+  interest: 45
+  classes: [dev-tool]
+  match:
+    rules:
+      - {type: title, equals: Alertmanager, weight: 0.9}
+
+- id: zabbix
+  name: Zabbix
+  category: panel
+  description: System monitoringu Zabbix.
+  tags: [php, monitoring]
+  interest: 50
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:a:zabbix:zabbix
+  implies: [PHP]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: cookie, name_regex: '^zbx_session(id)?$', weight: 0.95}
+      - {type: title, regex: 'Zabbix', weight: 0.6}
+      - {type: body, regex: 'zabbix\.com|class="zabbix-logo"|zbx-(?:logo|sidebar)', weight: 0.7}
+  version:
+    - {type: body, regex: 'Zabbix ([0-9]+\.[0-9]+(?:\.[0-9]+)?)\.? '}
+
+- id: nagios
+  name: Nagios
+  category: panel
+  description: System monitoringu Nagios.
+  tags: [monitoring]
+  interest: 50
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:a:nagios:nagios
+  match:
+    rules:
+      - {type: header, name: WWW-Authenticate, regex: 'realm="Nagios', weight: 0.95}
+      - {type: title, regex: '^Nagios(?: Core| XI)?', weight: 0.9}
+
+- id: icinga
+  name: Icinga Web
+  category: panel
+  description: System monitoringu Icinga.
+  tags: [php, monitoring]
+  interest: 50
+  classes: [admin-panel, login]
+  match:
+    rules:
+      - {type: cookie, name_regex: '^[Ii]cingaweb2', weight: 0.95}
+      - {type: title, regex: '^Icinga Web 2', weight: 0.9}
+
+- id: checkmk
+  name: Checkmk
+  category: panel
+  description: System monitoringu Checkmk.
+  tags: [python, monitoring]
+  interest: 50
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:a:checkmk:checkmk
+  match:
+    rules:
+      - {type: title, regex: '^Checkmk', weight: 0.8}
+      - {type: body, regex: '/check_mk/(?:themes|js)/|check_mk/login\.py', weight: 0.9}
+      - {type: redirect, contains: '/check_mk/', weight: 0.8}
+
+- id: netdata
+  name: Netdata
+  category: panel
+  description: Monitoring Netdata. Panel zwykle nie wymaga logowania.
+  tags: [monitoring]
+  interest: 50
+  classes: [dev-tool]
+  cpe: cpe:2.3:a:netdata:netdata
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Netdata Embedded HTTP Server(?: v?([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: title, regex: '^netdata dashboard|^Netdata Agent Console', weight: 0.9}
+
+- id: uptime-kuma
+  name: Uptime Kuma
+  category: panel
+  description: Monitoring dostępności Uptime Kuma.
+  tags: [nodejs, monitoring]
+  interest: 35
+  match:
+    rules:
+      - {type: title, equals: 'Uptime Kuma', weight: 0.9}
+
+- id: cpanel
+  name: cPanel / WHM
+  category: panel
+  description: Panel hostingowy cPanel, WHM albo Webmail.
+  tags: [hosting]
+  interest: 55
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:a:cpanel:cpanel
+  aliases: [cPanel, WHM]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^cpsrvd(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: title, regex: '^(?:cPanel|WHM|Webmail) Login$', weight: 0.9}
+      - {type: cookie, name_regex: '^(cprelogin|cpsession|whostmgrsession|webmailsession)$', weight: 0.9}
+
+- id: plesk
+  name: Plesk
+  category: panel
+  description: Panel hostingowy Plesk.
+  tags: [hosting]
+  interest: 55
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:a:plesk:plesk
+  match:
+    rules:
+      - {type: header, name: X-Powered-By, regex: '^Plesk(?:Lin|Win)', weight: 0.95}
+      - {type: title, regex: '^Plesk (?:Obsidian|Onyx)?', weight: 0.8}
+      - {type: header, name: Server, regex: '^sw-cp-server', weight: 0.95}
+
+- id: plesk-default-page
+  name: Plesk – strona domyślna
+  category: panel
+  technology: Plesk
+  description: Domena pokazuje stronę domyślną hostingu Plesk.
+  interest: 15
+  classes: [default-page]
+  match:
+    rules:
+      - {type: title, regex: 'Web Server''s Default Page|Domain Default page', weight: 0.9}
+
+- id: directadmin
+  name: DirectAdmin
+  category: panel
+  description: Panel hostingowy DirectAdmin.
+  tags: [hosting]
+  interest: 55
+  classes: [admin-panel, login]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^DirectAdmin Daemon(?: v?([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: title, equals: 'DirectAdmin Login', weight: 0.9}
+
+- id: webmin
+  name: Webmin
+  category: panel
+  description: Panel administracji systemem Webmin / Usermin.
+  tags: [perl]
+  interest: 65
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:a:webmin:webmin
+  aliases: [MiniServ]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^MiniServ(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: title, regex: '^Login to (?:Webmin|Usermin)', weight: 0.9}
+      - {type: service, field: product, regex: 'MiniServ|Webmin', weight: 0.8}
+
+- id: cockpit
+  name: Cockpit
+  category: panel
+  description: Panel administracji serwerem Linux Cockpit.
+  interest: 60
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:a:cockpit-project:cockpit
+  match:
+    rules:
+      - {type: body, regex: 'cockpit/static/login\.(?:js|css|min\.js)|id="login-fatal"', weight: 0.9}
+      - {type: cookie, name: cockpit, weight: 0.8}
+
+- id: keycloak
+  name: Keycloak
+  category: security
+  description: Serwer tożsamości Keycloak.
+  tags: [java, sso]
+  interest: 50
+  classes: [login]
+  cpe: cpe:2.3:a:redhat:keycloak
+  implies: [Java]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: 'Keycloak', weight: 0.8}
+      - {type: body, regex: '/resources/[0-9a-z]+/(?:admin|welcome|login|common)/keycloak', weight: 0.9}
+      - {type: favicon, mmh3: [-533488376], weight: 0.9}
+      - {type: cookie, name_regex: '^(AUTH_SESSION_ID|KC_RESTART|KEYCLOAK_)', weight: 0.9}
+      - {type: path, path: /realms/master, status: [200], contains_all: ['"realm":"master"', '"public_key"'], weight: 0.95}
+
+- id: keycloak-admin-console
+  name: Keycloak – konsola administracyjna
+  category: security
+  technology: Keycloak
+  description: Konsola administracyjna Keycloak jest osiągalna z sieci.
+  interest: 70
+  classes: [admin-panel]
+  match:
+    rules:
+      - {type: title, equals: 'Keycloak Administration Console', weight: 0.95}
+      - {type: url, regex: '/admin/[a-z0-9_-]+/console/', weight: 0.6}
+
+- id: sonarqube
+  name: SonarQube
+  category: devops
+  description: Analiza jakości kodu SonarQube.
+  tags: [java, kod]
+  interest: 50
+  classes: [dev-tool]
+  cpe: cpe:2.3:a:sonarsource:sonarqube
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^SonarQube', weight: 0.8}
+      - {type: body, regex: 'window\.serverStatus|sonarqube', weight: 0.5}
+      - {type: path, path: /api/system/status, status: [200], regex: '"status"\s*:\s*"(?:UP|STARTING|DB_MIGRATION_NEEDED)"', weight: 0.8}
+  version:
+    - {type: path, path: /api/system/status, regex: '"version"\s*:\s*"([0-9.]+)"'}
+
+- id: nexus
+  name: Sonatype Nexus Repository
+  category: devops
+  description: Repozytorium artefaktów Sonatype Nexus.
+  tags: [java, artefakty]
+  interest: 50
+  classes: [dev-tool]
+  cpe: cpe:2.3:a:sonatype:nexus_repository_manager
+  aliases: [Nexus]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Nexus/([0-9.\-]+)', weight: 0.95, version_group: 1}
+      - {type: title, regex: '^(?:Sonatype )?Nexus Repository', weight: 0.9}
+      - {type: cookie, name: NX-ANTI-CSRF-TOKEN, weight: 0.9}
+
+- id: artifactory
+  name: JFrog Artifactory
+  category: devops
+  description: Repozytorium artefaktów JFrog Artifactory.
+  tags: [java, artefakty]
+  interest: 50
+  classes: [dev-tool]
+  cpe: cpe:2.3:a:jfrog:artifactory
+  aliases: [Artifactory]
+  match:
+    rules:
+      - {type: header, name: X-Artifactory-Id, exists: true, weight: 0.95}
+      - {type: header, name: X-JFrog-Version, regex: '(?:Artifactory/)?([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: header, name: Server, regex: '^Artifactory/([0-9.]+)', weight: 0.95, version_group: 1}
+
+- id: harbor
+  name: Harbor
+  category: devops
+  description: Rejestr obrazów kontenerów Harbor.
+  tags: [go, docker]
+  interest: 50
+  classes: [dev-tool]
+  cpe: cpe:2.3:a:linuxfoundation:harbor
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, equals: Harbor, weight: 0.6}
+      - {type: body, contains: '<harbor-app>', weight: 0.9}
+      - {type: path, path: /api/v2.0/systeminfo, status: [200], contains: '"harbor_version"', weight: 0.95}
+  version:
+    - {type: path, path: /api/v2.0/systeminfo, regex: '"harbor_version"\s*:\s*"v?([0-9.]+)'}
+
+- id: docker-registry
+  name: Docker Registry
+  category: devops
+  description: Rejestr obrazów Docker (API v2).
+  tags: [go, docker]
+  interest: 55
+  classes: [dev-tool, api]
+  match:
+    rules:
+      - {type: header, name: Docker-Distribution-Api-Version, exists: true, weight: 0.95}
+      - {type: path, path: /v2/, status: [200, 401], field: header, name: Docker-Distribution-Api-Version, contains: 'registry/', weight: 0.95}
+
+- id: docker-registry-open
+  name: Docker Registry bez uwierzytelniania
+  category: devops
+  technology: Docker Registry
+  description: Rejestr obrazów odpowiada na /v2/ kodem 200 bez logowania. Każdy może pobrać obrazy.
+  interest: 85
+  classes: [dev-tool, api]
+  match:
+    rules:
+      - {type: path, path: /v2/, status: [200], field: header, name: Docker-Distribution-Api-Version, contains: 'registry/', weight: 0.95}
+
+- id: docker-api
+  name: Docker Engine API
+  category: devops
+  description: API demona Docker dostępne w sieci bez uwierzytelniania. Daje pełną kontrolę nad hostem.
+  tags: [docker]
+  interest: 100
+  classes: [dev-tool, api]
+  cpe: cpe:2.3:a:docker:docker
+  aliases: [Docker]
+  match:
+    rules:
+      - {type: path, path: /version, status: [200], contains_all: ['"ApiVersion"', '"MinAPIVersion"'], weight: 0.95}
+      - {type: header, name: Server, regex: '^Docker/([0-9.]+)', weight: 0.9, version_group: 1}
+  version:
+    - {type: path, path: /version, regex: '"Version"\s*:\s*"([0-9.]+)'}
+
+- id: kubernetes-api
+  name: Kubernetes API
+  category: devops
+  description: Serwer API Kubernetes.
+  tags: [go, kubernetes]
+  interest: 70
+  classes: [api, dev-tool]
+  cpe: cpe:2.3:a:kubernetes:kubernetes
+  aliases: [Kubernetes]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name_regex: '^X-Kubernetes-Pf-(Flowschema|Prioritylevel)-Uid$', exists: true, weight: 0.95}
+      - {type: body, regex: '"kind"\s*:\s*"Status"[\s\S]{0,200}"apiVersion"\s*:\s*"v1"', weight: 0.8}
+      - {type: path, path: /version, status: [200], contains_all: ['"gitVersion"', '"platform"'], weight: 0.95}
+  version:
+    - {type: path, path: /version, regex: '"gitVersion"\s*:\s*"v?([0-9.]+)'}
+
+- id: kubernetes-dashboard
+  name: Kubernetes Dashboard
+  category: devops
+  description: Panel WWW klastra Kubernetes.
+  tags: [kubernetes]
+  interest: 75
+  classes: [admin-panel, dev-tool]
+  match:
+    rules:
+      - {type: title, equals: 'Kubernetes Dashboard', weight: 0.95}
+      - {type: body, contains: '<kd-root>', weight: 0.9}
+
+- id: rancher
+  name: Rancher
+  category: devops
+  description: Platforma zarządzania klastrami Kubernetes Rancher.
+  tags: [kubernetes]
+  interest: 65
+  classes: [admin-panel, dev-tool]
+  cpe: cpe:2.3:a:suse:rancher
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^Rancher$|^Loading…$', weight: 0.3}
+      - {type: body, regex: 'rancher', weight: 0.4}
+      - {type: header, name_regex: '^X-(Rancher-Version|Api-Cattle-Auth)$', exists: true, weight: 0.9}
+
+- id: argocd
+  name: Argo CD
+  category: devops
+  description: Narzędzie GitOps Argo CD.
+  tags: [kubernetes, ci]
+  interest: 55
+  classes: [dev-tool, login]
+  cpe: cpe:2.3:a:argoproj:argo_cd
+  match:
+    rules:
+      - {type: title, equals: 'Argo CD', weight: 0.95}
+
+- id: swagger-ui
+  name: Swagger UI
+  category: devops
+  description: Interaktywna dokumentacja API Swagger UI. Pokazuje wszystkie punkty końcowe usługi.
+  tags: [api, dokumentacja]
+  interest: 40
+  classes: [api, dev-tool]
+  cpe: cpe:2.3:a:smartbear:swagger_ui
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, equals: 'Swagger UI', weight: 0.8}
+      - {type: body, regex: 'swagger-ui-bundle\.js|id="swagger-ui"|swagger-ui\.css', weight: 0.9}
+      - {type: favicon, mmh3: [-1128940573], weight: 0.8}
+      - {type: path, path: /swagger-ui/index.html, status: [200], regex: 'swagger-ui', weight: 0.9}
+      - {type: path, path: /swagger/index.html, status: [200], regex: 'swagger-ui', weight: 0.9}
+
+- id: openapi-spec
+  name: Specyfikacja OpenAPI
+  category: devops
+  technology: false
+  description: Usługa udostępnia opis swojego API (OpenAPI/Swagger).
+  tags: [api, dokumentacja]
+  interest: 35
+  classes: [api]
+  match:
+    rules:
+      - {type: path, path: /v3/api-docs, status: [200], regex: '"openapi"\s*:\s*"3\.', weight: 0.95}
+      - {type: path, path: /openapi.json, status: [200], regex: '"openapi"\s*:\s*"3\.', weight: 0.95}
+      - {type: path, path: /swagger.json, status: [200], regex: '"swagger"\s*:\s*"2\.|"openapi"\s*:\s*"3\.', weight: 0.95}
+      - {type: body, regex: '^\s*\{\s*"(?:openapi|swagger)"\s*:\s*"[23]\.', weight: 0.9}
+
+- id: graphql
+  name: GraphQL
+  category: devops
+  technology: false
+  description: Interfejs GraphQL albo jego konsola (GraphiQL, Playground).
+  tags: [api]
+  interest: 40
+  classes: [api]
+  match:
+    rules:
+      - {type: title, regex: 'GraphiQL|GraphQL Playground|Apollo (?:Server|Sandbox)', weight: 0.9}
+      - {type: body, regex: 'graphiql(?:\.min)?\.(?:js|css)|GraphQLPlayground\.init', weight: 0.9}
+
+- id: defectdojo
+  name: DefectDojo
+  category: security
+  description: Platforma zarządzania podatnościami DefectDojo.
+  tags: [python, bezpieczenstwo]
+  interest: 60
+  classes: [login]
+  implies: [Django]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: 'DefectDojo', weight: 0.8}
+      - {type: body, regex: '/static/dojo/|DefectDojo', weight: 0.7}
+
+- id: consul
+  name: HashiCorp Consul
+  category: devops
+  description: Rejestr usług HashiCorp Consul.
+  tags: [go]
+  interest: 60
+  classes: [dev-tool]
+  cpe: cpe:2.3:a:hashicorp:consul
+  aliases: [Consul]
+  match:
+    rules:
+      - {type: title, equals: 'Consul by HashiCorp', weight: 0.95}
+      - {type: header, name_regex: '^X-Consul-', exists: true, weight: 0.95}
+      - {type: body, contains: 'consul-ui/config/environment', weight: 0.9}
+
+- id: vault
+  name: HashiCorp Vault
+  category: security
+  description: Magazyn sekretów HashiCorp Vault.
+  tags: [go, sekrety]
+  interest: 65
+  classes: [login]
+  cpe: cpe:2.3:a:hashicorp:vault
+  aliases: [Vault]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, contains: 'vault/config/environment', weight: 0.9}
+      - {type: title, equals: Vault, weight: 0.4}
+      - {type: path, path: /v1/sys/health, status: [200, 429, 472, 473, 501, 503], contains_all: ['"sealed"', '"initialized"'], weight: 0.95}
+  version:
+    - {type: path, path: /v1/sys/health, regex: '"version"\s*:\s*"([0-9.]+)'}
+
+- id: nomad
+  name: HashiCorp Nomad
+  category: devops
+  description: Orkiestrator HashiCorp Nomad.
+  tags: [go]
+  interest: 65
+  classes: [dev-tool]
+  aliases: [Nomad]
+  match:
+    rules:
+      - {type: body, contains: 'nomad-ui/config/environment', weight: 0.95}
+      - {type: header, name: X-Nomad-Index, exists: true, weight: 0.95}
+
+- id: airflow
+  name: Apache Airflow
+  category: devops
+  description: Harmonogram zadań Apache Airflow.
+  tags: [python, dane]
+  interest: 60
+  classes: [dev-tool, login]
+  cpe: cpe:2.3:a:apache:airflow
+  aliases: [Airflow]
+  match:
+    rules:
+      - {type: title, regex: '^(?:Sign In - )?Airflow', weight: 0.9}
+      - {type: body, regex: 'airflow\.apache\.org|/static/pin_32\.png', weight: 0.6}
+
+- id: guacamole
+  name: Apache Guacamole
+  category: panel
+  description: Brama zdalnego pulpitu Apache Guacamole.
+  tags: [java, zdalny-dostep]
+  interest: 65
+  classes: [login, remote-access]
+  cpe: cpe:2.3:a:apache:guacamole
+  aliases: [Guacamole]
+  match:
+    rules:
+      - {type: title, regex: 'Guacamole', weight: 0.7}
+      - {type: body, regex: '<guac-(?:modal|notification)|guacamole-common-js|ng-app="index"[\s\S]{0,400}guac', weight: 0.9}
+
+- id: graylog
+  name: Graylog
+  category: panel
+  description: System zbierania logów Graylog.
+  tags: [java, logi]
+  interest: 50
+  classes: [login]
+  cpe: cpe:2.3:a:graylog:graylog
+  match:
+    rules:
+      - {type: header, name: X-Graylog-Node-Id, exists: true, weight: 0.95}
+      - {type: title, equals: 'Graylog Web Interface', weight: 0.95}
+
+- id: solr
+  name: Apache Solr
+  category: database
+  description: Silnik wyszukiwania Apache Solr z panelem administracyjnym.
+  tags: [java, baza-danych]
+  interest: 65
+  classes: [admin-panel]
+  cpe: cpe:2.3:a:apache:solr
+  aliases: [Solr]
+  match:
+    rules:
+      - {type: title, equals: 'Solr Admin', weight: 0.95}
+      - {type: body, contains: 'ng-app="solrAdminApp"', weight: 0.95}
+      - {type: redirect, regex: '/solr/$', weight: 0.6}
+
+- id: couchdb
+  name: Apache CouchDB
+  category: database
+  description: Baza dokumentowa CouchDB z interfejsem HTTP.
+  tags: [erlang, baza-danych]
+  interest: 70
+  classes: [api]
+  cpe: cpe:2.3:a:apache:couchdb
+  aliases: [CouchDB]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^CouchDB/([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: body, regex: '"couchdb"\s*:\s*"Welcome"', weight: 0.95}
+  version:
+    - {type: body, regex: '"version"\s*:\s*"([0-9.]+)"'}
+
+- id: influxdb
+  name: InfluxDB
+  category: database
+  description: Baza szeregów czasowych InfluxDB.
+  tags: [go, baza-danych]
+  interest: 60
+  cpe: cpe:2.3:a:influxdata:influxdb
+  match:
+    rules:
+      - {type: header, name: X-Influxdb-Version, regex: 'v?([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: header, name: X-Influxdb-Build, exists: true, weight: 0.95}
+
+- id: minio
+  name: MinIO
+  category: devops
+  description: Magazyn obiektów MinIO (zgodny z S3).
+  tags: [go, pliki]
+  interest: 55
+  cpe: cpe:2.3:a:minio:minio
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^MinIO', weight: 0.95}
+      - {type: title, regex: '^MinIO (?:Console|Browser)', weight: 0.9}
+
+- id: s3-compatible
+  name: Magazyn obiektów S3
+  category: devops
+  technology: false
+  description: Usługa odpowiada jak magazyn obiektów zgodny z Amazon S3.
+  tags: [pliki]
+  interest: 40
+  match:
+    condition: all
+    rules:
+      - {type: header, name: X-Amz-Request-Id, exists: true, weight: 0.6}
+      - {type: body, regex: '<Error>\s*<Code>|<ListBucketResult|<ListAllMyBucketsResult', weight: 0.7}
+
+- id: s3-bucket-listing
+  name: Publiczna lista obiektów S3
+  category: devops
+  technology: false
+  description: Magazyn obiektów pokazuje listę plików bez uwierzytelniania.
+  tags: [pliki]
+  interest: 80
+  classes: [directory-listing]
+  match:
+    rules:
+      - {type: body, regex: '<ListBucketResult[\s>]', weight: 0.95}
+
+- id: mailhog
+  name: MailHog / Mailpit
+  category: devops
+  description: Narzędzie testowe przechwytujące pocztę. Oznacza środowisko deweloperskie i pokazuje wiadomości każdemu.
+  tags: [poczta, test]
+  interest: 60
+  classes: [dev-tool, staging]
+  aliases: [Mailpit]
+  match:
+    rules:
+      - {type: title, regex: '^(?:MailHog|Mailpit)$', weight: 0.95}
+
+- id: teamcity
+  name: JetBrains TeamCity
+  category: devops
+  description: Serwer CI JetBrains TeamCity.
+  tags: [java, ci]
+  interest: 55
+  classes: [dev-tool, login]
+  cpe: cpe:2.3:a:jetbrains:teamcity
+  aliases: [TeamCity]
+  match:
+    rules:
+      - {type: header, name: TeamCity-Node-Id, exists: true, weight: 0.95}
+      - {type: title, regex: 'TeamCity', weight: 0.8}
+      - {type: cookie, name: TCSESSIONID, weight: 0.9}
+  version:
+    - {type: body, regex: 'Version ([0-9]{4}\.[0-9.]+) \(build'}
+
+- id: sentry
+  name: Sentry
+  category: devops
+  description: Platforma śledzenia błędów Sentry.
+  tags: [python]
+  interest: 45
+  classes: [dev-tool, login]
+  cpe: cpe:2.3:a:sentry:sentry
+  match:
+    rules:
+      - {type: title, regex: '\| Sentry$', weight: 0.8}
+      - {type: cookie, name_regex: '^(sentrysid|sentry-sc)$', weight: 0.9}
+
+- id: jaeger
+  name: Jaeger / Zipkin
+  category: devops
+  description: Interfejs śledzenia rozproszonego (Jaeger albo Zipkin), zwykle bez logowania.
+  tags: [monitoring]
+  interest: 45
+  classes: [dev-tool]
+  aliases: [Zipkin]
+  match:
+    rules:
+      - {type: title, regex: '^Jaeger UI$|^Zipkin', weight: 0.95}
+
+- id: supervisor
+  name: Supervisor
+  category: panel
+  description: Panel menedżera procesów Supervisor. Pozwala zatrzymywać i uruchamiać procesy.
+  tags: [python]
+  interest: 70
+  classes: [admin-panel]
+  match:
+    rules:
+      - {type: title, equals: 'Supervisor Status', weight: 0.95}
+      - {type: header, name: Server, regex: '^Medusa/', weight: 0.8}
+
+- id: pihole
+  name: Pi-hole
+  category: panel
+  description: Filtr DNS Pi-hole.
+  tags: [dns]
+  interest: 40
+  classes: [admin-panel]
+  match:
+    rules:
+      - {type: header, name: X-Pi-hole, exists: true, weight: 0.95}
+      - {type: title, regex: '^Pi-hole', weight: 0.9}
+
+- id: adguard-home
+  name: AdGuard Home
+  category: panel
+  description: Filtr DNS AdGuard Home.
+  tags: [dns]
+  interest: 40
+  classes: [admin-panel, login]
+  match:
+    rules:
+      - {type: title, regex: 'AdGuard Home', weight: 0.9}
+      - {type: body, contains: 'AdGuard Home', weight: 0.5}
+
+- id: vaultwarden
+  name: Vaultwarden / Bitwarden
+  category: security
+  description: Menedżer haseł Bitwarden albo Vaultwarden.
+  tags: [hasla]
+  interest: 55
+  classes: [login]
+  aliases: [Bitwarden]
+  match:
+    rules:
+      - {type: title, regex: '^(?:Vaultwarden Web|Bitwarden Web Vault|Bitwarden)$', weight: 0.9}
+      - {type: body, regex: 'bitwarden|vaultwarden', weight: 0.4}
+
+- id: syncthing
+  name: Syncthing
+  category: panel
+  description: Synchronizacja plików Syncthing – panel WWW.
+  tags: [go, pliki]
+  interest: 55
+  classes: [admin-panel]
+  match:
+    rules:
+      - {type: header, name_regex: '^X-Syncthing-(Id|Version)$', exists: true, weight: 0.95}
+      - {type: body, regex: 'ng-app="syncthing"|syncthing/core/', weight: 0.9}
+
+- id: vmware-esxi
+  name: VMware ESXi
+  category: panel
+  description: Hiperwizor VMware ESXi – interfejs zarządzania.
+  tags: [wirtualizacja]
+  interest: 70
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:o:vmware:esxi
+  aliases: ['VMware ESXi SOAP API', ESXi]
+  match:
+    rules:
+      - {type: body, contains: 'ID_EESX_Welcome', weight: 0.95}
+      - {type: title, regex: 'VMware ESXi', weight: 0.9}
+      - {type: service, field: product, regex: 'VMware ESXi', weight: 0.8}
+
+- id: vmware-vcenter
+  name: VMware vCenter
+  category: panel
+  description: Serwer zarządzania VMware vCenter.
+  tags: [wirtualizacja]
+  interest: 75
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:a:vmware:vcenter_server
+  aliases: [vCenter, 'VMware vCenter Server']
+  match:
+    rules:
+      - {type: body, regex: 'ID_VC_Welcome|/vsphere-client/|/ui/" title="Launch vSphere', weight: 0.95}
+      - {type: service, field: product, regex: 'VMware vCenter', weight: 0.8}
+
+- id: code-server
+  name: code-server
+  category: devops
+  description: Visual Studio Code w przeglądarce (code-server). Daje terminal na serwerze.
+  tags: [nodejs, ide]
+  interest: 75
+  classes: [dev-tool, login]
+  match:
+    rules:
+      - {type: title, regex: '^code-server(?: login)?$', weight: 0.95}
+
+- id: node-red
+  name: Node-RED
+  category: devops
+  description: Edytor przepływów Node-RED, często bez logowania. Pozwala uruchamiać kod.
+  tags: [nodejs, automatyka]
+  interest: 80
+  classes: [dev-tool, admin-panel]
+  cpe: cpe:2.3:a:nodered:node-red
+  match:
+    rules:
+      - {type: title, equals: Node-RED, weight: 0.95}
+
+- id: n8n
+  name: n8n
+  category: devops
+  description: Automatyzacja przepływów n8n.
+  tags: [nodejs, automatyka]
+  interest: 55
+  classes: [dev-tool, login]
+  match:
+    rules:
+      - {type: title, regex: '^n8n\.io - Workflow Automation', weight: 0.95}
+
+- id: ollama
+  name: Ollama
+  category: devops
+  description: Serwer modeli językowych Ollama z otwartym API.
+  tags: [ai, api]
+  interest: 60
+  classes: [api]
+  match:
+    rules:
+      - {type: body, regex: '^Ollama is running', weight: 0.95}
+
+- id: open-webui
+  name: Open WebUI
+  category: panel
+  description: Interfejs czatu dla modeli językowych Open WebUI.
+  tags: [ai]
+  interest: 40
+  classes: [login]
+  match:
+    rules:
+      - {type: title, equals: 'Open WebUI', weight: 0.95}
+
+- id: nginx-proxy-manager
+  name: Nginx Proxy Manager
+  category: panel
+  description: Panel zarządzania reverse proxy Nginx Proxy Manager.
+  interest: 60
+  classes: [admin-panel, login]
+  match:
+    rules:
+      - {type: title, equals: 'Nginx Proxy Manager', weight: 0.95}
+
+- id: phpldapadmin
+  name: phpLDAPadmin
+  category: panel
+  description: Panel administracyjny LDAP phpLDAPadmin.
+  tags: [php, ldap]
+  interest: 65
+  classes: [admin-panel]
+  implies: [PHP]
+  match:
+    rules:
+      - {type: title, regex: '^phpLDAPadmin', weight: 0.95}
+
+- id: spark-ui
+  name: Apache Spark / Hadoop – panel
+  category: devops
+  description: Panel klastra obliczeniowego (Spark, Hadoop YARN/HDFS, Flink) bez logowania.
+  tags: [java, dane]
+  interest: 60
+  classes: [dev-tool]
+  aliases: ['Apache Spark', 'Apache Hadoop', 'Apache Flink']
+  match:
+    rules:
+      - {type: title, regex: '^Spark (?:Master|Worker) at |^Namenode information$|^All Applications$|^Apache Flink Web Dashboard$|- Spark Jobs$', weight: 0.9}
+
+- id: selenium-grid
+  name: Selenium Grid
+  category: devops
+  description: Konsola Selenium Grid. Pozwala sterować przeglądarkami na serwerze.
+  tags: [test]
+  interest: 70
+  classes: [dev-tool, staging]
+  match:
+    rules:
+      - {type: title, regex: '^Selenium Grid', weight: 0.95}
+
+- id: cups
+  name: CUPS
+  category: panel
+  description: Serwer wydruku CUPS z interfejsem WWW.
+  tags: [drukarki]
+  interest: 40
+  classes: [admin-panel]
+  cpe: cpe:2.3:a:openprinting:cups
+  aliases: ['CUPS httpd']
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^CUPS/([0-9.]+)', weight: 0.95, version_group: 1}
+      - {type: title, regex: ' - CUPS [0-9.]+$', weight: 0.9}

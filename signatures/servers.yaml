@@ -1,0 +1,538 @@
+# Czujka: sygnatury serwerów WWW, serwerów aplikacji, proxy i ich stron domyślnych.
+
+- id: nginx
+  name: nginx
+  category: web-server
+  description: Serwer WWW i reverse proxy nginx.
+  cpe: cpe:2.3:a:f5:nginx
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^nginx(?:/([0-9.]+))?', weight: 0.9, version_group: 1}
+      - {type: body, regex: '<hr><center>nginx(?:/([0-9.]+))?</center>', weight: 0.9, version_group: 1}
+      - {type: service, field: product, regex: '^nginx', weight: 0.8}
+  version:
+    - {type: service, field: version, regex: '^([0-9][0-9.]*)'}
+
+- id: nginx-default-page
+  name: nginx – strona domyślna
+  category: web-server
+  technology: nginx
+  description: Serwer pokazuje stronę powitalną nginx. Usługa jest zainstalowana, ale nie skonfigurowana.
+  interest: 15
+  classes: [default-page]
+  match:
+    rules:
+      - {type: title, equals: 'Welcome to nginx!', weight: 0.9}
+      - {type: body, contains: 'If you see this page, nginx is successfully installed', weight: 0.9}
+
+- id: apache
+  name: Apache HTTP Server
+  category: web-server
+  description: Serwer WWW Apache httpd.
+  cpe: cpe:2.3:a:apache:http_server
+  aliases: ['Apache httpd', Apache]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Apache(?:/([0-9.]+))?(?:\s|$)', weight: 0.9, version_group: 1}
+      - {type: body, regex: '<address>Apache(?:/([0-9.]+))?[^<]* Server at ', weight: 0.9, version_group: 1}
+      - {type: service, field: product, regex: '^Apache httpd', weight: 0.8}
+  version:
+    - {type: service, field: version, regex: '^([0-9][0-9.]*)'}
+
+- id: apache-default-page
+  name: Apache – strona domyślna
+  category: web-server
+  technology: Apache HTTP Server
+  description: Serwer pokazuje stronę domyślną Apache („It works!”, strona Debiana, Ubuntu albo CentOS).
+  interest: 15
+  classes: [default-page]
+  match:
+    rules:
+      - {type: body, regex: '<h1>It works!</h1>|<p>It works!</p>', weight: 0.8}
+      - {type: title, regex: '^Apache2 (?:Ubuntu|Debian) Default Page|^It works! Apache httpd$|Test Page for the (?:Apache HTTP Server|HTTP Server)|^Apache HTTP Server Test Page', weight: 0.9}
+
+- id: apache-server-status
+  name: Apache – server-status
+  category: environment
+  description: Strona mod_status jest dostępna publicznie. Pokazuje adresy klientów i żądane adresy URL.
+  interest: 55
+  match:
+    rules:
+      - {type: path, path: /server-status, status: [200], contains_all: ['Apache Server Status', 'Server uptime'], weight: 0.95}
+
+- id: iis
+  name: Microsoft IIS
+  category: web-server
+  description: Serwer WWW Microsoft Internet Information Services.
+  tags: [microsoft]
+  cpe: cpe:2.3:a:microsoft:internet_information_services
+  aliases: ['Microsoft IIS httpd', IIS]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Microsoft-IIS(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: service, field: product, regex: '^Microsoft IIS', weight: 0.8}
+
+- id: iis-default-page
+  name: IIS – strona domyślna
+  category: web-server
+  technology: Microsoft IIS
+  description: Serwer pokazuje stronę powitalną IIS.
+  interest: 15
+  classes: [default-page]
+  match:
+    rules:
+      - {type: title, regex: '^IIS Windows(?: Server)?$|^IIS[0-9.]*$|^Microsoft Internet Information Services', weight: 0.9}
+      - {type: body, regex: 'iisstart\.(?:png|htm)|welcome\.png" alt="IIS', weight: 0.8}
+
+- id: httpapi
+  name: Microsoft HTTPAPI
+  category: web-server
+  description: Sterownik HTTP.sys systemu Windows (usługa bez własnej strony).
+  tags: [microsoft]
+  aliases: ['Microsoft HTTPAPI httpd']
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Microsoft-HTTPAPI(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+
+- id: caddy
+  name: Caddy
+  category: web-server
+  description: Serwer WWW Caddy.
+  tags: [go]
+  cpe: cpe:2.3:a:caddyserver:caddy
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Caddy', weight: 0.95}
+
+- id: caddy-default-page
+  name: Caddy – strona domyślna
+  category: web-server
+  technology: Caddy
+  description: Serwer pokazuje stronę powitalną Caddy.
+  interest: 15
+  classes: [default-page]
+  match:
+    rules:
+      - {type: title, equals: 'Caddy works!', weight: 0.9}
+
+- id: lighttpd
+  name: lighttpd
+  category: web-server
+  description: Lekki serwer WWW lighttpd, częsty na urządzeniach wbudowanych.
+  cpe: cpe:2.3:a:lighttpd:lighttpd
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^lighttpd(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: service, field: product, regex: '^lighttpd', weight: 0.8}
+
+- id: openresty
+  name: OpenResty
+  category: web-server
+  description: Platforma OpenResty (nginx z Lua).
+  cpe: cpe:2.3:a:openresty:openresty
+  implies: [nginx]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^openresty(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: body, regex: '<hr><center>openresty(?:/([0-9.]+))?</center>', weight: 0.9, version_group: 1}
+      - {type: title, equals: 'Welcome to OpenResty!', weight: 0.9}
+
+- id: tengine
+  name: Tengine
+  category: web-server
+  description: Serwer WWW Tengine (odmiana nginx).
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Tengine(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+
+- id: litespeed
+  name: LiteSpeed
+  category: web-server
+  description: Serwer WWW LiteSpeed.
+  cpe: cpe:2.3:a:litespeedtech:litespeed_web_server
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^LiteSpeed', weight: 0.95}
+      - {type: header, name_regex: '^X-(LiteSpeed|Turbo-Charged-By)', exists: true, weight: 0.8}
+
+- id: tomcat
+  name: Apache Tomcat
+  category: app-server
+  description: Kontener serwletów Apache Tomcat.
+  tags: [java]
+  cpe: cpe:2.3:a:apache:tomcat
+  implies: [Java]
+  aliases: ['Apache Tomcat/Coyote JSP engine', Tomcat]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^Apache Tomcat(?:/([0-9.]+))?', weight: 0.9, version_group: 1}
+      - {type: body, regex: '<h3>Apache Tomcat/([0-9.]+)', weight: 0.9, version_group: 1}
+      - {type: header, name: Server, regex: 'Apache-Coyote|Tomcat', weight: 0.8}
+      - {type: favicon, mmh3: [-297069493], weight: 0.9}
+      - {type: service, field: product, regex: 'Apache Tomcat', weight: 0.8}
+      - {type: path, path: /manager/html, status: [401, 403], regex: 'Tomcat Manager Application|tomcat-users\.xml|manager-gui', weight: 0.9}
+      - {type: path, path: /manager/html, status: [401], field: header, name: WWW-Authenticate, contains: 'Tomcat Manager', weight: 0.9}
+
+- id: tomcat-default-page
+  name: Tomcat – strona domyślna
+  category: app-server
+  technology: Apache Tomcat
+  description: Tomcat pokazuje stronę powitalną z odnośnikami do aplikacji Manager i Host Manager.
+  interest: 30
+  classes: [default-page]
+  match:
+    rules:
+      - {type: body, contains: "If you're seeing this, you've successfully installed Tomcat", weight: 0.95}
+
+- id: tomcat-manager
+  name: Tomcat Manager
+  category: app-server
+  technology: Apache Tomcat
+  description: Aplikacja Tomcat Manager jest osiągalna z sieci (prosi o hasło). Pozwala wdrażać aplikacje.
+  interest: 65
+  classes: [admin-panel, login]
+  match:
+    rules:
+      - {type: path, path: /manager/html, status: [401], field: header, name: WWW-Authenticate, contains: 'Tomcat Manager', weight: 0.95}
+
+- id: jetty
+  name: Jetty
+  category: app-server
+  description: Serwer aplikacji Eclipse Jetty.
+  tags: [java]
+  cpe: cpe:2.3:a:eclipse:jetty
+  implies: [Java]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Jetty(?:\(([0-9][0-9a-zA-Z.\-]*)\))?', weight: 0.95, version_group: 1}
+      - {type: body, regex: 'Powered by Jetty://\s*([0-9][0-9a-zA-Z.\-]*)?', weight: 0.9, version_group: 1}
+      - {type: service, field: product, regex: '^Jetty', weight: 0.8}
+
+- id: wildfly
+  name: WildFly / JBoss
+  category: app-server
+  description: Serwer aplikacji WildFly albo JBoss EAP.
+  tags: [java]
+  interest: 30
+  cpe: cpe:2.3:a:redhat:wildfly
+  implies: [Java]
+  aliases: [JBoss, WildFly, 'JBoss EAP']
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^(?:WildFly|JBoss)(?:[-/ ]?(?:EAP|Web)?[/-]?([0-9.]+))?', weight: 0.9, version_group: 1}
+      - {type: header, name: X-Powered-By, regex: 'JBoss|Undertow|WildFly', weight: 0.9}
+      - {type: title, regex: '^Welcome to (?:WildFly|JBoss)', weight: 0.9}
+      - {type: body, regex: 'Your WildFly instance is running|JBoss EAP is running|/console/index\.html">Administration Console', weight: 0.9}
+
+- id: weblogic
+  name: Oracle WebLogic
+  category: app-server
+  description: Serwer aplikacji Oracle WebLogic.
+  tags: [java, oracle]
+  interest: 45
+  cpe: cpe:2.3:a:oracle:weblogic_server
+  implies: [Java]
+  aliases: [WebLogic]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: Server, regex: 'WebLogic(?: Server)?\s*([0-9.]+)?', weight: 0.9, version_group: 1}
+      - {type: body, regex: 'Error 404--Not Found[\s\S]{0,200}From RFC 2068|WebLogic Server', weight: 0.7}
+      - {type: path, path: /console/login/LoginForm.jsp, status: [200], regex: 'WebLogic Server Administration Console|WebLogic Server Version: ([0-9.]+)', weight: 0.95}
+  version:
+    - {type: path, path: /console/login/LoginForm.jsp, regex: 'WebLogic Server Version: ([0-9.]+)'}
+
+- id: glassfish
+  name: GlassFish
+  category: app-server
+  description: Serwer aplikacji GlassFish / Payara.
+  tags: [java]
+  interest: 30
+  cpe: cpe:2.3:a:oracle:glassfish_server
+  implies: [Java]
+  aliases: [Payara]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '(?:GlassFish Server[^0-9]*|Payara Server[^0-9]*)([0-9.]+)?', weight: 0.95, version_group: 1}
+      - {type: title, regex: 'GlassFish Server - Server Running|Payara Server - Server Running', weight: 0.9}
+      - {type: body, contains: 'Your server is now running', weight: 0.6}
+
+- id: websphere
+  name: IBM WebSphere
+  category: app-server
+  description: Serwer aplikacji IBM WebSphere / Open Liberty.
+  tags: [java, ibm]
+  interest: 30
+  cpe: cpe:2.3:a:ibm:websphere_application_server
+  implies: [Java]
+  aliases: ['Open Liberty', WebSphere]
+  match:
+    rules:
+      - {type: header, name: Server, regex: 'WebSphere Application Server(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: header, name: X-Powered-By, regex: 'Servlet/[0-9.]+.*WebSphere|Open Liberty', weight: 0.8}
+      - {type: title, regex: 'WebSphere Liberty|Open Liberty', weight: 0.8}
+
+- id: gunicorn
+  name: Gunicorn
+  category: app-server
+  description: Serwer WSGI Gunicorn (Python).
+  tags: [python]
+  cpe: cpe:2.3:a:gunicorn:gunicorn
+  implies: [Python]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^gunicorn(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+
+- id: uwsgi
+  name: uWSGI
+  category: app-server
+  description: Serwer aplikacji uWSGI.
+  tags: [python]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^uWSGI', weight: 0.95}
+
+- id: uvicorn
+  name: Uvicorn
+  category: app-server
+  description: Serwer ASGI Uvicorn (Python).
+  tags: [python]
+  implies: [Python]
+  match:
+    rules:
+      - {type: header, name: Server, equals: uvicorn, weight: 0.95}
+
+- id: werkzeug
+  name: Werkzeug
+  category: app-server
+  description: Serwer deweloperski Werkzeug (Flask). Nie jest przeznaczony do pracy produkcyjnej.
+  tags: [python]
+  interest: 30
+  cpe: cpe:2.3:a:palletsprojects:werkzeug
+  implies: [Python]
+  aliases: ['Werkzeug httpd']
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Werkzeug/([0-9.]+)(?: Python/[0-9.]+)?', weight: 0.95, version_group: 1}
+
+- id: python-http-server
+  name: Python http.server
+  category: web-server
+  description: Prosty serwer plików Pythona (SimpleHTTP / http.server). Zwykle uruchomiony ręcznie i pokazuje listę plików.
+  tags: [python]
+  interest: 45
+  cpe: cpe:2.3:a:python:python
+  implies: [Python]
+  aliases: [SimpleHTTPServer]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^(?:SimpleHTTP|BaseHTTP)/[0-9.]+ Python/([0-9.]+)', weight: 0.95, version_group: 1}
+
+- id: python
+  name: Python
+  category: language
+  description: Interpreter Pythona ujawniony w nagłówku Server.
+  cpe: cpe:2.3:a:python:python
+  match:
+    rules:
+      - {type: header, name: Server, regex: '(?:Python|CPython)/([0-9.]+)', weight: 0.9, version_group: 1}
+
+- id: tornado
+  name: Tornado
+  category: app-server
+  description: Serwer i framework Pythona Tornado.
+  tags: [python]
+  implies: [Python]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^TornadoServer(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+
+- id: kestrel
+  name: Kestrel
+  category: web-server
+  description: Serwer WWW Kestrel (ASP.NET Core).
+  tags: [dotnet, microsoft]
+  implies: [ASP.NET Core]
+  match:
+    rules:
+      - {type: header, name: Server, equals: Kestrel, weight: 0.95}
+
+- id: nodejs
+  name: Node.js
+  category: language
+  description: Środowisko uruchomieniowe Node.js.
+  cpe: cpe:2.3:a:nodejs:node.js
+  match:
+    rules:
+      - {type: header, name: X-Powered-By, regex: '^(?:Express|Next\.js|Nuxt|Koa|Sails)', weight: 0.8}
+      - {type: header, name: Server, regex: 'node(?:\.js)?(?:/v?([0-9.]+))?$', weight: 0.8, version_group: 1}
+
+- id: puma
+  name: Puma
+  category: app-server
+  description: Serwer aplikacji Ruby Puma.
+  tags: [ruby]
+  implies: [Ruby]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^puma(?: ([0-9.]+))?', weight: 0.95, version_group: 1}
+
+- id: passenger
+  name: Phusion Passenger
+  category: app-server
+  description: Serwer aplikacji Phusion Passenger.
+  tags: [ruby]
+  cpe: cpe:2.3:a:phusion:passenger
+  match:
+    rules:
+      - {type: header, name_regex: '^(Server|X-Powered-By)$', regex: 'Phusion Passenger(?:\(R\))?\s*([0-9.]+)?', weight: 0.95, version_group: 1}
+
+- id: cowboy
+  name: Cowboy
+  category: web-server
+  description: Serwer HTTP Cowboy (Erlang).
+  tags: [erlang]
+  match:
+    rules:
+      - {type: header, name: Server, equals: Cowboy, weight: 0.9}
+
+- id: golang-http
+  name: Go net/http
+  category: web-server
+  description: Serwer HTTP biblioteki standardowej Go (rozpoznawany po usłudze nmap).
+  tags: [go]
+  aliases: ['Golang net/http server']
+  match:
+    rules:
+      - {type: service, field: product, contains: 'Golang net/http server', weight: 0.8}
+
+- id: haproxy
+  name: HAProxy
+  category: proxy
+  description: Load balancer HAProxy.
+  cpe: cpe:2.3:a:haproxy:haproxy
+  aliases: ['HAProxy http proxy']
+  match:
+    rules:
+      - {type: body, regex: '<h1>50[23] (?:Service Unavailable|Bad Gateway)</h1>\s*No server is available to handle this request', weight: 0.9}
+      - {type: header, name: Server, regex: '^HAProxy', weight: 0.9}
+      - {type: service, field: product, regex: '^HAProxy', weight: 0.8}
+
+- id: haproxy-stats
+  name: HAProxy – strona statystyk
+  category: proxy
+  technology: HAProxy
+  description: Strona statystyk HAProxy jest dostępna. Pokazuje adresy serwerów zaplecza.
+  interest: 50
+  classes: [admin-panel]
+  match:
+    rules:
+      - {type: title, regex: '^Statistics Report for HAProxy', weight: 0.95}
+  version:
+    - {type: body, regex: 'HAProxy version ([0-9.]+)'}
+
+- id: varnish
+  name: Varnish
+  category: proxy
+  description: Akcelerator HTTP Varnish.
+  cpe: cpe:2.3:a:varnish-cache:varnish
+  match:
+    rules:
+      - {type: header, name: X-Varnish, exists: true, weight: 0.9}
+      - {type: header, name: Via, regex: 'varnish(?: \(Varnish/([0-9.]+)\))?', weight: 0.9, version_group: 1}
+      - {type: header, name: Server, regex: '^Varnish', weight: 0.9}
+
+- id: envoy
+  name: Envoy
+  category: proxy
+  description: Proxy Envoy (często brama siatki usług).
+  match:
+    rules:
+      - {type: header, name: Server, equals: envoy, weight: 0.95}
+      - {type: header, name: X-Envoy-Upstream-Service-Time, exists: true, weight: 0.9}
+
+- id: squid
+  name: Squid
+  category: proxy
+  description: Serwer proxy Squid.
+  cpe: cpe:2.3:a:squid-cache:squid
+  aliases: ['Squid http proxy']
+  interest: 25
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^squid(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: header, name: Via, regex: '\(squid(?:/([0-9.]+))?\)', weight: 0.9, version_group: 1}
+      - {type: header, name: X-Squid-Error, exists: true, weight: 0.95}
+
+- id: traefik-proxy
+  name: Traefik
+  category: proxy
+  description: Reverse proxy Traefik (odpowiedź 404 routera).
+  tags: [go]
+  cpe: cpe:2.3:a:traefik:traefik
+  match:
+    rules:
+      - {type: path, path: /api/version, status: [200], regex: '"Version"\s*:\s*"([0-9.]+)[^"]*"\s*,\s*"Codename"', weight: 0.95, version_group: 1}
+      - {type: title, equals: 'Traefik Proxy', weight: 0.8}
+      - {type: title, equals: Traefik, weight: 0.7}
+
+- id: kong
+  name: Kong
+  category: proxy
+  description: Brama API Kong.
+  tags: [api]
+  cpe: cpe:2.3:a:konghq:kong
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^kong(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: header, name: Via, regex: 'kong(?:/([0-9.]+))?', weight: 0.9, version_group: 1}
+      - {type: header, name_regex: '^X-Kong-', exists: true, weight: 0.9}
+
+- id: cloudflare
+  name: Cloudflare
+  category: proxy
+  description: Usługa stoi za siecią Cloudflare.
+  match:
+    rules:
+      - {type: header, name: Server, equals: cloudflare, weight: 0.9}
+      - {type: header, name: CF-RAY, exists: true, weight: 0.9}
+
+- id: apache-traffic-server
+  name: Apache Traffic Server
+  category: proxy
+  description: Proxy i cache Apache Traffic Server.
+  cpe: cpe:2.3:a:apache:traffic_server
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^ATS(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: header, name: Via, regex: 'ApacheTrafficServer(?:/([0-9.]+))?', weight: 0.9, version_group: 1}
+
+- id: zope
+  name: Zope
+  category: app-server
+  description: Serwer aplikacji Zope (Python).
+  tags: [python]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Zope/\(?(?:Zope )?([0-9.]+)?', weight: 0.95, version_group: 1}
+
+- id: resin
+  name: Resin
+  category: app-server
+  description: Serwer aplikacji Caucho Resin.
+  tags: [java]
+  implies: [Java]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Resin(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+
+- id: openssl-in-server-header
+  name: OpenSSL (wersja w nagłówku Server)
+  category: library
+  technology: OpenSSL
+  description: Nagłówek Server ujawnia wersję biblioteki OpenSSL.
+  cpe: cpe:2.3:a:openssl:openssl
+  match:
+    rules:
+      - {type: header, name: Server, regex: 'OpenSSL/([0-9]+\.[0-9]+\.[0-9]+[a-z]*)', weight: 0.9, version_group: 1}

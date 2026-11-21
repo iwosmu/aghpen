@@ -1,0 +1,726 @@
+# Czujka: urządzenia IoT, kamery, drukarki, NAS, sterowniki, BMC, routery, zapory i bramy VPN.
+
+- id: hikvision
+  name: Hikvision
+  category: iot
+  description: Kamera albo rejestrator Hikvision.
+  tags: [kamera]
+  interest: 60
+  classes: [login]
+  cpe: cpe:2.3:h:hikvision:ip_camera
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^(?:DNVRS-Webs|App-webs/|Hikvision-Webs|DVRDVS-Webs)', weight: 0.9}
+      - {type: body, regex: '/doc/page/login\.asp|doc/script/lib/seajs', weight: 0.9}
+      - {type: service, field: product, contains: 'Hikvision', weight: 0.8}
+
+- id: dahua
+  name: Dahua
+  category: iot
+  description: Kamera albo rejestrator Dahua.
+  tags: [kamera]
+  interest: 60
+  classes: [login]
+  cpe: cpe:2.3:h:dahuasecurity:ip_camera
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, equals: 'WEB SERVICE', weight: 0.6}
+      - {type: body, regex: 'jsCore/rpcCore\.js|web_caps/webCapsConfig|/baseProj/images/favicon\.ico|dhvideowhmode', weight: 0.9}
+      - {type: service, field: product, contains: 'Dahua', weight: 0.8}
+
+- id: axis
+  name: Axis
+  category: iot
+  description: Kamera sieciowa Axis.
+  tags: [kamera]
+  interest: 55
+  cpe: cpe:2.3:h:axis:network_camera
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^AXIS\b', weight: 0.8}
+      - {type: body, regex: '/axis-cgi/|/view/viewer_index\.shtml|axis-webcomponents', weight: 0.8}
+      - {type: redirect, regex: '/view/(?:viewer_)?index\.shtml|/camera/index\.html', weight: 0.7}
+      - {type: header, name: WWW-Authenticate, regex: 'realm="AXIS', weight: 0.9}
+
+- id: ip-camera-generic
+  name: Kamera IP / rejestrator
+  category: iot
+  description: Interfejs WWW kamery IP albo rejestratora wideo (producent nieustalony).
+  tags: [kamera]
+  interest: 55
+  classes: [login]
+  technology: false
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^(?:IP ?Camera|Network Camera|NETSurveillance WEB|IPCam(?:era)? Client|DVR Login|NVR Login|Web Viewer|WebCam)\b', weight: 0.7}
+      - {type: header, name: Server, regex: '^(?:Vivotek|Avtech|IPCamera|Linux/[0-9.x]+ UPnP/1\.0 Avtech|Boa/[0-9.]+ \(with Intersil|GeoHttpServer|Mobotix)', weight: 0.8}
+      - {type: header, name: WWW-Authenticate, regex: 'realm="(?:IP ?Camera|ipcamera|IPCAM|NVR|DVR|netcam|Network Camera)', weight: 0.8}
+
+- id: mikrotik
+  name: MikroTik RouterOS
+  category: iot
+  description: Router MikroTik – strona konfiguracyjna WebFig.
+  tags: [router]
+  interest: 60
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:o:mikrotik:routeros
+  aliases: ['MikroTik router config httpd', MikroTik]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^RouterOS router configuration page|^RouterOS', weight: 0.9}
+      - {type: body, regex: 'mikrotik\.com|webfig/', weight: 0.7}
+      - {type: service, regex: 'MikroTik', weight: 0.8}
+      - {type: banner, regex: 'MikroTik', weight: 0.8}
+  version:
+    - {type: body, regex: 'RouterOS v([0-9.]+)'}
+    - {type: banner, regex: 'MikroTik (?:FTP server \(MikroTik )?v?([0-9.]+)'}
+
+- id: unifi
+  name: Ubiquiti UniFi
+  category: iot
+  description: Kontroler sieci Ubiquiti UniFi.
+  tags: [siec, wifi]
+  interest: 55
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:a:ui:unifi_network_application
+  aliases: [UniFi]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^UniFi (?:Network|OS)', weight: 0.9}
+      - {type: redirect, contains: '/manage/account/login', weight: 0.8}
+      - {type: body, regex: 'unifi-network-app|/manage/angular/|UniFi Network', weight: 0.7}
+
+- id: ubiquiti-airos
+  name: Ubiquiti airOS / EdgeOS
+  category: iot
+  description: Urządzenie Ubiquiti z systemem airOS albo EdgeOS.
+  tags: [siec, wifi]
+  interest: 55
+  classes: [admin-panel, login]
+  match:
+    rules:
+      - {type: cookie, name_regex: '^AIROS_', weight: 0.95}
+      - {type: title, regex: '^(?:EdgeOS|airOS|EdgeSwitch)', weight: 0.9}
+      - {type: body, regex: 'airos_logo|/login\.cgi\?uri=', weight: 0.8}
+
+- id: tplink
+  name: TP-Link
+  category: iot
+  description: Router albo punkt dostępowy TP-Link.
+  tags: [router]
+  interest: 50
+  classes: [admin-panel, login]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: Server, regex: '^(?:TP-LINK|Router Webserver|TP-LINK HTTPD)', weight: 0.8}
+      - {type: header, name: WWW-Authenticate, regex: 'realm="TP-LINK', weight: 0.95}
+      - {type: body, regex: 'tplinkwifi\.net|tplinklogin\.net|TP-LINK Technologies|tp-link\.com', weight: 0.7}
+      - {type: title, regex: '^TL-[A-Z0-9]+|TP-LINK', weight: 0.7}
+
+- id: synology
+  name: Synology DSM
+  category: iot
+  description: Serwer NAS Synology DiskStation Manager.
+  tags: [nas]
+  interest: 55
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:o:synology:diskstation_manager
+  aliases: [Synology]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, regex: 'SYNO\.(?:SDS|Core)|synoSDSjslib|webman/(?:modules|resources)', weight: 0.9}
+      - {type: title, regex: 'Synology (?:DiskStation|RackStation|NAS)|- Synology', weight: 0.8}
+      - {type: meta, name: description, contains: 'DiskStation provides a full-featured', weight: 0.9}
+      - {type: meta, name: application-name, regex: 'Synology|DiskStation', weight: 0.8}
+
+- id: qnap
+  name: QNAP
+  category: iot
+  description: Serwer NAS QNAP (QTS).
+  tags: [nas]
+  interest: 55
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:o:qnap:qts
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, regex: 'QNAP Turbo NAS|/cgi-bin/login\.html|qnap\.com|/cgi-bin/QTS\.cgi', weight: 0.8}
+      - {type: redirect, regex: '/cgi-bin/(?:login\.html|QTS\.cgi)?', weight: 0.4}
+      - {type: title, regex: '^QNAP', weight: 0.7}
+      - {type: header, name: Server, equals: 'http server 1.0', weight: 0.4}
+
+- id: truenas
+  name: TrueNAS / FreeNAS
+  category: iot
+  description: Serwer NAS TrueNAS albo FreeNAS.
+  tags: [nas]
+  interest: 55
+  classes: [admin-panel, login]
+  aliases: [FreeNAS]
+  match:
+    rules:
+      - {type: title, regex: '^(?:TrueNAS|FreeNAS)', weight: 0.9}
+
+- id: openmediavault
+  name: openmediavault
+  category: iot
+  description: Serwer NAS openmediavault.
+  tags: [nas]
+  interest: 55
+  classes: [admin-panel, login]
+  match:
+    rules:
+      - {type: title, regex: '^openmediavault', weight: 0.95}
+
+- id: hp-printer
+  name: Drukarka HP
+  category: iot
+  description: Drukarka albo urządzenie wielofunkcyjne HP z wbudowanym serwerem WWW.
+  tags: [drukarka]
+  interest: 40
+  aliases: ['HP LaserJet', 'HP JetDirect']
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^(?:HP HTTP Server|HP-ChaiSOE|HP-ChaiServer|Virata-EmWeb/[^ ]+ ?(?:HP|$))', weight: 0.9}
+      - {type: title, regex: 'HP (?:Color )?(?:LaserJet|OfficeJet|DeskJet|PageWide|DesignJet|ENVY|Photosmart)|JetDirect', weight: 0.9}
+      - {type: service, regex: 'HP (?:LaserJet|JetDirect|OfficeJet)', weight: 0.8}
+
+- id: brother-printer
+  name: Drukarka Brother
+  category: iot
+  description: Drukarka albo urządzenie wielofunkcyjne Brother.
+  tags: [drukarka]
+  interest: 40
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^debut/[0-9.]+', weight: 0.9}
+      - {type: title, regex: '^Brother (?:HL|MFC|DCP|ADS|QL|PT)-', weight: 0.95}
+
+- id: canon-printer
+  name: Drukarka Canon
+  category: iot
+  description: Drukarka albo urządzenie wielofunkcyjne Canon (Remote UI).
+  tags: [drukarka]
+  interest: 40
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^(?:CANON HTTP Server|Catwalk|KS_HTTP)', weight: 0.9}
+      - {type: title, regex: '^Remote UI|Canon (?:iR|imageRUNNER|MF|LBP|PIXMA)', weight: 0.8}
+
+- id: kyocera-printer
+  name: Drukarka Kyocera
+  category: iot
+  description: Drukarka albo urządzenie wielofunkcyjne Kyocera.
+  tags: [drukarka]
+  interest: 40
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^KM-MFP-http', weight: 0.95}
+      - {type: body, regex: '/startwlm/Start_Wlm\.htm|Kyocera Command Center', weight: 0.9}
+
+- id: xerox-printer
+  name: Drukarka Xerox
+  category: iot
+  description: Drukarka albo urządzenie wielofunkcyjne Xerox.
+  tags: [drukarka]
+  interest: 40
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Xerox_MicroServer', weight: 0.95}
+      - {type: title, regex: 'Xerox|CentreWare|WorkCentre|VersaLink|AltaLink|Phaser [0-9]', weight: 0.8}
+
+- id: epson-printer
+  name: Drukarka Epson
+  category: iot
+  description: Drukarka Epson.
+  tags: [drukarka]
+  interest: 40
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^EPSON(?:_Linux|-HTTP| HTTP Server)', weight: 0.95}
+      - {type: title, regex: '^(?:EPSON|Epson) ', weight: 0.6}
+
+- id: lexmark-printer
+  name: Drukarka Lexmark
+  category: iot
+  description: Drukarka Lexmark.
+  tags: [drukarka]
+  interest: 40
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Lexmark_Web_Server', weight: 0.95}
+      - {type: title, regex: '^Lexmark ', weight: 0.7}
+
+- id: printer-generic
+  name: Drukarka sieciowa
+  category: iot
+  description: Interfejs WWW drukarki (Ricoh, Konica Minolta, Samsung, Sharp, OKI).
+  tags: [drukarka]
+  interest: 40
+  technology: false
+  match:
+    rules:
+      - {type: title, regex: '^Web Image Monitor|PageScope Web Connection|SyncThru Web Service|^Sharp (?:MX|AR)-|^OKI |Printer Web Server|Embedded Web Server$', weight: 0.8}
+      - {type: service, field: name, regex: '^(?:ipp|jetdirect|printer)$', weight: 0.7}
+
+- id: octoprint
+  name: OctoPrint
+  category: iot
+  description: Sterowanie drukarką 3D OctoPrint.
+  tags: [druk-3d]
+  interest: 55
+  classes: [login]
+  cpe: cpe:2.3:a:octoprint:octoprint
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^OctoPrint', weight: 0.8}
+      - {type: body, regex: 'octoprint|var BASEURL\s*=', weight: 0.5}
+
+- id: home-assistant
+  name: Home Assistant
+  category: iot
+  description: System automatyki domowej Home Assistant.
+  tags: [automatyka]
+  interest: 55
+  classes: [login]
+  cpe: cpe:2.3:a:home-assistant:home-assistant
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, equals: 'Home Assistant', weight: 0.8}
+      - {type: body, regex: '<home-assistant>|/frontend_latest/|home-assistant-icon', weight: 0.9}
+      - {type: path, path: /manifest.json, status: [200], regex: '"name"\s*:\s*"Home Assistant"', weight: 0.9}
+
+- id: tasmota
+  name: Tasmota
+  category: iot
+  description: Urządzenie z oprogramowaniem Tasmota. Panel zwykle nie ma hasła.
+  tags: [automatyka, esp]
+  interest: 60
+  classes: [admin-panel]
+  match:
+    rules:
+      - {type: body, regex: 'Tasmota ([0-9]+\.[0-9]+\.[0-9]+)', weight: 0.95, version_group: 1}
+      - {type: body, regex: 'tasmota', weight: 0.5}
+
+- id: shelly
+  name: Shelly
+  category: iot
+  description: Przekaźnik albo czujnik Shelly.
+  tags: [automatyka, esp]
+  interest: 55
+  match:
+    rules:
+      - {type: path, path: /shelly, status: [200], regex: '"type"\s*:\s*"SH[A-Z0-9-]+"|"gen"\s*:\s*[234]', weight: 0.95}
+      - {type: title, regex: '^Shelly', weight: 0.7}
+  version:
+    - {type: path, path: /shelly, regex: '"fw(?:_id)?"\s*:\s*"[0-9]{8}-[0-9]{6}/v?([0-9][0-9a-z.\-]*)'}
+
+- id: esphome
+  name: ESPHome
+  category: iot
+  description: Urządzenie z oprogramowaniem ESPHome (serwer WWW bez logowania).
+  tags: [automatyka, esp]
+  interest: 55
+  match:
+    rules:
+      - {type: body, regex: '<esp-app>|esphome\.io|oi\.esphome\.io', weight: 0.9}
+      - {type: title, regex: 'ESPHome', weight: 0.8}
+
+- id: openwrt
+  name: OpenWrt LuCI
+  category: iot
+  description: Router z systemem OpenWrt (interfejs LuCI).
+  tags: [router]
+  interest: 55
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:o:openwrt:openwrt
+  aliases: [OpenWrt, LuCI]
+  match:
+    rules:
+      - {type: body, regex: '/cgi-bin/luci|/luci-static/', weight: 0.9}
+      - {type: title, regex: 'LuCI|OpenWrt', weight: 0.8}
+
+- id: ddwrt
+  name: DD-WRT
+  category: iot
+  description: Router z oprogramowaniem DD-WRT.
+  tags: [router]
+  interest: 55
+  classes: [admin-panel]
+  match:
+    rules:
+      - {type: title, regex: 'DD-WRT', weight: 0.9}
+      - {type: header, name: WWW-Authenticate, regex: 'realm="DD-WRT', weight: 0.95}
+
+- id: router-generic
+  name: Router / modem (D-Link, Netgear, ASUS, Zyxel, Huawei, DrayTek)
+  category: iot
+  description: Panel routera albo modemu klasy domowej lub biurowej.
+  tags: [router]
+  interest: 50
+  classes: [admin-panel, login]
+  technology: false
+  match:
+    rules:
+      - {type: header, name: WWW-Authenticate, regex: 'realm="(?:NETGEAR|D-Link|DSL Router|Broadband Router|ZyXEL|Linksys|ASUS|Wireless Router|Router|DrayTek|Huawei|Thomson|Technicolor)', weight: 0.9}
+      - {type: title, regex: '^(?:D-LINK|NETGEAR|ASUS (?:Wireless Router|Login)|ZyXEL|Zyxel|Linksys|Vigor ?[0-9]|HG[0-9]{3,4}|Tenda|Totolink|Mercusys)', weight: 0.8}
+      - {type: header, name: Server, regex: '^(?:DrayTek|ZyXEL-RomPager|Linksys|D-Link|dcs-lig-httpd|RouterOS|Huawei|mini_httpd/[0-9.]+ [0-9a-z]+ ?ASUS)', weight: 0.8}
+
+- id: pfsense
+  name: pfSense
+  category: security
+  description: Zapora sieciowa pfSense – panel logowania.
+  tags: [zapora]
+  interest: 65
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:a:netgate:pfsense
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, regex: '/css/pfSense\.css|pfSense is developed and maintained by Netgate|id="pfsense-logo', weight: 0.9}
+      - {type: title, regex: 'pfSense', weight: 0.8}
+      - {type: tls, field: subject, regex: '^pfSense-', weight: 0.8}
+
+- id: opnsense
+  name: OPNsense
+  category: security
+  description: Zapora sieciowa OPNsense – panel logowania.
+  tags: [zapora]
+  interest: 65
+  classes: [admin-panel, login]
+  cpe: cpe:2.3:a:opnsense:opnsense
+  match:
+    rules:
+      - {type: header, name: Server, equals: OPNsense, weight: 0.95}
+      - {type: title, regex: 'OPNsense', weight: 0.9}
+      - {type: tls, regex: 'OPNsense', weight: 0.7}
+
+- id: fortigate
+  name: Fortinet FortiGate
+  category: security
+  description: Zapora sieciowa albo brama SSL-VPN Fortinet FortiGate.
+  tags: [zapora, vpn]
+  interest: 70
+  classes: [login, remote-access]
+  cpe: cpe:2.3:o:fortinet:fortios
+  aliases: [FortiGate, FortiOS]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: header, name: Server, equals: 'xxxxxxxx-xxxxx', weight: 0.8}
+      - {type: body, regex: 'ftnt-fortinet-grid|/remote/login|fgt_lang|FortiToken', weight: 0.7}
+      - {type: redirect, contains: '/remote/login', weight: 0.8}
+      - {type: tls, regex: 'FortiGate|Fortinet', weight: 0.8}
+      - {type: path, path: /remote/login, status: [200], regex: 'fgt_lang|ftnt-fortinet-grid|/remote/logincheck', weight: 0.9}
+
+- id: paloalto-globalprotect
+  name: Palo Alto GlobalProtect
+  category: security
+  description: Portal VPN Palo Alto GlobalProtect.
+  tags: [zapora, vpn]
+  interest: 70
+  classes: [login, remote-access]
+  cpe: cpe:2.3:o:paloaltonetworks:pan-os
+  aliases: [GlobalProtect, PAN-OS]
+  match:
+    rules:
+      - {type: body, regex: 'global-protect/(?:login|portal)|GlobalProtect Portal', weight: 0.95}
+      - {type: redirect, contains: '/global-protect/', weight: 0.9}
+      - {type: title, regex: 'GlobalProtect', weight: 0.9}
+
+- id: sonicwall
+  name: SonicWall
+  category: security
+  description: Zapora sieciowa SonicWall.
+  tags: [zapora, vpn]
+  interest: 70
+  classes: [login]
+  cpe: cpe:2.3:o:sonicwall:sonicos
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^SonicWALL', weight: 0.95}
+      - {type: title, regex: 'SonicWall', weight: 0.8}
+
+- id: sophos
+  name: Sophos Firewall
+  category: security
+  description: Zapora sieciowa Sophos (panel administratora albo portal użytkownika).
+  tags: [zapora, vpn]
+  interest: 70
+  classes: [login]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: title, regex: '^Sophos|User Portal$', weight: 0.5}
+      - {type: body, regex: 'Sophos (?:Firewall|XG|UTM)|/userportal/webpages/|/webconsole/webpages/', weight: 0.8}
+      - {type: tls, regex: 'Sophos', weight: 0.6}
+
+- id: cisco-device
+  name: Cisco (IOS / ASA)
+  category: security
+  description: Urządzenie sieciowe Cisco – interfejs WWW albo WebVPN.
+  tags: [siec, vpn]
+  interest: 65
+  classes: [login]
+  cpe: cpe:2.3:o:cisco:ios
+  aliases: ['Cisco IOS http config', 'Cisco ASA']
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^cisco-IOS|^Cisco AWARE', weight: 0.95}
+      - {type: header, name: WWW-Authenticate, regex: 'realm="(?:level_15|Cisco)', weight: 0.9}
+      - {type: redirect, contains: '/+CSCOE+/', weight: 0.95}
+      - {type: body, regex: '/\+CSCOE\+/|webvpn', weight: 0.8}
+      - {type: service, field: product, regex: '^Cisco', weight: 0.8}
+
+- id: citrix-gateway
+  name: Citrix Gateway / NetScaler
+  category: security
+  description: Brama zdalnego dostępu Citrix Gateway (NetScaler).
+  tags: [vpn]
+  interest: 70
+  classes: [login, remote-access]
+  cpe: cpe:2.3:a:citrix:netscaler_gateway
+  aliases: [NetScaler]
+  match:
+    rules:
+      - {type: title, regex: '^(?:Citrix|NetScaler) (?:Gateway|Access Gateway)', weight: 0.95}
+      - {type: cookie, name_regex: '^NSC_[A-Za-z0-9_]+', weight: 0.8}
+      - {type: body, regex: '/vpn/index\.html|/logon/LogonPoint/', weight: 0.9}
+
+- id: pulse-secure
+  name: Ivanti / Pulse Connect Secure
+  category: security
+  description: Brama VPN Ivanti (dawniej Pulse) Connect Secure.
+  tags: [vpn]
+  interest: 75
+  classes: [login, remote-access]
+  cpe: cpe:2.3:a:ivanti:connect_secure
+  aliases: ['Pulse Secure']
+  match:
+    rules:
+      - {type: redirect, contains: '/dana-na/auth/', weight: 0.95}
+      - {type: body, regex: '/dana-na/(?:auth|css|imgs)/', weight: 0.9}
+
+- id: openvpn-as
+  name: OpenVPN Access Server
+  category: security
+  description: Serwer OpenVPN Access Server – strona logowania.
+  tags: [vpn]
+  interest: 60
+  classes: [login, remote-access]
+  match:
+    rules:
+      - {type: title, regex: '^OpenVPN (?:Login|CWS|Connect)', weight: 0.9}
+      - {type: cookie, name: openvpn_sess, weight: 0.9}
+      - {type: header, name: Server, regex: '^OpenVPN-AS', weight: 0.95}
+
+- id: f5-bigip
+  name: F5 BIG-IP
+  category: security
+  description: Urządzenie F5 BIG-IP (interfejs zarządzania TMUI albo load balancer).
+  tags: [load-balancer]
+  interest: 65
+  cpe: cpe:2.3:a:f5:big-ip_local_traffic_manager
+  aliases: [BIG-IP]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^BIG-?IP', weight: 0.95}
+      - {type: redirect, contains: '/tmui/login.jsp', weight: 0.95}
+      - {type: title, regex: '^BIG-IP', weight: 0.9}
+      - {type: cookie, name_regex: '^BIGipServer', weight: 0.8}
+
+- id: hp-ilo
+  name: HPE iLO
+  category: iot
+  description: Kontroler zdalnego zarządzania serwerem HPE Integrated Lights-Out.
+  tags: [bmc]
+  interest: 75
+  classes: [admin-panel, login, remote-access]
+  cpe: cpe:2.3:o:hp:integrated_lights-out
+  aliases: [iLO, 'HP Integrated Lights-Out']
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^(?:HPE?-iLO-Server|HP-iLO)(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: title, regex: '^iLO [0-9]|Integrated Lights-Out', weight: 0.9}
+      - {type: path, path: '/xmldata?item=all', status: [200], contains: 'Integrated Lights-Out', weight: 0.95}
+      - {type: tls, field: issuer, regex: 'iLO Default Issuer', weight: 0.9}
+  version:
+    - {type: path, path: '/xmldata?item=all', regex: '<FWRI>([0-9.]+)</FWRI>'}
+
+- id: dell-idrac
+  name: Dell iDRAC
+  category: iot
+  description: Kontroler zdalnego zarządzania serwerem Dell iDRAC.
+  tags: [bmc]
+  interest: 75
+  classes: [admin-panel, login, remote-access]
+  cpe: cpe:2.3:o:dell:idrac_firmware
+  aliases: [iDRAC]
+  match:
+    rules:
+      - {type: title, regex: 'iDRAC|Integrated Dell Remote Access', weight: 0.9}
+      - {type: redirect, regex: '/restgui/start\.html|/start\.html$', weight: 0.5}
+      - {type: body, regex: 'idrac-start-screen|/restgui/', weight: 0.8}
+      - {type: tls, regex: 'iDRAC|idrac-', weight: 0.7}
+      - {type: header, name: Server, regex: '^iDRAC/([0-9.]+)', weight: 0.95, version_group: 1}
+
+- id: supermicro-ipmi
+  name: Supermicro IPMI
+  category: iot
+  description: Kontroler BMC Supermicro.
+  tags: [bmc]
+  interest: 75
+  classes: [admin-panel, login, remote-access]
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, regex: 'ATEN International|/cgi/login\.cgi|Supermicro', weight: 0.7}
+      - {type: title, regex: 'Supermicro|^IPMI', weight: 0.7}
+      - {type: tls, regex: 'Super Micro|Supermicro|IPMI', weight: 0.6}
+
+- id: redfish
+  name: Redfish (BMC)
+  category: iot
+  description: Interfejs zarządzania sprzętem Redfish (kontroler BMC serwera).
+  tags: [bmc, api]
+  interest: 65
+  classes: [api, remote-access]
+  technology: false
+  match:
+    rules:
+      - {type: path, path: /redfish/v1/, status: [200], contains: '"RedfishVersion"', weight: 0.95}
+
+- id: apc-ups
+  name: APC UPS / PDU
+  category: iot
+  description: Karta zarządzania zasilaczem awaryjnym albo listwą APC.
+  tags: [zasilanie]
+  interest: 55
+  classes: [login]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^APC Embedded Web Server|^AOS', weight: 0.9}
+      - {type: title, regex: '^APC \| Log On|^Log On$', weight: 0.4}
+      - {type: body, regex: 'American Power Conversion|apc\.com', weight: 0.6}
+
+- id: voip-phone
+  name: Telefon / centrala VoIP
+  category: iot
+  description: Interfejs WWW telefonu albo centrali VoIP (Grandstream, Yealink, Polycom, Cisco SPA, FreePBX, 3CX).
+  tags: [voip]
+  interest: 50
+  classes: [login]
+  technology: false
+  match:
+    rules:
+      - {type: title, regex: '^Grandstream|^Yealink|^Polycom - |^Cisco SPA|^FreePBX|^3CX (?:Phone System|Webclient)|^Asterisk', weight: 0.85}
+      - {type: header, name: Server, regex: '^(?:Grandstream|Yealink|Polycom|Asterisk|snom)', weight: 0.9}
+
+- id: niagara
+  name: Tridium Niagara
+  category: iot
+  description: System automatyki budynkowej Tridium Niagara.
+  tags: [ics, bms]
+  interest: 80
+  classes: [login]
+  cpe: cpe:2.3:a:tridium:niagara
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Niagara Web Server(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+      - {type: cookie, name_regex: '^niagara_', weight: 0.9}
+
+- id: siemens-simatic
+  name: Siemens SIMATIC
+  category: iot
+  description: Sterownik albo panel Siemens SIMATIC z serwerem WWW.
+  tags: [ics]
+  interest: 85
+  cpe: cpe:2.3:h:siemens:simatic
+  match:
+    min_confidence: 0.5
+    rules:
+      - {type: body, regex: '/Portal/Portal\.mwsl|/CSS/S7Web\.css|Siemens AG', weight: 0.7}
+      - {type: title, regex: 'SIMATIC|S7-[0-9]{3,4}', weight: 0.8}
+      - {type: header, name: Server, regex: '^Siemens', weight: 0.8}
+
+- id: ics-gateway
+  name: Urządzenie przemysłowe (Schneider, Moxa, Lantronix, WAGO)
+  category: iot
+  description: Serwer WWW urządzenia przemysłowego albo konwertera portów szeregowych.
+  tags: [ics]
+  interest: 80
+  technology: false
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^(?:Schneider-WEB|MoxaHttp|Lantronix|WAGO|BECK IPC|CODESYS|Indy/|ioLogik)', weight: 0.9}
+      - {type: title, regex: '^(?:NPort |Moxa |WAGO |Lantronix |PowerLogic |Modicon )', weight: 0.8}
+
+- id: goahead
+  name: GoAhead
+  category: web-server
+  description: Wbudowany serwer WWW GoAhead, typowy dla kamer, routerów i sterowników.
+  tags: [wbudowany]
+  interest: 30
+  classes: [iot]
+  cpe: cpe:2.3:a:embedthis:goahead
+  aliases: ['GoAhead WebServer']
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^GoAhead-(?:Webs|http)(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+
+- id: boa
+  name: Boa
+  category: web-server
+  description: Wbudowany serwer WWW Boa (projekt porzucony w 2005 r.), typowy dla starych urządzeń.
+  tags: [wbudowany]
+  interest: 35
+  classes: [iot]
+  cpe: cpe:2.3:a:boa:boa
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^Boa/([0-9a-z.]+)', weight: 0.95, version_group: 1}
+
+- id: mini-httpd
+  name: mini_httpd / thttpd
+  category: web-server
+  description: Mały serwer WWW (mini_httpd, micro_httpd, thttpd), typowy dla urządzeń wbudowanych.
+  tags: [wbudowany]
+  interest: 30
+  classes: [iot]
+  aliases: [thttpd, micro_httpd]
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^(?:mini_httpd|micro_httpd|thttpd)(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+
+- id: rompager
+  name: RomPager
+  category: web-server
+  description: Wbudowany serwer WWW Allegro RomPager, typowy dla modemów i drukarek. Stare wersje są podatne (Misfortune Cookie).
+  tags: [wbudowany]
+  interest: 45
+  classes: [iot]
+  cpe: cpe:2.3:a:allegrosoft:rompager
+  match:
+    rules:
+      - {type: header, name: Server, regex: 'RomPager(?:/([0-9.]+))?', weight: 0.95, version_group: 1}
+
+- id: uhttpd
+  name: uHTTPd / lwIP / Mongoose
+  category: web-server
+  description: Wbudowany serwer WWW (uHTTPd, lwIP, Mongoose, WebIO), typowy dla mikrokontrolerów i routerów.
+  tags: [wbudowany]
+  interest: 30
+  classes: [iot]
+  technology: false
+  match:
+    rules:
+      - {type: header, name: Server, regex: '^(?:uhttpd|lwIP|Mongoose|ESP8266|ESP32|esp-idf|WebIOPi|Embedthis|Allegro-Software|eHTTP|WindRiver-WebServer|ZNC|Microchip)', weight: 0.9}
