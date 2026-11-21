@@ -171,6 +171,13 @@ func TestReprobeConfirmationRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	e := &Executor{B: b}
+	var am, hostsAM string
+	_ = st.Pool().QueryRow(ctx, `SELECT (SELECT a.amname::text FROM pg_class c JOIN pg_am a ON a.oid = c.relam WHERE c.relname = 'reprobe_log'),
+		(SELECT a.amname::text FROM pg_class c JOIN pg_am a ON a.oid = c.relam WHERE c.relname = 'hosts')`).Scan(&am, &hostsAM)
+	t.Logf("reprobe_log access method: %s (hosts: %s)", am, hostsAM)
+	if am != hostsAM {
+		t.Errorf("reprobe_log uses %s, hosts uses %s", am, hostsAM)
+	}
 
 	before := map[string]hostState{}
 	for _, ip := range ips {
