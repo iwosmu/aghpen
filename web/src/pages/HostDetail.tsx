@@ -124,7 +124,7 @@ export default function HostDetail() {
     <div>
       <PageHeader
         back={{ to: '/hosts', label: t('Hosty', 'Hosts') }}
-        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono">{h.ip}</span><span className="text-base font-normal"><HostStatusMark status={h.status} /></span></span>}
+        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono text-[26px] font-medium tracking-[-0.01em] sm:text-[30px]">{h.ip}</span><span className="font-sans text-base font-normal"><HostStatusMark status={h.status} /></span></span>}
         sub={<>{h.label ? <span className="text-ink">{h.label} · </span> : null}<span className="mono">{(h.hostnames ?? []).join(', ') || t('bez nazwy DNS', 'no DNS name')}</span></>}
         readOnly={!canEdit}
         actions={<span className="flex items-center gap-2 text-sm text-ink-2">{t('Ciekawość', 'Interest')} <InterestScore value={h.interest} /></span>}

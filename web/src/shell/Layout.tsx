@@ -249,8 +249,6 @@ export function probeModeLabel(mode: string | undefined): { short: string; long:
 function SafetyChip({ policy }: { policy: SafetyPolicy | undefined }) {
   const health = useItem<Health>('/healthz', undefined, { staleTime: 60_000 });
   if (!policy) return null;
-  const probe = health.data?.probe;
-  const pm = probeModeLabel(probe?.mode);
   const op = policy.operator_networks ?? [];
   const title = t('Polityka bezpieczeństwa skanowania', 'Scan safety policy')
     + (op.length ? '. ' + t('Blokada operatora wdrożenia: skanowanie tylko w ' + op.join(', ') + '. Żaden użytkownik, także administrator, nie może jej poszerzyć.', 'Deployment operator lock: scanning only inside ' + op.join(', ') + '. No user, an administrator included, can widen it.') : '');
@@ -260,11 +258,8 @@ function SafetyChip({ policy }: { policy: SafetyPolicy | undefined }) {
       title={title} data-testid="safety-chip"
     >
       <Icon name="shield" size={14} className="text-st-new" />
-      {op.length ? <><span className="inline-flex items-center gap-1" data-testid="safety-chip-lock"><Icon name="lock" size={12} className="text-ink-3" /><span className="mono text-ink">{op.length === 1 ? op[0] : op.length + ' ' + t('sieci', 'networks')}</span></span><span className="text-ink-3">·</span></> : null}
-      <span>{t('limit', 'cap')} <span className="num text-ink">{fmtInt(policy.max_pps)}</span> pps</span>
-      <span className="text-ink-3">·</span>
-      <span className="mono text-ink">{(policy.allowed_methods ?? []).join('/') || 'GET/HEAD'}</span>
-      {probe ? <><span className="text-ink-3">·</span><span className="text-ink-2" title={pm.long} data-testid="probe-mode">{pm.short}</span></> : health.data && health.data.engine === false ? <><span className="text-ink-3">·</span><span className="text-st-changed">{t('skaner niepodłączony', 'scanner not wired')}</span></> : null}
+      {op.length ? <span className="inline-flex items-center gap-1" data-testid="safety-chip-lock"><Icon name="lock" size={12} className="text-ink-3" /><span className="mono text-ink">{op.length === 1 ? op[0] : op.length + ' ' + t('sieci', 'networks')}</span></span> : null}
+      {health.data && health.data.engine === false ? <span className="text-st-changed">{t('skaner niepodłączony', 'scanner not wired')}</span> : null}
     </Link>
   );
 }
