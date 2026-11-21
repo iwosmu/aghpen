@@ -37,7 +37,7 @@ Zgłoszenie do zadania „Attack Surface Intelligence” Centrum Bezpieczeństwa
 | Film demo (około 2 minut, nagrany skryptem z prawdziwego interfejsu) | [`docs/demo/czujka-demo.mp4`](docs/demo/czujka-demo.mp4), tekst lektora [`docs/demo/lektor.txt`](docs/demo/lektor.txt) |
 | Scenariusz pokazu, notatki do slajdów, pytania | [`docs/DEMO.md`](docs/DEMO.md) |
 | Zgodność z treścią zadania: każde wymaganie, 12 punktów weryfikacji, 6 kryteriów, z dowodem | [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md) |
-| Wyniki zmierzone na laboratorium 70 hostów (precyzja, czułość, czas /16) | `docs/WYNIKI.md` (w przygotowaniu) |
+| Wyniki zmierzone na laboratorium 70 hostów (precyzja, czułość, czas /16) | [`docs/WYNIKI.md`](docs/WYNIKI.md) |
 | Działająca instancja z laboratorium 70 hostów | `https://czujka.dev`, konto do odczytu: dane logowania w zgłoszeniu |
 | Spis całej dokumentacji | [`docs/DOKUMENTACJA.md`](docs/DOKUMENTACJA.md) |
 

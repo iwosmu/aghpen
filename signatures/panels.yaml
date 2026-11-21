@@ -239,7 +239,7 @@
   technology: Gitea
   description: Strona instalatora Gitea jest dostępna. Kto ją wypełni, zostaje administratorem serwera.
   interest: 80
-  classes: [dev-tool, admin-panel]
+  classes: [dev-tool, admin-panel, install-page]
   match:
     rules:
       - {type: title, regex: '^Installation - Gitea', weight: 0.95}

@@ -619,3 +619,66 @@ func TestPortsUnknownKeepsServices(t *testing.T) {
 		t.Fatalf("after a finished scan: %v", s)
 	}
 }
+
+// The engine stores partial results of a host while the run goes on (marked
+// PortsUnknown) and the final result later. Nothing is marked gone by a
+// partial result, and the run's stored view is the final result.
+func TestPartialThenFinalResult(t *testing.T) {
+	st := storetest.New(t)
+	sink := st.NewSink(store.SinkOptions{MarkMissing: true})
+	ingest := func(h model.HostResult) {
+		t.Helper()
+		if err := sink.OnHost(ctx, h); err != nil {
+			t.Fatal(err)
+		}
+		if err := sink.Flush(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	svc := func(port int, title string) model.ServiceResult {
+		s := model.ServiceResult{Port: port, Proto: "tcp", State: "open", Name: "http"}
+		if title != "" {
+			s.HTTP = &model.HTTPFingerprint{Status: 200, Title: title}
+		}
+		return s
+	}
+	states := func() map[int]string {
+		hosts, _ := st.ListHosts(ctx, store.HostFilter{})
+		svcs, _ := st.HostServices(ctx, hosts.Items[0].ID)
+		out := map[int]string{}
+		for _, s := range svcs {
+			out[s.Port] = string(s.State)
+		}
+		return out
+	}
+	t0 := time.Now().UTC().Add(-time.Minute)
+	run1 := mkRun(t, st)
+	ingest(model.HostResult{RunID: run1.ID, IP: "10.20.0.10", Up: true, ObservedAt: t0, Services: []model.ServiceResult{svc(22, ""), svc(80, "Old"), svc(443, "")}})
+	run2 := mkRun(t, st)
+	ingest(model.HostResult{RunID: run2.ID, IP: "10.20.0.10", Up: true, PortsUnknown: true, ObservedAt: t0.Add(20 * time.Second), Services: []model.ServiceResult{svc(80, "")}})
+	if s := states(); s[22] != "open" || s[443] != "open" {
+		t.Fatalf("a partial result marked services gone: %v", s)
+	}
+	ingest(model.HostResult{RunID: run2.ID, IP: "10.20.0.10", Up: true, ObservedAt: t0.Add(30 * time.Second), Services: []model.ServiceResult{svc(22, ""), svc(80, "Final")}})
+	if s := states(); s[22] != "open" || s[80] != "open" || s[443] != "gone" {
+		t.Fatalf("after the final result: %v", s)
+	}
+	var got *model.HostResult
+	if err := st.EachRunResult(ctx, run2.ID, func(h *model.HostResult) error { got = h; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	hosts, _ := st.ListHosts(ctx, store.HostFilter{})
+	res, _, err := st.RunServiceResults(ctx, map[int64]int64{hosts.Items[0].ID: run2.ID})
+	if err != nil || got == nil || got.PortsUnknown {
+		t.Fatalf("run host = %+v, err %v", got, err)
+	}
+	titles := map[int]string{}
+	for _, s := range res[hosts.Items[0].ID] {
+		if s.HTTP != nil {
+			titles[s.Port] = s.HTTP.Title
+		}
+	}
+	if titles[80] != "Final" {
+		t.Errorf("the run's service view is not the final result: %v", titles)
+	}
+}

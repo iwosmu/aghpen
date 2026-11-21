@@ -97,6 +97,9 @@ type run struct {
 	// or a closed port); the end-of-run sanity check compares it with the
 	// hosts discovery found.
 	portAnswered atomic.Int64
+	// fullLeft is the host budget of the full-range pass (fullRangePlanned).
+	fullLeft    atomic.Int64
+	fullPlanned bool
 
 	e        *Engine
 	log      *slog.Logger
@@ -265,6 +268,18 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 		s.AddressesTotal = s.AddressesDone + total
 		s.ChunksTotal = s.ChunksDone + len(units)
 	})
+	if r.fullPlanned = r.fullRangePlanned(int64(total)); r.fullPlanned {
+		if r.ports.Count() >= 65535 {
+			// every port asked for: the top ports go first, so their services
+			// show within seconds, and the second pass scans the rest
+			if top, err := probe.EffectivePorts("top-1000", plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil && top.Count() > 0 {
+				r.ports = top
+			}
+		}
+		r.fullLeft.Store(fullRangeMaxHosts)
+		r.stats.addPass(model.PassTopPorts)
+		r.stats.addPass(model.PassFullRange)
+	}
 
 	chunks := make([]model.Chunk, len(units))
 	for i, u := range units {
@@ -414,7 +429,8 @@ type groupStats struct {
 	services int
 	http     int
 	packets  int64
-	hosts    []model.HostResult // reported to the sink when the group is final
+	hosts    []model.HostResult      // reported to the sink when the group is final
+	interim  map[string]interimCount // partial results already stored, not yet final
 }
 
 func (r *run) runGroup(ctx context.Context, g *group, want int) {
@@ -448,10 +464,14 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 	switch {
 	case ctx.Err() != nil:
 		status = model.ChunkDeferred
+		var pi interimCount
+		for _, c := range gs.interim {
+			pi.hosts, pi.open, pi.web = pi.hosts+c.hosts, pi.open+c.open, pi.web+c.web
+		}
 		r.stats.update(func(s *model.RunStats) {
-			s.HostsUp -= gs.hostsUp
-			s.ServicesOpen -= gs.services
-			s.HTTPServices -= gs.http
+			s.HostsUp -= gs.hostsUp + pi.hosts
+			s.ServicesOpen -= gs.services + pi.open
+			s.HTTPServices -= gs.http + pi.web
 		})
 	case err != nil:
 		status = model.ChunkFailed
@@ -541,6 +561,7 @@ func (r *run) finish(parent, work context.Context) model.RunOutcome {
 		}
 	}
 	r.sanityCheck()
+	r.stats.finishPasses(out.Status == model.RunCompleted)
 	out.Stats = r.stats.snapshot()
 	if out.Status == model.RunCompleted {
 		out.Stats.ETASec = 0
@@ -640,8 +661,25 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 	}
 
 	nPorts := 100.0
+	fullRange := false
 	if ports, err := probe.EffectivePorts(plan.Profile.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil {
 		nPorts = float64(ports.Count())
+		fullRange = fullRangeFor(plan.Profile.Ports, ports, est.Addresses)
+	}
+	if fullRange {
+		est.FullRangeMaxHosts = fullRangeMaxHosts
+		est.FullRangeMaxAddresses = fullRangeMaxAddresses
+		if all, err := probe.EffectivePorts("1-65535", plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil {
+			first, _ := probe.EffectivePorts(plan.Profile.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts)
+			if first != nil && first.Count() >= 65535 { // 1-65535: the top ports go first
+				first, _ = probe.EffectivePorts("top-1000", plan.Policy.AllowedPorts, plan.Policy.DeniedPorts)
+			}
+			if first != nil {
+				all.Remove(first)
+			}
+			est.FullRangePorts = all.Count()
+			est.EstFullRangeSecPerHost = math.Round(float64(est.FullRangePorts)/(float64(lim.ProbePPS())*0.9)*10) / 10
+		}
 	}
 	disc := probe.NormalizeDiscovery(plan.Profile.Discovery)
 	privileged := e.Prober().Privileged()
@@ -673,6 +711,15 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 		default:
 			packets = dead*deadCost(disc, privileged, est.DiscoveryMode, liveBlocks) + live*probes
 			packets += live * nPorts * 1.05
+		}
+		if fullRange {
+			// the second pass: the rest of 1-65535 on up to fullRangeMaxHosts live hosts
+			// (a new scope: every address may be live, the cautious figure)
+			fh := live
+			if len(plan.Hints) == 0 && rate == est.ExpectedLiveRate {
+				fh = float64(est.Addresses)
+			}
+			packets += math.Min(fh, fullRangeMaxHosts) * (65535 - nPorts) * 1.02
 		}
 		if plan.Profile.ServiceDetection {
 			packets += live * 3 * 14 // about 3 open ports per host, about 14 packets per version probe

@@ -47,27 +47,34 @@ $DC down -v --remove-orphans >/dev/null 2>&1
 $DC up -d --wait > "$OUT/compose.log" 2>&1 || { tail -20 "$OUT/compose.log"; exit 1; }
 CZ=$PROJECT-czujka-1
 CSRF=$(curl -sS -c "$JAR" -H "Content-Type: application/json" -d "{\"email\":\"$ADMIN\",\"password\":\"$ADMIN_PW\"}" $API/auth/login | jq -r .csrf_token)
-SCOPE=$(api POST /scopes "{\"name\":\"bench host\",\"targets\":[\"$HOST\"]}" | jq -r .id)
+if [ -n "${SB_PER_HOST_RPS:-}" ]; then # try another per-host HTTP limit of the safety policy
+  api PUT /settings/safety "$(api GET /settings/safety | jq -c --argjson r "$SB_PER_HOST_RPS" '.max_per_host_rps = $r')" | jq -c '{max_per_host_rps}'
+fi
+SCOPE=$(api POST /scopes '{"name":"bench host","criticality":3}' | jq -r .id)
+api POST /scopes/$SCOPE/targets "{\"text\":\"$HOST\"}" | jq -c '{address_count}'
 DEF=$(api GET "/profiles?limit=50" | jq -c '[.items[]][0] | del(.id, .created_at, .updated_at, .last_run_id, .next_run_at)')
 SRC=$LR_IP
 IF=$(docker exec "$CZ" sh -c "ip -o -4 addr | awk '/ 10\\.66\\./ {print \$2}'")
 echo "| profil | porty | czas do 1. usługi [s] | czas przebiegu [s] | usługi | maks. pps (wszystko) / limit | sekundy ponad limit |" > "$OUT/table.md"
 echo "| --- | --- | --- | --- | --- | --- | --- |" >> "$OUT/table.md"
 for v in ${SB_ONLY:-seven top1000 full}; do
-  case $v in seven) P=$SEVEN ;; top1000) P=top-1000 ;; full) P=1-65535 ;; esac
+  case $v in seven) P=$SEVEN ;; top1000) P=top-1000 ;; full) P=1-65535 ;; default) P=$(echo "$DEF" | jq -r .ports) ;; esac
   PROF=$(echo "$DEF" | jq -c --arg p "$P" --arg n "bench $v $(date +%s)" --argjson s "$SCOPE" '.name=$n | .ports=$p | .scope_ids=[$s] | .udp.enabled=false | .schedule.enabled=false')
-  PID=$(api POST /profiles "$PROF" | jq -r .id)
+  PID=$(api POST /profiles "$PROF" | jq -r '.id // empty')
+  [ -n "$PID" ] || { log "profile $v rejected"; continue; }
   docker rm -f czsb-td >/dev/null 2>&1
   docker run -d --name czsb-td --network "container:$CZ" --cap-add NET_RAW --cap-add NET_ADMIN czfull-tcpdump:latest tcpdump -i "$IF" -n -tt -l "src host $SRC or arp" >/dev/null
   sleep 1
   T0=$(python3 -c 'import time; print(time.time())' 2>/dev/null || date +%s)
-  RUN=$(api POST /runs "{\"profile_id\":$PID}" | jq -r .id)
+  RUN=$(api POST /runs "{\"profile_id\":$PID}" | jq -r '.id // empty')
+  [ -n "$RUN" ] || { log "run did not start (profile $PID)"; continue; }
   FIRST=""
   while :; do
     R=$(api GET /runs/$RUN); ST=$(echo "$R" | jq -r .status)
+    echo "$(date +%s) $(echo "$R" | jq -c '{s: .stats.services_open, p: .stats.passes}')" >> "$OUT/progress-$v.log"
     NOW=$(python3 -c 'import time; print(time.time())' 2>/dev/null || date +%s)
     if [ -z "$FIRST" ] && [ "$(api GET "/services?run_id=$RUN&limit=1" | jq '.total // (.items | length)')" -gt 0 ]; then FIRST=$(echo "$NOW - $T0" | bc); fi
-    case $ST in completed|failed|cancelled) break ;; esac
+    case $ST in completed|failed|cancelled|"") break ;; esac
     sleep 0.5
   done
   WALL=$(echo "$NOW - $T0" | bc)
@@ -77,7 +84,9 @@ for v in ${SB_ONLY:-seven top1000 full}; do
   echo "$R" | jq . > "$OUT/run-$v.json"
   api GET "/services?run_id=$RUN&limit=500" > "$OUT/services-$v.json"
   N=$(jq '.stats.services_open' "$OUT/run-$v.json")
-  printf '| %s | %s | %s | %.1f | %s | %s / %s | %s |\n' "$v" "$P" "${FIRST:-–}" "$WALL" "$N" "$(jq .all_max_per_s "$OUT/pps-$v.json")" "$CAP" "$(jq .all_seconds_over_cap "$OUT/pps-$v.json")" | tee -a "$OUT/table.md"
+  PSHOW=$P; [ ${#PSHOW} -gt 40 ] && PSHOW="${PSHOW:0:37}..."
+  jq -c '.stats.passes // empty' "$OUT/run-$v.json" > "$OUT/passes-$v.json"
+  printf '| %s | %s | %s | %.1f | %s | %s / %s | %s |\n' "$v" "$PSHOW" "${FIRST:-–}" "$WALL" "$N" "$(jq .all_max_per_s "$OUT/pps-$v.json")" "$CAP" "$(jq .all_seconds_over_cap "$OUT/pps-$v.json")" | tee -a "$OUT/table.md"
 done
 log "status $ST; output $OUT"
 [ "${SB_KEEP:-0}" = 1 ] || $DC down -v --remove-orphans >/dev/null 2>&1
