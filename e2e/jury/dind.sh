@@ -22,7 +22,7 @@ inner() { docker exec "$N" sh -c "$1"; }
 cleanup() { [ "${JURY_KEEP:-0}" = 1 ] || docker rm -f -v "$N" >/dev/null 2>&1; }
 trap cleanup EXIT
 
-log "building Czujka (czujka:$TAG) from the working tree"
+log "building Czujka (czujka:$TAG) from the working tree at $(git rev-parse --short HEAD)$(git diff --quiet -- . ':!e2e/jury' || echo ' with local changes')"
 CZUJKA_VERSION=$TAG docker compose -f deploy/docker-compose.yml build -q || exit 1
 
 log "starting the jury machine $N (docker:28-dind)"
