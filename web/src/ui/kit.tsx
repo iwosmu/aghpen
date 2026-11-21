@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { cx } from '../lib/format';
 import { t } from '../i18n';
 import { Icon } from './Icon';
-import { ApiError } from '../api/client';
+import { ApiError, isUnavailable } from '../api/client';
 
 // ---------- Button ----------
 type BtnVariant = 'primary' | 'default' | 'ghost' | 'danger' | 'dangerSolid';
@@ -185,18 +185,52 @@ export function Empty({ title, hint, action, icon = 'ring' }: { title: ReactNode
   );
 }
 
-export function ErrorState({ error, retry }: { error: unknown; retry?: () => void }) {
+export interface Explained { title: string; detail: string; code: string; calm: boolean; icon: string; retryable: boolean }
+
+/** Turns an error into text for the analyst. The server message is English and technical, so the title comes from the code. */
+export function explainError(error: unknown): Explained {
   const e = error as ApiError | Error | null;
-  const code = e instanceof ApiError ? e.code : 'error';
-  const forbidden = e instanceof ApiError && e.status === 403;
+  const msg = e?.message ?? String(error ?? '');
+  if (!(e instanceof ApiError)) return { title: t('Wystąpił błąd', 'Something went wrong'), detail: msg, code: 'error', calm: false, icon: 'alert', retryable: true };
+  const base = { code: e.code, calm: false, icon: 'alert', retryable: false };
+  if (e.status === 0) return { ...base, title: t('Brak połączenia z serwerem Czujki', 'Cannot reach the Czujka server'), detail: t('Sprawdź połączenie i spróbuj ponownie.', 'Check the connection and try again.'), retryable: true };
+  if (e.status === 501 || e.code === 'not_wired') return { ...base, calm: true, icon: 'info', title: t('Funkcja niedostępna w tej instalacji', 'This function is not available in this installation'), detail: t('Ten moduł nie jest podłączony do serwera. Pozostałe funkcje działają normalnie.', 'This module is not connected to the server. Everything else works as usual.') + ' (' + msg + ')' };
+  if (e.status === 401) return { ...base, icon: 'lock', title: t('Sesja wygasła', 'The session has expired'), detail: t('Zaloguj się ponownie.', 'Sign in again.') };
+  if (e.status === 403 && /csrf/i.test(msg)) return { ...base, icon: 'lock', title: t('Sesja wymaga odświeżenia', 'The session needs a refresh'), detail: t('Odśwież stronę i powtórz operację.', 'Reload the page and repeat the operation.') };
+  if (e.status === 403) return { ...base, icon: 'lock', title: t('Brak uprawnień', 'No permission'), detail: t('Twoja rola nie pozwala na tę operację.', 'Your role does not allow this operation.') + ' (' + msg + ')' };
+  if (e.status === 404) return { ...base, title: t('Nie znaleziono', 'Not found'), detail: t('Ten obiekt nie istnieje albo został usunięty.', 'This object does not exist or was deleted.') };
+  if (e.code === 'emergency_stop') return { ...base, icon: 'stop', title: t('Stop awaryjny jest aktywny', 'The emergency stop is active'), detail: t('Żaden skan nie wystartuje, dopóki blokada nie zostanie zwolniona.', 'No scan starts until the stop is released.') };
+  if (e.status === 409) return { ...base, title: t('Operacja jest sprzeczna z bieżącym stanem', 'The operation conflicts with the current state'), detail: msg };
+  if (e.status === 422 || e.code === 'validation') return { ...base, title: t('Dane nie przeszły walidacji', 'The data did not pass validation'), detail: msg };
+  if (e.status === 429) return { ...base, icon: 'clock', title: t('Zbyt wiele prób', 'Too many attempts'), detail: t('Spróbuj ponownie za kilka minut.', 'Try again in a few minutes.') + ' (' + msg + ')' };
+  if (e.status === 400) return { ...base, title: t('Nieprawidłowe żądanie', 'Bad request'), detail: msg };
+  if (e.status === 502 || e.status === 503 || e.status === 504) return { ...base, title: t('Usługa zewnętrzna nie odpowiada', 'An external service does not answer'), detail: msg, retryable: true };
+  return { ...base, title: t('Błąd serwera', 'Server error'), detail: msg, retryable: true };
+}
+
+export function ErrorState({ error, retry }: { error: unknown; retry?: () => void }) {
+  const x = explainError(error);
   return (
-    <div role="alert" className="flex flex-col items-start gap-1.5 px-4 py-8 sm:px-6">
-      <Icon name={forbidden ? 'lock' : 'alert'} className="text-danger" size={18} />
-      <p className="text-sm font-medium text-ink">
-        {forbidden ? t('Brak uprawnień do tych danych', 'You do not have permission to see this') : t('Nie udało się pobrać danych', 'Could not load the data')}
-      </p>
-      <p className="text-sm text-ink-2"><span className="mono text-xs text-ink-3">{code}</span> {e?.message}</p>
-      {retry && !forbidden ? <Button size="sm" icon="refresh" onClick={retry} className="mt-2">{t('Spróbuj ponownie', 'Try again')}</Button> : null}
+    <div role={x.calm ? 'status' : 'alert'} data-testid={x.calm ? 'unavailable' : 'error-state'} className="flex flex-col items-start gap-1.5 px-4 py-8 sm:px-6">
+      <Icon name={x.icon} className={x.calm ? 'text-ink-3' : 'text-danger'} size={18} />
+      <p className="text-sm font-medium text-ink">{x.title}</p>
+      <p className="max-w-[70ch] text-sm text-ink-2">{x.detail} <span className="mono text-xs text-ink-3">{x.code}</span></p>
+      {retry && x.retryable ? <Button size="sm" icon="refresh" onClick={retry} className="mt-2">{t('Spróbuj ponownie', 'Try again')}</Button> : null}
+    </div>
+  );
+}
+
+/** A calm note for a function whose server module is missing (HTTP 501). */
+export function Unavailable({ what, error }: { what?: ReactNode; error?: unknown }) {
+  const msg = (error as Error | undefined)?.message;
+  return (
+    <div role="status" data-testid="unavailable" className="flex items-start gap-2 border border-rule bg-sunk px-3 py-2.5 text-sm">
+      <Icon name="info" className="mt-0.5 flex-none text-ink-3" size={14} />
+      <div className="min-w-0">
+        <p className="font-medium text-ink">{t('Funkcja niedostępna w tej instalacji', 'This function is not available in this installation')}</p>
+        <p className="text-xs text-ink-2">{what ?? t('Ten moduł nie jest podłączony do serwera. Pozostałe funkcje działają normalnie.', 'This module is not connected to the server. Everything else works as usual.')}</p>
+        {msg ? <p className="mono mt-0.5 break-words text-2xs text-ink-3">{msg}</p> : null}
+      </div>
     </div>
   );
 }
@@ -217,11 +251,13 @@ export function SkeletonRows({ rows = 6 }: { rows?: number }) {
 
 export function InlineError({ error }: { error: unknown }) {
   if (!error) return null;
-  const e = error as ApiError | Error;
+  if (isUnavailable(error)) return <Unavailable error={error} />;
+  const x = explainError(error);
+  const plain = !(error instanceof ApiError);
   return (
     <p role="alert" className="flex items-start gap-1.5 text-xs text-danger">
-      <Icon name="alert" size={14} className="mt-px" />
-      <span>{e instanceof ApiError ? <span className="mono mr-1">{e.code}</span> : null}{e.message}</span>
+      <Icon name={x.icon} size={14} className="mt-px flex-none" />
+      <span>{plain ? x.detail : <><span className="font-medium">{x.title}.</span> {x.detail}</>}</span>
     </p>
   );
 }
@@ -258,12 +294,12 @@ export function Dialog({ open, onClose, title, children, footer, width = 520 }: 
 }
 
 // ---------- Toasts ----------
-type Toast = { id: number; text: ReactNode; tone: 'ok' | 'error' };
+type Toast = { id: number; text: ReactNode; tone: 'ok' | 'error' | 'info' };
 let pushToast: ((t: Omit<Toast, 'id'>) => void) | null = null;
-export function toast(text: ReactNode, tone: 'ok' | 'error' = 'ok') { pushToast?.({ text, tone }); }
+export function toast(text: ReactNode, tone: 'ok' | 'error' | 'info' = 'ok') { pushToast?.({ text, tone }); }
 export function toastError(e: unknown) {
-  const err = e as Error;
-  toast(<span>{e instanceof ApiError ? <span className="mono mr-1.5 text-xs">{e.code}</span> : null}{err?.message ?? String(e)}</span>, 'error');
+  const x = explainError(e);
+  toast(<span data-testid={x.calm ? 'toast-unavailable' : 'toast-error'}><span className="font-medium">{x.title}.</span> <span className="text-ink-2">{x.detail}</span></span>, x.calm ? 'info' : 'error');
 }
 
 export function Toaster() {
@@ -272,7 +308,7 @@ export function Toaster() {
     pushToast = (x) => {
       const id = Date.now() + Math.random();
       setItems((cur) => [...cur.slice(-3), { ...x, id }]);
-      setTimeout(() => setItems((cur) => cur.filter((i) => i.id !== id)), x.tone === 'error' ? 7000 : 3500);
+      setTimeout(() => setItems((cur) => cur.filter((i) => i.id !== id)), x.tone === 'ok' ? 3500 : 7000);
     };
     return () => { pushToast = null; };
   }, []);
@@ -284,7 +320,7 @@ export function Toaster() {
           className={cx('pointer-events-auto flex items-start gap-2 border bg-raised px-3 py-2 text-sm shadow-[var(--shadow)]', i.tone === 'error' ? 'border-danger/70' : 'border-rule-strong')}
           style={{ animation: 'rise-in 200ms var(--ease-out-expo)' }}
         >
-          <Icon name={i.tone === 'error' ? 'alert' : 'check'} className={i.tone === 'error' ? 'mt-0.5 text-danger' : 'mt-0.5 text-st-new'} size={14} />
+          <Icon name={i.tone === 'error' ? 'alert' : i.tone === 'info' ? 'info' : 'check'} className={i.tone === 'error' ? 'mt-0.5 text-danger' : i.tone === 'info' ? 'mt-0.5 text-ink-3' : 'mt-0.5 text-st-new'} size={14} />
           <div className="min-w-0 flex-1">{i.text}</div>
         </div>
       ))}

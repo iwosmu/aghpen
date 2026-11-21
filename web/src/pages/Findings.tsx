@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
+import { NextSteps } from '../ui/NextSteps';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidate, useAction, useItem, usePage } from '../api/hooks';
 import { del, patch, post } from '../api/client';
@@ -28,7 +29,9 @@ function DetailDialog({ id, onClose }: { id: number; onClose: () => void }) {
   const canEdit = can('results:update');
   const q = useItem<Finding>('/findings/' + id);
   const save = useAction((body: Record<string, unknown>) => patch<Finding>('/findings/' + id, body), { invalidate: ['/findings', '/dashboard'], success: t('Zapisano', 'Saved') });
-  const remove = useAction(() => del('/findings/' + id), { invalidate: ['/findings', '/dashboard'], success: t('Znalezisko usunięte', 'Finding deleted'), onSuccess: onClose });
+  const qc = useQueryClient();
+  // Close first, then refresh the lists: a refetch of the deleted finding would answer 404.
+  const remove = useAction(() => del('/findings/' + id), { success: t('Znalezisko usunięte', 'Finding deleted'), onSuccess: () => { onClose(); window.setTimeout(() => invalidate(qc, '/findings', '/dashboard'), 60); } });
   const f = q.data;
   return (
     <Dialog open onClose={onClose} width={720} title={f ? <span className="flex items-center gap-2"><Sev level={f.severity} compact />{f.title}</span> : t('Znalezisko', 'Finding')}
@@ -182,7 +185,7 @@ export default function Findings() {
         sort={u.get('sort', '-interest')} onSort={(s) => u.set({ sort: s })}
         selected={canEdit || canExport ? selected : undefined} onSelect={canEdit || canExport ? setSelected : undefined}
         rowClass={(f) => (f.status === 'resolved' || f.status === 'false_positive' ? 'text-ink-2' : undefined)}
-        empty={<Empty icon="findings" title={active ? t('Żadne znalezisko nie pasuje do filtrów', 'No finding matches the filters') : t('Nie ma jeszcze znalezisk', 'There is no finding yet')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Znaleziska powstają po skanie z dopasowań sygnatur i wykrytych zmian. Możesz też dodać własne.', 'Findings come from signature matches and detected changes after a scan. You can also add your own.')} />}
+        empty={<Empty icon="findings" title={active ? t('Żadne znalezisko nie pasuje do filtrów', 'No finding matches the filters') : t('Nie ma jeszcze znalezisk', 'There is no finding yet')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Znaleziska powstają po skanie z dopasowań sygnatur i wykrytych zmian. Możesz też dodać własne.', 'Findings come from signature matches and detected changes after a scan. You can also add your own.')} action={active ? undefined : <NextSteps />} />}
         mobile={(f) => (
           <div>
             <div className="flex items-center justify-between gap-2"><Sev level={f.severity} /><FindingStatusMark status={f.status} /></div>

@@ -23,29 +23,37 @@ export function fmtSigned(n: number): string {
   return (n > 0 ? '+' : '−') + fmtInt(Math.abs(n));
 }
 
-export function fmtDateTime(iso: string | null | undefined): string {
-  if (!iso) return '–';
+/** A date the server really set. Go writes an unset time as year 1. */
+export function realDate(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '–';
+  if (Number.isNaN(d.getTime()) || d.getUTCFullYear() < 1971) return null;
+  return d;
+}
+
+export function fmtDateTime(iso: string | null | undefined): string {
+  const d = realDate(iso);
+  if (!d) return '–';
   return new Intl.DateTimeFormat(locale(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(d);
 }
 
 export function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return '–';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '–';
+  const d = realDate(iso);
+  if (!d) return '–';
   return new Intl.DateTimeFormat(locale(), { year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 }
 
 export function fmtTime(iso: string | null | undefined): string {
-  if (!iso) return '–';
-  return new Intl.DateTimeFormat(locale(), { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  const d = realDate(iso);
+  if (!d) return '–';
+  return new Intl.DateTimeFormat(locale(), { hour: '2-digit', minute: '2-digit' }).format(d);
 }
 
 /** "3 min temu", "za 2 h". */
 export function fmtRelative(iso: string | null | undefined, now = Date.now()): string {
-  if (!iso) return '–';
-  const diff = new Date(iso).getTime() - now;
+  const real = realDate(iso);
+  if (!real) return '–';
+  const diff = real.getTime() - now;
   const abs = Math.abs(diff);
   const rtf = new Intl.RelativeTimeFormat(locale(), { numeric: 'auto', style: 'short' });
   if (abs < 45_000) return t('przed chwilą', 'just now');

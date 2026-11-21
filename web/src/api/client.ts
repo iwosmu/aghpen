@@ -2,16 +2,25 @@
 // The transport is replaceable so the dev-only fixture layer can answer requests
 // without the pages knowing.
 
+import { parseJSON } from './normalize';
+
 const BASE = '/api/v1';
 
 export class ApiError extends Error {
   status: number;
   code: string;
-  constructor(status: number, code: string, message: string) {
+  details?: unknown;
+  constructor(status: number, code: string, message: string, details?: unknown) {
     super(message);
     this.status = status;
     this.code = code;
+    this.details = details;
   }
+}
+
+/** The route exists but its component is not connected in this installation (HTTP 501, code not_wired). */
+export function isUnavailable(e: unknown): boolean {
+  return e instanceof ApiError && (e.status === 501 || e.code === 'not_wired');
 }
 
 export type Transport = (req: Request) => Promise<Response>;
@@ -37,7 +46,21 @@ export function qs(q?: Query): string {
   return s ? '?' + s : '';
 }
 
-async function send(method: string, path: string, body?: BodyInit | null, headers?: Record<string, string>): Promise<Response> {
+/** Reads the session again and returns its CSRF token. Used once when the server rejects a stale token. */
+async function refreshCsrf(): Promise<boolean> {
+  try {
+    const res = await transport(new Request(BASE + '/me', { headers: { Accept: 'application/json' }, credentials: 'same-origin' }));
+    if (!res.ok) return false;
+    const s = await res.json();
+    if (!s?.csrf_token || s.csrf_token === csrfToken) return false;
+    csrfToken = s.csrf_token;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function send(method: string, path: string, body?: BodyInit | null, headers?: Record<string, string>, retried = false): Promise<Response> {
   const h = new Headers(headers);
   h.set('Accept', 'application/json');
   if (method !== 'GET' && method !== 'HEAD' && csrfToken) h.set('X-CSRF-Token', csrfToken);
@@ -49,14 +72,20 @@ async function send(method: string, path: string, body?: BodyInit | null, header
     throw new ApiError(0, 'network', e instanceof Error ? e.message : 'network error');
   }
   if (!res.ok) {
-    let code = 'internal';
+    let code = res.status === 501 ? 'not_wired' : res.status >= 500 ? 'internal' : 'error';
     let message = res.statusText || 'HTTP ' + res.status;
+    let details: unknown;
     try {
       const j = await res.json();
-      if (j && j.error) { code = j.error.code ?? code; message = j.error.message ?? message; }
+      if (j && j.error) { code = j.error.code ?? code; message = j.error.message ?? message; details = j.error.details; }
     } catch { /* body was not JSON */ }
-    if (res.status === 401 && onUnauthorized && !path.startsWith('/auth/')) onUnauthorized();
-    throw new ApiError(res.status, code, message);
+    // The session changed in another tab: its CSRF token is new. Read it and send the request once more.
+    if (res.status === 403 && /csrf/i.test(message) && !retried && !path.startsWith('/auth/') && (await refreshCsrf())) {
+      return send(method, path, body, headers, true);
+    }
+    // The session probe itself answers 401 when there is no session: it must not trigger another probe.
+    if (res.status === 401 && onUnauthorized && !path.startsWith('/auth/') && path !== '/me') onUnauthorized();
+    throw new ApiError(res.status, code, message, details);
   }
   return res;
 }
@@ -66,7 +95,7 @@ export async function api<T>(method: string, path: string, body?: unknown): Prom
   const res = await send(method, path, hasBody ? JSON.stringify(body) : null, hasBody ? { 'Content-Type': 'application/json' } : undefined);
   if (res.status === 204) return undefined as T;
   const text = await res.text();
-  return (text ? JSON.parse(text) : undefined) as T;
+  return text ? parseJSON<T>(text) : (undefined as T);
 }
 
 export const get = <T>(path: string, q?: Query) => api<T>('GET', path + qs(q));
@@ -77,7 +106,7 @@ export const del = <T = void>(path: string) => api<T>('DELETE', path);
 
 export async function upload<T>(path: string, form: FormData): Promise<T> {
   const res = await send('POST', path, form);
-  return (await res.json()) as T;
+  return parseJSON<T>(await res.text());
 }
 
 /** Fetch an export and hand it to the browser as a file download. */

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
+import { NextSteps } from '../ui/NextSteps';
 import { useAction, usePage } from '../api/hooks';
 import { post } from '../api/client';
 import type { Change, ScanRun } from '../api/types';
@@ -101,7 +102,7 @@ export default function Changes() {
         sort={u.get('sort', '-at')} onSort={(s) => u.set({ sort: s })}
         selected={canAck ? selected : undefined} onSelect={canAck ? setSelected : undefined}
         rowClass={(c) => cx(c.acked_at && 'opacity-70')}
-        empty={<Empty icon="changes" title={active ? t('Żadna zmiana nie pasuje do filtrów', 'No change matches the filters') : t('Nie zapisano jeszcze żadnej zmiany', 'No change has been recorded yet')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Zmiany pojawiają się od drugiego skanu: Czujka porównuje każdy przebieg z poprzednim.', 'Changes appear from the second scan on: Czujka compares each run with the previous one.')} />}
+        empty={<Empty icon="changes" title={active ? t('Żadna zmiana nie pasuje do filtrów', 'No change matches the filters') : t('Nie zapisano jeszcze żadnej zmiany', 'No change has been recorded yet')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Zmiany pojawiają się od drugiego skanu: Czujka porównuje każdy przebieg z poprzednim.', 'Changes appear from the second scan on: Czujka compares each run with the previous one.')} action={active ? undefined : <NextSteps />} />}
         mobile={(c) => (
           <div>
             <div className="flex items-center justify-between gap-2"><ChangeMark kind={c.kind} expected={c.expected} /><span className="num text-xs text-ink-3">#{c.run_id}</span></div>
