@@ -121,7 +121,7 @@ for mode in thorough balanced; do
   scan "K-$mode" routed -targets 10.77.0.0/22,10.79.0.0/20 -exclude "$SPARSE_EXCL" -ports "$PORTS" -pps 2000 -discovery "$mode" -no-sv -measure-iface eth0 -quiet
   check "K-$mode" -expect lab-ports
 done
-# fast mode is measured, not required to be complete: in 7 of 15 runs at
+# fast mode is measured, not required to be complete: in 8 of 16 runs at
 # 2000 pps it missed one or two hosts that answer ping. Cause: the sweep
 # makes the lab router resolve about 700 dead addresses per second, the
 # neighbour table of the Docker VM holds 1024 entries (kernel log: "neighbor

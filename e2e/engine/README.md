@@ -39,7 +39,7 @@ Sieci: `czeng-net` 10.77.0.0/22 (laboratorium), `czeng-scan` 10.78.0.0/24 (skane
 | 10.76.0.40 | Apache Tomcat 10.1 | 8080 |
 | 10.76.0.50 | HTTPS z certyfikatem samopodpisanym | 8443 |
 | 10.76.0.60 | nginx na nietypowym porcie | 8181 |
-| 10.76.0.70 | DNS (dnsmasq) i NTP po UDP | 53/udp, 123/udp, 53/tcp |
+| 10.76.0.70 | DNS (dnsmasq), NTP i agent SNMP po UDP | 53/udp, 123/udp, 161/udp, 53/tcp |
 
 Hasła w tym laboratorium są losowe i istnieją tylko w kontenerach. Skaner nigdzie się nie loguje.
 
@@ -57,6 +57,16 @@ Profil skanu ma pole `discovery.mode`:
 
 W segmencie lokalnym nmap używa ARP i wszystkie tryby robią jedno przejście.
 
+### Ograniczenie trybu fast
+
+Przy 2000 pps na zakresie 5115 adresów tryb `fast` pominął jeden lub dwa hosty (z 7) w 8 z 16 przebiegów. Tryby `balanced` i `thorough` nie pominęły żadnego hosta w 8 przebiegach. Przyczyna leży na ścieżce, nie w nmap: router laboratorium musi rozwiązać adres MAC każdego martwego adresu, a tablica sąsiadów jądra w maszynie Docker ma 1024 wpisy. Log jądra pokazuje `neighbour: arp_cache: neighbor table overflow!`. Pakiet do hosta, dla którego router nie może wtedy utworzyć wpisu, ginie. Tryb `fast` wysyła tylko 6 pakietów na host w dwóch krótkich seriach, więc ma najmniejszy zapas. To samo zjawisko występuje na prawdziwym routerze ostatniego skoku, gdy skan szybko przechodzi przez dużą, pustą, bezpośrednio podłączoną sieć. Zalecenie: `fast` tylko do szybkiego przeglądu; do inwentaryzacji `balanced` (domyślny) albo niższy limit pps.
+
+## Skan UDP
+
+Opcjonalny, domyślnie wyłączony (`udp.enabled` w profilu, `-udp` w scanprobe). Lista dozwolonych usług: DNS 53, NTP 123, NetBIOS-NS 137, SNMP 161, IKE 500, SSDP 1900, mDNS 5353. Profil może tylko zawęzić tę listę; porty polityki bezpieczeństwa filtrują ją tak jak TCP. Skan wymaga nmap z surowymi gniazdami; bez nich etap jest pomijany z wpisem w logu.
+
+Port 161 nie trafia do nmap. Sondy nmap dla SNMP zawierają żądanie SNMPv1 ze społecznością „public”, czyli próbę domyślnego poświadczenia. Silnik wysyła własne zapytanie: SNMPv3 engine discovery (RFC 3414), bez nazwy użytkownika i bez poświadczeń, najwyżej dwa pakiety na host.
+
 ## Scenariusze
 
 | Scenariusz | Co sprawdza |
@@ -70,7 +80,8 @@ W segmencie lokalnym nmap używa ARP i wszystkie tryby robią jedno przejście.
 | F-native | zapasowy skaner w Go (bez nmap), tylko połączenia TCP |
 | G-unprivileged | brak surowych gniazd: nmap sam przechodzi na `-sT` |
 | I-adaptive | 4094 adresy przy 2000 pps: rozmiar grup rośnie z 256 w stronę 4096 |
-| K-thorough, K-balanced, K-fast | tryby wykrywania hostów na rzadkiej przestrzeni (5115 adresów, hosty w 4 z 20 bloków /24, 2000 pps); każdy tryb musi znaleźć wszystkie 7 hostów, także ten bez ICMP |
+| K-thorough, K-balanced | tryby wykrywania hostów na rzadkiej przestrzeni (5115 adresów, hosty w 4 z 20 bloków /24, 2000 pps); oba muszą znaleźć wszystkie 7 hostów, także ten bez ICMP |
+| K-fast | ten sam zakres w trybie `fast`: wynik jest mierzony. Test nie przechodzi, gdy zginie host bez ICMP. Brak innego hosta jest wypisany jako liczba pominięć (patrz „Ograniczenie trybu fast”) |
 | J-apps | jeden przebieg silnika z prawdziwym kolektorem HTTP/TLS, biblioteką 386 sygnatur i skanem UDP; sprawdzane są technologie, wersje i klasy każdej aplikacji oraz zgodność licznika żądań HTTP z liczbą żądań wysłanych przez kolektor |
 | H-emergency | awaryjne zatrzymanie: silnik odmawia startu i nie wysyła żadnego pakietu |
 
