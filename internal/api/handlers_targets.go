@@ -443,7 +443,9 @@ func (s *Server) updateTarget(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		err = mergePatch(&t, patch, "value", "note", "tags", "enabled")
 	}
-	if err == nil {
+	_, newValue := patch["value"]
+	_, switched := patch["enabled"]
+	if err == nil && newValue { // an absent field is unchanged: the stored value is not parsed again
 		parsed, perr := ParseTarget(t.Value)
 		if perr != nil {
 			err = invalid("value: %v", perr)
@@ -451,8 +453,6 @@ func (s *Server) updateTarget(w http.ResponseWriter, r *http.Request) {
 			t.Kind, t.Value, t.Addresses = parsed.Kind, parsed.Value, parsed.Addresses
 		}
 	}
-	_, newValue := patch["value"]
-	_, switched := patch["enabled"]
 	if err == nil && (newValue || (switched && t.Enabled)) {
 		// The same allowed-networks and operator-lock check as creation
 		// (security review H1): a new value, or a target switched on again.
