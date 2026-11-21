@@ -29,6 +29,7 @@ type Server struct {
 	log     *slog.Logger
 	targets TargetParser
 	handler http.Handler
+	mux     chi.Routes
 }
 
 // New builds the server and its routes.
@@ -55,6 +56,7 @@ func (s *Server) Handler() http.Handler { return s.handler }
 
 func (s *Server) routes() http.Handler {
 	r := chi.NewRouter()
+	s.mux = r
 	r.Use(s.recoverer, s.securityHeaders)
 	can := func(p model.Permission) func(http.Handler) http.Handler { return auth.Require(p, s.authFail) }
 	session := auth.RequireSession(s.authFail)
@@ -570,8 +572,24 @@ var singular = map[string]string{"hosts": "host", "services": "service", "findin
 var actionWords = map[string]bool{"pause": true, "resume": true, "cancel": true, "ack": true, "validate": true, "retrohunt": true,
 	"preview": true, "import": true, "test": true, "release": true, "estimate": true, "login": true, "logout": true, "defectdojo": true, "results": true}
 
+// namedActions are the routes whose audit action does not follow the generic rule.
+var namedActions = map[string][2]string{
+	"POST /api/v1/runs":                       {"run.start", "run"},
+	"PUT /api/v1/settings/safety":             {"safety.update", "safety"},
+	"POST /api/v1/emergency-stop":             {"safety.emergency_stop", "safety"},
+	"POST /api/v1/emergency-stop/release":     {"safety.emergency_stop_release", "safety"},
+	"PUT /api/v1/settings/defectdojo":         {"integration.defectdojo.update", "integration"},
+	"POST /api/v1/settings/defectdojo/test":   {"integration.defectdojo.test", "integration"},
+	"POST /api/v1/findings/export/defectdojo": {"finding.export.defectdojo", "finding"},
+	"POST /api/v1/import/results":             {"result.import", "result"},
+}
+
 // defaultAction names the audit action from the route: PATCH /hosts/{id} is "host.update".
+// A denied request gets the same name as an allowed one, so the log can be filtered by action.
 func defaultAction(method, pattern string) (action, entity string) {
+	if n, ok := namedActions[method+" "+pattern]; ok {
+		return n[0], n[1]
+	}
 	var lit []string
 	for _, seg := range strings.Split(strings.TrimPrefix(pattern, "/api/v1"), "/") {
 		if seg == "" || strings.HasPrefix(seg, "{") {
@@ -611,6 +629,12 @@ func (s *Server) audit(next http.Handler) http.Handler {
 		pattern := ""
 		if rc := chi.RouteContext(r.Context()); rc != nil {
 			pattern = rc.RoutePattern()
+		}
+		if pattern == "" || strings.HasSuffix(pattern, "*") {
+			// A request that a middleware rejected (no session, CSRF) never reached its route: look the route up.
+			if tc := chi.NewRouteContext(); s.mux != nil && s.mux.Match(tc, r.Method, r.URL.Path) {
+				pattern = tc.RoutePattern()
+			}
 		}
 		action, entity := defaultAction(r.Method, pattern)
 		if a.action != "" {
