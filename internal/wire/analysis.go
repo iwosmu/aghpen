@@ -7,6 +7,7 @@ package wire
 import (
 	"context"
 	"log/slog"
+	"net/netip"
 	"sort"
 	"strconv"
 	"strings"
@@ -340,21 +341,23 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 	for _, sc := range scopes.Items {
 		crit[sc.ID] = sc.Criticality
 	}
-	// The docker host (loopback targets scanned through the host gateway):
-	// name it and tag Czujka's own service, which is not a finding about the network.
+	// The docker host (loopback targets scanned through the host gateway, or
+	// 127.0.0.1 in host-network mode): name it and tag Czujka's own service,
+	// which is not a finding about the network.
 	self := map[int64]bool{}
-	if gw := targets.HostGateway(); gw.IsValid() {
-		for i := range hosts {
-			if hosts[i].IP != gw.String() || !hosts[i].Up {
-				continue
-			}
-			ids, err := a.st.MarkDockerHost(ctx, hosts[i].HostID, a.SelfPort)
-			if err != nil {
-				return nil, err
-			}
-			for _, id := range ids {
-				self[id] = true
-			}
+	gw := targets.HostGateway()
+	for i := range hosts {
+		ip, err := netip.ParseAddr(hosts[i].IP)
+		isHost := err == nil && (ip.Unmap().IsLoopback() || (gw.IsValid() && ip.Unmap() == gw))
+		if !isHost || !hosts[i].Up {
+			continue // only the docker host: the gateway, or loopback in host-network mode
+		}
+		ids, err := a.st.MarkDockerHost(ctx, hosts[i].HostID, a.SelfPort)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range ids {
+			self[id] = true
 		}
 	}
 	var svcRows []store.ServiceAnalysis
