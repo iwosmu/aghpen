@@ -253,7 +253,7 @@ var findingStatusPL = map[model.FindingStatus]string{
 
 var kindPL = map[model.ChangeKind]string{
 	model.ChangeHostNew: "Nowy host", model.ChangeHostGone: "Host nieaktywny", model.ChangeHostBack: "Host znów odpowiada",
-	model.ChangeHostUnstable: "Host niestabilny", model.ChangeHostMissing: "Host bez odpowiedzi", model.ChangeServiceNew: "Nowa usługa", model.ChangeServiceGone: "Usługa zniknęła",
+	model.ChangeHostUnstable: "Host niestabilny", model.ChangeHostMissing: "Nie odpowiada (niepotwierdzone)", model.ChangeServiceUnreachable: "Usługa nie odpowiada (niepotwierdzone)", model.ChangeServiceNew: "Nowa usługa", model.ChangeServiceGone: "Usługa zniknęła",
 	model.ChangeServiceChanged: "Zmiana usługi", model.ChangeTechNew: "Nowa technologia", model.ChangeTechGone: "Technologia zniknęła",
 	model.ChangeTechVersion: "Zmiana wersji", model.ChangeTitle: "Zmiana tytułu", model.ChangeHTTPStatus: "Zmiana statusu HTTP",
 	model.ChangeCert: "Zmiana certyfikatu", model.ChangeHeaders: "Zmiana nagłówków", model.ChangeCookies: "Zmiana ciasteczek",
@@ -323,7 +323,7 @@ func changeGroup(k model.ChangeKind) int {
 	switch k {
 	case model.ChangeHostNew, model.ChangeHostBack, model.ChangeServiceNew, model.ChangeServiceReturned:
 		return 0
-	case model.ChangeHostGone, model.ChangeServiceGone, model.ChangeHostMissing:
+	case model.ChangeHostGone, model.ChangeServiceGone, model.ChangeHostMissing, model.ChangeServiceUnreachable:
 		return 1
 	}
 	return 2
@@ -525,11 +525,11 @@ func build(in Input) doc {
 			parts = append(parts, "Ubyło: "+joinAnd(gone)+".")
 		}
 		if s.HostsMissing > 0 {
-			miss := "Bez odpowiedzi w tym przebiegu: " + nHosts(s.HostsMissing)
+			miss := "Nie odpowiada (niepotwierdzone): " + nHosts(s.HostsMissing)
 			if s.ServicesUnreachable > 0 {
-				miss += " (" + nServices(s.ServicesUnreachable) + " bez potwierdzenia)"
+				miss += ", z nimi " + nServices(s.ServicesUnreachable)
 			}
-			parts = append(parts, miss+"; to jeszcze nie jest zgłoszenie nieaktywności.")
+			parts = append(parts, miss+". Ponowne sondowanie potwierdzi, czy wróciły, czy zniknęły.")
 		}
 		if s.HostsBack > 0 {
 			parts = append(parts, "Powroty po nieaktywności: "+nHosts(s.HostsBack)+".")

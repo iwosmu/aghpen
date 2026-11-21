@@ -192,9 +192,10 @@ Wszystkie stałe są w `stability.go` i `diff.go`, każda z komentarzem. Zmiana 
 
 ### 2.9 Ponowne sondowanie sterowane modelem
 
-Pakiet `internal/reprobe` dopytuje hosty, o których model wie za mało. Szczegóły tras są w `docs/API-time.md`.
+Pakiet `internal/reprobe` dopytuje hosty, o których model wie za mało. Mechanizm jest włączony od pierwszego startu. Trasy: [`docs/API.md`](API.md) (`/reprobe/plan`, `/settings/reprobe`).
 
 - **Potwierdzenie.** Host dostał `host_missing` (status `unstable`, wcześniej odpowiadał). Czujka sprawdza go ponownie 10, 30 i 90 minut po pierwszym braku odpowiedzi (`backoff_minutes`). Seria starsza niż ostatni krok plus 12 godzin nie jest już potwierdzana.
+- **Szybkie potwierdzenie młodego hosta.** Host z mniej niż 8 obserwacjami (`MinObsForExpected`, rytm jeszcze nieznany) jest sprawdzany 1, 3 i 10 minut po pierwszym braku (`reprobe.YoungBackoffMinutes`). Dla hosta widzianego raz model zgłasza nieaktywność po drugim braku z rzędu (`p_alive` 0,36, potem 0,19 < 0,2). Pierwsza sonda potwierdzająca daje więc `host_gone` i `service_gone` około 1–2 minuty po drugim skanie. Test: `TestVanishedHostInTwoScans` (`internal/wire`, prawdziwa baza).
 - **Prawdopodobnie aktywny.** Host niestabilny jest sprawdzany 5 minut po początku najbliższej godziny, w której model daje częstość odpowiedzi co najmniej `likely_up_rate` (domyślnie 0,6). Warunek: co najmniej 8 obserwacji i prawdziwa odpowiedź w tym samym typie dnia (dzień roboczy albo weekend, godzina ±1).
 - **Bezpieczeństwo.** Sondy działają tylko w oknach skanowania profilu (`sched.NextAllowed`) i pod polityką bezpieczeństwa: wykluczenia, limity pakietów i HTTP, wyłącznik awaryjny. Budżet to 200 adresów na godzinę (`budget_per_hour`), liczony razem dla wszystkich sond z ostatniej godziny. Nadmiar przechodzi na następną godzinę. Sonda sprawdza najwyżej 32 znane porty hosta.
 - Wykonawca startuje co minutę. Zbiera należne sondy w jeden przebieg na profil (`trigger = reprobe`) i nie startuje nowego, dopóki poprzedni trwa.
@@ -307,15 +308,15 @@ Jury robi co najmniej dwa przebiegi i może zatrzymać kontener między nimi. Ho
 
 | Profil | Przebieg 1 | Przebieg 2 | Zmiany po przebiegu 2 | Liczniki |
 | --- | --- | --- | --- | --- |
-| `down_after_misses = 0` (model) | host i 3 usługi | brak odpowiedzi | `host_missing` (średnia) | `hosts_missing 1`, `services_unreachable 3` |
+| `down_after_misses = 0` (model) | host i 3 usługi | brak odpowiedzi | `host_missing` (średnia) + 3 × `service_unreachable` (niska); po sondzie potwierdzającej (1 min) `host_gone` + 3 × `service_gone` | `hosts_missing 1`, `services_unreachable 3` |
 | `down_after_misses = 1` | host i 3 usługi | brak odpowiedzi | `host_gone` + 3 × `service_gone` | `hosts_gone 1`, `services_gone 3` |
-| `down_after_misses = 2` | host i 3 usługi | brak odpowiedzi | `host_missing`; `host_gone` po trzecim przebiegu | `hosts_missing 1` |
+| `down_after_misses = 2` | host i 3 usługi | brak odpowiedzi | `host_missing` + 3 × `service_unreachable`; `host_gone` po sondzie potwierdzającej | `hosts_missing 1` |
 
 Zdania z testu `TestTwoPassMissingHost` (`go test ./internal/analyze -run TwoPass -v`):
 
 ```text
 jedna wcześniejsza obserwacja, model:
-  Host 10.66.3.17 nie odpowiedział w tym przebiegu (w poprzednim aktywny, 3 otwarte usługi); model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku
+  Host 10.66.3.17 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 3 otwarte usługi: 22/tcp ssh OpenSSH, 80/tcp http nginx, 8080/tcp http Jenkins; model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku
 40 obserwacji, zawsze odpowiadał, model:
   … model: p_alive 0,26, zgłoszenie nieaktywności po kolejnym braku
 reguła N = 1:
@@ -326,7 +327,7 @@ reguła N = 2:
 
 Bez reguły model zgłasza nieaktywność po drugim braku z rzędu: jeden brak nigdy nie wystarcza (`ε = 0,10`, rozdz. 2.3). Liczby `p_alive` i „po kolejnym braku" trafiają do zdania, gdy wywołujący wypełni migawkę przez `HostSnapshot.SetAssessment`. Brak, który tłumaczy rytm hosta, zostaje zmianą oczekiwaną (`host_gone` z `expected = true`), nie `host_missing`.
 
-Raport z przebiegu mówi to w zdaniu wstępnym: „Bez odpowiedzi w tym przebiegu: 1 host (2 usługi bez potwierdzenia); to jeszcze nie jest zgłoszenie nieaktywności." Wiersz zmiany stoi w sekcji „Co zniknęło".
+Każda otwarta usługa takiego hosta dostaje zmianę `service_unreachable` („Usługa … nie odpowiada (niepotwierdzone)”): drugi skan pokazuje, co zniknęło razem z hostem, zanim sonda potwierdzi stan. Raport z przebiegu mówi to w zdaniu wstępnym: „Nie odpowiada (niepotwierdzone): 1 host, z nimi 2 usługi. Ponowne sondowanie potwierdzi, czy wróciły, czy zniknęły.” Wiersze stoją w sekcji „Co zniknęło”.
 
 ## 4. Pewność identyfikacji technologii
 

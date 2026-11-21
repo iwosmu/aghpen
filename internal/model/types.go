@@ -854,25 +854,28 @@ type ServiceGroup struct {
 type ChangeKind string
 
 const (
-	ChangeHostNew        ChangeKind = "host_new"
-	ChangeHostGone       ChangeKind = "host_gone"     // reported inactive
-	ChangeHostBack       ChangeKind = "host_back"     // was inactive, answers again
-	ChangeHostUnstable   ChangeKind = "host_unstable" // started to flap
-	ChangeHostMissing    ChangeKind = "host_missing"  // answered in the previous run, silent now, not yet reported inactive
-	ChangeServiceNew     ChangeKind = "service_new"
-	ChangeServiceGone    ChangeKind = "service_gone"
-	ChangeServiceChanged ChangeKind = "service_changed" // product, version, banner
-	ChangeTechNew        ChangeKind = "tech_new"
-	ChangeTechGone       ChangeKind = "tech_gone"
-	ChangeTechVersion    ChangeKind = "tech_version"
-	ChangeTitle          ChangeKind = "title_changed"
-	ChangeHTTPStatus     ChangeKind = "status_changed"
-	ChangeCert           ChangeKind = "cert_changed"
-	ChangeHeaders        ChangeKind = "headers_changed"
-	ChangeCookies        ChangeKind = "cookies_changed"
-	ChangeContent        ChangeKind = "content_changed" // body differs strongly (simhash distance)
-	ChangeRedirect       ChangeKind = "redirect_changed"
-	ChangeClass          ChangeKind = "class_changed" // for example became an admin panel
+	ChangeHostNew      ChangeKind = "host_new"
+	ChangeHostGone     ChangeKind = "host_gone"     // reported inactive
+	ChangeHostBack     ChangeKind = "host_back"     // was inactive, answers again
+	ChangeHostUnstable ChangeKind = "host_unstable" // started to flap
+	ChangeHostMissing  ChangeKind = "host_missing"  // answered in the previous run, silent now, not yet reported inactive
+	// ChangeServiceUnreachable: an open service of a host_missing host. Its
+	// state is unknown in this run, not gone; a confirmation probe decides.
+	ChangeServiceUnreachable ChangeKind = "service_unreachable"
+	ChangeServiceNew         ChangeKind = "service_new"
+	ChangeServiceGone        ChangeKind = "service_gone"
+	ChangeServiceChanged     ChangeKind = "service_changed" // product, version, banner
+	ChangeTechNew            ChangeKind = "tech_new"
+	ChangeTechGone           ChangeKind = "tech_gone"
+	ChangeTechVersion        ChangeKind = "tech_version"
+	ChangeTitle              ChangeKind = "title_changed"
+	ChangeHTTPStatus         ChangeKind = "status_changed"
+	ChangeCert               ChangeKind = "cert_changed"
+	ChangeHeaders            ChangeKind = "headers_changed"
+	ChangeCookies            ChangeKind = "cookies_changed"
+	ChangeContent            ChangeKind = "content_changed" // body differs strongly (simhash distance)
+	ChangeRedirect           ChangeKind = "redirect_changed"
+	ChangeClass              ChangeKind = "class_changed" // for example became an admin panel
 	// ChangeServiceReturned: a service reported gone (or missing from the
 	// previous run) is open again. Before holds {state, last_open_run_id,
 	// last_open_at, away_seconds, runs_away}; After is "open".
@@ -1049,6 +1052,23 @@ type RetroHuntResult struct {
 }
 
 // ---------- Integrations ----------
+
+// WebhookSettings configure the alert webhook: one POST with a JSON summary
+// to the operator's own endpoint after every analysed run.
+type WebhookSettings struct {
+	Enabled bool `json:"enabled"`
+	// URL is the endpoint (http or https). Stored encrypted: Slack and
+	// Mattermost URLs carry their token in the path.
+	URL string `json:"url"`
+	// MinSeverity: a run sends the POST only when a change or a new finding
+	// has at least this severity (info, low, medium, high; default medium).
+	MinSeverity Severity `json:"min_severity"`
+	Secret      string   `json:"secret,omitempty"` // write-only HMAC-SHA256 key; GET returns SecretSet
+	SecretSet   bool     `json:"secret_set"`
+	// UIURL is the public address of Czujka for the links in the message.
+	// Empty: the address the settings were saved from.
+	UIURL string `json:"ui_url"`
+}
 
 type DefectDojoSettings struct {
 	Enabled         bool   `json:"enabled"`

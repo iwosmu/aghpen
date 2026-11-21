@@ -93,6 +93,7 @@ Base path `/api/v1`. JSON bodies use the types of `internal/model/types.go` (the
 | POST `/emergency-stop` | safety:stop | → `SafetyPolicy` (sets the flag; every running run stops at once and becomes `paused` with `pause_reason: "emergency_stop"`; its SSE stream sends `paused`, not `done`: the run is not finished and can be resumed after the release; new runs, ad-hoc runs and resumes answer 409 `emergency_stop`) |
 | POST `/emergency-stop/release` | safety:manage | → `SafetyPolicy` (clears the flag; paused runs stay paused until someone calls `/runs/{id}/resume`) |
 | GET `/settings/defectdojo` · PUT · POST `/settings/defectdojo/test` | integrations:manage | `DefectDojoSettings` → `{ok, message, version}`. `link_url`: the public base of every DefectDojo link that Czujka stores and shows (`dojo_url` of findings, `test_url`, product and engagement links); empty = `url`. Set it when Czujka reaches DefectDojo at an address a browser cannot open (for example `url: http://host.docker.internal:18080`, `link_url: https://dojo.example.org`). It must be an http or https address with a host (else 422). `scope_mappings: [{scope_id, product_type_name, product_name, engagement_name}]` (each scope at most once; the scope must exist). `status_sync`: after every analysed run, close resolved findings in DefectDojo, reopen observed ones and apply the status pull (result in the audit log, action `finding.sync.defectdojo`) |
+| GET `/settings/webhook` · PUT · POST `/settings/webhook/test` | integrations:manage | `WebhookSettings` `{enabled, url, min_severity, secret (write-only), secret_set, ui_url}`; PUT also takes `clear_secret: true`. `url` must be http or https with a host (else 422); it is stored encrypted together with `secret`. An empty `secret` keeps the stored one. `min_severity`: `info`, `low`, `medium` (default) or `high`. `ui_url`: the public address of Czujka for the links; empty = the address the settings were saved from. The test sends one message with `event: "test"` and answers `{ok, status, ms, error}` (always 200; `ok: false` on failure). It uses the stored settings; `url` and `secret` in the body override them, so a form can test before saving. See "Alert webhook" below |
 | GET `/healthz` | public | → `{status, version, db, tde, tde_detail, field_encryption, engine, probe: {prober, mode, raw_sockets}}`; `host_gateway`: the IPv4 address loopback targets are scanned as (empty when the mapping is off); `probe.mode` is `nmap-raw` (SYN scan, ICMP/ARP discovery), `nmap-connect` (no raw sockets: `-sT`) or `native` (Go TCP connect, no nmap) |
 | GET `/doctor` | safety:manage | → `{ok, version, checks: [{name, title, status: ok|warn|fail, detail, fix}]}`: the installation check of `czujka doctor` (database, pg_tde, master key, nmap version, raw sockets, DNS, free disk, pg_dump/pg_restore, routes to the scan networks of enabled scopes; no packet is sent). `fix` is a Polish instruction |
 
@@ -109,6 +110,34 @@ Base path `/api/v1`. JSON bodies use the types of `internal/model/types.go` (the
 - **service_returned.** A service (same host, port, protocol) that was open in an earlier run, not open in the previous one, and is open now: kind `service_returned` (low; medium for sensitive classes), `field: "state"`, `before: {state: "gone", last_open_run_id, last_open_at, away_seconds, runs_away}`, `after: "open"`. A service seen open before is never `service_new`. `summary.services_returned` counts them.
 - **Response time.** Every service observation keeps the time of the first HTTP request (`result.http.response_ms`). Baseline: the median of the last 5 answered observations that were not slow themselves (one is enough). `response_slower` (low) when the time is at least 2× the baseline and at least 300 ms above it, or when the port is open and HTTP no longer answers; `response_recovered` (info) when a slow service is back to normal. Reported on the transition only. `field: "http.response_ms"`, `before: {baseline_ms, ms}`, `after: {ms}` or `{ms: null, error: "no_answer"}`. `summary.responses_slower` counts them. Service items carry `response_ms` (latest observation, null without an HTTP answer) and `response_slow` (that observation was slow).
 - **Sub-routers.** Other packages can mount routes under `/api/v1` through `Deps.Mounts` (`api.Mount{Pattern, Router func(guard api.Guard) http.Handler}`). `api.Guard` is the permission middleware of this router (`guard(model.PermResultsRead)`); `api.WriteJSON` and `api.WriteError` write answers in the format above.
+
+## Alert webhook
+
+After every analysed run (scan, re-probe, import, manual entry), Czujka sends one `POST` to the configured URL, when the webhook is enabled and the run has at least one change or new finding at `min_severity` or above. Otherwise it sends nothing.
+
+- Headers: `Content-Type: application/json`, `User-Agent: Czujka/1.0 (webhook)`, `X-Czujka-Event: run.analyzed` (or `test`), and with a secret `X-Czujka-Signature: sha256=<hex HMAC-SHA256(secret, raw body)>`.
+- One attempt, 10 s timeout, no retry, redirects not followed. A status outside 2xx is a failure. Every delivery (and every test) writes an audit entry `integration.webhook.send` with `{run_id, status, ms, changes, findings, error}`.
+- Body:
+
+```json
+{
+  "event": "run.analyzed",
+  "run_id": 12,
+  "run_url": "https://czujka.example/runs/12",
+  "trigger": "manual",
+  "scope": "profil dmz",
+  "finished_at": "2026-11-21T18:00:00Z",
+  "counts": {"service_new": 1, "service_gone": 1, "host_missing": 1, "findings_new": 1},
+  "changes": [{"kind": "service_new", "severity": "medium", "ip": "10.0.0.1", "port": 8080,
+               "summary": "Nowa usługa 10.0.0.1:8080 (Jenkins)", "url": "https://czujka.example/services/9"}],
+  "findings": [{"kind": "finding", "severity": "high", "ip": "10.0.0.1", "port": 8080,
+                "summary": "Panel administracyjny: Jenkins", "interest": 80, "url": "https://czujka.example/hosts/1"}],
+  "text": "*Czujka: przebieg #12 przeanalizowany* (profil dmz)\nnowe usługi: 1, ...\n• [wysoka] Panel administracyjny: Jenkins (10.0.0.1:8080) https://czujka.example/hosts/1\n...\nPrzebieg: https://czujka.example/runs/12"
+}
+```
+
+- `counts` is `summary.by_kind` of the run plus `findings_new`. `changes` (at most 10, highest severity first) holds the kinds `host_new`, `service_new`, `host_gone`, `service_gone`, `host_missing`, `service_unreachable`, `host_back`, `service_returned` and `response_slower` at `min_severity` or above; expected changes are left out. `findings` (at most 5) are the findings first seen in this run, by severity and interest.
+- `text` is a Polish plain-text message with bare URLs. Slack and Mattermost incoming webhooks render it as is; other receivers read the JSON fields.
 
 ## Exposure rules and signature from an example
 
@@ -164,7 +193,7 @@ Routes of `internal/timeline`. `Page<T>` lists take `limit` (default 50, max 100
 
 Model-driven confirmation probes (`internal/reprobe`). When a host goes `host_missing`, Czujka probes only that address and its known ports again after 10, 30 and 90 minutes (configurable), so a host that really went away becomes `host_gone` without a full scan, and a host that was only briefly silent returns to `up`. Hosts that answer irregularly get a probe in an hour when the availability model expects them up.
 
-**Off by default.** A fresh installation stores `enabled: false`: traffic that the scanner starts on its own needs the consent of an administrator. The first-run wizard offers it (checked by default); `PUT /settings/reprobe {"enabled": true}` turns it on.
+**On by default.** A fresh installation stores `enabled: true`. Re-probing sends the profile's own safe probes to single addresses that a scan already found, within the hourly budget, the scan windows, the safety policy and the emergency stop. `PUT /settings/reprobe {"enabled": false}` turns it off.
 
 | Method and path | Permission | Body → answer |
 | --- | --- | --- |
@@ -211,7 +240,7 @@ Settings     {enabled: false (fresh installation), budget_per_hour: 200, backoff
 ### Re-probing rules (`reprobe.Build`, a pure function)
 
 - Candidates: hosts with status `unstable` or `expected-offline` whose latest observation is a miss. `down` hosts wait for the next full scan.
-- **Confirm**: a host that went `host_missing` (status `unstable`, answered before) gets probes at `first miss + backoff_minutes[k]`, k = reprobes already recorded since the first miss. An overdue step is due now. A miss streak older than the last step plus 12 hours is not confirmed any more.
+- **Confirm**: a host that went `host_missing` (status `unstable`, answered before) gets probes at `first miss + backoff_minutes[k]`, k = reprobes already recorded since the first miss. An overdue step is due now. A miss streak older than the last step plus 12 hours is not confirmed any more. A host with fewer than 8 observations (no rhythm learned yet) uses the steps 1, 3 and 10 minutes instead (`reprobe.YoungBackoffMinutes`), so a host seen in one scan and silent in the next is confirmed inactive about a minute later.
 - **Likely up**: other candidates (and confirm hosts after the last step) are probed 5 minutes into the next hour whose model up-rate (`analyze.UpRates`) is at least `likely_up_rate`, where the host really answered on the same type of day (weekday or weekend, hour ±1), after its latest observation or reprobe. It needs at least 8 observations (`analyze.MinObsForExpected`).
 - **Safety**: never when `enabled` is false or the emergency stop is set; never an address in the policy exclusions (IP, CIDR, range); the time moves to the next open window of the host's profile (`sched.NextAllowed`), and a likely-up hour without an open window is skipped; at most `budget_per_hour` addresses per hour, counting the reprobes of the last hour (`reprobe_log`); later probes move to the next hour with a note. The engine applies the safety policy again (ports, rates, exclusions).
 - The executor (`reprobe.Executor`) runs every minute, starts the due probes as one targeted run per profile with trigger `reprobe`, records them in `reprobe_log`, and starts nothing while a reprobe run is still queued, running or analysing.

@@ -100,6 +100,14 @@ export interface ScanEstimate {
   addresses: number; chunks: number; est_packets: number; est_duration_sec: number; effective_pps: number;
   fits_window: boolean; window_sec: number; based_on_history: boolean; expected_live_rate: number;
   discovery_mode?: string;
+  /** > 0: after the top ports, up to this many live hosts also get the rest of 1-65535 (counted in packets and duration). */
+  full_range_max_hosts?: number;
+  /** the scope-size trigger: the full range applies to scopes of at most this many addresses */
+  full_range_max_addresses?: number;
+  /** ports per host in the second pass (the rest of 1-65535) */
+  full_range_ports?: number;
+  /** seconds the second pass takes for one live host at this profile's effective rate */
+  est_full_range_sec_per_host?: number;
 }
 
 export type RunStatus = 'queued' | 'running' | 'paused' | 'analyzing' | 'completed' | 'failed' | 'cancelled';
