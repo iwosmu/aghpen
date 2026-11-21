@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iwosmu/aghpen/internal/interchange"
 	"github.com/iwosmu/aghpen/internal/model"
 )
 
@@ -498,7 +499,7 @@ func TestDescriptionTagsSeverity(t *testing.T) {
 		t.Errorf("generic = %+v", g)
 	}
 	f.URL = ""
-	if e := endpointOf(f); e[0].Protocol != "tcp" {
+	if e := interchange.DojoEndpoints(f); e[0].Protocol != "tcp" {
 		t.Errorf("endpoint without a URL = %+v", e)
 	}
 	if s := TargetFromSettings(model.DefectDojoSettings{ProductName: " Kampus "}); s.ProductName != "Kampus" || s.EngagementName != DefaultEngagement {

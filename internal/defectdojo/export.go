@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iwosmu/aghpen/internal/interchange"
 	"github.com/iwosmu/aghpen/internal/model"
 )
 
@@ -54,147 +55,23 @@ type dojoFinding struct {
 	Endpoints        []int64  `json:"endpoints"`
 }
 
-// genericFinding is one finding of the "Generic Findings Import" JSON format.
-type genericFinding struct {
-	Title            string            `json:"title"`
-	Description      string            `json:"description"`
-	Severity         string            `json:"severity"`
-	Date             string            `json:"date,omitempty"`
-	UniqueIDFromTool string            `json:"unique_id_from_tool"`
-	VulnIDFromTool   string            `json:"vuln_id_from_tool,omitempty"`
-	Active           bool              `json:"active"`
-	Verified         bool              `json:"verified"`
-	FalseP           bool              `json:"false_p"`
-	StaticFinding    bool              `json:"static_finding"`
-	DynamicFinding   bool              `json:"dynamic_finding"`
-	References       string            `json:"references,omitempty"`
-	Endpoints        []genericEndpoint `json:"endpoints,omitempty"`
-	Tags             []string          `json:"tags,omitempty"`
-}
-
-type genericEndpoint struct {
-	Protocol string `json:"protocol,omitempty"`
-	Host     string `json:"host"`
-	Port     int    `json:"port,omitempty"`
-	Path     string `json:"path,omitempty"`
-}
-
 // Severity maps a Czujka severity to DefectDojo's name and numerical code.
-func Severity(s model.Severity) (name, numerical string) {
-	switch s {
-	case model.SevHigh:
-		return "High", "S1"
-	case model.SevMedium:
-		return "Medium", "S2"
-	case model.SevLow:
-		return "Low", "S3"
-	}
-	return "Info", "S4"
-}
+func Severity(s model.Severity) (name, numerical string) { return interchange.DojoSeverity(s) }
 
-// statusFlags maps the analyst's status to DefectDojo's flags.
+// statusFlags maps the analyst's status to DefectDojo's flags
+// (interchange.FlagsOf holds the table).
 func statusFlags(st model.FindingStatus) (active, verified, falseP, mitigated bool) {
-	switch st {
-	case model.FindingTriaged:
-		return true, true, false, false
-	case model.FindingFalsePositive:
-		return false, false, true, false
-	case model.FindingResolved:
-		return false, false, false, true
-	}
-	return true, false, false, false // new, accepted
+	f := interchange.FlagsOf(st)
+	return f.Active, f.Verified, f.FalseP, f.IsMitigated
 }
 
-// Tags returns the DefectDojo tags of a finding: "czujka", its type and its
-// own tags, lower case, without spaces and commas.
-func Tags(f model.Finding) []string {
-	set := map[string]bool{"czujka": true}
-	add := func(t string) {
-		t = strings.ToLower(strings.TrimSpace(t))
-		t = strings.NewReplacer(" ", "-", ",", "-", "\"", "", "'", "").Replace(t)
-		if t != "" {
-			set[t] = true
-		}
-	}
-	add(f.Type)
-	for _, t := range f.Tags {
-		add(t)
-	}
-	if f.Status == model.FindingAccepted {
-		add("accepted")
-	}
-	out := make([]string, 0, len(set))
-	for t := range set {
-		out = append(out, t)
-	}
-	sort.Strings(out)
-	return out
-}
+// Tags returns the DefectDojo tags of a finding (interchange.DojoTags).
+func Tags(f model.Finding) []string { return interchange.DojoTags(f) }
 
-// Description builds the Markdown description: the text of the finding, the
-// facts, and the evidence. Cookie values and other secrets are never in
-// Finding.Evidence, so they cannot reach DefectDojo.
-func Description(f model.Finding) string {
-	var b strings.Builder
-	b.WriteString(strings.TrimSpace(f.Description))
-	b.WriteString("\n\n")
-	fmt.Fprintf(&b, "**Host:** %s", f.IP)
-	if f.Port != 0 {
-		fmt.Fprintf(&b, " · **Port:** %d", f.Port)
-	}
-	if f.URL != "" {
-		fmt.Fprintf(&b, " · **URL:** %s", f.URL)
-	}
-	b.WriteString("\n\n")
-	fmt.Fprintf(&b, "**Typ obserwacji:** %s · **Ocena ciekawości:** %d/100", f.Type, f.Interest)
-	if f.Signature != "" {
-		fmt.Fprintf(&b, " · **Sygnatura:** %s", f.Signature)
-	}
-	b.WriteString("\n\n")
-	if !f.FirstSeen.IsZero() {
-		fmt.Fprintf(&b, "**Pierwsza obserwacja:** %s · **Ostatnia obserwacja:** %s\n\n",
-			f.FirstSeen.UTC().Format("2006-01-02 15:04 UTC"), f.LastSeen.UTC().Format("2006-01-02 15:04 UTC"))
-	}
-	if len(f.Evidence) > 0 {
-		b.WriteString("**Dowody**\n\n")
-		for _, e := range f.Evidence {
-			fmt.Fprintf(&b, "- %s (%s): `%s`\n", e.Where, e.Matcher, strings.ReplaceAll(e.Snippet, "`", "'"))
-		}
-		b.WriteString("\n")
-	}
-	if strings.TrimSpace(f.Note) != "" {
-		fmt.Fprintf(&b, "**Notatka analityka:** %s\n\n", strings.TrimSpace(f.Note))
-	}
-	fmt.Fprintf(&b, "_Źródło: Czujka. Bezpieczna detekcja obecności cech: bez prób logowania, bez payloadów. Klucz: %s_", f.Key)
-	return b.String()
-}
+// Description builds the Markdown description (interchange.DojoDescription).
+func Description(f model.Finding) string { return interchange.DojoDescription(f) }
 
-// endpointOf builds the endpoint of a finding. The host is always the IP
-// address, so the endpoint does not change when a name changes.
-func endpointOf(f model.Finding) []genericEndpoint {
-	if f.IP == "" {
-		return nil
-	}
-	e := genericEndpoint{Host: f.IP, Port: f.Port, Protocol: "tcp"}
-	if u, err := url.Parse(f.URL); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
-		e.Protocol = u.Scheme
-	}
-	return []genericEndpoint{e}
-}
-
-func toGeneric(f model.Finding) genericFinding {
-	sev, _ := Severity(f.Severity)
-	active, verified, falseP, _ := statusFlags(f.Status)
-	g := genericFinding{
-		Title: f.Title, Description: Description(f), Severity: sev, UniqueIDFromTool: f.Key, VulnIDFromTool: f.Type,
-		Active: active, Verified: verified, FalseP: falseP, DynamicFinding: true, References: f.URL,
-		Endpoints: endpointOf(f), Tags: Tags(f),
-	}
-	if !f.FirstSeen.IsZero() {
-		g.Date = f.FirstSeen.UTC().Format("2006-01-02")
-	}
-	return g
-}
+func toGeneric(f model.Finding) interchange.DojoGenericFinding { return interchange.ToDojoGeneric(f) }
 
 // existingFindings reads the findings of a test, keyed by unique_id_from_tool.
 // When a key exists more than once (data from another tool or an old
@@ -270,8 +147,8 @@ func (c *Client) ExportFindings(ctx context.Context, t Target, findings []model.
 	for start := 0; start < len(fresh); start += importBatch {
 		batch := fresh[start:min(start+importBatch, len(fresh))]
 		gen := struct {
-			Findings []genericFinding `json:"findings"`
-		}{Findings: make([]genericFinding, len(batch))}
+			Findings []interchange.DojoGenericFinding `json:"findings"`
+		}{Findings: make([]interchange.DojoGenericFinding, len(batch))}
 		for i, f := range batch {
 			gen.Findings[i] = toGeneric(f)
 		}

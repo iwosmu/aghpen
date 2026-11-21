@@ -223,7 +223,7 @@ func (c *collector) add(v map[Field]string) error {
 		name, ver := splitTech(t)
 		svc.Technologies = append(svc.Technologies, model.Technology{Name: name, Version: ver, Sources: []string{"import"}})
 	}
-	for _, cl := range splitList(strings.ReplaceAll(get(FClasses), ",", ";")) {
+	for _, cl := range splitList(strings.NewReplacer(",", ";", " ", ";", "\t", ";").Replace(get(FClasses))) {
 		svc.Classes = append(svc.Classes, cl)
 	}
 	title, server, redirect := get(FTitle), get(FServer), get(FRedirect)
