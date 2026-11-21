@@ -89,6 +89,6 @@ for hp in $TOXI:18000 $TOXI:18001 $TOXI:18002 $TOXI:18003 $TOXI:18004 $TOXI:1800
   echo "| $hp | $t | $a | $b |"
 done
 echo
-echo "czas przebiegu: $(cat "$OUT/wall-1.txt") s i $(cat "$OUT/wall-2.txt") s; usługi: $(jq .stats.services_open "$OUT/run-1.json") i $(jq .stats.services_open "$OUT/run-2.json"); zmiany w 2. przebiegu: $(api GET "/changes?run_id=$RUN&limit=50" | jq -c '[.items[]? | .type] ')"
+echo "czas przebiegu: $(cat "$OUT/wall-1.txt") s i $(cat "$OUT/wall-2.txt") s; usługi: $(jq .stats.services_open "$OUT/run-1.json") i $(jq .stats.services_open "$OUT/run-2.json"); zmiany w 2. przebiegu: $(api GET "/changes?run_id=$RUN&limit=50" | jq -c '[.items[]? | "\(.kind) \(.ip):\(.port)"] ')"
 } | tee "$OUT/table.md"
 [ "${TB_KEEP:-0}" = 1 ] || { $DC down -v --remove-orphans >/dev/null 2>&1; docker rm -f czsb-toxi czsb-traefik >/dev/null 2>&1; }

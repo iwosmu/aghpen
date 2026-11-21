@@ -913,7 +913,7 @@ func (s slowSV) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*pro
 				select {
 				case <-ctx.Done():
 					return nil, context.Cause(ctx)
-				case <-time.After(20 * time.Second):
+				case <-time.After(time.Second):
 				}
 			}
 		}
@@ -921,7 +921,7 @@ func (s slowSV) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*pro
 	return s.fakeNet.ServiceScan(ctx, req)
 }
 
-func TestQuickPathHTTPStopsSlowVersionDetection(t *testing.T) {
+func TestQuickPathKeepsSlowVersionDetection(t *testing.T) {
 	netw := slowSV{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 80, 8080}}}}
 	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
 	plan := basePlan("10.7.0.5")
@@ -933,8 +933,8 @@ func TestQuickPathHTTPStopsSlowVersionDetection(t *testing.T) {
 	if out.Status != model.RunCompleted {
 		t.Fatalf("outcome = %+v", out)
 	}
-	if d := time.Since(start); d > 10*time.Second {
-		t.Errorf("run took %v: the HTTP answer must stop version detection on port 80", d)
+	if d := time.Since(start); d < time.Second {
+		t.Errorf("run took %v: version detection must run to its end", d)
 	}
 	h := sink.host("10.7.0.5")
 	if h == nil || len(h.Services) != 3 {
@@ -946,8 +946,8 @@ func TestQuickPathHTTPStopsSlowVersionDetection(t *testing.T) {
 			if s.Name != "ssh" || s.Product != "OpenSSH" || s.HTTP != nil {
 				t.Errorf("ssh = %+v", s)
 			}
-		case 80, 8080: // 8080: the port table says "unknown" here (nmap says "ppp" for 3000), the page says http
-			if s.Name != "http" || s.HTTP == nil {
+		case 80, 8080: // the HTTP answer and nmap's product and version, both kept
+			if s.Name != "http" || s.HTTP == nil || s.Product != "nginx" || s.Version != "1.27.0" {
 				t.Errorf("http = %+v", s)
 			}
 		}
@@ -1234,5 +1234,34 @@ func TestQuickPathReadsTheAMQPVersion(t *testing.T) {
 	h := sink.host("10.7.0.5")
 	if h == nil || h.Services[1].Name != "amqp" || h.Services[1].Product != "RabbitMQ" || h.Services[1].Version != "4.3.8" {
 		t.Fatalf("host = %+v", h)
+	}
+}
+
+// Two runs of the same unchanged services must give the same service data,
+// however long version detection takes compared with the HTTP stage.
+func TestQuickPathResultDoesNotDependOnTiming(t *testing.T) {
+	scan := func(p probe.Prober) []model.ServiceResult {
+		e := New(Deps{Prober: p, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
+		plan := basePlan("10.7.0.5")
+		plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+		plan.Policy.MaxPerHostRPS = 100
+		sink := newSink()
+		if out := e.Run(context.Background(), plan, sink); out.Status != model.RunCompleted {
+			t.Fatalf("outcome = %+v", out)
+		}
+		return sink.host("10.7.0.5").Services
+	}
+	hosts := map[string][]int{"10.7.0.5": {22, 80, 8080}}
+	fast := scan(&fakeNet{hosts: hosts})
+	slow := scan(slowSV{&fakeNet{hosts: hosts}})
+	if len(fast) != len(slow) {
+		t.Fatalf("fast %d services, slow %d", len(fast), len(slow))
+	}
+	for i := range fast {
+		f, s := fast[i], slow[i]
+		if f.Port != s.Port || f.Name != s.Name || f.Product != s.Product || f.Version != s.Version ||
+			strings.Join(f.CPE, ",") != strings.Join(s.CPE, ",") || len(f.Technologies) != len(s.Technologies) {
+			t.Errorf("port %d: fast %+v\nslow %+v", f.Port, f, s)
+		}
 	}
 }

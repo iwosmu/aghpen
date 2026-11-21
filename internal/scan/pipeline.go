@@ -811,15 +811,17 @@ func (r *run) densePass(ctx context.Context, g *group, scanned map[string]*probe
 }
 
 // A small run (few open TCP ports in the group) takes the quick path:
-// version detection runs per port, in parallel with the HTTP stage, and a
-// port that answered HTTP stops its version detection. nmap's -sV is slow on
+// version detection runs per port, in parallel with the HTTP stage, and
+// partial results go to the store while it runs. Every port's version
+// detection runs to its end (bounded by quickServiceTimeout), so the final
+// result has nmap's product and version and does not depend on timing. nmap's -sV is slow on
 // HTTP servers that ignore its non-HTTP probes: Gitea on port 3000 took 42 s
 // for one port (probes listing port 3000 first, 5 s wait each), while the
 // HTTP collector reads it in under a second. Measured on one host with 7
 // ports: 68 s before, mostly -sV (43 s) and then the HTTP stage (24 s).
 const (
 	quickMaxPairs       = 32               // open TCP ports in a group, all hosts together
-	quickServiceTimeout = 30 * time.Second // bound for one port's version detection
+	quickServiceTimeout = 60 * time.Second // bound for one port's version detection (Gitea: 42 s)
 	quickMaxProcs       = 8                // nmap processes at one time on the quick path
 )
 
@@ -1016,15 +1018,14 @@ func (r *run) quickHost(ctx context.Context, h probe.Host, attempts, rate int, p
 		}()
 	}
 
+	// The HTTP answer does not stop the port's version detection: nmap's
+	// product and version are part of the result (the lab gate lost 17 of
+	// 32 service versions when it did, and Gitea's "Go" came and went with
+	// the timing). Partial results show the services early instead.
 	r.httpHost(ctx, &res, func(svc *model.ServiceResult) {
 		mu.Lock()
 		described[svc.Port], changed = *svc, true
 		mu.Unlock()
-		if svc.HTTP != nil {
-			if c := cancels[svc.Port]; c != nil {
-				c()
-			}
-		}
 	})
 	svwg.Wait()
 	close(stop)

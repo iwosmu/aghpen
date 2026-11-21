@@ -124,8 +124,11 @@ log "before: $NB"
 mem_sampler
 trap 'rm -f "$OUT/.mem.on"' EXIT
 PREV=""
+SEEN=" "
 for st in $STATES; do
-  log "=== state $st ==="
+  # A state named twice ("t0 t0": the stability check) writes its files as t0-2, t0-3 ...
+  K=$st; n=1; while [[ "$SEEN" == *" $K "* ]]; do n=$((n + 1)); K=$st-$n; done; SEEN="$SEEN$K "
+  log "=== state $st ($K) ==="
   lab/scenario.sh "$st" 2>&1 | tail -1 | tee -a "$OUT/run.log"
   # every packet the scanner sends on the lab interface, for one-second bins (e2e/ppsbins)
   LABIF=$(docker exec "$CZ" sh -c "ip -o -4 addr | awk '/ 10\\.66\\./ {print \$2}'")
@@ -150,27 +153,27 @@ for st in $STATES; do
   done
   WALL=$(( $(date +%s) - T0 ))
   P1=$(txp)
-  sleep 1; docker logs "$PROJECT-tcpdump" 2>/dev/null > "$OUT/tcpdump-$st.txt"; docker rm -f "$PROJECT-tcpdump" >/dev/null 2>&1
+  sleep 1; docker logs "$PROJECT-tcpdump" 2>/dev/null > "$OUT/tcpdump-$K.txt"; docker rm -f "$PROJECT-tcpdump" >/dev/null 2>&1
   CAPPPS=$(echo "$PJSON" | jq '.rate.max_pps')
-  go run ./e2e/ppsbins -src "$LR_IP" -cap "$CAPPPS" "$OUT/tcpdump-$st.txt" > "$OUT/pps-$st.txt"
-  go run ./e2e/ppsbins -src "$LR_IP" -cap "$CAPPPS" -json "$OUT/tcpdump-$st.txt" > "$OUT/pps-$st.json"
-  gzip -f "$OUT/tcpdump-$st.txt"
-  sed -n 2,3p "$OUT/pps-$st.txt" | tee -a "$OUT/run.log"
-  echo "$R" | jq . > "$OUT/run-$st.json"
+  go run ./e2e/ppsbins -src "$LR_IP" -cap "$CAPPPS" "$OUT/tcpdump-$K.txt" > "$OUT/pps-$K.txt"
+  go run ./e2e/ppsbins -src "$LR_IP" -cap "$CAPPPS" -json "$OUT/tcpdump-$K.txt" > "$OUT/pps-$K.json"
+  gzip -f "$OUT/tcpdump-$K.txt"
+  sed -n 2,3p "$OUT/pps-$K.txt" | tee -a "$OUT/run.log"
+  echo "$R" | jq . > "$OUT/run-$K.json"
   log "run $RUN $(echo "$R" | jq -r .status) in $WALL s; tx packets on the lab interface: $((P1 - P0)), peak $PEAK pps; $(echo "$R" | jq -c '{hosts_up: .stats.hosts_up, services: .stats.services_open, packets: .stats.packets_sent, avg_pps: (.stats.avg_pps|floor), peak_pps: .stats.peak_pps, http_requests: .stats.http_requests, elapsed: .stats.elapsed_sec}')"
-  echo "$st run=$RUN wall=$WALL tx=$((P1 - P0)) peak=$PEAK" >> "$OUT/runs.txt"
-  e2e/neigh-check.sh -json > "$OUT/neigh-$st.json"; log "after $st: $(e2e/neigh-check.sh)"
-  curl -sS -b "$JAR" -o "$OUT/export-$st.json" "$API/export/runs/$RUN.json"
-  api GET "/changes?run_id=$RUN&limit=1000" > "$OUT/changes-$st.json"
-  go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$st.json" -ignore "$IGNORE" -max-list 0 > "$OUT/score-$st.txt"
-  go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$st.json" -ignore "$IGNORE" -json > "$OUT/score-$st.json"
-  go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$st.json" -ignore "$IGNORE" -strict -json > "$OUT/score-strict-$st.json"
-  sed -n '1,12p' "$OUT/score-$st.txt" | tee -a "$OUT/run.log"
-  if [ -n "$PREV" ] && [ -f "lab/ground-truth/changes-$PREV-$st.json" ]; then
+  echo "$K run=$RUN wall=$WALL tx=$((P1 - P0)) peak=$PEAK" >> "$OUT/runs.txt"
+  e2e/neigh-check.sh -json > "$OUT/neigh-$K.json"; log "after $K: $(e2e/neigh-check.sh)"
+  curl -sS -b "$JAR" -o "$OUT/export-$K.json" "$API/export/runs/$RUN.json"
+  api GET "/changes?run_id=$RUN&limit=1000" > "$OUT/changes-$K.json"
+  go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$K.json" -ignore "$IGNORE" -max-list 0 > "$OUT/score-$K.txt"
+  go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$K.json" -ignore "$IGNORE" -json > "$OUT/score-$K.json"
+  go run ./e2e/score -truth lab/ground-truth/$st.json -export "$OUT/export-$K.json" -ignore "$IGNORE" -strict -json > "$OUT/score-strict-$K.json"
+  sed -n '1,12p' "$OUT/score-$K.txt" | tee -a "$OUT/run.log"
+  if [ -n "$PREV" ] && [ "$K" = "$st" ] && [ -f "lab/ground-truth/changes-$PREV-$st.json" ]; then
     go run ./e2e/score -changes lab/ground-truth/changes-$PREV-$st.json -truth-from lab/ground-truth/$PREV.json -truth lab/ground-truth/$st.json \
-      -from "$OUT/export-$PREV.json" -to "$OUT/export-$st.json" -ignore "$IGNORE" -max-list 0 > "$OUT/changes-score-$PREV-$st.txt"
+      -from "$OUT/export-$PREV.json" -to "$OUT/export-$K.json" -ignore "$IGNORE" -max-list 0 > "$OUT/changes-score-$PREV-$st.txt"
     go run ./e2e/score -changes lab/ground-truth/changes-$PREV-$st.json -truth-from lab/ground-truth/$PREV.json -truth lab/ground-truth/$st.json \
-      -from "$OUT/export-$PREV.json" -to "$OUT/export-$st.json" -product-changes "$OUT/changes-$st.json" -ignore "$IGNORE" -max-list 0 > "$OUT/product-changes-score-$PREV-$st.txt"
+      -from "$OUT/export-$PREV.json" -to "$OUT/export-$K.json" -product-changes "$OUT/changes-$K.json" -ignore "$IGNORE" -max-list 0 > "$OUT/product-changes-score-$PREV-$st.txt"
     log "changes $PREV -> $st (export diff):     $(sed -n 4p "$OUT/changes-score-$PREV-$st.txt")"
     log "changes $PREV -> $st (product changes): $(sed -n 4p "$OUT/product-changes-score-$PREV-$st.txt")"
   fi
