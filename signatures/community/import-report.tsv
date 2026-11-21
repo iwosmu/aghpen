@@ -1,0 +1,167 @@
+source	projectdiscovery/nuclei-templates@1ad258956016afba455d4284539812eb24be690a
+templates	59403
+converted	4273
+kept (default set)	3464
+opt-in (disabled, own path)	803
+dropped: not passive / unsupported: wyrażenie DSL nuclei „regex	53269
+dropped: technology already in the hand-written library	642
+dropped: not passive / unsupported: szablon nuclei używa pola „payloads”	247
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code == 200” nie jest obsługiwane	222
+dropped: not passive / unsupported: szablon nuclei używa pola „raw”	143
+dropped: front-end library, CDN, font or analytics (not a service)	95
+dropped: not passive / unsupported: wyrażenie DSL nuclei „contains	73
+dropped: not passive / unsupported: wyrażenie DSL nuclei „contains_any	37
+dropped: generic: longest pattern 7 characters	34
+dropped: not passive / unsupported: warunki „and” tego żądania są zbyt złożone dla kilku ścieże	23
+dropped: unsafe (safe mode)	23
+dropped: not passive / unsupported: wyrażenie DSL nuclei „contains_all	22
+dropped: not passive / unsupported: szablon nuclei używa protokołu „flow”	15
+dropped: not passive / unsupported: część odpowiedzi „server” nie jest obsługiwana	14
+dropped: not passive / unsupported: szablon nuclei używa pola „headers”	14
+dropped: generic: longest pattern 6 characters	10
+dropped: not passive / unsupported: część odpowiedzi „content_type” nie jest obsługiwana	10
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code==200 &&	10
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code==200” nie jest obsługiwane	10
+dropped: not passive / unsupported: niebezpieczna ścieżka „/#/login”	9
+dropped: not passive / unsupported: sygnatura prosi o 7 ścieżek	9
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code == 200 && contains	9
+dropped: no usable technology name	8
+dropped: not passive / unsupported: wyrażenie DSL nuclei „compare_versions	8
+dropped: evaluation: fires against the truth	6
+dropped: duplicate id	5
+dropped: generic: longest pattern 5 characters	5
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code == 200 || status_code == 401” n	5
+dropped: not passive / unsupported: niebezpieczna ścieżka „	4
+dropped: not passive / unsupported: wyrażenie DSL nuclei „len	4
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code==200 && contains	4
+dropped: not passive / unsupported: dopasowanie używa zmiennych albo funkcji pomocniczych nuclei	3
+dropped: not passive / unsupported: sygnatura prosi o 6 ścieżek	3
+dropped: not passive / unsupported: sygnatura prosi o 8 ścieżek	3
+dropped: not passive / unsupported: wyrażenie DSL nuclei „	3
+dropped: not passive / unsupported: zmienne szablonu nuclei nie są obsługiwane	3
+dropped: not passive / unsupported: ścieżka „{{BaseURL}}/{{randstr}}” używa zmiennych albo funkcji	3
+dropped: not passive / unsupported: żądanie nuclei nie ma listy matchers	3
+dropped: not passive / unsupported: niebezpieczna ścieżka „/#/login?redirect=%2F”	2
+dropped: not passive / unsupported: niebezpieczna ścieżka „/admin/config.php”	2
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login?next=/”	2
+dropped: not passive / unsupported: niebezpieczna ścieżka „/setup/start”	2
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code == 200 || status_code == 400” n	2
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code == 404” nie jest obsługiwane	2
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code >= 200 && status_code < 400” ni	2
+dropped: generic: longest pattern 3 characters	1
+dropped: generic: longest pattern 4 characters	1
+dropped: not passive / unsupported: część odpowiedzi „body_2” nie jest obsługiwana	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/#!/auth”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/#!/dashboards”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/#!/login”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/#!/welcome”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/#/admin/dashboard”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/#/install/main”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/#/logIn?redirectURL=%2F”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/#/pipelines”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/#login”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/#welcome”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/&?=?”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/+CSCOE+/logon.html”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/.redmine-cli”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/.settings/rules.json?auth=FIREBASE_SECRET�	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/?path=/settings/about”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/Account/LogIn?returnUrl=%2F&hasAttemptedCo	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/CACHE/sdesktop/install/start.htm”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/Kenesto/Account/LogOn?ReturnUrl=%2fkenesto	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/Start?0”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/_/#/login”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/account/signin?/”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/account/signin?ReturnUrl=%2f”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/accounts/login/?next=/”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/accounts/login?next=/admin/”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/actuator%72”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/admin/login?next=%2Fadmin”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/anaqua/Public/Login.aspx?ReturnUrl=%2fanaq	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/api/v1/namespaces/default/secrets”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/app/outside.html#/signin”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/app/welcome/default/#!/login”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/arcgis/tokens/”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/auth-sign-in?appUri=%2F”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/auth/?next=%2F”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/bitrix/components/bitrix/map.yandex.view/s	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/cgi-bin/upload/web-ftp.cgi”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/cgi-bin/webcm?getpage=../html/login.html�	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/dashboard/#/signin”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/ecrire/?exec=install”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/en-US/login?return=/live-view”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/front/privateLogin.jsp”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/ghost/#/signin”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/home/index.html#hashHome”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/horizon/auth/login/?next=/horizon/”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/html/skin/ric/C/config/default.config.json	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/iclock/accounts/login/?next=/iclock/data/i	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/index.html#en”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/index.php?/installer”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/index.php?r=installer/welcome”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/index.php?route=account/login”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/index.php?route=common/home”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/index.php?s=/admin/Index/index”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/install/make-config.php”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/install/page_start.php”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/jolokia/version”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/jw/web/	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/listconf?command=conf”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login#goto=%2Fdashboard”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login#login”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login.cgi?uri=/”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login.html#/login”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login.html#/”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login.sh”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login/?next=/”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login?loginUrl=%2Findex”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login?redir=/ng”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login?redirect=%2Fdashboard”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login?redirectTo=/”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login?route=%2Fworkspaces%2Fdefault%3F”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/login?url=%2F”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/mylittlebackup/”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/ng/login?returnUrl=%2F”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/out/out.Login.php?referuri=%2Fout%2Fout.Vi	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/password-page/ovf/account-credentials-ovf�	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/pre/config.php?version=2.0”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/rep/start/index.jsp”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/restgui/start.html”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/run.php?project=admin&execute_mode=ADMIN&c	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/secure/SetupMode!default.jspa”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/setup/setupcluster-start.action”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/sf/start”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/signin/#!/login?returnUrl=%2Fapp%2Fdefault	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/sitecore/shell/sitecore.version.xml”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/start.html”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/ui/#/login”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/ui/#navigate/Login”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/ui/login?from=/dashboards”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/upload/setup/install.php”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/user/login?redirect=%2F”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/userlogin!doDefault.action?os_destination=	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/veracore/Home/#systems”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/web/#/user/login”	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/web/index.html?start=wizard#!/wizard/wizar	1
+dropped: not passive / unsupported: niebezpieczna ścieżka „/wlm/login?next=/wlm”	1
+dropped: not passive / unsupported: szablon nuclei używa protokołu „ssl”	1
+dropped: not passive / unsupported: typ dopasowania nuclei „xpath” nie jest obsługiwany	1
+dropped: not passive / unsupported: wyrażenie DSL nuclei „!contains	1
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code == 101” nie jest obsługiwane	1
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code == 200 || status_code == 404” n	1
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code == 200 || status_code == 429” n	1
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code == 301 || status_code == 302” n	1
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code == 401” nie jest obsługiwane	1
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code_1 == 200 && contains	1
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code_1 == 200” nie jest obsługiwane	1
+dropped: not passive / unsupported: wyrażenie DSL nuclei „status_code_2 == 200” nie jest obsługiwane	1
+dropped: not passive / unsupported: wyrażenie regularne jest za długie	1
+dropped: not passive / unsupported: ścieżka „https	1
+dropped: not passive / unsupported: ścieżka „{{BaseURL}}/?s={{randstr}}&c={{randstr}}&a={{randstr}}&m=	1
+dropped: not passive / unsupported: ścieżka „{{BaseURL}}/owa/auth/logon.aspx?replaceCurrent=1&url={{Ba	1
+dropped: not passive / unsupported: ścieżka „{{BaseURL}}/puppet-ca/v1/certificate_request/{{randstr}}�	1
+group favicons	517
+group installers	40
+group opt-in	803
+group panels	432
+group technologies	2475

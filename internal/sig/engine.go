@@ -92,6 +92,14 @@ func loadFS(fsys fs.FS) ([]model.Signature, error) {
 		return nil, err
 	}
 	sort.Strings(files)
+	// Imported corpora come after the hand-written library (cmd/sigimport
+	// already dropped every import that names one of our technologies).
+	community, err := fs.Glob(fsys, "community/*.yaml")
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(community)
+	files = append(files, community...)
 	var out []model.Signature
 	seen := map[string]string{}
 	for _, name := range files {
