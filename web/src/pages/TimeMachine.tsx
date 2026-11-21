@@ -48,7 +48,7 @@ function Scrubber({ runs, index, onIndex }: { runs: RunPoint[]; index: number; o
     <div>
       <div
         ref={ref} role="slider" tabIndex={0} data-testid="tm-scrubber"
-        aria-label={t('Przebieg na osi czasu', 'Run on the time line')} aria-valuemin={0} aria-valuemax={runs.length - 1} aria-valuenow={index}
+        aria-label={t('Skan na osi czasu', 'Scan on the timeline')} aria-valuemin={0} aria-valuemax={runs.length - 1} aria-valuenow={index}
         aria-valuetext={cur ? '#' + cur.run_id + ' ' + fmtDateTime(cur.at) : ''}
         className="relative mx-2 cursor-pointer touch-none select-none outline-none focus-visible:ring-2 focus-visible:ring-accent"
         style={{ height: H + 8 }}
@@ -68,7 +68,7 @@ function Scrubber({ runs, index, onIndex }: { runs: RunPoint[]; index: number; o
           const h = light ? 8 : 10 + Math.round(Math.sqrt(r.changes / maxChanges) * (H - 12));
           const sel = i === index;
           return (
-            <span key={r.run_id} title={'#' + r.run_id + ' · ' + fmtDateTime(r.at) + ' · ' + triggerLabel(r.trigger) + ' · ' + r.changes + ' ' + t('zmian', 'changes')}
+            <span key={r.run_id} title={'#' + r.run_id + ' · ' + fmtDateTime(r.at) + ' · ' + triggerLabel(r.trigger) + ' · ' + r.changes + ' ' + t('zmiana / zmiany / zmian (plural())', 'change / changes')}
               className={cx('absolute bottom-1 -translate-x-1/2', sel ? 'bg-accent' : r.changes - r.changes_expected > 0 ? 'bg-ink-2' : 'bg-ink-3', light && !sel && 'opacity-60')}
               style={{ left: pos(i) + '%', height: h, width: light ? 2 : sel ? 6 : 4 }} />
           );
@@ -77,7 +77,7 @@ function Scrubber({ runs, index, onIndex }: { runs: RunPoint[]; index: number; o
       </div>
       <div className="mt-1 flex justify-between px-2 text-2xs text-ink-3">
         <span className="num">{runs[0] ? fmtDateTime(runs[0].at) : ''}</span>
-        <span>{t('← → pełne skany · z Shift także częściowe (wąskie kreski)', '← → full scans · with Shift also partial runs (thin marks)')}</span>
+        <span>{t('← → pełne skany, z Shift także częściowe', '← → full scans, with Shift also partial ones')}</span>
         <span className="num">{runs.length ? fmtDateTime(runs[runs.length - 1].at) : ''}</span>
       </div>
     </div>
@@ -89,7 +89,7 @@ function Count({ label, value, now, tone }: { label: string; value: number; now?
   return (
     <div className="min-w-0 border-l border-rule pl-3 [&:nth-child(3n+1)]:border-l-0 [&:nth-child(3n+1)]:pl-0">
       <dt className="text-xs text-ink-3">{label}</dt>
-      <dd className={cx('num text-xl', tone)}>{fmtInt(value)}{d ? <span className="ml-1.5 text-xs text-ink-3" title={t('różnica do dziś', 'difference to today')}>{d > 0 ? '+' : ''}{fmtInt(d)} {t('dziś', 'today')}</span> : null}</dd>
+      <dd className={cx('num text-xl', tone)}>{fmtInt(value)}{d ? <span className="ml-1.5 text-xs text-ink-3" title={t('zmiana do dziś', 'change to today')}>{d > 0 ? '+' : ''}{fmtInt(d)} {t('dziś', 'today')}</span> : null}</dd>
     </div>
   );
 }
@@ -136,11 +136,11 @@ function SnapshotMap({ runId, frameRunId }: { runId: number; frameRunId?: number
           const v = per.get(b.cidr);
           if (!v || (!v.goneNow && !v.svcGone)) return null;
           return <span className="text-st-gone">{[
-            v.goneNow ? v.goneNow + ' ' + plural(v.goneNow, ['host z tamtej chwili dziś nie odpowiada', 'hosty z tamtej chwili dziś nie odpowiadają', 'hostów z tamtej chwili dziś nie odpowiada'], ['host from then is silent today', 'hosts from then are silent today']) : '',
+            v.goneNow ? v.goneNow + ' ' + plural(v.goneNow, ['host z tamtej chwili dziś nie odpowiada', 'hosty z tamtej chwili dziś nie odpowiadają', 'hostów z tamtej chwili dziś nie odpowiada'], ['host from then is not responding today', 'hosts from then are not responding today']) : '',
             v.svcGone ? v.svcGone + ' ' + plural(v.svcGone, ['usługa z tamtej chwili dziś nie odpowiada', 'usługi z tamtej chwili dziś nie odpowiadają', 'usług z tamtej chwili dziś nie odpowiada'], ['service from then is not open today', 'services from then are not open today']) : '',
           ].filter(Boolean).join(' · ')}</span>;
         }} />
-      <p className="mt-2 text-xs text-ink-3">{t('Kolor: liczba hostów aktywnych w tamtym przebiegu. Obwódka: blok, w którym host albo usługa z tamtej chwili dziś nie odpowiada.', 'Colour: hosts up in that run. Outline: a block where a host or a service from then is silent today.')}</p>
+      <p className="mt-2 text-xs text-ink-3">{t('Kolor: liczba aktywnych hostów. Obwódka: host albo usługa dziś nie odpowiada.', 'Colour: hosts up. Outline: a host or a service is not responding today.')}</p>
     </div>
   );
 }
@@ -185,13 +185,13 @@ function SnapshotLists({ runId }: { runId: number }) {
         { id: 'findings', label: t('Znaleziska', 'Findings'), count: findings.data?.total },
       ]} />
       <FilterBar onClear={() => u.clear(['hstatus', 'sstate', 'fsev'])} active={[status, state, sev].filter(Boolean).length}>
-        {tab === 'hosts' ? <FilterField label={t('Stan wtedy', 'Status then')} width={180}><Select value={status} onChange={(v) => u.set({ hstatus: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'up', label: t('aktywne', 'up') }, { value: 'missing', label: t('bez odpowiedzi (poza nieaktywnymi)', 'silent (not down)') }, { value: 'unstable', label: t('niestabilne', 'unstable') }, { value: 'expected-offline', label: t('poza godzinami', 'expected offline') }, { value: 'down', label: t('nieaktywne', 'down') }]} /></FilterField> : null}
-        {tab === 'services' ? <FilterField label={t('Stan wtedy', 'State then')} width={180}><Select value={state} onChange={(v) => u.set({ sstate: v })} options={[{ value: '', label: t('otwarte i nieznane', 'open and unknown') }, { value: 'open', label: t('otwarte', 'open') }, { value: 'unknown', label: t('nieznane', 'unknown') }, { value: 'gone', label: t('zniknęły', 'gone') }, { value: 'all', label: t('wszystkie', 'all') }]} /></FilterField> : null}
+        {tab === 'hosts' ? <FilterField label={t('Stan wtedy', 'Status then')} width={180}><Select value={status} onChange={(v) => u.set({ hstatus: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'up', label: t('aktywne', 'up') }, { value: 'not responding', label: t('nie odpowiada', 'not responding') }, { value: 'unstable', label: t('niestabilne', 'unstable') }, { value: 'expected-offline', label: t('poza godzinami', 'outside usual hours') }, { value: 'down', label: t('nieaktywne', 'down') }]} /></FilterField> : null}
+        {tab === 'services' ? <FilterField label={t('Stan wtedy', 'Status then')} width={180}><Select value={state} onChange={(v) => u.set({ sstate: v })} options={[{ value: '', label: t('otwarte i nieznane', 'open and unknown') }, { value: 'open', label: t('otwarte', 'open') }, { value: 'unknown', label: t('nieznane', 'unknown') }, { value: 'gone', label: t('zniknęły', 'gone') }, { value: 'all', label: t('wszystkie', 'all') }]} /></FilterField> : null}
         {tab === 'findings' ? <FilterField label={t('Waga', 'Severity')} width={140}><Select value={sev} onChange={(v) => u.set({ fsev: v })} options={[{ value: '', label: t('dowolna', 'any') }, { value: 'high', label: t('wysoka', 'high') }, { value: 'medium', label: t('średnia', 'medium') }, { value: 'low', label: t('niska', 'low') }, { value: 'info', label: 'info' }]} /></FilterField> : null}
       </FilterBar>
-      {tab === 'hosts' ? <DataTable rows={hosts.data?.items} cols={hCols} rowKey={(h) => h.id} loading={hosts.isPending} error={hosts.error} retry={() => hosts.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak hostów dla tych filtrów w tamtej chwili.', 'No host for these filters at that time.')}</p>} mobile={(h) => <div className="flex justify-between"><span className="mono">{h.ip}</span><HostStatusMark status={h.status} /></div>} /> : null}
-      {tab === 'services' ? <DataTable rows={services.data?.items} cols={sCols} rowKey={(s) => s.id} rowClass={(s) => (s.carried ? 'text-ink-3 [&_.link]:text-ink-2' : undefined)} loading={services.isPending} error={services.error} retry={() => services.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak usług dla tych filtrów w tamtej chwili.', 'No service for these filters at that time.')}</p>} mobile={(s) => <div className={cx('flex justify-between gap-2', s.carried && 'text-ink-3')}><span className="mono">{s.ip}:{s.port}</span>{s.carried ? <NotScanned /> : <ServiceStateMark state={s.state} />}</div>} /> : null}
-      {tab === 'findings' ? <DataTable rows={findings.data?.items} cols={fCols} rowKey={(f) => f.id} loading={findings.isPending} error={findings.error} retry={() => findings.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Żadne znalezisko nie było wtedy otwarte.', 'No finding was open at that time.')}</p>} mobile={(f) => <div><Sev level={f.severity} compact /> {f.title}</div>} /> : null}
+      {tab === 'hosts' ? <DataTable rows={hosts.data?.items} cols={hCols} rowKey={(h) => h.id} loading={hosts.isPending} error={hosts.error} retry={() => hosts.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak hostów dla tych filtrów.', 'No hosts for these filters.')}</p>} mobile={(h) => <div className="flex justify-between"><span className="mono">{h.ip}</span><HostStatusMark status={h.status} /></div>} /> : null}
+      {tab === 'services' ? <DataTable rows={services.data?.items} cols={sCols} rowKey={(s) => s.id} rowClass={(s) => (s.carried ? 'text-ink-3 [&_.link]:text-ink-2' : undefined)} loading={services.isPending} error={services.error} retry={() => services.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak usług dla tych filtrów.', 'No services for these filters.')}</p>} mobile={(s) => <div className={cx('flex justify-between gap-2', s.carried && 'text-ink-3')}><span className="mono">{s.ip}:{s.port}</span>{s.carried ? <NotScanned /> : <ServiceStateMark state={s.state} />}</div>} /> : null}
+      {tab === 'findings' ? <DataTable rows={findings.data?.items} cols={fCols} rowKey={(f) => f.id} loading={findings.isPending} error={findings.error} retry={() => findings.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak otwartych znalezisk.', 'No open findings.')}</p>} mobile={(f) => <div><Sev level={f.severity} compact /> {f.title}</div>} /> : null}
       {cur.data ? <Pager total={cur.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null }, { keepOffset: true })} /> : null}
     </Panel>
   );
@@ -226,16 +226,16 @@ export default function TimeMachine() {
     return () => window.removeEventListener('keydown', onKey);
   }, [cur, runs]);
 
-  const header = <PageHeader title={t('Wehikuł czasu', 'Time machine')} sub={t('Sieć taka, jaka była po wybranym przebiegu: hosty, usługi i znaleziska z tamtej chwili, a obok to, co od tamtej pory zniknęło albo się zmieniło.', 'The network as it was after the chosen run: hosts, services and findings of that moment, next to what has gone or changed since.')} />;
+  const header = <PageHeader title={t('Oś czasu', 'Timeline')} sub={t('Sieć taka, jaka była po wybranym przebiegu: hosty, usługi i znaleziska z tamtej chwili, a obok to, co od tamtej pory zniknęło albo się zmieniło.', 'The network as it was after the chosen run: hosts, services and findings of that moment, next to what has gone or changed since.')} />;
   if (tl.error) return <div>{header}<div className="p-4 sm:p-6">{routeMissing(tl.error) ? <Unavailable what={t('Serwer nie udostępnia jeszcze osi czasu (GET /timeline). Gdy integrator podłączy moduł, ta strona pokaże każdy przeanalizowany przebieg.', 'The server does not serve the time line yet (GET /timeline). When the integrator wires the module, this page shows every analysed run.')} /> : <ErrorState error={tl.error} retry={() => tl.refetch()} />}</div></div>;
   if (!tl.data) return <div>{header}<SkeletonRows rows={10} /></div>;
-  if (runs.length === 0) return <div>{header}<div className="p-4 sm:p-6"><Empty icon="history" title={t('Brak przeanalizowanych przebiegów', 'No analysed run yet')} hint={t('Oś czasu zapełni się po pierwszym zakończonym skanie.', 'The time line fills after the first finished scan.')} /></div></div>;
+  if (runs.length === 0) return <div>{header}<div className="p-4 sm:p-6"><Empty icon="history" title={t('Brak skanów', 'No scans yet')} hint={t('Oś czasu zapełni się po pierwszym zakończonym skanie.', 'The time line fills after the first finished scan.')} /></div></div>;
   if (runs.length === 1) {
     return (
       <div>{header}<div className="p-4 sm:p-6" data-testid="tm-one-run">
-        <Empty icon="history" title={t('Wehikuł czasu potrzebuje co najmniej dwóch przebiegów', 'The time machine needs at least two runs')}
+        <Empty icon="history" title={t('Potrzeba co najmniej dwóch skanów', 'At least two scans are needed')}
           hint={t('Jest jeden przeanalizowany przebieg (#' + runs[0].run_id + ', ' + fmtDateTime(runs[0].at) + '). Po następnym skanie zobaczysz tu, jak sieć wyglądała wtedy i co od tamtej pory zniknęło albo się zmieniło.', 'There is one analysed run (#' + runs[0].run_id + ', ' + fmtDateTime(runs[0].at) + '). After the next scan this page shows how the network looked then and what has gone or changed since.')}
-          action={<Link to={'/runs/' + runs[0].run_id} className="link text-sm">{t('Otwórz przebieg', 'Open the run')} #{runs[0].run_id}</Link>} />
+          action={<Link to={'/runs/' + runs[0].run_id} className="link text-sm">{t('Otwórz skan', 'Open scan')} #{runs[0].run_id}</Link>} />
       </div></div>
     );
   }
@@ -244,23 +244,23 @@ export default function TimeMachine() {
   const few = runs.length <= 5;
   const counts = s ? (
     <dl className={cx('grid gap-y-3', few ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-3')}>
-      <Count label={t('Hosty aktywne', 'Hosts up')} value={s.hosts_up} now={latest.hosts_up} />
-      <Count label={t('Hosty bez odpowiedzi', 'Hosts missing')} value={s.hosts_missing} now={latest.hosts_missing} />
-      <Count label={t('Hosty nieaktywne', 'Hosts down')} value={s.hosts_down} now={latest.hosts_down} />
-      <Count label={t('Usługi otwarte', 'Services open')} value={s.services_open} now={latest.services_open} />
-      <Count label={t('Usługi nieznane', 'Services unknown')} value={s.services_unknown} now={latest.services_unknown} />
-      <Count label={t('Znaleziska otwarte', 'Open findings')} value={s.findings_open} now={latest.findings_open} />
+      <Count label={t('Aktywne hosty', 'Hosts up')} value={s.hosts_up} now={latest.hosts_up} />
+      <Count label={t('Nie odpowiadają', 'Not responding')} value={s.hosts_missing} now={latest.hosts_missing} />
+      <Count label={t('Nieaktywne hosty', 'Hosts down')} value={s.hosts_down} now={latest.hosts_down} />
+      <Count label={t('Otwarte usługi', 'Open services')} value={s.services_open} now={latest.services_open} />
+      <Count label={t('Nieznane usługi', 'Unknown services')} value={s.services_unknown} now={latest.services_unknown} />
+      <Count label={t('Otwarte znaleziska', 'Open findings')} value={s.findings_open} now={latest.findings_open} />
     </dl>
   ) : null;
   const sentences = s ? ((s.diff_to_now?.sentences ?? []).length && run.run_id !== latest.run_id ? (
     <ul className="space-y-1 text-sm" data-testid="tm-sentences">{(s.diff_to_now.sentences ?? []).map((x, i) => <li key={i} className="flex gap-2"><span className="mt-2 h-1 w-1 flex-none bg-ink-3" />{x}</li>)}</ul>
-  ) : <p className="text-sm text-ink-2">{run.run_id === latest.run_id ? t('To jest najnowszy przebieg: stan bieżący. Wybierz wcześniejszy przebieg na osi, żeby zobaczyć, co się od niego zmieniło.', 'This is the latest run: the current state. Pick an earlier run on the line to see what changed since.') : t('Od tamtej chwili nic się nie zmieniło.', 'Nothing has changed since then.')}</p>) : null;
+  ) : <p className="text-sm text-ink-2">{run.run_id === latest.run_id ? t('To najnowszy skan.', 'This is the latest scan.') : t('Brak zmian od tamtej chwili.', 'No changes since then.')}</p>) : null;
   if (few) {
     return (
       <div>
         {header}
         <div className="space-y-4 p-4 sm:p-6">
-          <Panel title={<span>{t('Przebieg', 'Run')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
+          <Panel title={<span>{t('Skan', 'Scan')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
             actions={<span className="num text-ink-3">{cur + 1} / {runs.length}{snap.data ? ' · ' + snap.data.took_ms + ' ms' : ''}</span>}>
             <Scrubber runs={runs} index={cur} onIndex={setIndex} />
           </Panel>
@@ -279,27 +279,27 @@ export default function TimeMachine() {
     <div>
       {header}
       <div className="space-y-4 p-4 sm:p-6">
-        <Panel title={<span>{t('Przebieg', 'Run')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
+        <Panel title={<span>{t('Skan', 'Scan')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
           actions={<span className="num text-ink-3">{cur + 1} / {runs.length}{snap.data ? ' · ' + snap.data.took_ms + ' ms' : ''}</span>}>
           <Scrubber runs={runs} index={cur} onIndex={setIndex} />
         </Panel>
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-          <Panel title={t('Stan w tamtej chwili', 'State at that moment')}>
+          <Panel title={t('Stan w tamtej chwili', 'Status at that moment')}>
             {snap.error ? <ErrorState error={snap.error} retry={() => snap.refetch()} /> : !s ? <SkeletonRows rows={4} /> : (
               <div className={cx(snap.isFetching && 'opacity-70 transition-opacity')} data-testid="tm-summary">
                 <dl className="grid grid-cols-3 gap-y-3">
-                  <Count label={t('Hosty aktywne', 'Hosts up')} value={s.hosts_up} now={latest.hosts_up} />
-                  <Count label={t('Hosty bez odpowiedzi', 'Hosts missing')} value={s.hosts_missing} now={latest.hosts_missing} />
-                  <Count label={t('Hosty nieaktywne', 'Hosts down')} value={s.hosts_down} now={latest.hosts_down} />
-                  <Count label={t('Usługi otwarte', 'Services open')} value={s.services_open} now={latest.services_open} />
-                  <Count label={t('Usługi nieznane', 'Services unknown')} value={s.services_unknown} now={latest.services_unknown} />
-                  <Count label={t('Znaleziska otwarte', 'Open findings')} value={s.findings_open} now={latest.findings_open} />
+                  <Count label={t('Aktywne hosty', 'Hosts up')} value={s.hosts_up} now={latest.hosts_up} />
+                  <Count label={t('Nie odpowiadają', 'Not responding')} value={s.hosts_missing} now={latest.hosts_missing} />
+                  <Count label={t('Nieaktywne hosty', 'Hosts down')} value={s.hosts_down} now={latest.hosts_down} />
+                  <Count label={t('Otwarte usługi', 'Open services')} value={s.services_open} now={latest.services_open} />
+                  <Count label={t('Nieznane usługi', 'Unknown services')} value={s.services_unknown} now={latest.services_unknown} />
+                  <Count label={t('Otwarte znaleziska', 'Open findings')} value={s.findings_open} now={latest.findings_open} />
                 </dl>
                 <div className="mt-4 border-t border-rule pt-3">
                   <p className="label mb-1.5">{t('Od tamtej chwili do dziś', 'From then to today')}</p>
                   {(s.diff_to_now?.sentences ?? []).length ? (
                     <ul className="space-y-1 text-sm" data-testid="tm-sentences">{(s.diff_to_now.sentences ?? []).map((x, i) => <li key={i} className="flex gap-2"><span className="mt-2 h-1 w-1 flex-none bg-ink-3" />{x}</li>)}</ul>
-                  ) : <p className="text-sm text-ink-2">{run.run_id === latest.run_id ? t('To jest najnowszy przebieg: stan bieżący.', 'This is the latest run: the current state.') : t('Od tamtej chwili nic się nie zmieniło.', 'Nothing has changed since then.')}</p>}
+                  ) : <p className="text-sm text-ink-2">{run.run_id === latest.run_id ? t('To najnowszy skan.', 'This is the latest scan.') : t('Brak zmian od tamtej chwili.', 'No changes since then.')}</p>}
                 </div>
               </div>
             )}
@@ -323,7 +323,7 @@ function Lane({ intervals, t0, t1, height = 10 }: { intervals: LifeInterval[]; t
       {intervals.map((iv, i) => {
         const a = (new Date(iv.from).getTime() - t0) / span;
         const b = ((iv.ongoing ? t1 : new Date(iv.to).getTime()) - t0) / span;
-        return <span key={i} className="absolute top-0 h-full" title={iv.state + (iv.status && iv.status !== iv.state ? ' (' + iv.status + ')' : '') + ' · ' + fmtDateTime(iv.from) + ' – ' + (iv.ongoing ? t('teraz', 'now') : fmtDateTime(iv.to)) + ' · #' + iv.from_run + '–#' + iv.to_run + ' · ' + iv.observations + ' ' + t('obs.', 'obs.')}
+        return <span key={i} className="absolute top-0 h-full" title={iv.state + (iv.status && iv.status !== iv.state ? ' (' + iv.status + ')' : '') + ' · ' + fmtDateTime(iv.from) + ' – ' + (iv.ongoing ? t('teraz', 'now') : fmtDateTime(iv.to)) + ' · #' + iv.from_run + '–#' + iv.to_run + ' · ' + iv.observations + ' ' + t('obserwacji', 'obserwacji')}
           style={{ left: a * 100 + '%', width: Math.max(0.4, (b - a) * 100) + '%', background: laneColor[iv.state] ?? 'var(--ink-3)', opacity: iv.state === 'unknown' ? 0.5 : 1 }} />;
       })}
     </div>
@@ -332,14 +332,14 @@ function Lane({ intervals, t0, t1, height = 10 }: { intervals: LifeInterval[]; t
 
 export function HostLifePanel({ hostId }: { hostId: number }) {
   const q = useItem<HostLife>('/timeline/hosts/' + hostId);
-  if (q.error && routeMissing(q.error)) return <Panel title={t('Życie hosta w czasie', 'Host life over time')}><Unavailable what={t('Pasma dostępności hosta i jego usług pojawią się, gdy serwer udostępni GET /timeline/hosts/{id}.', 'The availability lanes of the host and its services appear when the server serves GET /timeline/hosts/{id}.')} /></Panel>;
-  if (q.error) return <Panel title={t('Życie hosta w czasie', 'Host life over time')}><ErrorState error={q.error} retry={() => q.refetch()} /></Panel>;
-  if (!q.data) return <Panel title={t('Życie hosta w czasie', 'Host life over time')}><SkeletonRows rows={3} /></Panel>;
+  if (q.error && routeMissing(q.error)) return <Panel title={t('Dostępność hosta', 'Host availability')}><Unavailable what={t('Pasma dostępności hosta i jego usług pojawią się, gdy serwer udostępni GET /timeline/hosts/{id}.', 'The availability lanes of the host and its services appear when the server serves GET /timeline/hosts/{id}.')} /></Panel>;
+  if (q.error) return <Panel title={t('Dostępność hosta', 'Host availability')}><ErrorState error={q.error} retry={() => q.refetch()} /></Panel>;
+  if (!q.data) return <Panel title={t('Dostępność hosta', 'Host availability')}><SkeletonRows rows={3} /></Panel>;
   const L = q.data;
   const t0 = new Date(L.first_seen).getTime();
   const t1 = Math.max(Date.now(), new Date(L.last_seen).getTime());
   return (
-    <Panel title={t('Życie hosta w czasie', 'Host life over time')} actions={<span className="num text-ink-3">{fmtDateTime(L.first_seen)} – {t('teraz', 'now')}</span>}>
+    <Panel title={t('Dostępność hosta', 'Host availability')} actions={<span className="num text-ink-3">{fmtDateTime(L.first_seen)} – {t('teraz', 'now')}</span>}>
       <div className="grid grid-cols-[110px_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 text-xs" data-testid="host-lanes">
         <span className="font-medium">{t('host', 'host')}</span><Lane intervals={L.host ?? []} t0={t0} t1={t1} height={14} />
         {(L.services ?? []).map((s) => (
@@ -347,7 +347,7 @@ export function HostLifePanel({ hostId }: { hostId: number }) {
         ))}
       </div>
       <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-2xs text-ink-3">
-        {[['up', t('host odpowiada', 'host answers')], ['missing', t('brak odpowiedzi', 'missing')], ['down', t('nieaktywny', 'down')], ['open', t('usługa otwarta', 'service open')], ['unknown', t('stan nieznany', 'state unknown')]].map(([k, l]) => <span key={k} className="inline-flex items-center gap-1"><span className="inline-block h-2 w-3" style={{ background: laneColor[k], opacity: k === 'unknown' ? 0.5 : 1 }} />{l}</span>)}
+        {[['up', t('host odpowiada', 'host responds')], ['not responding', t('nie odpowiada', 'not responding')], ['down', t('nieaktywny', 'down')], ['open', t('usługa otwarta', 'service open')], ['unknown', t('stan nieznany', 'status unknown')]].map(([k, l]) => <span key={k} className="inline-flex items-center gap-1"><span className="inline-block h-2 w-3" style={{ background: laneColor[k], opacity: k === 'unknown' ? 0.5 : 1 }} />{l}</span>)}
         <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-px bg-ink" />{t('zmiana wersji', 'version change')}</span>
       </p>
     </Panel>
@@ -371,7 +371,7 @@ const fieldLabel = (f: string) => sharedFieldLabel(f, 'service');
 
 export function ServiceHistoryPanel({ serviceId }: { serviceId: number }) {
   const q = useItem<ServiceHistory>('/timeline/services/' + serviceId);
-  const title = t('Historia pól', 'Field history');
+  const title = t('Zmiany pól', 'Field changes');
   if (q.error && routeMissing(q.error)) return <Panel title={title}><Unavailable what={t('Historia zmian pól usługi pojawi się, gdy serwer udostępni GET /timeline/services/{id}.', 'The field history of the service appears when the server serves GET /timeline/services/{id}.')} /></Panel>;
   if (q.error) return <Panel title={title}><ErrorState error={q.error} retry={() => q.refetch()} /></Panel>;
   if (!q.data) return <Panel title={title}><SkeletonRows rows={3} /></Panel>;
