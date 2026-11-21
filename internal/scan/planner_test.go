@@ -2,6 +2,7 @@ package scan
 
 import (
 	"context"
+	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -223,16 +224,18 @@ func TestEffectiveLimits(t *testing.T) {
 	p := model.ScanProfile{Rate: model.RateLimits{MaxPPS: 1000, MaxParallelChunks: 4, MaxParallelHosts: 16, HTTPRPS: 50, PerHostConcurrency: 3, PerHostDelayMs: 200}}
 	pol := model.SafetyPolicy{MaxPPS: 300, MaxHTTPRPS: 20, MaxPerHostRPS: 2, MaxPathsPerHost: 5}
 	l := EffectiveLimits(p, pol)
-	if l.PPS != 300 || l.HTTPRPS != 20 || l.PerHostRPS != 2 || l.ParallelChunks != 4 || l.ParallelHosts != 16 || l.PerHostConc != 3 || l.PerHostDelay != 200*time.Millisecond || l.MaxPaths != 5 {
+	// HTTP fits a quarter of the 300 pps cap: 300/4/8 = 9.375 requests/s
+	if l.PPS != 300 || l.HTTPRPS != 9.375 || l.PerHostRPS != 2 || l.ParallelChunks != 4 || l.ParallelHosts != 16 || l.PerHostConc != 3 || l.PerHostDelay != 200*time.Millisecond || l.MaxPaths != 5 {
 		t.Errorf("limits = %+v", l)
 	}
-	p.Rate.MaxPPS, p.Rate.HTTPRPS = 100, 5
+	p.Rate.MaxPPS, p.Rate.HTTPRPS = 1000, 5
+	pol.MaxPPS = 1000
 	l = EffectiveLimits(p, pol)
-	if l.PPS != 100 || l.HTTPRPS != 5 {
+	if l.PPS != 1000 || l.HTTPRPS != 5 {
 		t.Errorf("the profile may be stricter: %+v", l)
 	}
 	l = EffectiveLimits(model.ScanProfile{}, model.SafetyPolicy{})
-	if l.PPS != defaultPPS || l.ParallelChunks != defaultParallelChunks || l.HTTPRPS != defaultHTTPRPS || l.MaxPaths != 0 {
+	if l.PPS != defaultPPS || l.ParallelChunks != defaultParallelChunks || l.HTTPRPS != math.Min(defaultHTTPRPS, float64(defaultPPS)/32) || l.MaxPaths != 0 {
 		t.Errorf("defaults = %+v", l)
 	}
 	l = EffectiveLimits(model.ScanProfile{Rate: model.RateLimits{MaxPPS: 2, MaxParallelChunks: 8}}, model.SafetyPolicy{})

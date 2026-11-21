@@ -750,3 +750,10 @@ func TestSilentHostGetsASecondPortScan(t *testing.T) {
 		t.Errorf("retried = %d, want the silent host counted", out.Stats.Retried)
 	}
 }
+
+func TestHTTPRateFollowsALowCap(t *testing.T) {
+	l := EffectiveLimits(model.ScanProfile{Rate: model.RateLimits{MaxPPS: 200, HTTPRPS: 20}}, model.SafetyPolicy{})
+	if l.HTTPRPS != 6.25 || l.HTTPReserve() != 50 || l.ProbePPS() != 150 {
+		t.Errorf("cap 200: http %v rps, reserve %d, probes %d", l.HTTPRPS, l.HTTPReserve(), l.ProbePPS())
+	}
+}

@@ -2,6 +2,7 @@ package scan
 
 import (
 	"context"
+	"math"
 	"sync"
 	"time"
 
@@ -84,6 +85,11 @@ func EffectiveLimits(p model.ScanProfile, pol model.SafetyPolicy) Limits {
 	}
 	if l.HTTPRPS <= 0 {
 		l.HTTPRPS = defaultHTTPRPS
+	}
+	// HTTP must fit into its reserve of the packet cap (HTTPReserve): at a
+	// low cap the request rate goes down with it (cap 200: 6.25 requests/s).
+	if most := float64(l.PPS) / 4 / httpPacketsPerRequest; l.HTTPRPS > most {
+		l.HTTPRPS = math.Max(1, most)
 	}
 	if l.PerHostRPS <= 0 {
 		l.PerHostRPS = defaultPerHostRPS
