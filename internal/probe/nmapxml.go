@@ -6,6 +6,8 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/iwosmu/aghpen/internal/model"
 )
 
 type xHost struct {
@@ -129,7 +131,7 @@ func convertHost(xh xHost) Host {
 			h.IP = a.Addr
 		case "mac":
 			h.MAC = a.Addr
-			h.Vendor = a.Vendor
+			h.Vendor = model.VendorForMAC(a.Addr, a.Vendor)
 		}
 	}
 	for _, n := range xh.Hostnames {

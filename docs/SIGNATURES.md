@@ -316,7 +316,7 @@ Wynik z 2026-11-21 (`fpprobe -addr 127.0.0.1:<port> -paths`, obrazy `latest`):
 | nextcloud | 19112 | 200 | Nextcloud 34.0.6, PHP 8.5.13, Apache HTTP Server 2.4.71 | login | 167837543 |
 | portainer | 19113 | 200 | Portainer, Angular | admin-panel, dev-tool | -845890009 |
 | portainer-tls | 19213 | 200 | Portainer, Angular | admin-panel, dev-tool | -845890009 |
-| rabbitmq | 19114 | 200 | RabbitMQ Management, Cowboy, jQuery 3.5.1, Bootstrap | admin-panel, login | -1015107330 |
+| rabbitmq | 19114 | 200 | RabbitMQ, Cowboy, jQuery 3.5.1, Bootstrap | admin-panel, login | -1015107330 |
 | prometheus | 19115 | 200 | Prometheus 3.16.0 | dev-tool | -1449038499 |
 | traefik | 19116 | 200 | Traefik 3.7.19 | admin-panel, dev-tool | 1752131761 |
 | adminer | 19117 | 200 | Adminer 6.3.0, PHP 8.4.28 | admin-panel, database, login | -519503050 |

@@ -197,6 +197,8 @@ func TestBuiltinDetections(t *testing.T) {
 		{name: "OpenSSH banner", svc: &model.ServiceResult{Port: 22, Name: "ssh", Banner: "SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.5"}, tech: "OpenSSH", version: "9.6p1", classes: []string{model.ClassRemoteAccess}},
 		{name: "Dropbear banner", svc: &model.ServiceResult{Port: 22, Name: "ssh", Banner: "SSH-2.0-dropbear_2022.83"}, tech: "Dropbear SSH", version: "2022.83", classes: []string{model.ClassRemoteAccess, model.ClassIoT}},
 		{name: "MariaDB from nmap", svc: &model.ServiceResult{Port: 3306, Name: "mysql", Product: "MariaDB", Version: "10.11.6", Confidence: 1}, tech: "MariaDB", version: "10.11.6", classes: []string{model.ClassDatabase}},
+		{name: "Mosquitto from the nmap service name", svc: &model.ServiceResult{Port: 1883, Name: "mosquitto version 2.0.23", Confidence: 1}, tech: "Mosquitto", version: "2.0.23", classes: []string{model.ClassIoT}},
+		{name: "RabbitMQ AMQP from nmap", svc: &model.ServiceResult{Port: 5672, Name: "amqp", Product: "RabbitMQ", Version: "4.3.8", Confidence: 1}, tech: "RabbitMQ", version: "4.3.8"},
 		{name: "Redis from nmap", svc: &model.ServiceResult{Port: 6379, Name: "redis", Product: "Redis key-value store", Version: "7.2.4", Confidence: 1}, tech: "Redis", version: "7.2.4", classes: []string{model.ClassDatabase}},
 		{name: "JWT cookie without flags over HTTPS", svc: &model.ServiceResult{Name: "http", Tunnel: "ssl", HTTP: func() *model.HTTPFingerprint {
 			h := http(200, "App", "x", nil)
