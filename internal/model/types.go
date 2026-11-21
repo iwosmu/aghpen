@@ -478,6 +478,10 @@ type HostResult struct {
 	// listed services are what was measured; services it does not list are
 	// unknown, not gone.
 	PortsUnknown bool `json:"ports_unknown,omitempty"`
+	// Interim: a partial result sent while the host is still being described
+	// (the engine's quick path). The final result of the same run replaces
+	// it. The store keeps the service's change hash and its known fields.
+	Interim bool `json:"interim,omitempty"`
 }
 
 // VendorForMAC returns the vendor to show for a MAC address. A locally

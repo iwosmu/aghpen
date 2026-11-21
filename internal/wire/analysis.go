@@ -244,9 +244,12 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 			prevRun = p.RunID
 		}
 		switch {
-		case p.Up:
+		case p.Up && p.Reason != model.ReasonPortsUnknown:
 			pairs[id] = p.RunID
 		case p.ServiceRun != 0:
+			// a silent host, or one whose last port scan did not finish (a
+			// stopped run that stored only a partial result): its services are
+			// those of its newest finished port scan
 			pairs[id] = p.ServiceRun // a silent host carries its last known services forward
 		}
 	}

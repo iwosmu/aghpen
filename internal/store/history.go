@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"time"
+
+	"github.com/iwosmu/aghpen/internal/model"
 )
 
 // responseExpr is the HTTP response time of a service observation in ms, or
@@ -10,6 +12,12 @@ import (
 // time is stored in the observation result (http.response_ms).
 const responseExpr = `CASE WHEN COALESCE((o.result->'http'->>'status')::int, 0) > 0
 	THEN GREATEST(COALESCE((o.result->'http'->>'response_ms')::int, 0), 0) ELSE -1 END`
+
+// finishedScan selects host observations ho whose port scan finished. A run
+// stopped after a partial result has a subset of the services, often without
+// their HTTP answer yet: it counts neither as a run the service was away nor
+// as a response time (a missing answer would read as "no answer").
+const finishedScan = `ho.reason IS DISTINCT FROM '` + model.ReasonPortsUnknown + `'`
 
 // ServiceHistory is what the runs before runID know about one service.
 type ServiceHistory struct {
@@ -31,9 +39,10 @@ func (s *Store) ServiceHistories(ctx context.Context, runID int64, serviceIDs []
 		part := serviceIDs[lo:min(lo+batch, len(serviceIDs))]
 		err := eachJSON(ctx, s.db, wrapJSON(`SELECT s.id AS service_id, COALESCE(lo.run_id, 0) AS last_open_run, lo.at AS last_open_at,
 			CASE WHEN lo.run_id IS NULL THEN 0 ELSE (SELECT count(DISTINCT ho.run_id) FROM host_observations ho
-				WHERE ho.host_id = s.host_id AND ho.up AND ho.run_id > lo.run_id AND ho.run_id < $2) END AS runs_away,
+				WHERE ho.host_id = s.host_id AND ho.up AND ho.run_id > lo.run_id AND ho.run_id < $2 AND `+finishedScan+`) END AS runs_away,
 			COALESCE((SELECT array_agg(x.v ORDER BY x.at, x.id) FROM (SELECT * FROM (SELECT DISTINCT ON (o.run_id) o.id, o.at, `+responseExpr+` AS v
-				FROM service_observations o WHERE o.service_id = s.id AND o.run_id < $2 AND o.state = 'open' ORDER BY o.run_id, o.at DESC, o.id DESC) r
+				FROM service_observations o JOIN host_observations ho ON ho.host_id = o.host_id AND ho.run_id = o.run_id
+				WHERE o.service_id = s.id AND o.run_id < $2 AND o.state = 'open' AND `+finishedScan+` ORDER BY o.run_id, o.at DESC, o.id DESC) r
 				ORDER BY r.at DESC, r.id DESC LIMIT $3) x), '{}') AS response
 			FROM services s
 			LEFT JOIN LATERAL (SELECT o.run_id, o.at FROM service_observations o WHERE o.service_id = s.id AND o.run_id < $2 AND o.state = 'open'
@@ -64,7 +73,8 @@ func (s *Store) ResponseSeries(ctx context.Context, serviceID int64, limit int) 
 	}
 	out := []ResponsePoint{}
 	err := eachJSON(ctx, s.db, wrapJSON(`SELECT * FROM (SELECT * FROM (SELECT DISTINCT ON (o.run_id) o.run_id, o.at, `+responseExpr+` AS ms FROM service_observations o
-		WHERE o.service_id = $1 AND o.state = 'open' ORDER BY o.run_id, o.at DESC, o.id DESC) r ORDER BY r.at DESC LIMIT $2) x ORDER BY x.at, x.run_id`), []any{serviceID, limit},
+		JOIN host_observations ho ON ho.host_id = o.host_id AND ho.run_id = o.run_id
+		WHERE o.service_id = $1 AND o.state = 'open' AND `+finishedScan+` ORDER BY o.run_id, o.at DESC, o.id DESC) r ORDER BY r.at DESC LIMIT $2) x ORDER BY x.at, x.run_id`), []any{serviceID, limit},
 		func(p *ResponsePoint) error {
 			out = append(out, *p)
 			return nil

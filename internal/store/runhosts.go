@@ -109,7 +109,8 @@ type PrevHost struct {
 	Up         bool      `json:"up"`
 	Status     string    `json:"status"` // model status at that observation; "" when it was never analysed
 	At         time.Time `json:"at"`
-	ServiceRun int64     `json:"service_run"` // newest earlier run in which the host answered; 0 = never
+	ServiceRun int64     `json:"service_run"` // newest earlier run in which the host answered with a finished port scan; 0 = never
+	Reason     string    `json:"reason"`      // reason of the newest observation ("ports-unknown": its services are a subset)
 }
 
 // PrevHosts returns, for each given host, its newest observation in a run before runID.
@@ -119,10 +120,11 @@ func (s *Store) PrevHosts(ctx context.Context, runID int64, hostIDs []int64) (ma
 	if len(hostIDs) == 0 {
 		return out, nil
 	}
-	err := eachJSON(ctx, s.db, wrapJSON(`SELECT p.host_id, p.run_id, p.up, p.status, p.at, COALESCE(u.run_id, 0) AS service_run
-		FROM (SELECT DISTINCT ON (host_id) host_id, run_id, up, status, at FROM host_observations
+	err := eachJSON(ctx, s.db, wrapJSON(`SELECT p.host_id, p.run_id, p.up, p.status, p.at, p.reason, COALESCE(u.run_id, 0) AS service_run
+		FROM (SELECT DISTINCT ON (host_id) host_id, run_id, up, status, at, reason FROM host_observations
 			WHERE host_id = ANY($1) AND run_id < $2 ORDER BY host_id, run_id DESC, at DESC) p
-		LEFT JOIN (SELECT host_id, max(run_id) AS run_id FROM host_observations WHERE host_id = ANY($1) AND run_id < $2 AND up GROUP BY host_id) u
+		LEFT JOIN (SELECT host_id, max(run_id) AS run_id FROM host_observations WHERE host_id = ANY($1) AND run_id < $2 AND up
+			AND reason IS DISTINCT FROM '`+model.ReasonPortsUnknown+`' GROUP BY host_id) u
 			ON u.host_id = p.host_id`), []any{hostIDs, runID}, func(p *PrevHost) error {
 		out[p.HostID] = *p
 		return nil
