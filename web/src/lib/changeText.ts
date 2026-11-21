@@ -2,7 +2,7 @@
 // (shapes from the integrator's contract: before {away_seconds, runs_away, last_open_at},
 // before {baseline_ms, ms} / after {ms} or {ms: null, error}).
 import type { Change } from '../api/types';
-import { t, plural, getLang } from '../i18n';
+import { t, plural } from '../i18n';
 import { fmtDuration, fmtMs } from './format';
 
 function field(v: unknown, k: string): unknown {
@@ -52,39 +52,4 @@ export function awayText(c: Change): string {
   if (!a || a <= 0) return '';
   const runs = r ? ' (' + r + ' ' + plural(r, ['skan', 'skany', 'skanów'], ['scan', 'scans']) + ')' : '';
   return t('nie było jej ' + fmtDuration(a), 'away for ' + fmtDuration(a)) + runs;
-}
-
-
-/**
- * The summary line of a change. The API writes it in Polish; for the change
- * kinds of the one-machine story the English view gets its own sentence.
- */
-export function changeSummary(c: Change): string {
-  if (getLang() !== 'en') return c.summary;
-  const where = c.ip + (c.port ? ':' + c.port : '');
-  const usual = field(c.before, 'baseline_ms');
-  const usualText = typeof usual === 'number' ? ' (usually ' + fmtMs(usual) + ')' : '';
-  switch (c.kind) {
-    case 'service_returned': {
-      const a = awaySeconds(c), r = runsAway(c);
-      return 'Service ' + where + ' is back' + (a && a > 0 ? ' after ' + fmtDuration(a) : '') + (r ? ' (away in ' + r + ' ' + (r === 1 ? 'scan' : 'scans') + ')' : '');
-    }
-    case 'response_slower': {
-      const ms = field(c.after, 'ms');
-      return typeof ms === 'number' ? 'Service ' + where + ' responds slower: ' + fmtMs(ms) + usualText : 'Service ' + where + ': the port is open, but HTTP did not answer in time' + usualText;
-    }
-    case 'response_recovered': {
-      const ms = field(c.after, 'ms');
-      return 'Service ' + where + ' answers in its usual time again' + (typeof ms === 'number' ? ': ' + fmtMs(ms) : '') + usualText;
-    }
-    case 'host_gone':
-      return 'Host ' + c.ip + ' reported down';
-    case 'service_gone':
-      return 'Service ' + where + ' is gone';
-    case 'host_missing':
-      return 'Host ' + c.ip + ' is not answering (unconfirmed): it answered in the previous run; Czujka checks it again';
-    case 'service_unreachable':
-      return 'Service ' + where + ' is not answering (unconfirmed): the host did not answer in this run';
-    default: return c.summary;
-  }
 }

@@ -263,7 +263,6 @@ export function InterestScore({ value, reasons, showTip }: { value: number; reas
 
 export function InterestBreakdown({ value, reasons }: { value: number; reasons: InterestReason[] | null | undefined }) {
   const list = reasons ?? [];
-  const sum = list.reduce((a, r) => a + r.points, 0);
   // Each reason is a segment of one 0-100 bar, in list order; what goes over 100 is cut, as the score is.
   const shade = (i: number) => Math.max(0.28, 1 - i * 0.14);
   let used = 0;
@@ -292,7 +291,6 @@ export function InterestBreakdown({ value, reasons }: { value: number; reasons: 
           ))}
         </ul>
       )}
-      {sum > 100 ? <p className="mt-2 text-xs text-ink-3">{t('Suma ' + sum + ' punktów, ograniczona do 100.', 'Sum of ' + sum + ' points, capped at 100.')}</p> : null}
     </div>
   );
 }

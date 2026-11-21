@@ -267,6 +267,8 @@ export interface Change {
   id: number; run_id: number; prev_run_id: number | null; at: string; kind: ChangeKind; severity: Severity;
   host_id: number; ip: string; service_id: number | null; port: number; summary: string; field: string;
   before: unknown; after: unknown; expected: boolean; acked_by: string; acked_at: string | null;
+  /** internal measures (rule, p_alive, simhash_distance…); only in the expanded view. Optional: older servers do not send it. */
+  detail?: Record<string, unknown> | null;
 }
 
 export interface DiffReport { from: ScanRun; to: ScanRun; summary: RunDiffSummary; changes: Change[] | null }

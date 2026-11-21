@@ -31,18 +31,31 @@ function itemLabel(c: Change, svc: Map<string, Service>, showIp: boolean): strin
  * Shows nothing when the run changed nothing a person reads as a story.
  */
 export function RunStory({ runId, className, testId = 'run-story' }: { runId: number; className?: string; testId?: string }) {
-  const q = usePage<Change>('/changes', { run_id: runId, expected: false, limit: 200 });
+  const q = useRunChanges(runId);
   return <StoryList changes={q.data?.items ?? []} runId={runId} className={className} testId={testId} />;
+}
+
+function useRunChanges(runId: number | undefined) {
+  return usePage<Change>('/changes', { run_id: runId, expected: false, limit: 200 }, Boolean(runId));
+}
+
+function hasStory(changes: Change[]): boolean {
+  return changes.some((c) => !c.expected && (c.kind === 'host_missing' || STORY.some((s) => s.kind === c.kind)));
+}
+
+/** Whether RunStory shows lines for this run; undefined while loading. Same query, so no second request. */
+export function useRunStoryShown(runId: number | undefined): boolean | undefined {
+  const q = useRunChanges(runId);
+  return q.data ? hasStory(q.data.items) : undefined;
 }
 
 /** The story lines for a list of changes (a run, or the diff of two runs). */
 export function StoryList({ changes, runId, className, testId = 'run-story' }: { changes: Change[]; runId?: number; className?: string; testId?: string }) {
   const items = changes.filter((c) => !c.expected && STORY.some((s) => s.kind === c.kind));
-  const anyMissing = changes.some((c) => c.kind === 'host_missing' && !c.expected);
   const hosts = [...new Set(items.map((c) => c.host_id))];
   const oneHost = hosts.length === 1 ? hosts[0] : 0;
   const svcQ = usePage<Service>('/services', { host_id: oneHost || undefined, limit: 500 }, oneHost > 0);
-  if (!items.length && !anyMissing) return null;
+  if (!hasStory(changes)) return null;
   const svc = new Map<string, Service>();
   for (const s of svcQ.data?.items ?? []) svc.set(s.host_id + ':' + s.port, s);
   const showIp = hosts.length > 1;
@@ -64,7 +77,7 @@ export function StoryList({ changes, runId, className, testId = 'run-story' }: {
                 const extra = st.kind === 'service_returned' ? (awayText(c) ? ', ' + awayText(c) : '')
                   : st.kind === 'response_slower' || st.kind === 'response_recovered' ? (responseDelta(c) ? ' ' + responseDelta(c) : '') : '';
                 const to = c.service_id ? '/services/' + c.service_id : svc.get(c.host_id + ':' + c.port) ? '/services/' + svc.get(c.host_id + ':' + c.port)!.id : '/hosts/' + c.host_id;
-                return <span key={c.id}>{i ? ', ' : ''}<Link to={to} className="mono link">{itemLabel(c, svc, showIp)}</Link>{extra ? <span className="num text-ink-2">{extra}</span> : null}</span>;
+                return <span key={c.id}>{i ? <span className="text-ink-2">,{' '}</span> : null}<Link to={to} className="mono link">{itemLabel(c, svc, showIp)}</Link>{extra ? <span className="text-ink-2">{extra}</span> : null}</span>;
               })}
               {n > 6 ? <span className="text-ink-2">{t(' i ' + (n - 6) + ' więcej', ' and ' + (n - 6) + ' more')}</span> : null}
             </span>

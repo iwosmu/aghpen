@@ -13,6 +13,8 @@ import { ExportButtons, useDraft } from '../ui/edit';
 import { useCan } from '../session';
 import { serviceName, isSelf } from '../lib/serviceName';
 import { ResponseCell, SelfTag } from '../ui/serviceBits';
+import { ProductValue } from '../ui/ProductValue';
+import { productLine, shownProduct } from '../lib/shownProduct';
 
 const FILTERS = ['q', 'state', 'port', 'name', 'tech', 'class', 'tag', 'min_interest', 'tls', 'group_key', 'host_id', 'run_id'];
 
@@ -45,7 +47,7 @@ export default function Services() {
     { id: 'state', header: t('Stan', 'Status'), hide: 'lg', cell: (s) => <ServiceStateMark state={s.state} /> },
     { id: 'name', header: t('Usługa', 'Service'), sort: 'name', cell: (s) => <span>{serviceName(s)}{s.tls ? <span className="ml-1.5 text-2xs text-ink-3">TLS</span> : null}{isSelf(s) ? <SelfTag /> : null}</span> },
     { id: 'title', header: t('Tytuł / produkt', 'Title / product'), cell: (s) => (
-      <span className="block max-w-[300px] truncate" title={s.title}>{s.title || <span className="text-ink-2">{[s.product, s.version].filter(Boolean).join(' ') || '–'}</span>}
+      <span className="block max-w-[300px] truncate" title={s.title}>{s.title || <span className="text-ink-2"><ProductValue s={s} /></span>}
         {s.overrides && Object.keys(s.overrides).length ? <span className="ml-1.5 text-2xs text-st-changed" title={t('wartość poprawiona przez analityka', 'value corrected by an analyst')}>{t('poprawione', 'edited')}</span> : null}</span>
     ) },
     { id: 'tech', header: t('Technologie', 'Technologies'), hide: 'md', cell: (s) => <span className="block max-w-[210px] truncate text-ink-2">{(s.technologies ?? []).map((x) => x.name + (x.version ? ' ' + x.version : '')).join(', ') || '–'}</span> },
@@ -109,7 +111,7 @@ export default function Services() {
           mobile={(s) => (
             <div>
               <div className="flex items-center justify-between gap-2"><span className="mono text-sm">{s.ip}:{s.port}</span><InterestScore value={s.interest} /></div>
-              <div className="mt-0.5 truncate text-sm text-ink-2">{s.title || [s.product, s.version].filter(Boolean).join(' ') || serviceName(s)}</div>
+              <div className="mt-0.5 truncate text-sm text-ink-2">{s.title || productLine(shownProduct(s)) || serviceName(s)}</div>
               <div className="mt-1"><ClassChips classes={s.classes} max={2} /></div>
             </div>
           )}
