@@ -157,4 +157,28 @@ The over-cap warning stays (more than 5 % above the run cap); with the basis `pa
 
 Contract note: the task named `packets_estimated` a bool; in `internal/model` it is an `int64` (the estimated part of `packets_sent`). The UI shows "≈" when it is above 0.
 
-`DefectDojoSettings.link_url` is not on the integration branch yet (not in `internal/model` or `docs/API.md`). The settings form already has the field "Adres do odnośników (publiczny)", shown only when `GET /settings/defectdojo` returns the key, so it appears without a new UI change when the server supports it. No screenshot yet.
+`DefectDojoSettings.link_url` is now served; section 11, row 9 has the check and the screenshots.
+
+## 13. Juror's-eye review (nine fixes, feature freeze)
+
+Stacks: `czui` (real lab data: full runs of profile 4 and profile 2, re-probes #131, #142, #148, #149, gone services) and a fresh `czuiv` stack for the time machine (full runs #1, #2, #4, ad-hoc run #3 on 10.66.10.10-11). "Before" shots come from a worktree at `ea8f5c7` served against the same API. All shots are in `web/screenshots/lab/jury-*`.
+
+| # | Point | What changed | Shots (before → after) |
+| --- | --- | --- | --- |
+| 1 | Dashboard compares full runs | The headline and the deltas use the last two **full** runs of one profile (`lib/headline.ts`: `isFullRun`, `lastFullPair`). A partial run (reprobe, ad-hoc, manual entry, import) gets its own line: "Ostatnio: sprawdzenie 512 adresów (#148, …); przebieg częściowy, bez porównania." The delta tooltip names the two runs. Data comes from the real `GET /runs` list and run `stats`; no API change was needed. Compare and the runs list follow the same rule: Compare defaults to the last full pair and marks partial runs; the runs list shows "sprawdzenie N adresów · opcje profilu …" for partial runs. | jury-1-dashboard, jury-9a-compare, jury-9b-runs |
+| 2 | Live first | Services default to "otwarte"; "wszystkie" sorts live above gone (`-state,` prefix), gone rows stay muted. Hosts default to "bez nieaktywnych" (`up,unstable,expected-offline,unknown`). "Najciekawsze usługi" already reads open services only. | jury-2-services, jury-6b-hosts |
+| 3 | Findings grouped | Default status "otwarte" (new, triaged). Default view "Według rodzaju": one row per kind ("… · 18 usług", status summary, top severity, max interest), expandable to the addresses; a row opens the drawer. "Lista" keeps the old table with bulk actions. Resolved ones sit behind the status filter. | jury-3-findings, jury-3b-findings-open-group (after only), jury-m-findings |
+| 4 | Probe strip legend | Cells carry only colour plus title and aria-label; one legend row below (date range, "odpowiedź / brak odpowiedzi / kolejne skany"). Checked with 1 and 3 observations (few-observations strip), and 8+ and 60 observations (weekly map plus recent-probe bar, unchanged and already label-free). | jury-4-host-1obs, jury-4-host-3obs, jury-m-host-strip |
+| 5 | Translated fields | `lib/fields.ts` (`fieldLabel`, `fieldValue`) used by Changes, Compare, service field history and the time machine: "stan: brak → otwarta", "stan hosta: aktywny → bez odpowiedzi", "wersja nginx". The raw field stays in the title attribute. | jury-5-changes, jury-9a-compare |
+| 6 | Hosts without open ports | The ports column says "brak otwartych portów" (title: "odpowiada, brak otwartych portów w profilu"); technology stays blank. | jury-6-hosts-noports |
+| 7 | Time machine | One run: "Wehikuł czasu potrzebuje co najmniej dwóch przebiegów" with a link to the run. Up to 5 runs: the diff panel first, the lists directly under it, the map last. Partial runs are thin marks; ← → step over them, Shift + ← → includes them. On the newest run the diff says "Od tamtej pory inwentarz się nie zmienił." | jury-7a-time-one-run, jury-7b-time-few-runs, jury-7c-time-earlier-run (after only) |
+| 8 | Local MAC | `lib/mac.ts` `isLocalMac` (second hex digit 2/6/A/E): the UI shows "adres lokalny" instead of the vendor. | jury-8-mac |
+| 9 | Crawl as viewer and analyst, PL and EN | 21 pages, no console errors. Fixed: "p_alive" column header → "Obecność"; "(host_missing)/(host_gone)" in profile help; Hosts subtitle; plurals ("1 naruszenie", "1 wiersz", "1 user"); permission group headings ("targets" → "Cele i zakresy"); Compare default pair; partial runs in the runs list. | jury-9a-compare, jury-9b-runs, jury-9c-roles |
+
+Backend items (not changed, UI only):
+
+- The MAC vendor comes from the API as is. The lookup gives local addresses a vendor (e.g. `66:21:C4:…` on host 192 → "Applicon", the OUI of `00:00:40`). It should skip locally administered addresses.
+- Finding, signature and rule titles and descriptions are Polish in the EN view (server data).
+- The host tag filter lists the internal tag "new-exposure".
+- A dashboard field `last_full_run` / `prev_full_run` would save the extra `GET /runs` call; the UI does not need it.
+- Auto-resolve flapping on the frequent profile (section 11, item 4) is still open.

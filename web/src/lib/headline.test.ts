@@ -30,3 +30,26 @@ describe('headline helpers', () => {
     expect(overCap(10, 0)).toBe(false);
   });
 });
+
+import { isFullRun, lastFullPair, partialRunPhrase } from './headline';
+import type { ScanRun } from '../api/types';
+
+const run = (id: number, extra: Partial<ScanRun> = {}) => ({ id, status: 'completed', profile_id: 4, trigger: 'schedule', ad_hoc: null, stats: { addresses_total: 256 }, ...extra }) as unknown as ScanRun;
+
+describe('full and partial runs', () => {
+  it('tells a full run from a partial one', () => {
+    expect(isFullRun(run(1))).toBe(true);
+    expect(isFullRun(run(2, { trigger: 'reprobe', profile_id: null }))).toBe(false);
+    expect(isFullRun(run(3, { ad_hoc: { profile_id: 2, addresses: ['10.66.10.0/24'], ports: '', reason: '' } }))).toBe(false);
+    expect(isFullRun(run(4, { trigger: 'import' }))).toBe(false);
+    expect(isFullRun(run(5, { status: 'failed' }))).toBe(false);
+  });
+  it('pairs the last full run with the previous full run of the same profile', () => {
+    const p = lastFullPair([run(10, { trigger: 'reprobe', profile_id: null }), run(9, { profile_id: 2 }), run(8), run(7, { profile_id: 2 })]);
+    expect([p.full?.id, p.prev?.id]).toEqual([9, 7]);
+    expect(lastFullPair([run(3, { trigger: 'import' })])).toEqual({});
+  });
+  it('describes a partial run', () => {
+    expect(partialRunPhrase(run(1, { trigger: 'reprobe', profile_id: null, stats: { addresses_total: 512 } as ScanRun['stats'], ad_hoc: { profile_id: 2, addresses: [], ports: '', reason: 'x' } }))).toMatch(/512/);
+  });
+});

@@ -23,9 +23,14 @@ export default function Services() {
   const filters = useMemo(() => {
     const q: Record<string, string> = {};
     for (const k of FILTERS) { const v = u.get(k); if (v) q[k] = v; }
+    // Default: open services only. "all" shows gone ones too, below the live ones.
+    const st = u.get('state', 'open');
+    if (st === 'all') delete q.state; else q.state = st;
     return q;
   }, [u]);
-  const list = usePage<Service>('/services', { ...filters, sort: u.get('sort', '-interest'), limit, offset }, view === 'list');
+  const state = u.get('state', 'open');
+  const sortSv = u.get('sort', '-interest');
+  const list = usePage<Service>('/services', { ...filters, sort: state === 'all' && /interest/.test(sortSv) ? '-state,' + sortSv : sortSv, limit, offset }, view === 'list');
   const groups = usePage<ServiceGroup>('/service-groups', { ...filters, sort: u.get('gsort', '-count'), limit, offset }, view === 'groups');
   const [q, setQ] = useDraft(u.get('q'), (v) => u.set({ q: v }));
   const [tech, setTech] = useDraft(u.get('tech'), (v) => u.set({ tech: v }));
@@ -68,7 +73,7 @@ export default function Services() {
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
         <SearchField value={q} onChange={setQ} placeholder={t('adres, tytuł, produkt, technologia', 'address, title, product, technology')} width={250} />
         <FilterField label={t('Stan', 'State')} width={120}>
-          <Select value={u.get('state')} onChange={(v) => u.set({ state: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'open', label: t('otwarta', 'open') }, { value: 'gone', label: t('zniknęła', 'gone') }, { value: 'filtered', label: t('filtrowana', 'filtered') }]} />
+          <Select value={state} onChange={(v) => u.set({ state: v === 'open' ? null : v })} options={[{ value: 'open', label: t('otwarte', 'open') }, { value: 'all', label: t('wszystkie', 'all') }, { value: 'gone', label: t('zniknięte', 'gone') }, { value: 'filtered', label: t('filtrowane', 'filtered') }]} />
         </FilterField>
         <FilterField label={t('Klasa', 'Class')} width={170}>
           <Select value={u.get('class')} onChange={(v) => u.set({ class: v })} options={[{ value: '', label: t('dowolna', 'any') }, ...SERVICE_CLASSES.map((c) => ({ value: c, label: classLabel(c) }))]} />

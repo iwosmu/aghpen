@@ -12,6 +12,7 @@ import { WeekHeatmap } from '../viz/WeekHeatmap';
 import { useCan } from '../session';
 import { ReprobePanel } from './Reprobe';
 import { HostLifePanel } from './TimeMachine';
+import { isLocalMac } from '../lib/mac';
 
 /** Fewer observations than the model needs: the probes as a strip and when the weekly pattern appears. */
 const MIN_OBS = 8;
@@ -21,21 +22,23 @@ function FewObservations({ a, n }: { a: AvailabilityProfile; n: number }) {
     <div data-testid="few-observations">
       <p className="text-sm text-ink">{t('Model zna ten host dopiero z ' + n + ' ' + plural(n, ['obserwacji', 'obserwacji', 'obserwacji'], ['', '']) + '.', 'The model knows this host from only ' + n + ' ' + (n === 1 ? 'observation' : 'observations') + '.')}</p>
       <p className="mt-1 text-sm text-ink-2">{t('Wzorzec tygodniowy (mapa 7 × 24 godzin) pojawi się, gdy będzie co najmniej ' + MIN_OBS + ' obserwacji: jeszcze ' + (MIN_OBS - n) + ' ' + plural(MIN_OBS - n, ['skan', 'skany', 'skanów'], ['', '']) + ' tego hosta. Do tego czasu „nieaktywny” wynika z progu braków odpowiedzi.', 'The weekly pattern (a 7 × 24 hour map) appears from ' + MIN_OBS + ' observations: ' + (MIN_OBS - n) + ' more scans of this host. Until then "inactive" follows the miss threshold.')}</p>
-      <ol className="mt-3 grid grid-cols-8 gap-1.5">
-        {recent.map((o, i) => (
-          <li key={i} className="flex min-w-0 flex-col items-center gap-1 text-center">
-            <span className="block h-[22px] w-full" style={o.up ? { background: 'var(--seq-4)' } : { boxShadow: 'inset 0 0 0 1px var(--rule-strong)' }} aria-hidden="true" />
-            <span className="num text-2xs text-ink-2">{fmtDateTime(o.at).slice(-5)}</span>
-            <span className="text-2xs text-ink-3">{o.up ? t('odpowiedź', 'answer') : t('brak', 'miss')}</span>
-          </li>
-        ))}
+      <ol className="mt-3 grid grid-cols-8 gap-1.5" data-testid="probe-strip">
+        {recent.map((o, i) => {
+          const label = fmtDateTime(o.at) + ': ' + (o.up ? t('odpowiedź', 'answer') : t('brak odpowiedzi', 'no answer'));
+          return <li key={i} className="block h-[22px] min-w-0" style={o.up ? { background: 'var(--seq-4)' } : { boxShadow: 'inset 0 0 0 1px var(--rule-strong)' }} title={label} aria-label={label} />;
+        })}
         {Array.from({ length: Math.max(0, MIN_OBS - recent.length) }).map((_, i) => (
-          <li key={'f' + i} className="flex min-w-0 flex-col items-center gap-1 text-center" aria-hidden="true">
-            <span className="block h-[22px] w-full border border-dashed border-rule" />
-            <span className="text-2xs text-ink-3">–</span>
-          </li>
+          <li key={'f' + i} className="block h-[22px] min-w-0 border border-dashed border-rule" aria-hidden="true" />
         ))}
       </ol>
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-2xs text-ink-3" data-testid="probe-legend">
+        <span className="num">{recent.length ? fmtDateTime(recent[0].at) + (recent.length > 1 ? ' → ' + fmtDateTime(recent[recent.length - 1].at) : '') : ''}</span>
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5" style={{ background: 'var(--seq-4)' }} aria-hidden="true" />{t('odpowiedź', 'answer')}</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5" style={{ boxShadow: 'inset 0 0 0 1px var(--rule-strong)' }} aria-hidden="true" />{t('brak odpowiedzi', 'no answer')}</span>
+          {recent.length < MIN_OBS ? <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 border border-dashed border-rule" aria-hidden="true" />{t('kolejne skany', 'next scans')}</span> : null}
+        </span>
+      </div>
     </div>
   );
 }
@@ -147,7 +150,7 @@ export default function HostDetail() {
                 {(h.hostnames ?? []).join(', ') || '–'}
                 <OverrideNote o={h.overrides?.hostnames} canEdit={canEdit} onRevert={() => save.mutate({ hostnames: null })} />
               </KV>
-              {h.mac ? <KV k="MAC" mono>{h.mac}{h.vendor ? <span className="ml-2 font-sans text-ink-3">{h.vendor}</span> : null}</KV> : null}
+              {h.mac ? <KV k="MAC" mono>{h.mac}{isLocalMac(h.mac) ? <span className="ml-2 font-sans text-ink-3" title={t('Adres administrowany lokalnie (kontener, maszyna wirtualna): nie należy do żadnego producenta.', 'A locally administered address (container, virtual machine): no vendor owns it.')} data-testid="mac-local">{t('adres lokalny', 'local address')}</span> : h.vendor ? <span className="ml-2 font-sans text-ink-3">{h.vendor}</span> : null}</KV> : null}
               <KV k={t('Zakresy', 'Scopes')}>{(h.scope_ids ?? []).map((sid) => scopes.data?.items.find((s) => s.id === sid)?.name ?? '#' + sid).join(', ') || '–'}</KV>
               <KV k={t('Pierwszy raz', 'First seen')}><span className="num">{fmtDateTime(h.first_seen)}</span></KV>
               <KV k={t('Ostatnio widziany', 'Last seen')}><span className="num">{fmtDateTime(h.last_seen)}</span> <span className="text-ink-3">{fmtRelative(h.last_seen)}</span></KV>

@@ -4,6 +4,17 @@ import { useAction, useItem, usePage } from '../api/hooks';
 import { ApiError, del, patch, post, put } from '../api/client';
 import type { AuditEntry, DefectDojoSettings, DojoPullResult, DojoScopeMapping, DojoSyncResult, DojoTestResult, Permission, PermissionInfo, Role, SafetyPolicy, Scope, User } from '../api/types';
 import { t, getLang, plural } from '../i18n';
+
+/** The heading of a permission group ("targets" → "Cele"). */
+function permGroupLabel(g: string): string {
+  const m: Record<string, [string, string]> = {
+    targets: ['Cele i zakresy', 'Targets and scopes'], scans: ['Skany i profile', 'Scans and profiles'], results: ['Wyniki i znaleziska', 'Results and findings'],
+    signatures: ['Sygnatury i reguły', 'Signatures and rules'], export: ['Eksport', 'Export'], users: ['Użytkownicy', 'Users'], roles: ['Role', 'Roles'],
+    audit: ['Dziennik audytu', 'Audit log'], safety: ['Bezpieczeństwo', 'Safety'], integrations: ['Integracje', 'Integrations'], admin: ['Administracja', 'Administration'],
+  };
+  const v = m[g];
+  return v ? t(v[0], v[1]) : g;
+}
 import { cx, fmtDateTime, fmtInt, fmtRelative } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
 import { lockMessage, outsideLock } from '../lib/lock';
@@ -104,7 +115,7 @@ function RolesTab({ canManage }: { canManage: boolean }) {
               {list.map((r) => (
                 <th key={r.id} className="min-w-[104px] px-2 py-2 text-left align-bottom font-medium">
                   <div className="text-sm text-ink">{roleLabel(r.slug, r.name)}</div>
-                  <div className="text-2xs font-normal text-ink-3">{r.builtin ? t('wbudowana', 'built-in') : t('własna', 'custom')} · {r.user_count} {t('os.', 'users')}</div>
+                  <div className="text-2xs font-normal text-ink-3">{r.builtin ? t('wbudowana', 'built-in') : t('własna', 'custom')} · {r.user_count} {getLang() === 'pl' ? 'os.' : plural(r.user_count, ['', '', ''], ['user', 'users'])}</div>
                   {!r.builtin && canManage ? (
                     <div className="mt-1 flex gap-1">
                       {draft[r.id] ? <Button size="sm" variant="primary" busy={save.isPending} onClick={() => save.mutate(r)}>{t('Zapisz', 'Save')}</Button> : null}
@@ -118,7 +129,7 @@ function RolesTab({ canManage }: { canManage: boolean }) {
           <tbody>
             {groups.map(([group, items]) => (
               <Fragment key={group}>
-                <tr className="border-b border-rule bg-raised"><th colSpan={list.length + 1} className="sticky left-0 px-3 py-1 text-left text-xs font-semibold text-ink-2">{group}</th></tr>
+                <tr className="border-b border-rule bg-raised"><th colSpan={list.length + 1} className="sticky left-0 px-3 py-1 text-left text-xs font-semibold text-ink-2">{permGroupLabel(group)}</th></tr>
                 {items.map((p) => (
                   <tr key={p.permission} className="border-b border-rule last:border-b-0 hover:bg-raised">
                     <th scope="row" className="sticky left-0 z-10 bg-panel px-3 py-1 text-left font-normal"><div className="text-sm text-ink">{en ? p.label_en : p.label_pl}</div><div className="mono text-2xs text-ink-3">{p.permission}</div></th>

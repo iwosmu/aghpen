@@ -4,6 +4,7 @@ import { useItem, usePage } from '../api/hooks';
 import type { AtFinding, AtHost, AtService, FieldHistory, HostLife, LifeInterval, Page, RunMap, ScanRun, ServiceHistory, Snapshot, Timeline, RunPoint } from '../api/types';
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtInt } from '../lib/format';
+import { fieldLabel as sharedFieldLabel, fieldValue } from '../lib/fields';
 import { useUrlState } from '../lib/hooks';
 import { routeMissing } from '../lib/route';
 import { Empty, ErrorState, PageHeader, Panel, Select, SkeletonRows, Tabs, Unavailable } from '../ui/kit';
@@ -18,7 +19,14 @@ function useDebounced<T>(v: T, ms: number): T {
   return d;
 }
 
-const isLight = (r: RunPoint) => r.trigger === 'reprobe' || r.trigger === 'manual-entry';
+const isLight = (r: RunPoint) => r.trigger === 'reprobe' || r.trigger === 'manual-entry' || r.trigger === 'import';
+
+/** The next run in a direction: partial runs (re-probe, ad hoc, import, manual entry) are skipped unless all is set. */
+function stepRun(runs: RunPoint[], from: number, dir: 1 | -1, all: boolean): number {
+  for (let i = from + dir; i >= 0 && i < runs.length; i += dir) if (all || !isLight(runs[i])) return i;
+  return from;
+}
+const withModifier = (e: { shiftKey: boolean; altKey: boolean; ctrlKey: boolean; metaKey: boolean }) => e.shiftKey || e.altKey || e.ctrlKey || e.metaKey;
 
 /** The scrubber: one mark per analysed run, height by the number of changes; re-probe runs are thin and short. */
 function Scrubber({ runs, index, onIndex }: { runs: RunPoint[]; index: number; onIndex: (i: number) => void }) {
@@ -47,8 +55,8 @@ function Scrubber({ runs, index, onIndex }: { runs: RunPoint[]; index: number; o
         onPointerMove={(e) => { if (drag.current) pick(e.clientX); }}
         onPointerUp={() => { drag.current = false; }}
         onKeyDown={(e) => {
-          if (e.key === 'ArrowLeft') { e.preventDefault(); onIndex(Math.max(0, index - 1)); }
-          if (e.key === 'ArrowRight') { e.preventDefault(); onIndex(Math.min(runs.length - 1, index + 1)); }
+          if (e.key === 'ArrowLeft') { e.preventDefault(); onIndex(stepRun(runs, index, -1, withModifier(e))); }
+          if (e.key === 'ArrowRight') { e.preventDefault(); onIndex(stepRun(runs, index, 1, withModifier(e))); }
           if (e.key === 'Home') { e.preventDefault(); onIndex(0); }
           if (e.key === 'End') { e.preventDefault(); onIndex(runs.length - 1); }
         }}
@@ -68,7 +76,7 @@ function Scrubber({ runs, index, onIndex }: { runs: RunPoint[]; index: number; o
       </div>
       <div className="mt-1 flex justify-between px-2 text-2xs text-ink-3">
         <span className="num">{runs[0] ? fmtDateTime(runs[0].at) : ''}</span>
-        <span>{t('← → krok o jeden przebieg · wąskie kreski to ponowne sprawdzenia', '← → one run per step · thin marks are re-probes')}</span>
+        <span>{t('← → pełne skany · z Shift także częściowe (wąskie kreski)', '← → full scans · with Shift also partial runs (thin marks)')}</span>
         <span className="num">{runs.length ? fmtDateTime(runs[runs.length - 1].at) : ''}</span>
       </div>
     </div>
@@ -203,18 +211,62 @@ export default function TimeMachine() {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
       if (el.closest('input, textarea, select, [role=slider]')) return;
-      if (e.key === 'ArrowLeft') setIndex(Math.max(0, cur - 1));
-      if (e.key === 'ArrowRight') setIndex(Math.min(runs.length - 1, cur + 1));
+      if (e.key === 'ArrowLeft') setIndex(stepRun(runs, cur, -1, withModifier(e)));
+      if (e.key === 'ArrowRight') setIndex(stepRun(runs, cur, 1, withModifier(e)));
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [cur, runs.length]);
+  }, [cur, runs]);
 
   const header = <PageHeader title={t('Wehikuł czasu', 'Time machine')} sub={t('Sieć taka, jaka była po wybranym przebiegu: hosty, usługi i znaleziska z tamtej chwili, a obok to, co od tamtej pory zniknęło albo się zmieniło.', 'The network as it was after the chosen run: hosts, services and findings of that moment, next to what has gone or changed since.')} />;
   if (tl.error) return <div>{header}<div className="p-4 sm:p-6">{routeMissing(tl.error) ? <Unavailable what={t('Serwer nie udostępnia jeszcze osi czasu (GET /timeline). Gdy integrator podłączy moduł, ta strona pokaże każdy przeanalizowany przebieg.', 'The server does not serve the time line yet (GET /timeline). When the integrator wires the module, this page shows every analysed run.')} /> : <ErrorState error={tl.error} retry={() => tl.refetch()} />}</div></div>;
   if (!tl.data) return <div>{header}<SkeletonRows rows={10} /></div>;
   if (runs.length === 0) return <div>{header}<div className="p-4 sm:p-6"><Empty icon="history" title={t('Brak przeanalizowanych przebiegów', 'No analysed run yet')} hint={t('Oś czasu zapełni się po pierwszym zakończonym skanie.', 'The time line fills after the first finished scan.')} /></div></div>;
+  if (runs.length === 1) {
+    return (
+      <div>{header}<div className="p-4 sm:p-6" data-testid="tm-one-run">
+        <Empty icon="history" title={t('Wehikuł czasu potrzebuje co najmniej dwóch przebiegów', 'The time machine needs at least two runs')}
+          hint={t('Jest jeden przeanalizowany przebieg (#' + runs[0].run_id + ', ' + fmtDateTime(runs[0].at) + '). Po następnym skanie zobaczysz tu, jak sieć wyglądała wtedy i co od tamtej pory zniknęło albo się zmieniło.', 'There is one analysed run (#' + runs[0].run_id + ', ' + fmtDateTime(runs[0].at) + '). After the next scan this page shows how the network looked then and what has gone or changed since.')}
+          action={<Link to={'/runs/' + runs[0].run_id} className="link text-sm">{t('Otwórz przebieg', 'Open the run')} #{runs[0].run_id}</Link>} />
+      </div></div>
+    );
+  }
   const s = snap.data?.summary;
+  // With few runs the content uses the width: what changed first, the lists right under it, the map last.
+  const few = runs.length <= 5;
+  const counts = s ? (
+    <dl className={cx('grid gap-y-3', few ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-3')}>
+      <Count label={t('Hosty aktywne', 'Hosts up')} value={s.hosts_up} now={latest.hosts_up} />
+      <Count label={t('Hosty bez odpowiedzi', 'Hosts missing')} value={s.hosts_missing} now={latest.hosts_missing} />
+      <Count label={t('Hosty nieaktywne', 'Hosts down')} value={s.hosts_down} now={latest.hosts_down} />
+      <Count label={t('Usługi otwarte', 'Services open')} value={s.services_open} now={latest.services_open} />
+      <Count label={t('Usługi nieznane', 'Services unknown')} value={s.services_unknown} now={latest.services_unknown} />
+      <Count label={t('Znaleziska otwarte', 'Open findings')} value={s.findings_open} now={latest.findings_open} />
+    </dl>
+  ) : null;
+  const sentences = s ? ((s.diff_to_now?.sentences ?? []).length && run.run_id !== latest.run_id ? (
+    <ul className="space-y-1 text-sm" data-testid="tm-sentences">{(s.diff_to_now.sentences ?? []).map((x, i) => <li key={i} className="flex gap-2"><span className="mt-2 h-1 w-1 flex-none bg-ink-3" />{x}</li>)}</ul>
+  ) : <p className="text-sm text-ink-2">{run.run_id === latest.run_id ? t('To jest najnowszy przebieg: stan bieżący. Wybierz wcześniejszy przebieg na osi, żeby zobaczyć, co się od niego zmieniło.', 'This is the latest run: the current state. Pick an earlier run on the line to see what changed since.') : t('Od tamtej chwili nic się nie zmieniło.', 'Nothing has changed since then.')}</p>) : null;
+  if (few) {
+    return (
+      <div>
+        {header}
+        <div className="space-y-4 p-4 sm:p-6">
+          <Panel title={<span>{t('Przebieg', 'Run')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
+            actions={<span className="num text-ink-3">{cur + 1} / {runs.length}{snap.data ? ' · ' + snap.data.took_ms + ' ms' : ''}</span>}>
+            <Scrubber runs={runs} index={cur} onIndex={setIndex} />
+          </Panel>
+          <Panel title={t('Od tamtej chwili do dziś', 'From then to today')}>
+            {snap.error ? <ErrorState error={snap.error} retry={() => snap.refetch()} /> : !s ? <SkeletonRows rows={3} /> : (
+              <div className={cx('space-y-4', snap.isFetching && 'opacity-70 transition-opacity')} data-testid="tm-summary">{sentences}<div className="border-t border-rule pt-3">{counts}</div></div>
+            )}
+          </Panel>
+          {runId ? <SnapshotLists runId={runId} /> : null}
+          <Panel title={t('Mapa przestrzeni adresowej wtedy', 'Address-space map then')}>{runId ? <SnapshotMap runId={runId} frameRunId={frameRun?.id} /> : null}</Panel>
+        </div>
+      </div>
+    );
+  }
   return (
     <div>
       {header}
@@ -307,7 +359,7 @@ function FragmentLane({ label, intervals, versions, t0, t1 }: { label: React.Rea
   );
 }
 
-const fieldLabel = (f: string) => ({ name: t('usługa', 'service'), version: t('wersja', 'version'), title: t('tytuł', 'title'), status: t('status HTTP', 'HTTP status'), certificate: t('certyfikat', 'certificate'), headers: t('nagłówki', 'headers'), technologies: t('technologie', 'technologies') } as Record<string, string>)[f] ?? f;
+const fieldLabel = (f: string) => sharedFieldLabel(f, 'service');
 
 export function ServiceHistoryPanel({ serviceId }: { serviceId: number }) {
   const q = useItem<ServiceHistory>('/timeline/services/' + serviceId);
@@ -327,7 +379,7 @@ export function ServiceHistoryPanel({ serviceId }: { serviceId: number }) {
                 <ol className="space-y-0.5">
                   {f.values.map((v, i) => (
                     <li key={i} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 text-sm">
-                      <span className={cx('mono truncate', i === f.values.length - 1 ? 'text-ink' : 'text-ink-2')} title={v.value}>{v.value || '–'}</span>
+                      <span className={cx('mono truncate', i === f.values.length - 1 ? 'text-ink' : 'text-ink-2')} title={v.value}>{(f.field === 'state' || f.field === 'classes' ? fieldValue(f.field, v.value) : v.value) || '–'}</span>
                       <span className="num text-2xs text-ink-3">{fmtDateTime(v.from)} – {fmtDateTime(v.to)} · #{v.from_run}–#{v.to_run}</span>
                     </li>
                   ))}

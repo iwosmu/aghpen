@@ -15,6 +15,7 @@ import { EstimateBox } from './ProfileEdit';
 import { OperatorLockNote } from './Targets';
 import { outsideLock } from '../lib/lock';
 import { Icon } from '../ui/Icon';
+import { isFullRun, partialRunPhrase } from '../lib/headline';
 
 export function triggerLabel(x: string): string {
   switch (x) {
@@ -115,7 +116,7 @@ export default function Runs() {
   const cols: Col<ScanRun>[] = [
     { id: 'id', header: '#', sort: 'id', width: 64, cell: (r) => <Link to={'/runs/' + r.id} className="num link">#{r.id}</Link> },
     { id: 'status', header: t('Stan', 'Status'), cell: (r) => <RunStatusMark status={r.status} pauseReason={r.pause_reason} /> },
-    { id: 'profile', header: t('Profil / źródło', 'Profile / source'), cell: (r) => <span className="block max-w-[280px] truncate" title={r.profile_name + (r.note ? ' · ' + r.note : '')}>{r.label ? <span className="mr-1.5 border border-rule-strong px-1 text-2xs text-ink-2">{r.label}</span> : null}{r.profile_name}</span> },
+    { id: 'profile', header: t('Profil / źródło', 'Profile / source'), cell: (r) => <span className="block max-w-[280px] truncate" title={r.profile_name + (r.note ? ' · ' + r.note : '')}>{r.label ? <span className="mr-1.5 border border-rule-strong px-1 text-2xs text-ink-2">{r.label}</span> : null}{isFullRun(r) || r.status !== 'completed' && r.profile_id != null ? r.profile_name : <>{partialRunPhrase(r)}{r.profile_name ? <span className="text-ink-3"> · {t('opcje profilu', 'profile options')} {r.profile_name}</span> : null}</>}</span> },
     { id: 'trigger', header: t('Start', 'Trigger'), hide: 'lg', cell: (r) => <span className={r.trigger === 'reprobe' ? 'text-accent' : 'text-ink-2'}>{triggerLabel(r.trigger)}</span> },
     { id: 'started', header: t('Rozpoczęty', 'Started'), sort: 'started_at', cell: (r) => <span className="num text-ink-2" title={fmtDateTime(r.started_at)}>{fmtRelative(r.started_at)}</span> },
     { id: 'dur', header: t('Czas', 'Duration'), align: 'right', hide: 'md', cell: (r) => <span className="num">{fmtDuration(r.stats.elapsed_sec)}</span> },

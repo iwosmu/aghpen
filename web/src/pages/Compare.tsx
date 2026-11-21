@@ -8,6 +8,7 @@ import { Check, Empty, ErrorState, PageHeader, Select, SkeletonRows } from '../u
 import { Icon } from '../ui/Icon';
 import { Glyph, Sev, changeKindInfo, type GlyphName, type Tone } from '../ui/marks';
 import { BeforeAfter } from './Changes';
+import { isFullRun, lastFullPair } from '../lib/headline';
 
 function RunCard({ run, side }: { run: ScanRun; side: string }) {
   return (
@@ -53,14 +54,16 @@ export default function Compare() {
   const u = useUrlState();
   const runs = usePage<ScanRun>('/runs', { limit: 100, status: 'completed', sort: '-id' });
   const list = runs.data?.items ?? [];
-  const to = u.get('to') || (list[0] ? String(list[0].id) : '');
+  // Default: the last two full runs of one profile (a partial run sees only part of the network).
+  const pair = lastFullPair(list);
+  const to = u.get('to') || (pair.full ? String(pair.full.id) : list[0] ? String(list[0].id) : '');
   const toRun = list.find((r) => String(r.id) === to);
-  const prevId = toRun?.summary?.prev_run_id;
+  const prevId = toRun?.id === pair.full?.id && pair.prev ? pair.prev.id : toRun?.summary?.prev_run_id;
   const from = u.get('from') || (prevId ? String(prevId) : list.find((r) => String(r.id) !== to) ? String(list.find((r) => String(r.id) !== to)!.id) : '');
   const showExpected = u.get('expected') === '1';
   const ready = Boolean(from && to && from !== to);
   const diff = useItem<DiffReport>('/diff', { from, to }, { enabled: ready });
-  const opts = list.map((r) => ({ value: String(r.id), label: '#' + r.id + ' · ' + fmtDateTime(r.finished_at) + ' · ' + r.profile_name }));
+  const opts = list.map((r) => ({ value: String(r.id), label: '#' + r.id + ' · ' + fmtDateTime(r.finished_at) + ' · ' + r.profile_name + (isFullRun(r) ? '' : ' · ' + t('częściowy', 'partial')) }));
   const d = diff.data;
   const all = d?.changes ?? [];
   const group = (g: string) => all.filter((c) => changeKindInfo(c.kind).group === g || (g === 'changed' && changeKindInfo(c.kind).group === 'unstable'));
