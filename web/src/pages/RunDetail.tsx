@@ -79,6 +79,9 @@ export default function RunDetail() {
   const policyCap = safety.data?.max_pps ?? 0;
   const cap = Math.min(profile.data?.rate.max_pps ?? policyCap, policyCap || Infinity) || policyCap;
   const maxSize = Math.max(1, ...(chunks.data ?? []).map((c) => c.size));
+  const running = (chunks.data ?? []).filter((c) => c.status === 'running');
+  const runningChunks = running.length;
+  const runningAddrs = running.reduce((a, c) => a + c.size, 0);
   const sortedChunks = [...(chunks.data ?? [])].sort((a, b) => a.seq - b.seq);
   const groupSizes = new Map<number, number>();
   for (const c of sortedChunks) if (c.group) groupSizes.set(c.group, (groupSizes.get(c.group) ?? 0) + 1);
@@ -148,7 +151,13 @@ export default function RunDetail() {
               <span><span className="num text-xl font-semibold">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów sprawdzonych', 'of addresses probed')}</span></span>
               <span className="num text-sm text-ink-2">{fmtInt(s.addresses_done)} / {fmtInt(s.addresses_total)}</span>
             </div>
-            <div className="mt-2"><ProgressBar value={s.addresses_done} max={s.addresses_total} label={t('Postęp skanu', 'Scan progress')} /></div>
+            <div className="mt-2"><ProgressBar value={s.addresses_done} max={s.addresses_total} active={isLive ? runningAddrs : 0} label={t('Postęp skanu', 'Scan progress')} /></div>
+            {run.status === 'running' && runningChunks > 0 ? (
+              <p className="mt-1.5 flex items-center gap-2 text-xs text-ink-2" data-testid="run-phase">
+                <span className="bar-active inline-block h-1.5 w-4" aria-hidden="true" />
+                {phaseText(s, runningChunks, runningAddrs)}
+              </p>
+            ) : null}
             <dl className="mt-3 grid grid-cols-2 gap-y-3 sm:grid-cols-4">
               <Fact label={run.status === 'completed' ? t('Czas trwania', 'Duration') : t('Czas aktywny', 'Active time')}><span className="num">{fmtDuration(s.elapsed_sec)}</span></Fact>
               <Fact label={t('Pozostało (ETA)', 'Remaining (ETA)')}><span className="num">{isLive || run.status === 'paused' ? (run.status === 'analyzing' ? t('analiza', 'analysing') : fmtDuration(s.eta_sec)) : '–'}</span></Fact>
@@ -290,4 +299,12 @@ function RunNote({ run, canEdit }: { run: ScanRun; canEdit: boolean }) {
       </Dialog>
     </div>
   );
+}
+
+/** The phase of a running scan in words, from what the counters show so far. */
+export function phaseText(s: ScanRun['stats'], chunks: number, addrs: number): string {
+  const where = t(chunks + ' ' + plural(chunks, ['podgrupie', 'podgrupach', 'podgrupach'], ['', '']) + ' (' + fmtInt(addrs) + ' adresów)', chunks + ' ' + (chunks === 1 ? 'chunk' : 'chunks') + ' (' + fmtInt(addrs) + ' addresses)');
+  if (s.http_requests > 0) return t('Rozpoznawanie usług WWW i wykrywanie hostów w ', 'Identifying web services and discovering hosts in ') + where;
+  if (s.services_open > 0) return t('Wykrywanie hostów i usług w ', 'Discovering hosts and services in ') + where;
+  return t('Wykrywanie hostów w ', 'Discovering hosts in ') + where + t('. Postęp rośnie po zakończeniu każdej podgrupy.', '. Progress grows as each chunk finishes.');
 }
