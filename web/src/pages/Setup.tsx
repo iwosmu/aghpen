@@ -147,9 +147,9 @@ export default function Setup() {
       id = once.id;
     }
     const run = await post<ScanRun>('/runs', { profile_id: id });
-    // Re-probing is off in a fresh installation. The wizard turns it on when the box stays checked;
-    // a server without the module (404/405/501) does not block the first scan.
-    if (reprobe) await put('/settings/reprobe', { enabled: true }).catch(() => undefined);
+    // Re-probing is on in a fresh installation; an unchecked box turns it off.
+    // A server without the module (404/405/501) does not block the first scan.
+    if (!reprobe) await put('/settings/reprobe', { enabled: false }).catch(() => undefined);
     try { localStorage.setItem(SETUP_DONE_KEY, String(Math.round((Date.now() - startedAt) / 1000))); } catch { /* ignore */ }
     invalidate(qc, '/runs', '/dashboard', '/profiles');
     navigate('/runs/' + run.id, { replace: true });
@@ -264,7 +264,7 @@ export default function Setup() {
           ) : null}
           <div className="mt-3">
             <Check checked={reprobe} onChange={setReprobe} label={t('Sprawdzaj ponownie hosty, które przestały odpowiadać', 'Re-probe hosts that went silent')} />
-            <p className="ml-6 text-xs text-ink-3">{t('Kilka pojedynczych sond na godzinę (domyślnie najwyżej 200 adresów), tylko w oknach profilu, zamiast czekać z potwierdzeniem do następnego pełnego skanu.', 'A few single probes per hour (at most 200 addresses by default), only inside the profile windows, instead of waiting for the next full scan to confirm.')}</p>
+            <p className="ml-6 text-xs text-ink-3">{t('Domyślnie włączone. Host, który przestał odpowiadać, Czujka sprawdza ponownie pojedynczą sondą (nowy host w ciągu kilku minut), tylko w oknach profilu, zamiast czekać z potwierdzeniem do następnego pełnego skanu. Odznacz, aby wyłączyć.', 'On by default. A host that went silent is checked again with a single probe (a new host within minutes), only inside the profile windows, instead of waiting for the next full scan to confirm. Uncheck to turn it off.')}</p>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Button variant="primary" icon="play" busy={busy} onClick={start} data-testid="setup-start">{t('Uruchom pierwszy skan', 'Start the first scan')}</Button>

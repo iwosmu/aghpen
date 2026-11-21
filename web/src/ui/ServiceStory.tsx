@@ -8,7 +8,7 @@ import { Panel } from './kit';
 import { Glyph, changeKindInfo } from './marks';
 import { awayText, responseDelta } from '../lib/changeText';
 
-const LIFE = ['service_new', 'service_gone', 'service_returned', 'response_slower', 'response_recovered', 'host_gone', 'host_back', 'host_missing'];
+const LIFE = ['service_new', 'service_gone', 'service_returned', 'response_slower', 'response_recovered', 'host_gone', 'host_back', 'host_missing', 'service_unreachable'];
 
 /** The life of one service as one story: first seen, gone, back, slower, oldest first. */
 export function ServiceStory({ s }: { s: Service }) {

@@ -96,6 +96,13 @@ export interface ScanProfile {
   next_run_at: string | null; last_run_id: number | null; created_at: string; updated_at: string;
 }
 
+/** GET/PUT /settings/webhook. secret is write-only: the server answers secret_set. */
+export interface WebhookSettings {
+  enabled: boolean; url: string; min_severity: 'info' | 'low' | 'medium' | 'high'; secret_set: boolean; ui_url: string;
+}
+/** POST /settings/webhook/test: always 200; status 0 = no answer. */
+export interface WebhookTestResult { ok: boolean; status: number; ms: number; error?: string }
+
 export interface ScanEstimate {
   addresses: number; chunks: number; est_packets: number; est_duration_sec: number; effective_pps: number;
   fits_window: boolean; window_sec: number; based_on_history: boolean; expected_live_rate: number;
@@ -243,7 +250,7 @@ export interface ServiceGroup {
 }
 
 export type ChangeKind =
-  | 'host_new' | 'host_gone' | 'host_back' | 'host_unstable' | 'host_missing' | 'service_new' | 'service_gone' | 'service_changed'
+  | 'host_new' | 'host_gone' | 'host_back' | 'host_unstable' | 'host_missing' | 'service_unreachable' | 'service_new' | 'service_gone' | 'service_changed'
   | 'tech_new' | 'tech_gone' | 'tech_version' | 'title_changed' | 'status_changed' | 'cert_changed'
   | 'headers_changed' | 'cookies_changed' | 'content_changed' | 'redirect_changed' | 'class_changed'
   | 'service_returned' | 'response_slower' | 'response_recovered';

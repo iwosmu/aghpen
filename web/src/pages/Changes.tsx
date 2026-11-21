@@ -23,6 +23,8 @@ export function BeforeAfter({ c }: { c: Change }) {
   const before = c.kind === 'response_recovered' && c.before && typeof c.before === 'object' && 'ms' in c.before ? { ms: (c.before as { ms: number | null }).ms } : c.before;
   const b = c.field ? fieldValue(c.field, before) : show(before), a = c.field ? fieldValue(c.field, c.after) : show(c.after);
   if (!b && !a) return null;
+  // never two equal values with an arrow
+  if (b && a && b === a) return <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs">{c.field ? <span className="text-ink-3" title={c.field}>{fieldLabel(c.field)}:</span> : null}<span className="mono text-ink">{a}</span></span>;
   return (
     <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs">
       {c.field ? <span className="text-ink-3" title={c.field}>{fieldLabel(c.field)}:</span> : null}
@@ -77,7 +79,7 @@ export default function Changes() {
         actions={<><ExportButtons kind="changes" query={filters} /><LinkButton to="/changes/compare" icon="compare">{t('Porównaj dwa skany', 'Compare two runs')}</LinkButton></>}
       />
       <div className="flex flex-wrap items-center gap-1.5 border-b border-rule px-4 py-2 sm:px-6" role="group" aria-label={t('Szybkie filtry', 'Quick filters')} data-testid="change-quick">
-        {(['service_gone', 'service_returned', 'service_new', 'response_slower', 'response_recovered'] as const).map((k) => {
+        {(['service_gone', 'host_missing', 'service_unreachable', 'service_returned', 'service_new', 'response_slower', 'response_recovered'] as const).map((k) => {
           const i = changeKindInfo(k);
           const on = u.get('kind') === k;
           return (

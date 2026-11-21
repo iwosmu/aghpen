@@ -13,6 +13,7 @@ import { AddressMap } from '../viz/AddressMap';
 import { BarList, PacketCount, ProgressBar, RateGauge, TrendRows } from '../viz/charts';
 import { useSession } from '../session';
 import { RunStory } from '../ui/RunStory';
+import { useHostVerdicts } from '../ui/MissingHosts';
 import { PartialNote, RunPasses } from '../ui/RunPasses';
 import { useArrivalOrder } from '../ui/arrivalOrder';
 import { SMALL_RUN } from './RunDetail';
@@ -42,6 +43,13 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   const run = full === undefined ? (partial ? null : last) : full;
   const s = run?.summary;
   const expected = (d.recent_changes ?? []).filter((c) => c.expected).length;
+  // Hosts that did not answer in this run, and what the confirmation probe decided since.
+  const missingQ = useItem<Page<Change>>('/changes', { run_id: run?.id, kind: 'host_missing,service_unreachable', limit: 500 }, { enabled: Boolean(run?.id) && (s?.hosts_missing ?? 0) > 0 });
+  const missingItems = missingQ.data?.items ?? [];
+  const verdicts = useHostVerdicts(missingItems.filter((c) => c.kind === 'host_missing'));
+  // services of hosts the confirmation probe has decided about are no longer "not answering"
+  const decidedServices = missingItems.filter((c) => c.kind === 'service_unreachable' && verdicts.has(c.host_id)).length;
+  const confirmedGone = [...verdicts.values()].filter((v) => v.kind === 'host_gone').length;
   if (!run && partial) {
     return (
       <div>
@@ -61,19 +69,20 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   }
   const baseline = Boolean(s) && !s!.prev_run_id;
   const changed = s ? s.services_changed : 0;
-  const missing = s?.hosts_missing ?? 0;
-  const unreachable = s?.services_unreachable ?? 0;
+  const missing = Math.max(0, (s?.hosts_missing ?? 0) - verdicts.size);
+  const unreachable = Math.max(0, (s?.services_unreachable ?? 0) - decidedServices);
   const added = s ? s.hosts_new + s.services_new : 0;
   const gone = s ? s.hosts_gone + s.services_gone : 0;
   const returned = s?.services_returned ?? 0;
   const slower = s?.responses_slower ?? 0;
-  const quiet = s ? added + gone + changed + s.hosts_unstable + missing + returned + slower === 0 : true;
+  const recovered = s?.by_kind?.response_recovered ?? 0;
+  const quiet = s ? added + gone + changed + s.hosts_unstable + missing + confirmedGone + returned + slower + recovered === 0 : true;
   const open = (d.top_findings ?? []).filter((f) => f.status === 'new' || f.status === 'triaged');
   const important = open.filter((f) => f.severity === 'high' || f.interest >= ATTENTION_INTEREST);
   const panels = adminPanelNames(open);
   const attention = h.admin_panels > 0 || h.findings_high > 0 || important.length > 0;
   const named = (panels.length ? panels : adminPanelServiceNames(d.top_services ?? [])).slice(0, 2);
-  const parts = s ? changeParts({ added, gone, changed, missing, unstable: s.hosts_unstable, returned, slower }, getLang(), plural) : [];
+  const parts = s ? changeParts({ added, gone, changed, missing, unstable: s.hosts_unstable, returned, slower, recovered, confirmedGone }, getLang(), plural) : [];
   const headline = baseline
     ? t('Pierwszy obraz sieci: ' + fmtInt(h.hosts_up) + ' ' + plural(h.hosts_up, ['aktywny host', 'aktywne hosty', 'aktywnych hostów'], ['', '']) + ', ' + fmtInt(h.services_open) + ' ' + plural(h.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['', '']) + '.',
       'First picture of the network: ' + fmtInt(h.hosts_up) + ' ' + (h.hosts_up === 1 ? 'host' : 'hosts') + ' up, ' + fmtInt(h.services_open) + ' open ' + (h.services_open === 1 ? 'service' : 'services') + '.')
@@ -127,8 +136,9 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
           {s.responses_slower ? <Count n={s.responses_slower} glyph="slow" tone="changed" label={plural(s.responses_slower, ['wolniejsza odpowiedź', 'wolniejsze odpowiedzi', 'wolniejszych odpowiedzi'], ['slower response', 'slower responses'])} to={'/changes?run_id=' + run.id + '&kind=response_slower'} /> : null}
           <Count n={changed} glyph="delta" tone="changed" label={plural(changed, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes'])} to={'/changes?run_id=' + run.id} />
           <Count n={s.hosts_unstable} glyph="wave" tone="unstable" label={plural(s.hosts_unstable, ['host niestabilny', 'hosty niestabilne', 'hostów niestabilnych'], ['unstable host', 'unstable hosts'])} to={'/hosts?status=unstable'} />
-          <Count n={missing} glyph="half" tone="expected" label={plural(missing, ['host bez odpowiedzi', 'hosty bez odpowiedzi', 'hostów bez odpowiedzi'], ['host missing', 'hosts missing'])} to={'/changes?run_id=' + run.id + '&kind=host_missing'} />
-          {unreachable ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap py-0.5 text-sm text-ink-3" title={t('Usługi hostów, które milczą, ale nie są jeszcze uznane za nieaktywne: stan nieznany, nie zamknięte.', 'Services of silent hosts that are not reported inactive yet: unknown, not closed.')}><span className="num text-base font-medium text-ink-2">{unreachable}</span>{plural(unreachable, ['usługa nieosiągalna', 'usługi nieosiągalne', 'usług nieosiągalnych'], ['service unreachable', 'services unreachable'])}</span> : null}
+          <Count n={missing} glyph="half" tone="expected" label={plural(missing, ['host nie odpowiada (niepotwierdzone)', 'hosty nie odpowiadają (niepotwierdzone)', 'hostów nie odpowiada (niepotwierdzone)'], ['host not answering (unconfirmed)', 'hosts not answering (unconfirmed)'])} to={'/changes?run_id=' + run.id + '&kind=host_missing'} />
+          {unreachable ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap py-0.5 text-sm text-ink-3" title={t('Usługi hostów, które milczą, ale nie są jeszcze uznane za nieaktywne: stan nieznany, nie zamknięte.', 'Services of silent hosts that are not reported inactive yet: unknown, not closed.')}><span className="num text-base font-medium text-ink-2">{unreachable}</span>{plural(unreachable, ['usługa nie odpowiada (niepotwierdzone)', 'usługi nie odpowiadają (niepotwierdzone)', 'usług nie odpowiada (niepotwierdzone)'], ['service not answering (unconfirmed)', 'services not answering (unconfirmed)'])}</span> : null}
+          {confirmedGone ? <Count n={confirmedGone} glyph="minus" tone="gone" label={plural(confirmedGone, ['host zniknął (potwierdzone)', 'hosty zniknęły (potwierdzone)', 'hostów zniknęło (potwierdzone)'], ['host gone (confirmed)', 'hosts gone (confirmed)'])} to={'/changes?kind=host_gone'} /> : null}
           <Count n={expected} glyph="dashring" tone="expected" label={plural(expected, ['zmiana oczekiwana', 'zmiany oczekiwane', 'zmian oczekiwanych'], ['expected change', 'expected changes'])} to={'/changes?run_id=' + run.id + '&expected=true'} />
         </div>
       ) : null}
