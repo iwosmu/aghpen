@@ -288,7 +288,7 @@ func TestRetroHuntOverStoredObservations(t *testing.T) {
 		{RunID: run2.ID, IP: "10.20.0.6", Up: true, ObservedAt: at2, Services: []model.ServiceResult{other}},
 	})
 
-	res, err := w.RetroHunt(ctx, sigLogin, false)
+	res, err := w.RetroHunt(ctx, sigLogin, false, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,7 +327,7 @@ func TestRetroHuntOverStoredObservations(t *testing.T) {
 	}
 
 	// latestOnly: one observation per service, so the old portal page is not read.
-	res, err = w.RetroHunt(ctx, sigLogin, true)
+	res, err = w.RetroHunt(ctx, sigLogin, true, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,30 +336,30 @@ func TestRetroHuntOverStoredObservations(t *testing.T) {
 	}
 	// A signature for the old marker still finds the old observation when every run is searched.
 	oldSig := "id: stary\nname: Stary portal\nbody: 'Stary portal'\n"
-	if res, _ = w.RetroHunt(ctx, oldSig, false); res.TotalHits != 1 || res.Hits[0].RunID != run1.ID {
+	if res, _ = w.RetroHunt(ctx, oldSig, false, true); res.TotalHits != 1 || res.Hits[0].RunID != run1.ID {
 		t.Errorf("history: %+v", res)
 	}
-	if res, _ = w.RetroHunt(ctx, oldSig, true); res.TotalHits != 0 {
+	if res, _ = w.RetroHunt(ctx, oldSig, true, true); res.TotalHits != 0 {
 		t.Errorf("latest only must not see the old page: %+v", res)
 	}
 	// A non-HTTP signature.
-	if res, _ = w.RetroHunt(ctx, "id: ssh\nname: OpenSSH\nbanner: {regex: 'OpenSSH_([0-9.]+)', version_group: 1}\n", true); res.TotalHits != 1 || res.Hits[0].Port != 22 || res.Hits[0].Match.Version != "9.6" || res.Hits[0].IP != "10.20.0.5" {
+	if res, _ = w.RetroHunt(ctx, "id: ssh\nname: OpenSSH\nbanner: {regex: 'OpenSSH_([0-9.]+)', version_group: 1}\n", true, true); res.TotalHits != 1 || res.Hits[0].Port != 22 || res.Hits[0].Match.Version != "9.6" || res.Hits[0].IP != "10.20.0.5" {
 		t.Errorf("ssh: %+v", res)
 	}
 	// An unsafe signature is an error and reads nothing.
-	if _, err = w.RetroHunt(ctx, "id: evil\nname: Evil\nrequests:\n  - {path: /login, method: POST}\nbody: x\n", false); err == nil || !strings.Contains(err.Error(), "POST") {
+	if _, err = w.RetroHunt(ctx, "id: evil\nname: Evil\nrequests:\n  - {path: /login, method: POST}\nbody: x\n", false, true); err == nil || !strings.Contains(err.Error(), "POST") {
 		t.Errorf("unsafe signature: err = %v", err)
 	}
 	// The hit limit bounds the list, not the count.
 	w.MaxHits = 1
-	if res, _ = w.RetroHunt(ctx, sigLogin, false); res.TotalHits != 2 || len(res.Hits) != 1 || !res.Truncated || !strings.Contains(res.Notes[len(res.Notes)-1], "pierwsze 1 z 2") {
+	if res, _ = w.RetroHunt(ctx, sigLogin, false, true); res.TotalHits != 2 || len(res.Hits) != 1 || !res.Truncated || !strings.Contains(res.Notes[len(res.Notes)-1], "pierwsze 1 z 2") {
 		t.Errorf("limit: %+v", res)
 	}
 	w.MaxHits = 0
 	// A cancelled request stops the stream.
 	cctx, cancel := context.WithCancel(ctx)
 	cancel()
-	if _, err = w.RetroHunt(cctx, sigLogin, false); err == nil {
+	if _, err = w.RetroHunt(cctx, sigLogin, false, true); err == nil {
 		t.Error("a cancelled context must stop the retro-hunt")
 	}
 
@@ -460,7 +460,7 @@ func TestRetroHuntScale(t *testing.T) {
 			}
 		}
 	}()
-	res, err := w.RetroHunt(ctx, hunt, false)
+	res, err := w.RetroHunt(ctx, hunt, false, true)
 	close(done)
 	if err != nil {
 		t.Fatal(err)
@@ -481,7 +481,7 @@ func TestRetroHuntScale(t *testing.T) {
 	}
 
 	// The same hunt over the newest observation of every service only.
-	if latest, err := w.RetroHunt(ctx, hunt, true); err != nil || latest.TotalHits != want {
+	if latest, err := w.RetroHunt(ctx, hunt, true, true); err != nil || latest.TotalHits != want {
 		t.Errorf("latest only: hits = %d, err = %v", latest.TotalHits, err)
 	}
 	// A reload while the data is there: the hook path.

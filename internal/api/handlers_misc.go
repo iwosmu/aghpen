@@ -230,7 +230,7 @@ func (s *Server) retroHunt(w http.ResponseWriter, r *http.Request) {
 		notWired(w, "retro-hunt (internal/sig)")
 		return
 	}
-	res, err := s.d.RetroHunter.RetroHunt(r.Context(), in.YAML, in.LatestOnly)
+	res, err := s.d.RetroHunter.RetroHunt(r.Context(), in.YAML, in.LatestOnly, canSeeCookies(r))
 	if err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, "validation", err.Error())
 		return
