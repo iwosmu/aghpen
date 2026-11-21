@@ -28,17 +28,17 @@ function ResultView({ res, scope, onDone }: { res: PassiveResult; scope: Scope; 
     <div className="space-y-3" data-testid="passive-result">
       <p className="text-sm text-ink-2">
         <span className="num text-ink">{fmtInt((res.facts ?? []).length)}</span> {plural((res.facts ?? []).length, ['fakt w zakresie', 'fakty w zakresie', 'faktów w zakresie'], ['fact in scope', 'facts in scope'])}
-        {' · '}<span className="num text-ink">{cands.length}</span> {plural(cands.length, ['kandydat', 'kandydatów', 'kandydatów'], ['candidate', 'candidates'])}
+        {' · '}<span className="num text-ink">{cands.length}</span> {plural(cands.length, ['kandydat', 'kandydaci', 'kandydatów'], ['candidate', 'candidates'])}
         {' · '}<span className="num text-ink">{hints.length}</span> {t('podpowiedzi nazw', 'name hints')}
         {' · '}<span className="num text-ink">{oos.length}</span> {t('poza zakresem', 'out of scope')}
-        {res.hosts_updated !== undefined ? <>{' · '}<span className="num text-ink">{res.hosts_updated}</span> {t('hostów dostało nazwy', 'hosts got names')}</> : null}
+        {res.hosts_updated !== undefined ? <>{' · '}<span className="num text-ink">{res.hosts_updated}</span> {t('hosty z nową nazwą: (liczba po etykiecie)', 'hosts named: (count after the label)')}</> : null}
       </p>
-      {res.file ? <p className="text-xs text-ink-3">{t('Plik', 'File')}: {res.file.format}, {fmtInt(res.file.records)} {t('rekordów', 'records')}, {fmtInt(res.file.skipped)} {t('pominiętych', 'skipped')}, {fmtInt(res.file.invalid_total)} {t('błędnych', 'invalid')}{(res.file.invalid ?? []).slice(0, 3).map((i) => <span key={i.line} className="block">{t('wiersz', 'line')} <span className="num">{i.line}</span>: <span className="mono">{i.value}</span>: {i.reason}</span>)}</p> : null}
+      {res.file ? <p className="text-xs text-ink-3">{t('Plik', 'File')}: {res.file.format}, {fmtInt(res.file.records)} {t('rekordy: (liczba po etykiecie)', 'records: (count after the label)')}, {fmtInt(res.file.skipped)} {t('pominiętych', 'skipped')}, {fmtInt(res.file.invalid_total)} {t('błędnych', 'invalid')}{(res.file.invalid ?? []).slice(0, 3).map((i) => <span key={i.line} className="block">{t('wiersz', 'line')} <span className="num">{i.line}</span>: <span className="mono">{i.value}</span>: {i.reason}</span>)}</p> : null}
       {(res.sources ?? []).filter((s) => s.error || s.skipped).map((s) => <p key={s.name} className="flex items-start gap-1.5 text-xs text-st-changed"><Glyph name="delta" tone="changed" size={12} />{s.name}: {s.skipped ? t('pominięte (źródło zewnętrzne wyłączone)', 'skipped (external source disabled)') : s.error}</p>)}
       {cands.length ? (
         <div className="border border-rule">
           <div className="flex items-center justify-between gap-2 border-b border-rule bg-raised px-3 py-1.5 text-xs text-ink-2">
-            <span>{t('Kandydaci na cele: nic nie jest dodawane bez potwierdzenia', 'Target candidates: nothing is added without confirmation')}</span>
+            <span>{t('Kandydaci na cele', 'Target candidates')}</span>
             <button type="button" className="link" onClick={() => setPicked(picked.size === cands.length ? new Set() : new Set(cands.map((c) => c.value)))}>{picked.size === cands.length ? t('odznacz wszystkie', 'clear all') : t('zaznacz wszystkie', 'select all')}</button>
           </div>
           <ul className="max-h-[300px] overflow-auto">
@@ -58,7 +58,7 @@ function ResultView({ res, scope, onDone }: { res: PassiveResult; scope: Scope; 
             </div>
           ) : null}
         </div>
-      ) : <p className="text-sm text-ink-2">{t('Brak nowych kandydatów: wszystko, co źródło podało, jest już w zakresie albo poza nim.', 'No new candidates: everything the source gave is already in the scope or outside it.')}</p>}
+      ) : <p className="text-sm text-ink-2">{t('Brak nowych kandydatów.', 'No new candidates.')}</p>}
       {hints.length ? (
         <details className="border border-rule px-3 py-1.5 text-sm">
           <summary className="cursor-pointer text-ink-2">{t('Podpowiedzi nazw dla adresów w zakresie', 'Name hints for addresses in scope')} ({hints.length})</summary>
@@ -67,7 +67,7 @@ function ResultView({ res, scope, onDone }: { res: PassiveResult; scope: Scope; 
       ) : null}
       {oos.length ? (
         <details className="border border-rule px-3 py-1.5 text-sm">
-          <summary className="cursor-pointer text-ink-2">{t('Poza każdym zakresem: pokazane, nigdy nie skanowane', 'Outside every scope: shown, never scanned')} ({oos.length})</summary>
+          <summary className="cursor-pointer text-ink-2">{t('Poza zakresami (nieskanowane)', 'Outside every scope (not scanned)')} ({oos.length})</summary>
           <ul className="mt-1">{oos.slice(0, 50).map((f, i) => <li key={i} className="flex gap-2 py-0.5 text-xs"><span className="mono">{f.ip || f.hostname}</span><span className="text-ink-3">{f.kind} · {f.source}</span></li>)}</ul>
         </details>
       ) : null}
@@ -85,7 +85,7 @@ function CrtshTab({ run, busy }: { run: () => void; busy: boolean }) {
     <div className="space-y-3">
       <p className="flex items-start gap-2 border border-rule-strong bg-st-changed-wash px-3 py-2 text-sm">
         <Glyph name="delta" tone="changed" />
-        <span>{t('crt.sh to usługa zewnętrzna. Zapytanie wysyła do niej nazwy domen z zakresu. Do adresów w sieci nie trafia żaden pakiet. Domyślnie wyłączone; włącza administrator.', 'crt.sh is an external service. A query sends it the domain names of the scope. No packet goes to the network addresses. Off by default; an administrator turns it on.')}</span>
+        <span>{t('crt.sh to usługa zewnętrzna. Zapytanie wysyła do niej nazwy domen z zakresu.', 'crt.sh is an external service. A query sends it the domain names of the scope.')}</span>
       </p>
       {admin ? (
         <label className="flex items-center gap-2 text-sm">
@@ -125,7 +125,7 @@ export function PassivePanel({ scope }: { scope: Scope }) {
               <span className="label mb-1 block">{t('Plik ze strefą DNS, CSV, JSON albo JSONL (nazwy i adresy)', 'A DNS zone, CSV, JSON or JSONL file (names and addresses)')}</span>
               <FileInput testId="passive-file" file={file} onFile={setFile} />
             </label>
-            <Button icon="upload" busy={runIt.isPending} disabled={!file} onClick={() => runIt.mutate('file')}>{t('Wczytaj', 'Read')}</Button>
+            <Button icon="upload" busy={runIt.isPending} disabled={!file} onClick={() => runIt.mutate('file')}>{t('Importuj', 'Import')}</Button>
           </div>
         ) : tab === 'ptr' ? (
           <div className="space-y-2">
@@ -133,7 +133,7 @@ export function PassivePanel({ scope }: { scope: Scope }) {
             <Button icon="refresh" busy={runIt.isPending} onClick={() => runIt.mutate('ptr')} data-testid="passive-ptr">{t('Uruchom odwrotny DNS', 'Run reverse DNS')}</Button>
           </div>
         ) : <CrtshTab run={() => runIt.mutate('crtsh')} busy={runIt.isPending} />}
-        {disabled ? <p className="text-sm text-ink-2">{t('crt.sh jest wyłączone w tej instalacji. Administrator może je włączyć powyżej.', 'crt.sh is off in this installation. An administrator can turn it on above.')}</p> : <InlineError error={runIt.error} />}
+        {disabled ? <p className="text-sm text-ink-2">{t('crt.sh jest wyłączone. Włącza je administrator.', 'crt.sh is off. An administrator turns it on.')}</p> : <InlineError error={runIt.error} />}
         {res ? <div className={cx(runIt.isPending && 'opacity-60')}><ResultView key={JSON.stringify(res.candidates?.map((c) => c.value))} res={res} scope={scope} onDone={() => setRes(null)} /></div> : null}
       </div>
     </Panel>
