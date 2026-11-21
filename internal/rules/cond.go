@@ -183,7 +183,7 @@ func (p *parser) parseCond(n *yaml.Node, path string, info *condInfo) Cond {
 
 var knownClasses = map[string]bool{model.ClassAdminPanel: true, model.ClassLogin: true, model.ClassStaging: true, model.ClassIoT: true,
 	model.ClassDefaultPage: true, model.ClassAPI: true, model.ClassDevTool: true, model.ClassDatabase: true, model.ClassRemoteAccess: true,
-	model.ClassDirListing: true, model.ClassErrorPage: true}
+	model.ClassDirListing: true, model.ClassErrorPage: true, model.ClassInstallPage: true, model.ClassUnauthControlAPI: true}
 
 const leafKeys = "class, tech, port, proto, service, product, banner, state, tls, scheme, http_status, header, cookie, title, url, hostname, new_within_days, tags, host_status, redirects_to_https, min_interest, all, any, not"
 

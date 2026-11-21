@@ -302,3 +302,37 @@ func TestPolicyInterestStaysUnderTheEngineFinding(t *testing.T) {
 		t.Error("severity order lost")
 	}
 }
+
+// The two takeover rules of the starter pack on the services of the
+// organisers' template: an unfinished Gitea installer, the Toxiproxy API, a
+// Docker API on 2375 without a signature, and a finished WordPress.
+func TestBuiltinTakeoverRules(t *testing.T) {
+	pack, err := Builtin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]*Rule{}
+	for _, r := range pack {
+		byID[r.ID] = r
+	}
+	installer := web(1, 3001, "http", "Instalacja - Gitea", "install-page")
+	toxi := web(2, 8474, "http", "", "unauth-control-api")
+	docker := &SvcRec{Service: model.Service{ID: 3, Port: 2375, Proto: "tcp", State: model.ServiceOpen, Name: "docker"}}
+	blog := web(4, 8080, "http", "Blog")
+	h := host(1, "192.168.65.254", installer, toxi, docker, blog)
+	for id, want := range map[string][]int{"unfinished-install-page": {3001}, "unauthenticated-control-api": {8474, 2375}} {
+		r := byID[id]
+		if r == nil || !r.Enabled || r.Severity != model.SevHigh {
+			t.Fatalf("%s: missing, disabled or not high: %+v", id, r)
+		}
+		e := NewEvaluator([]*Rule{r}, now)
+		e.Host(h)
+		var got []int
+		for _, v := range e.Finish() {
+			got = append(got, v.Port)
+		}
+		if fmt.Sprint(got) != fmt.Sprint(want) {
+			t.Errorf("%s: ports %v, want %v", id, got, want)
+		}
+	}
+}

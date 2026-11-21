@@ -170,7 +170,7 @@ Razem 96 wierszy.
 go build ./... && go vet ./... && go test -count=1 ./...
 make test-integration                    # testy bazy na PostgreSQL z pg_tde (docker)
 make e2e-full                            # cały produkt przez REST API, około 15 minut; zapis: e2e/full/transcript.txt
-docker compose -f deploy/docker-compose.yml up -d --build --wait
+docker compose up -d                     # w katalogu głównym, bez .env
 curl -s http://127.0.0.1:8080/healthz    # "engine":true, "tde":true, "probe":{"mode":"nmap-raw"}
 ```
 

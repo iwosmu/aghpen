@@ -8,6 +8,16 @@ Ten katalog zawiera narzędzia, które porównują wynik skanu z prawdą wzorcow
 | `e2e/nmapconv`, `e2e/nmap2czujka` | zamienia XML nmap na `[]model.HostResult` (punkt odniesienia: „goły nmap”) |
 | `e2e/labscan.sh` | skan odniesienia ze skrzynki skanera: przegląd /16, pełny skan TCP z `-sV`, trzy porty UDP, konwersja |
 | `e2e/watchunstable` | oś czasu hostów niestabilnych: co widać w sieci i co mówi model dostępności |
+| `e2e/lab-run.sh` | pełny pomiar przez REST API produktu: t0 → t1 → t2, eksporty, oceny stanów i zmian, pakiety w sekundach (`tcpdump` + `ppsbins`), pamięć, rozmiar bazy |
+| `e2e/lab-gate.sh` | bramka przed scaleniem zmian silnika: jeden pełny skan /16 w stanie t0, progi czułości, limit pakietów w każdej sekundzie, ostrzeżenia silnika, tablica sąsiadów; kod wyjścia 1, gdy coś nie przejdzie |
+| `e2e/lab-tradeoff.sh` | tabela kompromisu profili: każdy wariant to jeden przebieg `lab-run.sh` w stanie t0 |
+| `e2e/unstable-series.sh` | seria skanów hostów niestabilnych co minutę; `US_BUCKET`, `US_PERIOD` włączają zegar laboratoryjny |
+| `e2e/ppsbins` | pakiety wysłane przez skaner w przedziałach jednosekundowych, z podziałem na klasy (ARP, SYN, ICMP, UDP, DNS, TCP jądra) |
+| `e2e/neigh-check.sh` | tablica sąsiadów (ARP) hosta Dockera: wpisy, `gc_thresh3`, `table_fulls`; kod 1 powyżej 80 % limitu |
+
+**Dwie pułapki pomiaru ruchu** (obie zmierzone): `tcpdump -Q out` nie widzi pakietów, które nmap wysyła przez surowe gniazdo IP; `tcpdump` w przestrzeni sieciowej kontenera pokazuje każdą ramkę ARP wstrzykniętą przez nmap dwa razy (2 µs odstępu), więc `ppsbins` usuwa identyczną linię w oknie 1 ms.
+
+**Tablica sąsiadów jest wspólna dla całego hosta Dockera** (wszystkie przestrzenie sieciowe). Gdy jest pełna, kontenery laboratorium przestają odpowiadać na ARP (Linux odpowiada tylko wtedy, gdy może zapisać pytającego) i każdy skan na tej maszynie gubi hosty i porty. `lab-run.sh` i `lab-gate.sh` sprawdzają ją przed pomiarem.
 
 Wszystkie skany używają tylko bezpiecznych technik: ARP/ICMP, SYN, `-sV` i cztery skrypty nmap z kategorii `safe` (`http-title`, `http-server-header`, `http-headers`, `ssl-cert`). Żadnego logowania, żadnych ładunków.
 

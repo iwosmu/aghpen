@@ -137,7 +137,8 @@ Uwagi dla skanera:
 - W tej samej sieci L2 nmap wykrywa hosty przez ARP. Domyślne tempo jest za wolne dla /16 (ponad 10 minut). Z `-T4 --min-rate 3000 --max-retries 2` przegląd 65 536 adresów trwa 48 s.
 - Skaner pod własnym adresem (np. `10.66.0.20`) widzi też siebie. Podaj go narzędziu oceny: `score -ignore 10.66.0.20`. Brama i skrzynka są pomijane zawsze (pole `ignore` w ground truth).
 - Rekordy PTR: wbudowany resolver dockera (`127.0.0.11`) sam odpowiada na zapytania odwrotne nazwą kontenera (`czujka-lab-cam-1-1.czujka-lab`). Nazwy ze strefy laboratorium daje zapytanie wprost do serwera: `dig @10.66.0.53 -x 10.66.30.10` → `kamera-1.lab.czujka.test`. Zapytania w przód (`www.lab.czujka.test`) działają przez oba.
-- Skanuj tylko `10.66.0.0/16`. Laboratorium nie wysyła ruchu poza swoją sieć.
+- Skanuj tylko `10.66.0.0/16`. Laboratorium samo nie wysyła ruchu poza swoją sieć, ale sieć `czujka-lab` to zwykły bridge dockera z trasą na zewnątrz. Obrazy, które same się aktualizują, mogą więc pobrać aktualizację. Tak było z WordPressem 5.8.3 (`wp-old`): po minucie od startu zaktualizował się do 7.1.5 i prawda wzorcowa przestała pasować (pomiar 2026-11-21). Dlatego kontenery WordPressa mają `AUTOMATIC_UPDATER_DISABLED` (`lab/manifest/real.go`).
+- Opowieść do pokazu historii: `lab/story.sh` przeprowadza laboratorium przez serię prawdziwych zmian (nowe hosty, aktualizacje, nowy certyfikat, panel administracyjny, otwarty port bazy, staging, który znika i wraca, „noc” urządzeń biurowych). Każdy krok trafia z czasem UTC do pliku JSON-lines. Domyślnie 2 cykle po 8 kroków i krok startowy, 15 minut na krok: około 4 h 15 min. Skróć zegar modelu dostępności (`docs/ALGORYTMY.md`, 2.10), żeby mapa tygodnia zapełniła się w tym czasie.
 
 ## 5. Co jest w laboratorium
 

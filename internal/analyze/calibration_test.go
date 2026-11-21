@@ -51,7 +51,8 @@ func TestDojoLoginCalibration(t *testing.T) {
 		t.Fatalf("%d findings, want 3", len(fs))
 	}
 	login := got[FindingLoginPlainHTTP]
-	if login.Interest != 50 || login.Signature == "" {
+	// base 50, plus 2 from the service interest (75) as the tie-break
+	if login.Interest != 52 || login.Signature == "" {
 		t.Errorf("login-plain-http %+v", login)
 	}
 	hasURL := false

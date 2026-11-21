@@ -127,3 +127,19 @@ func TestDiffResponseSlowerAndRecovered(t *testing.T) {
 		t.Errorf("after %v", c.After)
 	}
 }
+
+// Behind a firewall that drops packets (ufw), a stopped service reads
+// "filtered", not "closed". A full scan of an answering host that finds a
+// previously open port filtered reports it gone, not unknown.
+func TestDiffFilteredPortOfOpenServiceIsGone(t *testing.T) {
+	web := httpSvc(28787, "Welcome to nginx!", 200)
+	other := httpSvc(28788, "Welcome to nginx!", 200)
+	prev := snap(1, host("172.17.0.1", model.HostUp, web, other))
+	filtered := web
+	filtered.State, filtered.HTTP = "filtered", nil
+	cs, sum := Diff(&prev, snap(2, host("172.17.0.1", model.HostUp, filtered, other)), DiffOptions{})
+	c := find(cs, model.ChangeServiceGone)
+	if c == nil || c.Port != 28787 || c.After != "filtered" || sum.ServicesGone != 1 || sum.ServicesUnreachable != 0 {
+		t.Fatalf("changes %v, summary %+v", kinds(cs), sum)
+	}
+}

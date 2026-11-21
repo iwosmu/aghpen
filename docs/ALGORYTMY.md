@@ -211,6 +211,17 @@ Kubełki modelu mają domyślnie szerokość 1 h i okres 1 tygodnia (168 kubełk
 
 Reguły: szerokość co najmniej 1 s, okres jest całkowitą wielokrotnością szerokości, najwyżej 168 kubełków. Przy innym zegarze model liczy kubełek jako `(czas Unix mod okres) / szerokość`, kurczy częstość kubełka prosto do częstości globalnej (bez poziomu dnia tygodnia) i opisuje rytm jako „zegar laboratoryjny”. To ustawienie służy tylko do pokazu. W produkcji zostaw wartości domyślne.
 
+### 2.11 Skan portów: limit czasu, porty nieznane, kontrola poprawności
+
+nmap skanuje hosty jednego procesu równolegle, w tempie przydzielonym grupie (limit pakietów minus rezerwa HTTP, podzielony między równoległe grupy). Jeden host może więc potrzebować całego czasu procesu. Limit czasu na host (`--host-timeout`) rośnie z pracą: `max(5 min, hosty × porty × 3 / tempo)`. Pomiar na serwerze publicznym przed zmianą: 8 równoległych grup po 105 pps, grupa z około 35 hostami i 1000 portów potrzebowała ponad 330 s; stały limit 5 minut odciął wszystkie hosty tej grupy. Przebieg skończył się bez błędu z 8 usługami zamiast 107, a porównanie zgłosiło 100 usług, które „zniknęły".
+
+- nmap z `-Pn` w sieci Ethernet zapisuje host po limicie czasu jako `timedout="true"` z powodem `arp-response`. Czujka czyta ten atrybut. Taki host dostaje drugi skan portów.
+- Host, którego skan i tak się nie skończył, trafia do wyniku z `ports_unknown` (powód `ports-unknown`). Baza nie oznacza jego usług jako zniknięte, a porównanie liczy je jako nieosiągalne (`services_unreachable`).
+- Przebieg dostaje ostrzeżenie (`stats.warnings`, widoczne w API i na stronie przebiegu), gdy port scan nie skończył się dla jakiegoś hosta albo gdy na skan portów odpowiedziała mniej niż połowa hostów znalezionych przez wykrywanie (co najmniej 8 hostów).
+- Host z co najmniej 10 otwartymi portami z listy profilu dostaje dodatkowy skan portów 1–10000 (najwyżej 4 hosty na grupę). Host z wieloma usługami zwykle nasłuchuje też na nietypowych portach. W laboratorium host z 64 portami pokazał 33 porty z listy domyślnej i ukrywał 31 portów o randze 1045–7379 w tabeli częstości nmap (albo bez rangi), wszystkie poniżej 10000.
+
+Każda zmiana silnika przechodzi przez `e2e/lab-gate.sh` (pełny /16 laboratorium przez API produktu, progi czułości, kontrola pakietów w każdej sekundzie, tablica sąsiadów). Wyniki: `docs/WYNIKI.md`.
+
 ## 3. Wykrywanie zmian
 
 `Diff(prev, cur)` porównuje dwa obrazy sieci i zwraca listę zmian oraz podsumowanie. Gdy nie ma poprzedniego przebiegu, nie ma zmian: pierwszy skan to punkt odniesienia.
@@ -407,7 +418,7 @@ Ponowny skan tej samej rzeczy daje ten sam klucz. Baza aktualizuje więc obserwa
 | --- | --- | --- |
 | `admin-panel` | 75 | |
 | `debug-page` | 75 | |
-| `database-exposed` | 70 | |
+| `database-exposed` | 70 | tylko protokół bazy; narzędzie WWW do baz (phpMyAdmin, Adminer, pgAdmin) dostaje `admin-panel` |
 | `remote-access-exposed` | 20 | telnet, rlogin: 70; RDP, VNC: 50; SSH: 20 |
 | `expired-cert` | 40 | na stronie logowania: 70 |
 | `dev-tool` | 60 | |
@@ -423,7 +434,7 @@ Ponowny skan tej samej rzeczy daje ten sam klucz. Baza aktualizuje więc obserwa
 | `default-page` | 15 | |
 | `interesting-cookie` | 10 | ciasteczko sesyjne bez flag: 25; wartość JWT: 20; z sygnatury: 5–25 |
 
-Modyfikatory: krytyczność zakresu 4 dodaje 5, krytyczność 5 dodaje 10 (`FindingInput.ScopeCriticality`); usługa nowa od poprzedniego przebiegu dodaje 10. Wynik jest obcięty do 100.
+Modyfikatory: krytyczność zakresu 4 dodaje 5, krytyczność 5 dodaje 10 (`FindingInput.ScopeCriticality`); usługa nowa od poprzedniego przebiegu dodaje 10. Ocena usługi rozstrzyga remisy w obrębie typu: dodaje 0–4 punkty (jeden punkt na każde 10 ponad 50). W laboratorium 15 obserwacji miało wcześniej tę samą ocenę 75; teraz panel routera po zwykłym HTTP (usługa 96) stoi nad stroną logowania WordPressa (usługa 80). Wynik jest obcięty do 100. Obserwacje z reguł ekspozycji mają najwyżej 69, więc stoją pod obserwacją silnika o tym samym fakcie (`docs/REGULY.md`).
 
 **Bliskie duplikaty na jednej usłudze** łączą się w jedną obserwację z kilkoma wierszami dowodów:
 

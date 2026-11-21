@@ -47,7 +47,7 @@ _9 zmian oczekiwanych: hosty, które o tej porze zwykle nie odpowiadają albo od
 
 ### Panel administracyjny: Jenkins (10.66.3.17:8080)
 
-waga: **informacja** · ciekawość **85**/100 · `http://10.66.3.17:8080/` · nowa w tym przebiegu · także: narzędzie deweloperskie, nowa ekspozycja, nagłówki HTTP
+waga: **informacja** · ciekawość **87**/100 · `http://10.66.3.17:8080/` · nowa w tym przebiegu · także: narzędzie deweloperskie, nowa ekspozycja, nagłówki HTTP
 
 - `header:X-Jenkins`: 2.440.1
 - `title`: Dashboard \[Jenkins\]

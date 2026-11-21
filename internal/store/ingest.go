@@ -214,7 +214,7 @@ ON CONFLICT (ip) DO UPDATE SET
 		'os_guess', to_jsonb(EXCLUDED.os_guess), EXCLUDED.os_guess <> ''),
 	scope_ids = EXCLUDED.scope_ids,
 	mac = CASE WHEN EXCLUDED.mac <> '' THEN EXCLUDED.mac ELSE h.mac END,
-	vendor = CASE WHEN EXCLUDED.vendor <> '' THEN EXCLUDED.vendor ELSE h.vendor END,
+	vendor = CASE WHEN EXCLUDED.mac <> '' OR EXCLUDED.vendor <> '' THEN EXCLUDED.vendor ELSE h.vendor END, -- an observed MAC brings its vendor, even none
 	last_seen = GREATEST(h.last_seen, EXCLUDED.last_seen),
 	last_up = COALESCE(GREATEST(h.last_up, EXCLUDED.last_up), h.last_up, EXCLUDED.last_up),
 	status = CASE WHEN EXCLUDED.status = 'up' THEN 'up' WHEN h.status = 'up' THEN 'unstable' ELSE h.status END,
@@ -368,7 +368,7 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 		}
 		addr, _ := netip.ParseAddr(ip)
 		hostsIn = append(hostsIn, hostIn{IP: ip, Hostnames: nonNil(r.Hostnames), ScopeIDs: scopes.match(addr, r.Hostnames), Up: r.Up,
-			At: r.ObservedAt.UTC(), OSGuess: r.OSGuess, MAC: r.MAC, Vendor: r.Vendor, Source: opt.Source, RunID: r.RunID})
+			At: r.ObservedAt.UTC(), OSGuess: r.OSGuess, MAC: r.MAC, Vendor: model.VendorForMAC(r.MAC, r.Vendor), Source: opt.Source, RunID: r.RunID})
 	}
 
 	{

@@ -465,6 +465,21 @@ type HostResult struct {
 	PortsUnknown bool `json:"ports_unknown,omitempty"`
 }
 
+// VendorForMAC returns the vendor to show for a MAC address. A locally
+// administered address (bit 0x02 of the first byte: second hex digit 2, 6,
+// A or E), as Docker, virtual machines and phones with random MACs use, has
+// no registered vendor: an OUI lookup on it names an unrelated company
+// (the lab's Docker addresses showed "Applicon").
+func VendorForMAC(mac, vendor string) string {
+	if len(mac) >= 2 {
+		switch mac[1] {
+		case '2', '6', 'a', 'A', 'e', 'E':
+			return ""
+		}
+	}
+	return vendor
+}
+
 // ReasonPortsUnknown is the HostResult.Reason of a host that answered but
 // whose port scan did not finish. The reason is stored with the host
 // observation, so the analysis after the run still knows it.
@@ -517,6 +532,12 @@ const (
 	ClassRemoteAccess = "remote-access"
 	ClassDirListing   = "directory-listing"
 	ClassErrorPage    = "error-page"
+	// ClassInstallPage: an unfinished installer anyone can complete (Gitea
+	// install form, WordPress wp-admin/install.php).
+	ClassInstallPage = "install-page"
+	// ClassUnauthControlAPI: a control API that answers without
+	// authentication (Toxiproxy API, Traefik api.insecure, Docker API on 2375).
+	ClassUnauthControlAPI = "unauth-control-api"
 )
 
 type Cookie struct {

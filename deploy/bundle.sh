@@ -15,14 +15,16 @@ echo "bundle: building czujka:$VERSION"
 CZUJKA_VERSION=$VERSION docker compose -f deploy/docker-compose.yml build czujka
 # The database image is built only when it is missing: the tag may be shared.
 docker image inspect czujka-db:17 >/dev/null 2>&1 || docker build -t czujka-db:17 deploy/db
+# The one-shot service that writes the database password (see docker-compose.yml).
+docker image inspect alpine:3.22 >/dev/null 2>&1 || docker pull alpine:3.22
 echo "bundle: saving the images"
-docker save "czujka:$VERSION" czujka-db:17 | gzip -1 > "$OUT/images.tar.gz"
+docker save "czujka:$VERSION" czujka-db:17 alpine:3.22 | gzip -1 > "$OUT/images.tar.gz"
 # Compose file without build sections, pinned to this version.
 awk '
   /^    build:/ { skip = 1; next }
   skip && /^      / { next }
   { skip = 0; print }
-' deploy/docker-compose.yml | sed -e "s|image: czujka:\${CZUJKA_VERSION:-dev}|image: czujka:\${CZUJKA_VERSION:-$VERSION}|" > "$OUT/docker-compose.yml"
+' deploy/docker-compose.yml | grep -v 'pull_policy: build' | grep -v 'Always build from this checkout' | sed -e "s|image: czujka:\${CZUJKA_VERSION:-dev}|image: czujka:\${CZUJKA_VERSION:-$VERSION}|" > "$OUT/docker-compose.yml"
 cp deploy/docker-compose.scan-network.yml deploy/init.sh "$OUT/"
 sed -e "s|^CZUJKA_VERSION=.*|CZUJKA_VERSION=$VERSION|" deploy/.env.example > "$OUT/.env.example"
 cat > "$OUT/install.sh" <<'EOF'
