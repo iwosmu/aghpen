@@ -317,17 +317,17 @@ Jury robi co najmniej dwa przebiegi i może zatrzymać kontener między nimi. Ho
 Zdania z testu `TestTwoPassMissingHost` (`go test ./internal/analyze -run TwoPass -v`):
 
 ```text
-jedna wcześniejsza obserwacja, model:
-  Host 10.66.3.17 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 3 otwarte usługi: 22/tcp ssh OpenSSH, 80/tcp http nginx, 8080/tcp http Jenkins; model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku
-40 obserwacji, zawsze odpowiadał, model:
-  … model: p_alive 0,26, zgłoszenie nieaktywności po kolejnym braku
+jedna wcześniejsza obserwacja, model (p_alive 0,36):
+  Host 10.66.3.17 nie odpowiada (niepotwierdzone), miał 3 otwarte usługi
+40 obserwacji, zawsze odpowiadał, model (p_alive 0,26):
+  Host 10.66.3.17 nie odpowiada (niepotwierdzone), miał 3 otwarte usługi
 reguła N = 1:
-  Host 10.66.3.17 zgłoszony jako nieaktywny: brak odpowiedzi w 1 przebiegu z rzędu (reguła profilu: zgłoszenie po 1 braku)
+  Host 10.66.3.17 nieaktywny, nie odpowiada od 1 skanu
 reguła N = 2:
-  … model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku, reguła profilu: 2 braki z rzędu
+  Host 10.66.3.17 nie odpowiada (niepotwierdzone), miał 3 otwarte usługi
 ```
 
-Bez reguły model zgłasza nieaktywność po drugim braku z rzędu: jeden brak nigdy nie wystarcza (`ε = 0,10`, rozdz. 2.3). Liczby `p_alive` i „po kolejnym braku" trafiają do zdania, gdy wywołujący wypełni migawkę przez `HostSnapshot.SetAssessment`. Brak, który tłumaczy rytm hosta, zostaje zmianą oczekiwaną (`host_gone` z `expected = true`), nie `host_missing`.
+Bez reguły model zgłasza nieaktywność po drugim braku z rzędu: jeden brak nigdy nie wystarcza (`ε = 0,10`, rozdz. 2.3). Zdanie zmiany nie podaje miar wewnętrznych. `p_alive`, liczba braków do zgłoszenia, reguła profilu i otwarte usługi trafiają do pola `detail` zmiany, gdy wywołujący wypełni migawkę przez `HostSnapshot.SetAssessment`. Pola `before`/`after` niosą prawdziwy stan hosta: `up`, `missing` (nie odpowiada, niepotwierdzone), `down`, `unstable`, `expected-offline` (poza godzinami). Łańcuch `up → missing → down` i `down → up` zgadza się więc z kolejnymi zmianami jednego hosta. Brak, który tłumaczy rytm hosta, zostaje zmianą oczekiwaną (`host_gone` z `expected = true`), nie `host_missing`.
 
 Każda otwarta usługa takiego hosta dostaje zmianę `service_unreachable` („Usługa … nie odpowiada (niepotwierdzone)”): drugi skan pokazuje, co zniknęło razem z hostem, zanim sonda potwierdzi stan. Raport z przebiegu mówi to w zdaniu wstępnym: „Nie odpowiada (niepotwierdzone): 1 host, z nimi 2 usługi. Ponowne sondowanie potwierdzi, czy wróciły, czy zniknęły.” Wiersze stoją w sekcji „Co zniknęło”.
 
