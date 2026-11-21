@@ -31,13 +31,21 @@ FROM alpine:${ALPINE_VERSION}
 #  - nmap gets cap_net_raw and cap_net_admin, so it can send SYN, ICMP and ARP probes (nmap --privileged).
 #  - czujka gets cap_net_raw only: at start it opens one raw ICMP socket to find out whether raw
 #    sockets work, and then runs nmap in SYN mode; without it the engine falls back to nmap -sT.
+#  - nft gets cap_net_admin: the kernel packet cap (below).
 # The container must keep NET_RAW and NET_ADMIN in its bounding set (docker-compose.yml: cap_add),
 # and must not set no-new-privileges, which would ignore file capabilities.
 # postgresql17-client: pg_dump and pg_restore for czujka backup / czujka restore.
-RUN apk add --no-cache nmap nmap-scripts libcap ca-certificates tzdata postgresql17-client \
+# nftables: the kernel packet cap (internal/kcap). czujka runs nft to install a rule in the
+# output hook of this container's network namespace that drops probe packets over the cap of
+# the safety policy, also when nmap sends a backlog after a freeze. nft gets cap_net_admin as
+# a file capability and is executable only by the group czujka. It never runs in the host's
+# namespace (network_mode: host): there the cap is reported as unavailable.
+RUN apk add --no-cache nmap nmap-scripts libcap ca-certificates tzdata postgresql17-client nftables \
  && addgroup -S -g 10001 czujka && adduser -S -u 10001 -G czujka -h /var/lib/czujka czujka \
  && mkdir -p /var/lib/czujka && chown -R czujka:czujka /var/lib/czujka \
- && setcap cap_net_raw,cap_net_admin+eip "$(readlink -f /usr/bin/nmap)"
+ && setcap cap_net_raw,cap_net_admin+eip "$(readlink -f /usr/bin/nmap)" \
+ && chgrp czujka "$(readlink -f /usr/sbin/nft)" && chmod 0750 "$(readlink -f /usr/sbin/nft)" \
+ && setcap cap_net_admin+ep "$(readlink -f /usr/sbin/nft)"
 COPY --from=build /out/czujka /usr/local/bin/czujka
 RUN setcap cap_net_raw+ep /usr/local/bin/czujka && apk del libcap
 ENV CZUJKA_LISTEN=:8080 \

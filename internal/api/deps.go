@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/iwosmu/aghpen/internal/auth"
 	"github.com/iwosmu/aghpen/internal/defectdojo"
+	"github.com/iwosmu/aghpen/internal/kcap"
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/passive"
 	"github.com/iwosmu/aghpen/internal/runner"
@@ -231,4 +232,15 @@ type Deps struct {
 
 	// EngineInfo describes the prober for /healthz (prober, mode, raw_sockets); nil omits it.
 	EngineInfo func() map[string]any
+
+	// KernelCap is the kernel packet cap (internal/kcap); nil omits kernel_cap.
+	KernelCap KernelCap
+}
+
+// KernelCap is the kernel packet cap: its state for GET /settings/safety and
+// /healthz, and a new install when the policy cap changes.
+type KernelCap interface {
+	Sync(ctx context.Context, pps int)
+	Retry()
+	Status(ctx context.Context) kcap.Status
 }

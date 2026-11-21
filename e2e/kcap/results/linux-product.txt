@@ -1,0 +1,37 @@
+# kcap product check 2026-11-21T23:25:03Z on omen, commit 481fe48 + kcap (working tree)
+
+## 1. bridge network + scan-network overlay (CZUJKA_KERNEL_CAP=auto)
+  log: {"time":"2026-11-21T23:25:38.049457616Z","level":"INFO","msg":"kernel packet cap installed","table":"inet czujka_kcap","policy_pps":1000,"kernel_pps":1100,"burst":110,"exempt":2}
+  interfaces: eth0 eth1 eth2 lo 
+  image size: 123.6 MB
+  /healthz without a session: {"status":"ok","kernel_cap":null}
+  /healthz as admin:          {"status":"ok","kernel_cap":{"mode":"auto","active":true,"pps":1100,"burst":110,"policy_pps":1000,"dropped":0}}
+  GET /settings/safety:       {"max_pps":1000,"kernel_cap":{"mode":"auto","active":true,"pps":1100,"burst":110,"policy_pps":1000,"dropped":0}}
+  PUT max_pps=500:            {"max_pps":500,"kernel_cap":{"mode":"auto","active":true,"pps":550,"burst":55,"policy_pps":500,"dropped":0}}
+  rule in the kernel:         rate over 550/second burst 55 packets
+  tables in this namespace:   table ip nat;table inet czujka_kcap;
+
+### run: normal (freeze 0 s)
+  SYN packets per second on the scan interface (seconds above 520 listed):
+  seconds: 69, max 376 SYN/s
+  {"id":1,"status":"completed","services_open":30,"packets_sent":21451,"notes":null,"warnings":null}
+  kernel counter: before 0, after 0
+  services found: 21 22 25 53 80 110 143 443 445 993 995 1433 1521 2049 3000 3306 3389 5000 5432 5672 5900 6379 8000 8080 8081 8443 9000 9200 11211 15672
+
+### run: freeze (freeze 15 s)
+  frozen: /usr/bin/nmap -sS -Pn -p 1-20000 -n -T4 -v --min-rate 375 --max-rate 375 --max-retries 2 -
+  23:27:02 SIGSTOP nmap
+  23:27:17 SIGCONT nmap
+  SYN packets per second on the scan interface (seconds above 520 listed):
+  seconds: 70, max 376 SYN/s
+  {"id":2,"status":"completed","services_open":30,"packets_sent":21451,"notes":["jądro odrzuciło 5604 pakietów ponad limit"],"warnings":null}
+  kernel counter: before 0, after 5604
+  services found: 21 22 25 53 80 110 143 443 445 993 995 1433 1521 2049 3000 3306 3389 5000 5432 5672 5900 6379 8000 8080 8081 8443 9000 9200 11211 15672
+
+## 2. host network (deploy/docker-compose.host-network.yml), CZUJKA_KERNEL_CAP=require
+  log: {"time":"2026-11-21T23:28:54.2938995Z","level":"WARN","msg":"kernel packet cap not installed","reason":"unavailable: host network (CZUJKA_NETWORK_MODE=host)","mode":"require"}
+  /healthz as admin: {"status":"ok","kernel_cap":{"mode":"require","active":false,"pps":0,"burst":0,"policy_pps":0,"dropped":0,"reason":"unavailable: host network (CZUJKA_NETWORK_MODE=host)"}}
+  POST /runs:        {"error":{"code":"kernel_cap","message":"kernel packet cap required: CZUJKA_KERNEL_CAP=require, but the kernel packet cap is not installed: unavailable: host network (CZUJKA_NETWORK_MODE=host)"}}
+  czujka_kcap tables in the host namespace: 0
+
+# done

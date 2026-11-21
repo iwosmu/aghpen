@@ -57,6 +57,32 @@ type Options struct {
 	PauseCause func(reason string) error
 	// Lookup resolves domain targets for the allowed-networks check; nil uses DefaultLookup.
 	Lookup LookupFunc
+	// KernelCap is the kernel packet cap (internal/kcap); nil: none.
+	KernelCap KernelCap
+}
+
+// KernelCap is the kernel packet cap: the manager installs it for the policy
+// cap before every run, refuses a run while a required cap is missing, and
+// notes the packets the kernel dropped during the run.
+type KernelCap interface {
+	Sync(ctx context.Context, pps int)
+	Ready() error
+	Dropped(ctx context.Context) (int64, bool)
+}
+
+// ErrKernelCap: CZUJKA_KERNEL_CAP=require and the kernel packet cap is not installed.
+var ErrKernelCap = errors.New("kernel packet cap required")
+
+// kernelCapReady installs the cap for the policy cap and says whether a run may start.
+func (m *Manager) kernelCapReady(ctx context.Context, policy model.SafetyPolicy) error {
+	if m.opt.KernelCap == nil {
+		return nil
+	}
+	m.opt.KernelCap.Sync(ctx, policy.MaxPPS)
+	if err := m.opt.KernelCap.Ready(); err != nil {
+		return fmt.Errorf("%w: %v", ErrKernelCap, err)
+	}
+	return nil
 }
 
 // Manager runs scans. One Manager exists per process.
@@ -290,6 +316,9 @@ func (m *Manager) Start(ctx context.Context, profileID int64, userID *int64, tri
 	if policy.EmergencyStop { // checked first: the stop answers 409 also in a build without an engine
 		return model.ScanRun{}, ErrEmergencyStop
 	}
+	if err := m.kernelCapReady(ctx, policy); err != nil {
+		return model.ScanRun{}, err
+	}
 	if m.opt.Engine == nil {
 		return model.ScanRun{}, ErrNotWired
 	}
@@ -395,6 +424,16 @@ func (m *Manager) execute(ctx context.Context, a *activeRun, p model.ScanProfile
 		fail(err)
 		return
 	}
+	// Also a run that the scheduler or a restart starts: the cap follows the
+	// policy, and a required cap that is missing stops the run here.
+	if err := m.kernelCapReady(bg, plan.Policy); err != nil {
+		fail(err)
+		return
+	}
+	dropped0, dropOK := int64(0), false
+	if m.opt.KernelCap != nil {
+		dropped0, dropOK = m.opt.KernelCap.Dropped(bg)
+	}
 	now := time.Now().UTC()
 	a.mu.Lock()
 	a.run.Status, a.run.PauseReason, a.run.ResumeAt, a.run.WindowEnd, a.run.Error = model.RunRunning, "", nil, plan.WindowEnd, ""
@@ -412,6 +451,12 @@ func (m *Manager) execute(ctx context.Context, a *activeRun, p model.ScanProfile
 		outcome = model.RunOutcome{Status: model.RunPaused, Stats: run.Stats}
 	} else {
 		outcome = m.runEngine(ctx, plan, sink)
+		if dropOK {
+			// The counter is global: a run at the same time adds its own drops.
+			if d, ok := m.opt.KernelCap.Dropped(bg); ok && d > dropped0 && !reflect.DeepEqual(outcome.Stats, model.RunStats{}) {
+				outcome.Stats.Notes = append(outcome.Stats.Notes, fmt.Sprintf("jądro odrzuciło %d pakietów ponad limit", d-dropped0))
+			}
+		}
 	}
 	if err := sink.inner.Flush(bg); err != nil {
 		m.log.Error("flush results", "run", run.ID, "err", err)
@@ -612,6 +657,9 @@ func (m *Manager) Resume(ctx context.Context, runID int64) (model.ScanRun, error
 	}
 	if policy.EmergencyStop {
 		return run, ErrEmergencyStop
+	}
+	if err := m.kernelCapReady(ctx, policy); err != nil {
+		return run, err
 	}
 	if m.opt.Engine == nil {
 		return run, ErrNotWired
@@ -855,6 +903,9 @@ func (m *Manager) StartAdHoc(ctx context.Context, scope model.AdHocScope, userID
 	}
 	if policy.EmergencyStop {
 		return model.ScanRun{}, ErrEmergencyStop
+	}
+	if err := m.kernelCapReady(ctx, policy); err != nil {
+		return model.ScanRun{}, err
 	}
 	if m.opt.Engine == nil {
 		return model.ScanRun{}, ErrNotWired

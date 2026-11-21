@@ -35,7 +35,7 @@ Limit skuteczny to mniejsza z wartości profilu skanu i polityki bezpieczeństwa
 
 | Limit | Profil (domyślnie) | Polityka (domyślnie) | Gdzie egzekwowany |
 | --- | --- | --- | --- |
-| Pakiety sond na sekundę, wszystkie procesy razem | `rate.max_pps` (500) | `max_pps` (1000) | Jeden budżet (`scan.Budget`) dzielony między równoległe procesy nmap. Każdy proces dostaje udział jako `--min-rate` i `--max-rate`. |
+| Pakiety sond na sekundę, wszystkie procesy razem | `rate.max_pps` (500) | `max_pps` (1000) | Jeden budżet (`scan.Budget`) dzielony między równoległe procesy nmap. Każdy proces dostaje udział jako `--min-rate` i `--max-rate`. Pod spodem limit w jądrze: `max_pps` × 1,1 (rozdz. 1.2.1). |
 | Żądania HTTP na sekundę, wszystkie hosty razem | `rate.http_rps` (20) | `max_http_rps` (50) | Kubełek żetonów w silniku (`probe.Limiter`). Przed wywołaniem kolektora silnik pobiera tyle żetonów, ile żądań planuje (strona + ścieżki + ikona). |
 | Żądania HTTP na sekundę do jednego hosta | – | `max_per_host_rps` (2) | Limiter na host w silniku. |
 | Równoległe usługi HTTP na jednym hoście | `rate.per_host_concurrency` (1) | – | Semafor na host. |
@@ -45,13 +45,63 @@ Limit skuteczny to mniejsza z wartości profilu skanu i polityki bezpieczeństwa
 | Czas jednego żądania | `http.timeout_ms` (5000) | – | `httpfp` (test `TestSlowServers`) |
 | Ikona strony | – | 1 MiB | `httpfp` |
 
-Pomiar z laboratorium silnika (`e2e/engine/REPORT.md`, licznik pakietów interfejsu): przy limicie 500 pakietów na sekundę zmierzono 498–504 w każdej sekundzie. Samo `--max-rate` pilnuje tylko średniej, dlatego silnik ustawia też `--min-rate`. Skutek uboczny: nmap nie zwalnia sam przy utracie pakietów. Tempo trzeba dobrać do sieci.
+Pomiar z laboratorium silnika (`e2e/engine/REPORT.md`, licznik pakietów interfejsu): przy limicie 500 pakietów na sekundę zmierzono 498–504 w każdej sekundzie. Samo `--max-rate` pilnuje tylko średniej, dlatego silnik ustawia też `--min-rate`. Skutek uboczny: nmap nie zwalnia sam przy utracie pakietów. Tempo trzeba dobrać do sieci. Po zamrożeniu procesu żadna z tych opcji nie wystarcza; pilnuje wtedy limit w jądrze (rozdz. 1.2.1).
 
 Znane ograniczenia limitów:
 
 - Sondy wykrywania wersji (`-sV`) idą zwykłymi gniazdami. `--max-rate` ich nie obejmuje; licznik pakietów jest dla nich szacunkiem.
 - Limiter HTTP pobiera z góry koszt całego wywołania kolektora (strona, ikona, ścieżki). Żądania wewnątrz jednego wywołania idą bez odstępu między sobą, a przekierowania nie są wliczane.
 - Egzekwowanie w produkcie: **do weryfikacji po integracji silnika**.
+
+### 1.2.1 Dwa limity: nmap odmierza tempo, jądro pilnuje
+
+Opcje tempa nmap (`--min-rate`, `--max-rate`, `--scan-delay`) pilnują średniej. Gdy proces nmap stoi (zamrożona maszyna wirtualna, uśpiony laptop, brak czasu procesora), po wznowieniu nmap wysyła zaległe pakiety naraz. Odmierzanie w przestrzeni użytkownika tego nie zatrzyma, bo zamrożony był sam skaner.
+
+Dlatego Czujka ma drugi, niezależny limit w jądrze (`internal/kcap`). Przy starcie, przed każdym przebiegiem i po każdej zmianie `max_pps` w polityce Czujka instaluje regułę nftables w haku `output` przestrzeni sieciowej swojego kontenera.
+
+| | |
+| --- | --- |
+| Tabela | tylko `inet czujka_kcap`. Zamiana atomowa: jeden plik dla `nft -f` (utwórz tabelę, usuń ją, zdefiniuj na nowo) w jednej transakcji. Innych tabel Czujka nie dotyka. |
+| Co liczy | TCP SYN bez ACK; samotny TCP ACK spoza śledzonego połączenia (ping ACK nmap); ICMP echo i timestamp request; ICMPv6 echo request; UDP |
+| Czego nie liczy | pakietów nawiązanych połączeń (kolektor HTTP, odpowiedzi API), interfejsu `lo`, adresów bazy danych i resolwerów DNS (z `CZUJKA_DB_URL` i `/etc/resolv.conf`) |
+| Tempo | `max_pps` × 1,1 na sekundę, kubełek około 0,1 s tego tempa (przy `max_pps` 500: 550/s, 55 pakietów). Zwykłe tempo nmap mieści się pod limitem. Jądro obcina tylko wybuch. |
+| Licznik | nazwany licznik `dropped`: pakiety odrzucone przez jądro |
+
+Pomiar: `e2e/kcap/run.sh`, nmap `-sS` na 20 000 portów kontenera z 30 otwartymi portami, limit 500 pakietów na sekundę, nmap zatrzymany na 15 s (`SIGSTOP`, `SIGCONT`). Liczba to pakiety SYN w najwyższej sekundzie według tcpdump na interfejsie skanera. Pełne zapisy: `e2e/kcap/results/`.
+
+| Maszyna | Bez limitu w jądrze | Z limitem w jądrze | Odrzucone przez jądro | Skan bez zamrożenia, z limitem |
+| --- | --- | --- | --- | --- |
+| Linux (Ubuntu 24.04, jądro 6.8, nft 1.0.9) | 6820 (zaległość rozłożona na dwie sekundy: 1235 i 6820) | 505 | 7481 | najwyżej 501/s, 0 odrzuconych, 30 z 30 portów |
+| Docker Desktop na macOS (jądro 6.12 linuxkit) | 8113 | 503 | 7564 | najwyżej 502/s, 0 odrzuconych, 30 z 30 portów |
+
+Wcześniejszy przebieg na tym samym Linuksie dał 7598 pakietów w jednej sekundzie bez limitu i najwyżej 501 z limitem (7484 odrzucone). Pakiety odrzucone przez jądro nmap wysłał ponownie w swoim tempie. Z limitem skan po zamrożeniu znalazł te same 30 portów, a nmap zgłosił 20 002 wysłane pakiety. Bez limitu było ich 21 379 (ponowienia po wybuchu).
+
+Pomiar w produkcie (`e2e/kcap/product.sh`, Linux): przebieg skanu, w którym nmap stał 15 s, dostał notatkę „jądro odrzuciło 5604 pakietów ponad limit” i znalazł 30 z 30 usług. Najwyższa sekunda: 376 SYN (silnik dał procesowi nmap 375 z limitu profilu 500). Przebieg bez zamrożenia: 0 odrzuconych, 30 z 30 usług.
+
+| `CZUJKA_KERNEL_CAP` | Działanie |
+| --- | --- |
+| `auto` (domyślnie) | instaluje limit, gdy się da; gdy się nie da, skanuje i podaje powód w `kernel_cap.reason` i w logu |
+| `require` | nie uruchamia przebiegu bez zainstalowanego limitu (409, kod `kernel_cap`), jak `CZUJKA_TDE=require` |
+| `off` | nie instaluje; usuwa własną tabelę, jeśli została |
+
+Stan: `GET /settings/safety` zwraca `kernel_cap: {mode, active, pps, burst, policy_pps, dropped, reason}`. To samo pole jest w `/healthz` dla zalogowanego użytkownika z uprawnieniem `safety:manage`. `dropped` liczy od startu procesu: przy wymianie reguły Czujka dolicza wartość starego licznika. Zapis polityki ponawia nieudaną instalację.
+
+| Tryb sieci | Limit w jądrze |
+| --- | --- |
+| sieć mostkowa (domyślny `docker-compose.yml`) | działa: przestrzeń sieciowa należy tylko do kontenera Czujki |
+| nakładka `docker-compose.scan-network.yml` | działa: kontener dostaje kolejny interfejs w swojej przestrzeni; reguła obejmuje wszystkie interfejsy (sprawdzone: `eth0`–`eth2`) |
+| `docker-compose.host-network.yml` | nie instaluje: `unavailable: host network`. Przestrzeń sieciowa jest hosta, więc reguła ograniczyłaby też inne programy. Zawężenia do pakietów Czujki (`meta skuid`, `socket cgroupv2`) nie sprawdziliśmy. Z `require` przebieg nie startuje. Sprawdzone: w przestrzeni hosta nie powstaje żadna tabela `czujka_kcap`. |
+| binarka poza kontenerem (systemd) | nie instaluje: `unavailable: host network` |
+
+Czujka uznaje przestrzeń za przestrzeń hosta, gdy: `CZUJKA_NETWORK_MODE=host` (ustawia ją plik host-network), brak znacznika kontenera (`/.dockerenv`, `/run/.containerenv`) albo w przestrzeni są interfejsy hosta Dockera (`docker0`, `br-*`, `veth*`).
+
+Uprawnienia i obraz: `nft` ma `cap_net_admin` jako uprawnienie pliku, a uruchomić go może tylko grupa `czujka`. `NET_ADMIN` z `cap_add` służy więc też instalacji tej reguły. Obraz zyskał pakiety `nftables`, `libnftnl`, `libmnl`, `jansson`, `gmp` (licencje GPL-2.0, LGPL-2.1, MIT, LGPL-3.0): 1,5 MiB po instalacji, obraz ma 123,6 MB.
+
+Ograniczenia:
+
+- Zapytania ARP nmap idą przez gniazdo pakietowe, które omija hak `output`. Limit w jądrze ich nie obejmuje.
+- SYN wykrywania wersji (`-sV`) i kolektora HTTP liczą się do tego samego limitu. W pomiarze bez zamrożenia jądro nie odrzuciło żadnego pakietu.
+- Licznik jest wspólny dla procesu. Notatka przebiegu obejmuje też pakiety odrzucone w tym czasie innemu, równoległemu przebiegowi.
 
 ### 1.3 Polityka bezpieczeństwa
 
@@ -135,7 +185,7 @@ Sprawdzone na działającym stosie:
 | Cecha | Wartość |
 | --- | --- |
 | Użytkownik procesu | `czujka` (uid 10001), nie root |
-| Uprawnienia jądra | `cap_drop: ALL`, `cap_add: NET_RAW, NET_ADMIN`; nmap dostaje surowe gniazda przez `setcap` na pliku |
+| Uprawnienia jądra | `cap_drop: ALL`, `cap_add: NET_RAW, NET_ADMIN`; nmap dostaje surowe gniazda przez `setcap` na pliku; `nft` dostaje `cap_net_admin` na pliku do limitu w jądrze (rozdz. 1.2.1) |
 | System plików | tylko do odczytu (`touch /x` → „Read-only file system”); `/tmp` jako tmpfs |
 | Baza danych | sieć wewnętrzna bez trasy na zewnątrz, bez opublikowanego portu |
 | Interfejs WWW | domyślnie tylko `127.0.0.1:8080` |

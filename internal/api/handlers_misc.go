@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/iwosmu/aghpen/internal/kcap"
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/runner"
 	"github.com/iwosmu/aghpen/internal/targets"
@@ -250,7 +251,23 @@ func (s *Server) getSafety(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, p)
+	writeJSON(w, http.StatusOK, s.withKernelCap(r.Context(), p))
+}
+
+// safetyView is the safety policy with the state of the kernel packet cap
+// (read only, not stored).
+type safetyView struct {
+	model.SafetyPolicy
+	KernelCap *kcap.Status `json:"kernel_cap,omitempty"`
+}
+
+func (s *Server) withKernelCap(ctx context.Context, p model.SafetyPolicy) safetyView {
+	v := safetyView{SafetyPolicy: p}
+	if s.d.KernelCap != nil {
+		st := s.d.KernelCap.Status(ctx)
+		v.KernelCap = &st
+	}
+	return v
 }
 
 // checkSafety validates the fields that a PUT /settings/safety changes and
@@ -347,7 +364,12 @@ func (s *Server) putSafety(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	auditSet(r, "safety.update", "safety", nil, map[string]any{"max_pps": p.MaxPPS, "max_http_rps": p.MaxHTTPRPS, "exclusions": len(p.Exclusions), "allowed_networks": p.AllowedNetworks})
-	writeJSON(w, http.StatusOK, p)
+	if s.d.KernelCap != nil {
+		// The kernel cap follows the policy cap at once; a save also retries a failed install.
+		s.d.KernelCap.Retry()
+		s.d.KernelCap.Sync(r.Context(), p.MaxPPS)
+	}
+	writeJSON(w, http.StatusOK, s.withKernelCap(r.Context(), p))
 }
 
 func (s *Server) emergencyStop(w http.ResponseWriter, r *http.Request) {
@@ -502,6 +524,9 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 	out["host_gateway"] = ""
 	if gw := targets.HostGateway(); gw.IsValid() {
 		out["host_gateway"] = gw.String()
+	}
+	if p := principal(r); p != nil && s.d.KernelCap != nil && p.Can(model.PermSafetyManage) {
+		out["kernel_cap"] = s.d.KernelCap.Status(ctx)
 	}
 	writeJSON(w, http.StatusOK, out)
 }

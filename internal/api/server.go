@@ -243,6 +243,8 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeErr(w, http.StatusNotImplemented, "not_wired", msg)
 	case errors.Is(err, runner.ErrEmergencyStop):
 		writeErr(w, http.StatusConflict, "emergency_stop", msg)
+	case errors.Is(err, runner.ErrKernelCap):
+		writeErr(w, http.StatusConflict, "kernel_cap", msg)
 	case errors.As(err, new(*runner.ActiveRunError)):
 		var a *runner.ActiveRunError
 		errors.As(err, &a)
