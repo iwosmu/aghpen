@@ -1,0 +1,9 @@
+nazwa;typ;wartość;ttl
+www.kampus.example.;A;10.66.1.10;3600
+dziekanat.kampus.example;A;10.66.1.20;3600
+poczta.kampus.example;CNAME;mx1.kampus.example.;3600
+kampus.example;MX;10 mx1.kampus.example.;3600
+mx1.kampus.example;A;10.66.1.30;300
+chmura.kampus.example;A;203.0.113.50;300
+10.1.66.10.in-addr.arpa.;PTR;www.kampus.example.;3600
+zły wiersz;A;10.66.1.99;1

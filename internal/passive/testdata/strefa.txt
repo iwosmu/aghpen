@@ -1,0 +1,14 @@
+; <<>> DiG 9.18 <<>> AXFR kampus.example @ns1
+$ORIGIN kampus.example.
+$TTL 3600
+@	IN	SOA	ns1.kampus.example. hostmaster.kampus.example. (
+		2026112001 ; serial
+		7200 3600 1209600 3600 )
+@	IN	NS	ns1
+ns1	IN	A	10.66.0.53
+www	300	IN	A	10.66.1.10
+	IN	AAAA	2001:db8:66::10
+git	IN	CNAME	gitlab
+gitlab.kampus.example.	3600	IN	A	10.66.2.5
+40.3.66.10.in-addr.arpa.	IN	PTR	drukarka-3p.kampus.example.
+_dmarc	IN	TXT	"v=DMARC1; p=none"
