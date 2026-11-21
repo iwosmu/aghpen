@@ -62,7 +62,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
     return (
       <div>
         <p className="font-display text-[40px] leading-[1.02] sm:text-[52px]">{t('Nie ma jeszcze zakończonego skanu.', 'No scan has completed yet.')}</p>
-        <p className="mt-2 text-base text-ink-2">{t('Dodaj cele, przygotuj profil i uruchom pierwszy przebieg. Pulpit pokaże wtedy, co działa w sieci.', 'Add targets, prepare a profile and start the first run. The dashboard then shows what is on the network.')}</p>
+        <p className="mt-2 text-base text-ink-2">{t('Dodaj cele, przygotuj profil i uruchom skan.', 'Add targets, prepare a profile and start a scan.')}</p>
         <Link to="/targets" className="link mt-3 inline-block text-sm">{t('Dodaj cele', 'Add targets')}</Link>
       </div>
     );
@@ -100,13 +100,13 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
           </Link>
         ) : attention ? null : <span className="inline-flex items-center gap-2"><Icon name="check" className="flex-none text-st-new" />{t('Nic pilnego', 'Nothing urgent')}</span>}
         <span>
-          {t('Skan', 'Run')} <Link to={'/runs/' + run.id} className="num link">#{run.id}</Link> · {fmtRelative(run.finished_at)}
+          {t('Skan', 'Scan')} <Link to={'/runs/' + run.id} className="num link">#{run.id}</Link> · {fmtRelative(run.finished_at)}
           {baseline ? <span className="text-ink-3"> · {t('punkt odniesienia', 'baseline')}</span> : null}
         </span>
       </p>
       {partial ? (
         <p className="mt-1.5 text-sm text-ink-2" data-testid="handover-partial" title={t('Przebieg częściowy widzi tylko część sieci, więc nie porównujemy go z pełnym skanem.', 'A partial run sees only part of the network, so it is not compared with a full scan.')}>
-          {t('Ostatnio', 'Last')}: {partialRunPhrase(partial)} (<Link to={'/runs/' + partial.id} className="num link">#{partial.id}</Link>, {fmtRelative(partial.finished_at)}); {t('przebieg częściowy, bez porównania.', 'a partial run, not compared.')}
+          {t('Ostatnio', 'Last')}: {partialRunPhrase(partial)} (<Link to={'/runs/' + partial.id} className="num link">#{partial.id}</Link>, {fmtRelative(partial.finished_at)}); {t('skan częściowy.', 'a partial scan.')}
         </p>
       ) : null}
       {s && !baseline ? <RunStory runId={run.id} className="mt-3 space-y-1" testId="handover-story" /> : null}
@@ -114,15 +114,15 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-0.5 border-t border-rule pt-2.5" data-testid="handover-counts">
           <Count n={s.hosts_new} glyph="plus" tone="new" label={plural(s.hosts_new, ['nowy host', 'nowe hosty', 'nowych hostów'], ['new host', 'new hosts'])} to={'/changes?run_id=' + run.id + '&kind=host_new'} />
           <Count n={s.services_new} glyph="plus" tone="new" label={plural(s.services_new, ['nowa usługa', 'nowe usługi', 'nowych usług'], ['new service', 'new services'])} to={'/changes?run_id=' + run.id + '&kind=service_new'} />
-          <Count n={s.hosts_gone} glyph="minus" tone="gone" label={plural(s.hosts_gone, ['host nieaktywny', 'hosty nieaktywne', 'hostów nieaktywnych'], ['host inactive', 'hosts inactive'])} to={'/changes?run_id=' + run.id + '&kind=host_gone&expected=false'} />
+          <Count n={s.hosts_gone} glyph="minus" tone="gone" label={plural(s.hosts_gone, ['host nieaktywny', 'hosty nieaktywne', 'hostów nieaktywnych'], ['host down', 'hosts down'])} to={'/changes?run_id=' + run.id + '&kind=host_gone&expected=false'} />
           <Count n={s.services_gone} glyph="minus" tone="gone" label={plural(s.services_gone, ['usługa zniknęła', 'usługi zniknęły', 'usług zniknęło'], ['service gone', 'services gone'])} to={'/changes?run_id=' + run.id + '&kind=service_gone&expected=false'} />
           {s.services_returned ? <Count n={s.services_returned} glyph="returned" tone="new" label={plural(s.services_returned, ['usługa wróciła', 'usługi wróciły', 'usług wróciło'], ['service back', 'services back'])} to={'/changes?run_id=' + run.id + '&kind=service_returned'} /> : null}
-          {s.responses_slower ? <Count n={s.responses_slower} glyph="slow" tone="changed" label={plural(s.responses_slower, ['wolniejsza odpowiedź', 'wolniejsze odpowiedzi', 'wolniejszych odpowiedzi'], ['slower response', 'slower responses'])} to={'/changes?run_id=' + run.id + '&kind=response_slower'} /> : null}
+          {s.responses_slower ? <Count n={s.responses_slower} glyph="slow" tone="changed" label={plural(s.responses_slower, ['usługa odpowiada wolniej', 'usługi odpowiadają wolniej', 'usług odpowiada wolniej'], ['service responds slower', 'services respond slower'])} to={'/changes?run_id=' + run.id + '&kind=response_slower'} /> : null}
           <Count n={changed} glyph="delta" tone="changed" label={plural(changed, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes'])} to={'/changes?run_id=' + run.id} />
           <Count n={s.hosts_unstable} glyph="wave" tone="unstable" label={plural(s.hosts_unstable, ['host niestabilny', 'hosty niestabilne', 'hostów niestabilnych'], ['unstable host', 'unstable hosts'])} to={'/hosts?status=unstable'} />
-          <Count n={missing} glyph="half" tone="expected" label={plural(missing, ['host nie odpowiada (niepotwierdzone)', 'hosty nie odpowiadają (niepotwierdzone)', 'hostów nie odpowiada (niepotwierdzone)'], ['host not answering (unconfirmed)', 'hosts not answering (unconfirmed)'])} to={'/changes?run_id=' + run.id + '&kind=host_missing'} />
-          {unreachable ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap py-0.5 text-sm text-ink-3" title={t('Usługi hostów, które milczą, ale nie są jeszcze uznane za nieaktywne: stan nieznany, nie zamknięte.', 'Services of silent hosts that are not reported inactive yet: unknown, not closed.')}><span className="num text-base font-medium text-ink-2">{unreachable}</span>{plural(unreachable, ['usługa nie odpowiada (niepotwierdzone)', 'usługi nie odpowiadają (niepotwierdzone)', 'usług nie odpowiada (niepotwierdzone)'], ['service not answering (unconfirmed)', 'services not answering (unconfirmed)'])}</span> : null}
-          {confirmedGone ? <Count n={confirmedGone} glyph="minus" tone="gone" label={plural(confirmedGone, ['host zniknął (potwierdzone)', 'hosty zniknęły (potwierdzone)', 'hostów zniknęło (potwierdzone)'], ['host gone (confirmed)', 'hosts gone (confirmed)'])} to={'/changes?kind=host_gone'} /> : null}
+          <Count n={missing} glyph="half" tone="expected" label={plural(missing, ['host nie odpowiada (niepotwierdzone)', 'hosty nie odpowiadają (niepotwierdzone)', 'hostów nie odpowiada (niepotwierdzone)'], ['host not responding (unconfirmed)', 'hosts not responding (unconfirmed)'])} to={'/changes?run_id=' + run.id + '&kind=host_missing'} />
+          {unreachable ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap py-0.5 text-sm text-ink-3" title={t('Host nie odpowiada, więc stan jego usług jest nieznany.', 'The host is not responding, so the status of its services is unknown.')}><span className="num text-base font-medium text-ink-2">{unreachable}</span>{plural(unreachable, ['usługa nie odpowiada (niepotwierdzone)', 'usługi nie odpowiadają (niepotwierdzone)', 'usług nie odpowiada (niepotwierdzone)'], ['service not responding (unconfirmed)', 'services not responding (unconfirmed)'])}</span> : null}
+          {confirmedGone ? <Count n={confirmedGone} glyph="minus" tone="gone" label={plural(confirmedGone, ['host nieaktywny (potwierdzone)', 'hosty nieaktywne (potwierdzone)', 'hostów nieaktywnych (potwierdzone)'], ['host down (confirmed)', 'hosts down (confirmed)'])} to={'/changes?kind=host_gone'} /> : null}
           <Count n={expected} glyph="dashring" tone="expected" label={plural(expected, ['zmiana oczekiwana', 'zmiany oczekiwane', 'zmian oczekiwanych'], ['expected change', 'expected changes'])} to={'/changes?run_id=' + run.id + '&expected=true'} />
         </div>
       ) : null}
@@ -158,7 +158,7 @@ function Inventory({ d, pair }: { d: Dash; pair?: { full?: ScanRun; prev?: ScanR
     <dl className="grid max-w-[1100px] grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4" data-testid="dash-numbers">
       <Stat label={t('Aktywne hosty', 'Hosts up')} value={fmtInt(h.hosts_up)} delta={dHosts} deltaTitle={deltaTitle} to="/hosts?status=up" />
       <Stat label={t('Otwarte usługi', 'Open services')} value={fmtInt(h.services_open)} delta={dServices} deltaTitle={deltaTitle} to="/services?state=open" />
-      <Stat label={t('Niepotwierdzone zmiany', 'Unacknowledged changes')} value={fmtInt(h.changes_unacked)} to="/changes?acked=false&expected=false" />
+      <Stat label={t('Nieprzejrzane zmiany', 'Unreviewed changes')} value={fmtInt(h.changes_unacked)} to="/changes?acked=false&expected=false" />
       <Stat label={t('Znaleziska wysokiej wagi', 'High-severity findings')} value={fmtInt(h.findings_high)} to="/findings?severity=high&status=new,triaged" />
     </dl>
   );
@@ -171,12 +171,12 @@ function LivePorts({ runId }: { runId: number }) {
   const { rows: items } = useArrivalOrder('live-ports-' + runId, q.data?.items ?? [], true, byPort, byPort);
   return (
     <div data-testid="live-ports">
-      <p className="text-xs text-ink-3">{t('Otwarte porty do tej pory', 'Open ports so far')} <span className="num text-ink-2">{items.length}</span></p>
+      <p className="text-xs text-ink-3">{t('Otwarte usługi', 'Open services')} <span className="num text-ink-2">{items.length}</span></p>
       {items.length ? (
         <ul className="mt-1.5 flex flex-wrap gap-1">
           {items.slice(0, 40).map((s) => <li key={s.id}><Link to={'/services/' + s.id} className="mono inline-block border border-rule-strong px-1.5 py-0.5 text-xs hover:border-accent" title={serviceName(s)}>{s.port}</Link></li>)}
         </ul>
-      ) : <p className="mt-1.5 text-xs text-ink-2">{t('Czekam na pierwsze odpowiedzi…', 'Waiting for the first answers…')}</p>}
+      ) : <p className="mt-1.5 text-xs text-ink-2">{t('Oczekiwanie na odpowiedzi…', 'Waiting for responses…')}</p>}
     </div>
   );
 }
@@ -196,11 +196,11 @@ function ActiveRun({ initial }: { initial: ScanRun; d?: Dash }) {
     <section className="card px-4 py-3" data-testid="dash-active-run">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
         <RunStatusMark status={run.status} pauseReason={run.pause_reason} />
-        <Link to={'/runs/' + run.id} className="text-ink hover:underline">{t('Skan', 'Run')} <span className="num">#{run.id}</span> <span className="text-ink-2">· {run.profile_name}</span></Link>
+        <Link to={'/runs/' + run.id} className="text-ink hover:underline">{t('Skan', 'Scan')} <span className="num">#{run.id}</span> <span className="text-ink-2">· {run.profile_name}</span></Link>
         <span className="num text-ink">{small ? fmtInt(s.services_open) + ' ' + plural(s.services_open, ['usługa', 'usługi', 'usług'], ['service', 'services']) : fmtPct(pct)}</span>
         {run.status === 'analyzing' ? <span className="text-ink-2">{t('analiza zmian…', 'analysing changes…')}</span> : s.eta_sec > 0 ? <span className="text-ink-2">{t('pozostało', 'remaining')} <span className="num text-ink">{fmtDuration(s.eta_sec)}</span></span> : null}
         <span className="num text-ink-3">{fmtInt(s.current_pps)} pps</span>
-        <Link to={'/runs/' + run.id} className="link ml-auto inline-flex items-center gap-1 whitespace-nowrap">{t('Otwórz przebieg', 'Open the run')}<Icon name="arrowRight" size={12} /></Link>
+        <Link to={'/runs/' + run.id} className="link ml-auto inline-flex items-center gap-1 whitespace-nowrap">{t('Otwórz skan', 'Open scan')}<Icon name="arrowRight" size={12} /></Link>
       </div>
       <div className="mt-2.5"><ProgressBar value={s.addresses_done} max={s.addresses_total} active={activeAddrs} label={t('Postęp skanu', 'Scan progress')} /></div>
       <PartialNote run={run} className="mt-2" />
@@ -216,7 +216,7 @@ function IdleRun({ d }: { d: Dash }) {
       <span className="inline-flex items-center gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-ink-3" aria-hidden="true" />{t('Żaden skan teraz nie działa', 'No scan is running')}</span>
       {run ? <span>{t('Ostatni', 'Last')} <Link className="link num" to={'/runs/' + run.id}>#{run.id}</Link> · {fmtDateTime(run.finished_at)} · {fmtDuration(run.stats.elapsed_sec)}</span> : null}
       <span>{t('Następny', 'Next')} {d.next_run_at ? <><span className="text-ink">{fmtDateTime(d.next_run_at)}</span> <span className="text-ink-3">({fmtRelative(d.next_run_at)})</span></> : t('brak harmonogramu', 'not scheduled')}</span>
-      <Link to="/runs" className="link ml-auto">{t('Wszystkie przebiegi', 'All runs')}</Link>
+      <Link to="/runs" className="link ml-auto">{t('Wszystkie', 'All')}</Link>
     </section>
   );
 }
@@ -231,8 +231,8 @@ function RecentChanges({ changes }: { changes: Change[] }) {
   const expected = changes.filter((c) => c.expected);
   const list = (showExpected ? [...real.slice(0, 7), ...expected] : real.slice(0, 7));
   return (
-    <Panel title={t('Najnowsze zmiany', 'Recent changes')} count={real.length} flush actions={<Link to="/changes" className="link">{t('Dziennik zmian', 'Change log')}</Link>}>
-      {real.length === 0 && expected.length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Ostatni skan nie wykrył zmian.', 'The last scan found no change.')}</p> : null}
+    <Panel title={t('Najnowsze zmiany', 'Recent changes')} count={real.length} flush actions={<Link to="/changes" className="link">{t('Wszystkie', 'All')}</Link>}>
+      {real.length === 0 && expected.length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Brak zmian w ostatnim skanie.', 'No changes in the last scan.')}</p> : null}
       <ul>
         {list.map((c) => (
           <Row key={c.id} to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id}>
@@ -252,7 +252,7 @@ function RecentChanges({ changes }: { changes: Change[] }) {
           <Glyph name="dashring" tone="expected" />
           {showExpected
             ? t('Zwiń zmiany oczekiwane', 'Fold the expected changes')
-            : <>{expected.length} {plural(expected.length, ['zmiana zgodna', 'zmiany zgodne', 'zmian zgodnych'], ['change that fits', 'changes that fit'])} {t('z profilem dostępności hostów. Pokaż', 'the availability profile of the hosts. Show')}</>}
+            : <>{expected.length} {plural(expected.length, ['zmiana oczekiwana', 'zmiany oczekiwane', 'zmian oczekiwanych'], ['expected change', 'expected changes'])} {t('. Pokaż', '. Show')}</>}
           <Icon name={showExpected ? 'chevronDown' : 'chevronRight'} size={12} />
         </button>
       ) : null}
@@ -263,14 +263,14 @@ function RecentChanges({ changes }: { changes: Change[] }) {
 function SafetyPanel({ st }: { st: Dash['safety'] }) {
   const { can } = useSession();
   return (
-    <Panel title={t('Bezpieczeństwo skanowania', 'Scan safety')} actions={<Link to="/admin?tab=safety" className="link">{can('safety:manage') ? t('Polityka', 'Policy') : t('Podgląd polityki', 'View the policy')}</Link>}>
+    <Panel title={t('Bezpieczeństwo skanowania', 'Scan safety')} actions={<Link to="/admin?tab=safety" className="link">{can('safety:manage') ? t('Polityka', 'Policy') : t('Polityka', 'Policy')}</Link>}>
       <p className={cx('mb-2 flex items-center gap-2 text-sm font-medium', st.emergency_stop ? 'text-danger' : 'text-ink')}>
         <Icon name={st.emergency_stop ? 'stop' : 'shield'} className={st.emergency_stop ? '' : 'text-st-new'} />
-        {st.emergency_stop ? t('Stop awaryjny aktywny', 'Emergency stop is active') : t('Skaner działa w trybie bezpiecznej detekcji', 'The scanner runs in safe-detection mode')}
+        {st.emergency_stop ? t('Stop awaryjny włączony', 'Emergency stop is on') : t('Skaner działa w trybie bezpiecznej detekcji', 'The scanner runs in safe-detection mode')}
       </p>
       <dl>
-        <Stat label={t('Limit pakietów', 'Packet cap')} value={<>{fmtInt(st.max_pps)} <span className="font-sans text-xs font-normal text-ink-3">pps</span></>} />
-        <Stat label={t('Limit żądań HTTP', 'HTTP request cap')} value={<>{st.max_http_rps} <span className="font-sans text-xs font-normal text-ink-3">{t('na s, ', 'per s, ')}{st.max_per_host_rps} {t('na host', 'per host')}</span></>} />
+        <Stat label={t('Limit pakietów', 'Packet limit')} value={<>{fmtInt(st.max_pps)} <span className="font-sans text-xs font-normal text-ink-3">pps</span></>} />
+        <Stat label={t('Limit żądań HTTP', 'HTTP request limit')} value={<>{st.max_http_rps} <span className="font-sans text-xs font-normal text-ink-3">{t('na s, ', 'per s, ')}{st.max_per_host_rps} {t('na host', 'per host')}</span></>} />
         <Stat label={t('Metody HTTP', 'HTTP methods')} value={(st.allowed_methods ?? []).join(', ')} />
         <Stat label={t('Wykluczenia', 'Exclusions')} value={(st.exclusions ?? []).length} />
         <Stat label={t('Stop awaryjny', 'Emergency stop')} value={<HostlessState on={st.emergency_stop} />} mono={false} />
@@ -309,14 +309,14 @@ function FirstRun({ d }: { d: Dash }) {
         : t('Profil łączy zakresy z portami, tempem i oknami czasowymi.', 'A profile joins scopes with ports, rate and time windows.'),
       state: ready ? t('profil „' + ready.name + '” ma przypisany zakres', 'the profile "' + ready.name + '" has a scope') : undefined,
       to: can('scans:configure') ? (first ? '/profiles/' + first.id : '/profiles/new') : '/profiles',
-      cta: can('scans:configure') ? t('Otwórz profil', 'Open the profile') : t('Zobacz profile', 'View profiles'),
+      cta: can('scans:configure') ? t('Otwórz profil', 'Open profile') : t('Zobacz profile', 'View profiles'),
     },
     {
       done: false,
       title: t('Uruchom pierwszy skan', 'Start the first scan'),
       text: t('Przebieg pokaże postęp na mapie przestrzeni adresowej. Po nim pulpit powie, co działa w sieci i co się zmieniło.', 'The run shows its progress on the address-space map. After it the dashboard says what is on the network and what changed.'),
-      blocked: engineOff ? t('Silnik skanowania nie jest podłączony w tej instalacji. Zaimportuj wyniki z pliku.', 'The scan engine is not connected in this installation. Import results from a file.') : undefined,
-      to: '/profiles', cta: can('scans:run') ? t('Przejdź do uruchomienia', 'Go to start') : undefined,
+      blocked: engineOff ? t('Brak skanera w tej instalacji. Zaimportuj wyniki z pliku.', 'No scanner in this installation. Import results from a file.') : undefined,
+      to: '/profiles', cta: can('scans:run') ? t('Uruchom skan', 'Start a scan') : undefined,
     },
   ];
   const next = steps.findIndex((s) => !s.done);
@@ -324,7 +324,7 @@ function FirstRun({ d }: { d: Dash }) {
     <section aria-labelledby="first-run-title" data-testid="first-run">
       <h2 id="first-run-title" className="text-xl font-semibold tracking-[-0.015em]">{t('Czujka nie ma jeszcze danych o sieci.', 'Czujka has no data about the network yet.')}</h2>
       <p className="mt-2 max-w-[70ch] text-base text-ink-2">{t('Trzy kroki dzielą tę instalację od pierwszego obchodu. Każdy krok można wykonać teraz albo wrócić do niego później.', 'Three steps stand between this installation and its first watch. Do each step now or come back to it later.')}</p>
-      {can('targets:create') && can('scans:configure') ? <p className="mt-2 text-sm"><Link to="/setup" className="link">{t('Albo przejdź wszystko w jednym kreatorze (około 2 minuty)', 'Or go through everything in one wizard (about 2 minutes)')}</Link></p> : null}
+      {can('targets:create') && can('scans:configure') ? <p className="mt-2 text-sm"><Link to="/setup" className="link">{t('Albo użyj kreatora', 'Or use the wizard')}</Link></p> : null}
       <ol className="mt-4 border-y border-rule">
         {steps.map((s, i) => (
           <li key={s.title} className="grid grid-cols-[28px_minmax(0,1fr)] items-start gap-x-3 gap-y-2 border-b border-rule py-3 last:border-b-0 sm:grid-cols-[28px_minmax(0,1fr)_auto]">
@@ -348,8 +348,8 @@ function FirstRun({ d }: { d: Dash }) {
       {can('results:create') ? (
         <p className="mt-3 flex flex-wrap items-center gap-x-2 text-sm text-ink-2">
           <Icon name="upload" size={14} className="text-ink-3" />
-          {t('Masz już wyniki z nmap? Nie potrzebujesz skanu:', 'You already have nmap results? No scan is needed:')}
-          <Link to="/transfer" className="link">{t('zaimportuj plik XML', 'import the XML file')}</Link>
+          {t('Albo', 'Or')}
+          <Link to="/transfer" className="link">{t('zaimportuj wyniki z nmap', 'import nmap results')}</Link>
         </p>
       ) : null}
     </section>
@@ -401,7 +401,7 @@ export default function Dashboard() {
         <RecentChanges changes={d.recent_changes ?? []} />
         <div className="grid gap-5">
         <Panel title={t('Najważniejsze znaleziska', 'Top findings')} flush actions={<Link to="/findings" className="link">{t('Wszystkie', 'All')}</Link>}>
-          {(d.top_findings ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Brak otwartych znalezisk.', 'No open finding.')}</p> : null}
+          {(d.top_findings ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Brak otwartych znalezisk.', 'No open findings.')}</p> : null}
           <ul>
             {(d.top_findings ?? []).slice(0, 7).map((f) => (
               <Row key={f.id} to={'/findings?open=' + f.id}>
@@ -420,7 +420,7 @@ export default function Dashboard() {
         </Panel>
 
 
-        <Panel title={t('Najciekawsze usługi', 'Most interesting services')} flush actions={<Link to="/services?sort=-interest" className="link">{t('Eksplorator', 'Explorer')}</Link>}>
+        <Panel title={t('Najciekawsze usługi', 'Most interesting services')} flush actions={<Link to="/services?sort=-interest" className="link">{t('Wszystkie', 'All')}</Link>}>
           <ul>
             {(d.top_services ?? []).slice(0, 7).map((s) => (
               <Row key={s.id} to={'/services/' + s.id}>
@@ -447,7 +447,7 @@ export default function Dashboard() {
         <Panel title={t('Otwarte porty', 'Open ports')} actions={<span className="text-ink-3">{t('liczba usług', 'services')}</span>}>
           <BarList items={(d.ports ?? []).slice(0, 10)} mono href={(i) => '/services?port=' + i.name} labelWidth={150} extra={(i) => i.extra} />
         </Panel>
-        <Panel title={t('Trend w kolejnych skanach', 'Trend over runs')}>
+        <Panel title={t('Trend w kolejnych skanach', 'Trend over scans')}>
           <TrendRows points={d.trend ?? []} series={[
             { key: 'hosts', label: t('aktywne hosty', 'hosts up') },
             { key: 'services', label: t('otwarte usługi', 'open services') },
@@ -459,7 +459,7 @@ export default function Dashboard() {
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="min-w-0 space-y-4">
         <Panel title={t('Hosty niestabilne', 'Unstable hosts')} count={d.headline.hosts_unstable} flush actions={<Link to="/hosts?status=unstable" className="link">{t('Wszystkie', 'All')}</Link>}>
-          {(d.unstable_hosts ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Każdy znany host odpowiada zgodnie ze swoim profilem.', 'Every known host answers as its profile predicts.')}</p> : null}
+          {(d.unstable_hosts ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Brak niestabilnych hostów.', 'No unstable hosts.')}</p> : null}
           <ul>
             {(d.unstable_hosts ?? []).slice(0, 6).map((h) => (
               <li key={h.id}>
@@ -475,7 +475,7 @@ export default function Dashboard() {
         <ReprobePanel limit={5} />
         </div>
         <Panel title={t('Wygasające certyfikaty', 'Expiring certificates')} count={(d.certs_expiring ?? []).length} flush>
-          {(d.certs_expiring ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Żaden certyfikat nie wygasa w ciągu 30 dni.', 'No certificate expires within 30 days.')}</p> : null}
+          {(d.certs_expiring ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Żaden certyfikat nie wygasa w ciągu 30 dni.', 'No certificates expire within 30 days.')}</p> : null}
           <ul>
             {(d.certs_expiring ?? []).slice(0, 6).map((s) => {
               const days = s.latest?.result.tls?.days_left ?? 0;
@@ -502,7 +502,7 @@ export default function Dashboard() {
 
 function HostlessState({ on }: { on: boolean }) {
   return on
-    ? <span className="inline-flex items-center gap-1.5 text-sm"><Glyph name="x" tone="danger" />{t('aktywny', 'active')}</span>
-    : <span className="inline-flex items-center gap-1.5 text-sm font-normal text-ink-2"><Glyph name="ring" tone="expected" />{t('nieaktywny', 'off')}</span>;
+    ? <span className="inline-flex items-center gap-1.5 text-sm"><Glyph name="x" tone="danger" />{t('włączony', 'on')}</span>
+    : <span className="inline-flex items-center gap-1.5 text-sm font-normal text-ink-2"><Glyph name="ring" tone="expected" />{t('wyłączony', 'off')}</span>;
 }
 

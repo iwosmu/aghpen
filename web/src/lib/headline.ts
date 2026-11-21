@@ -35,12 +35,12 @@ export function changeParts(c: { added: number; gone: number; changed: number; m
   const add = (n: number, pl: [string, string, string], en: [string, string]) => { if (n > 0) parts.push(n + ' ' + plural(n, pl, en)); };
   void lang;
   add(c.added, ['nowa ekspozycja', 'nowe ekspozycje', 'nowych ekspozycji'], ['new exposure', 'new exposures']);
-  add(c.gone, ['zniknięcie', 'zniknięcia', 'zniknięć'], ['gone', 'gone']);
-  add(c.returned ?? 0, ['powrót usługi', 'powroty usług', 'powrotów usług'], ['service back', 'services back']);
-  add(c.slower ?? 0, ['wolniejsza odpowiedź', 'wolniejsze odpowiedzi', 'wolniejszych odpowiedzi'], ['slower response', 'slower responses']);
+  add(c.gone, ['usługa zniknęła', 'usługi zniknęły', 'usług zniknęło'], ['service gone', 'services gone']);
+  add(c.returned ?? 0, ['usługa wróciła', 'usługi wróciły', 'usług wróciło'], ['service back', 'services back']);
+  add(c.slower ?? 0, ['usługa odpowiada wolniej', 'usługi odpowiadają wolniej', 'usług odpowiada wolniej'], ['service responds slower', 'services respond slower']);
   add(c.recovered ?? 0, ['usługa znów szybka', 'usługi znów szybkie', 'usług znów szybkich'], ['service fast again', 'services fast again']);
   add(c.changed, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes']);
-  add(c.confirmedGone ?? 0, ['host zniknął (potwierdzone)', 'hosty zniknęły (potwierdzone)', 'hostów zniknęło (potwierdzone)'], ['host gone (confirmed)', 'hosts gone (confirmed)']);
+  add(c.confirmedGone ?? 0, ['host nieaktywny', 'hosty nieaktywne', 'hostów nieaktywnych'], ['host down', 'hosts down']);
   add(c.missing, ['host nie odpowiada (niepotwierdzone)', 'hosty nie odpowiadają (niepotwierdzone)', 'hostów nie odpowiada (niepotwierdzone)'], ['host not answering (unconfirmed)', 'hosts not answering (unconfirmed)']);
   add(c.unstable, ['host niestabilny', 'hosty niestabilne', 'hostów niestabilnych'], ['unstable host', 'unstable hosts']);
   return parts;
@@ -81,7 +81,7 @@ export function partialRunPhrase(r: ScanRun): string {
   const n = r.stats?.addresses_total ?? 0;
   if (r.trigger === 'import') return t('import pliku', 'a file import') + (r.import_file ? ' ' + r.import_file : '');
   if (r.trigger === 'manual-entry') return t('wpis ręczny', 'a manual entry');
-  const what = r.trigger === 'reprobe' && !r.ad_hoc?.reason ? t('ponowne sprawdzenie', 're-probe') : t('sprawdzenie', 'a check of');
+  const what = r.trigger === 'reprobe' && !r.ad_hoc?.reason ? t('ponowne sprawdzenie', 'a re-probe of') : t('sprawdzenie', 'a check of');
   return what + ' ' + fmtInt(n) + ' ' + (getLang() === 'pl' ? (n === 1 ? 'adresu' : 'adresów') : n === 1 ? 'address' : 'addresses');
 }
 
