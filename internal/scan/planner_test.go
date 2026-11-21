@@ -160,7 +160,7 @@ func TestTakeGroupAndResumeUnits(t *testing.T) {
 		{ID: 14, Seq: 4, Spec: []string{"10.0.3.5-9", "2001:db8::1"}, Size: 6, Status: model.ChunkFailed},
 	}
 	ex := targets.Build([]string{"10.0.1.0/25"}).V4
-	us, err := unitsFromChunks(chunks, ex)
+	us, err := unitsFromChunks(chunks, ex, nil)
 	if err != nil || len(us) != 3 {
 		t.Fatalf("resume units: %v %d", err, len(us))
 	}
@@ -173,7 +173,7 @@ func TestTakeGroupAndResumeUnits(t *testing.T) {
 	if !us[2].isV6() || len(us[2].ranges) != 1 {
 		t.Errorf("mixed chunk = %+v", us[2])
 	}
-	if _, err := unitsFromChunks([]model.Chunk{{Seq: 1, Spec: []string{"bogus"}}}, targets.Set{}); err == nil {
+	if _, err := unitsFromChunks([]model.Chunk{{Seq: 1, Spec: []string{"bogus"}}}, targets.Set{}, nil); err == nil {
 		t.Error("a broken spec must be an error")
 	}
 }

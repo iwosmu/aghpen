@@ -196,6 +196,23 @@ func (b *Budget) Release(n int) {
 	b.mu.Unlock()
 }
 
+// SetTotal changes the total (the safety policy may change between runs).
+// Shares in use keep their size; new ones see the new total.
+func (b *Budget) SetTotal(total int) {
+	b.mu.Lock()
+	b.total = max(1, total)
+	close(b.waiter)
+	b.waiter = make(chan struct{})
+	b.mu.Unlock()
+}
+
+// Total is the budget's size in packets per second.
+func (b *Budget) Total() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.total
+}
+
 // InUse returns the packets per second that are handed out now.
 func (b *Budget) InUse() int {
 	b.mu.Lock()

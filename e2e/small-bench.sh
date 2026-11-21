@@ -11,6 +11,9 @@
 # single machine. Nothing is published on the docker host and nothing of the docker
 # host is scanned. Do not run it beside e2e/lab-gate.sh: the jury host would be an
 # extra host in the /16. It removes the jury host at the end (SB_KEEP_TARGETS=1 keeps it).
+# SB_MANY=N replaces the jury host with N hosts on one /24 (10.66.252.1..N, scope
+# 10.66.252.0/24): nginx on 80 and on 40404 (outside top-1000, found only by the
+# full-range pass), to check the full-range host budget (16 per run).
 # Profiles: seven (7 named ports), top1000, full (1-65535). For each: wall time from
 # POST /runs to "completed", time until the first service is visible in GET /services,
 # services found, and the packets the product sent in one-second bins (e2e/ppsbins).
@@ -28,7 +31,15 @@ api() { curl -sS -b "$JAR" -c "$JAR" -X "$1" -H "X-CSRF-Token: $CSRF" -H "Conten
 # ---- jury host: one IP, seven services ----
 HOST=${SB_HOST:-10.66.251.10}
 SEVEN=80,8888,5672,15672,3000,22,5432
-if [ -z "$(docker ps -q --filter name=^czsb-host$)" ]; then
+if [ -n "${SB_MANY:-}" ]; then
+  HOST=10.66.252.0/24
+  for i in $(seq 1 "$SB_MANY"); do
+    docker rm -f "czsb-m$i" >/dev/null 2>&1
+    docker run -d --name "czsb-m$i" --network czujka-lab --ip "10.66.252.$i" nginx:alpine \
+      sh -c 'printf "server { listen 40404; return 200 \"extra\"; }\n" > /etc/nginx/conf.d/extra.conf && exec nginx -g "daemon off;"' >/dev/null
+  done
+  sleep 3
+elif [ -z "$(docker ps -q --filter name=^czsb-host$)" ]; then
   docker rm -f czsb-host czsb-httpd czsb-rabbit czsb-gitea czsb-pg >/dev/null 2>&1
   docker run -d --name czsb-host --network czujka-lab --ip "$HOST" nginx:alpine >/dev/null
   docker run -d --name czsb-httpd --network container:czsb-host httpd:alpine \
@@ -86,9 +97,11 @@ for v in ${SB_ONLY:-seven top1000 full}; do
   N=$(jq '.stats.services_open' "$OUT/run-$v.json")
   PSHOW=$P; [ ${#PSHOW} -gt 40 ] && PSHOW="${PSHOW:0:37}..."
   jq -c '.stats.passes // empty' "$OUT/run-$v.json" > "$OUT/passes-$v.json"
+  jq -r '"passes: \(.stats.passes // [] | map("\(.name) hosts \(.hosts) skipped \(.hosts_skipped // 0)") | join(", ")); notes: \(.stats.notes // [] | join("; "))"' "$OUT/run-$v.json" | tee -a "$OUT/run.log"
   printf '| %s | %s | %s | %.1f | %s | %s / %s | %s |\n' "$v" "$PSHOW" "${FIRST:-–}" "$WALL" "$N" "$(jq .all_max_per_s "$OUT/pps-$v.json")" "$CAP" "$(jq .all_seconds_over_cap "$OUT/pps-$v.json")" | tee -a "$OUT/table.md"
 done
 log "status $ST; output $OUT"
 [ "${SB_KEEP:-0}" = 1 ] || $DC down -v --remove-orphans >/dev/null 2>&1
 [ "${SB_KEEP_TARGETS:-0}" = 1 ] || docker rm -f czsb-host czsb-httpd czsb-rabbit czsb-gitea czsb-pg >/dev/null 2>&1
+[ "${SB_KEEP_TARGETS:-0}" = 1 ] || [ -z "${SB_MANY:-}" ] || for i in $(seq 1 "$SB_MANY"); do docker rm -f "czsb-m$i" >/dev/null 2>&1; done
 cat "$OUT/table.md"

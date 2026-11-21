@@ -129,14 +129,15 @@ func TestBuiltinDetections(t *testing.T) {
 		return &model.HTTPFingerprint{Scheme: "http", URL: "http://10.0.0.9/", FinalURL: "http://10.0.0.9/", Status: status, Title: title, BodyExcerpt: body, Headers: headers}
 	}
 	cases := []struct {
-		name    string
-		svc     *model.ServiceResult
-		hosts   []string
-		tech    string
-		version string
-		classes []string
-		sigs    []string
-		absent  []string // technologies that must not be reported
+		name      string
+		svc       *model.ServiceResult
+		hosts     []string
+		tech      string
+		version   string
+		classes   []string
+		sigs      []string
+		absent    []string // technologies that must not be reported
+		noClasses []string // classes that must not be reported
 	}{
 		{name: "WordPress", svc: &model.ServiceResult{Name: "http", HTTP: func() *model.HTTPFingerprint {
 			h := http(200, "CzujkaLab", `<meta name="generator" content="WordPress 6.9.4" /><link rel='stylesheet' href='http://x/wp-includes/css/dist/block-library/style.min.css?ver=6.9.4'><script src="/wp-content/themes/t/a.js"></script>`,
@@ -206,6 +207,8 @@ func TestBuiltinDetections(t *testing.T) {
 			h.Cookies = []model.Cookie{{Name: "session", Value: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NSJ9.c2ln", ValueLen: 45}}
 			return h
 		}()}, sigs: []string{"cookie-jwt", "cookie-session-no-secure", "cookie-session-no-httponly"}},
+		{name: "debug header is debug mode, not staging", svc: &model.ServiceResult{Name: "http", HTTP: http(200, "Panel", "<p>ok</p>", map[string][]string{"X-Debug-Mode": {"1"}})},
+			sigs: []string{"header-debug"}, noClasses: []string{model.ClassStaging}}, // X-Debug-Token stays staging: it is the Symfony profiler (environment.yaml)
 		{name: "plain page gives no technology", svc: &model.ServiceResult{Name: "http", HTTP: http(200, "Wydział Informatyki AGH", "<h1>Aktualności</h1><p>Zapraszamy na dzień otwarty. Kontakt: dziekanat.</p>", map[string][]string{"Content-Type": {"text/html; charset=utf-8"}})},
 			absent: []string{"WordPress", "Moodle", "PHP", "nginx", "Apache HTTP Server", "Jenkins", "phpMyAdmin"}},
 	}
@@ -237,6 +240,11 @@ func TestBuiltinDetections(t *testing.T) {
 			for _, name := range tc.absent {
 				if techByName(techs, name) != nil {
 					t.Errorf("false positive: %q in %+v", name, techs)
+				}
+			}
+			for _, c := range tc.noClasses {
+				if strings.Contains(","+strings.Join(classes, ",")+",", ","+c+",") {
+					t.Errorf("classes = %v must not have %q", classes, c)
 				}
 			}
 			if tc.name == "plain page gives no technology" && len(techs) != 0 {

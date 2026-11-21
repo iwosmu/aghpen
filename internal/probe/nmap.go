@@ -30,6 +30,8 @@ type Nmap struct {
 	log        *slog.Logger
 	xmlOnFD    atomic.Bool // XML on fd 3, so that stdout carries the packet statistics
 	seq        atomic.Int64
+	weakOnce   sync.Once
+	weak       map[string]bool // banner-length guesses of nmap-service-probes (weakmatch.go)
 }
 
 var (
@@ -433,8 +435,13 @@ func (n *Nmap) run(ctx context.Context, stage string, args, targetList []string)
 	if err != nil && ctx.Err() == nil && n.xmlOnFD.Load() && strings.Contains(err.Error(), "/dev/fd/3") {
 		n.log.Warn("nmap cannot write XML to fd 3, falling back to -oX - (packet counts become estimates)")
 		n.xmlOnFD.Store(false)
-		return n.exec(ctx, stage, args, targetList, false)
+		res, err = n.exec(ctx, stage, args, targetList, false)
 	}
+	n.weakOnce.Do(func() {
+		n.weak = loadWeakMatches(n.Path)
+		n.log.Info("weak nmap matches (banner-length guesses kept as name hints)", "count", len(n.weak))
+	})
+	demoteWeak(res, n.weak)
 	return res, err
 }
 

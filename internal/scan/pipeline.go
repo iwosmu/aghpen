@@ -3,6 +3,8 @@ package scan
 import (
 	"context"
 	"fmt"
+	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -169,7 +171,7 @@ func (r *run) udpStage(ctx context.Context, g *group, up []probe.Host, rate int,
 	}
 	t0 := r.e.now()
 	end := r.stats.begin(rate)
-	res, err := scanner.UDPScan(ctx, probe.UDPScanRequest{Hosts: ips, Ports: r.udpPorts, MaxRate: rate, HostTimeout: udpHostTimeout, IPv6: g.v6})
+	res, err := scanner.UDPScan(ctx, probe.UDPScanRequest{Hosts: ips, Ports: r.udpPorts, MaxRate: rate, HostTimeout: udpHostTimeout, IPv6: g.v6, Versions: r.plan.Profile.ServiceDetection})
 	end()
 	r.account(gs, res, t0)
 	if err != nil {
@@ -325,7 +327,8 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 			return context.Cause(ctx)
 		}
 	}
-	full := r.claimFullRange(hosts, scanned)
+	claimed := r.claimFullRange(ctx, g, hosts, scanned)
+	full := len(claimed) > 0
 	if full {
 		r.stats.passState(model.PassTopPorts, model.PassDone)
 	} else if err := r.densePass(ctx, g, scanned, rate, gs); err != nil {
@@ -381,7 +384,13 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 		// top ports: the port scan gets 90 % of the rate, version detection
 		// (a few connects per port) and its 1-port SYN scans the rest.
 		wide = make(chan fullScan, 1)
-		go func() { wide <- r.fullRangeScan(ctx, g, up, rate*9/10, gs) }()
+		var upFull []probe.Host
+		for _, h := range up {
+			if claimed[h.IP] {
+				upFull = append(upFull, h)
+			}
+		}
+		go func() { wide <- r.fullRangeScan(ctx, g, upFull, rate*9/10, gs) }()
 		describeRate = max(1, rate/10)
 	}
 	results, err := r.describeHosts(ctx, g, up, attempts, describeRate, gs, true, true)
@@ -397,7 +406,7 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 		for _, res := range results {
 			r.interimHost(gs, res)
 		}
-		if err := r.fullRangeFinish(ctx, g, up, results, fs, attempts, rate, gs); err != nil {
+		if err := r.fullRangeFinish(ctx, g, up, results, claimed, fs, attempts, rate, gs); err != nil {
 			return err
 		}
 	} else if err != nil {
@@ -577,7 +586,7 @@ func (r *run) httpHost(ctx context.Context, res *model.HostResult, done func(*mo
 	if d := r.lim.PerHostDelay; d > 0 && 1/d.Seconds() < perHost {
 		perHost = 1 / d.Seconds()
 	}
-	hostLim := probe.NewLimiter(perHost, 1)
+	hostLim := hostLimits{own: probe.NewLimiter(perHost, 1), shared: r.e.hostLimiter(res.IP, r.polPerHost)}
 	sem := make(chan struct{}, r.lim.PerHostConc)
 	hostname := ""
 	if len(res.Hostnames) > 0 {
@@ -1235,31 +1244,96 @@ func fullRangeFor(spec string, ports *probe.PortSet, addresses int64) bool {
 	return ports.Count() >= 65535 || strings.Contains(strings.ToLower(spec), "top-")
 }
 
-// claimFullRange decides the full-range pass for one group: every live host
-// of the group must fit into what is left of the run's host budget.
-func (r *run) claimFullRange(hosts []probe.Host, scanned map[string]*probe.Host) bool {
+// claimFullRange decides which live hosts of a group get the full-range
+// pass: per host, up to what is left of the run's host budget, the first
+// hosts by address. Groups claim in their order (group id), so the same
+// hosts get the full range in every run of an unchanged scope and the
+// coverage does not flap. The rest keep the profile's ports; the pass
+// counts them in hosts_skipped and the run gets a note ("16 z 19").
+func (r *run) claimFullRange(ctx context.Context, g *group, hosts []probe.Host, scanned map[string]*probe.Host) map[string]bool {
 	if !r.fullPlanned {
-		return false
+		return nil
 	}
-	n := int64(0)
+	if !r.fullWait(ctx, g.id) {
+		return nil
+	}
+	defer r.fullPass(g.id)
+	var live []netip.Addr
 	for _, h := range hosts {
 		if p := scanned[h.IP]; p != nil && !p.TimedOut && (h.Up || p.Responded) {
-			n++
+			if a, err := netip.ParseAddr(h.IP); err == nil {
+				live = append(live, a)
+			}
 		}
 	}
-	if n == 0 {
-		return false
+	if len(live) == 0 {
+		return nil
 	}
+	slices.SortFunc(live, func(a, b netip.Addr) int { return a.Compare(b) })
+	n := int64(len(live))
+	var k int64
 	for {
 		left := r.fullLeft.Load()
-		if left < n {
-			r.log.Info("full port range skipped: too many live hosts", "hosts", n, "budget_left", left)
-			r.stats.passSkipHosts(model.PassFullRange, int(n))
-			return false
+		k = min(n, max(left, 0))
+		if r.fullLeft.CompareAndSwap(left, left-k) {
+			break
 		}
-		if r.fullLeft.CompareAndSwap(left, left-n) {
+	}
+	if k < n {
+		r.log.Info("full port range: host budget reached", "group", g.id, "live", n, "covered", k)
+		r.stats.passSkipHosts(model.PassFullRange, int(n-k))
+	}
+	if k == 0 {
+		return nil
+	}
+	claimed := make(map[string]bool, k)
+	for _, a := range live[:k] {
+		claimed[a.String()] = true
+	}
+	return claimed
+}
+
+// fullWait blocks until every group before group id has claimed its share
+// of the full-range budget (or ended without claiming). false: ctx ended.
+func (r *run) fullWait(ctx context.Context, id int) bool {
+	for {
+		r.fullMu.Lock()
+		if max(r.fullNext, 1) >= id { // fullNext: the lowest group id not done yet
+			r.fullMu.Unlock()
 			return true
 		}
+		if r.fullWake == nil {
+			r.fullWake = make(chan struct{})
+		}
+		wake := r.fullWake
+		r.fullMu.Unlock()
+		select {
+		case <-wake:
+		case <-ctx.Done():
+			return false
+		}
+	}
+}
+
+// fullPass marks group id as done with its full-range claim (idempotent).
+func (r *run) fullPass(id int) {
+	r.fullMu.Lock()
+	defer r.fullMu.Unlock()
+	if r.fullPassed == nil {
+		r.fullPassed = map[int]bool{}
+	}
+	r.fullPassed[id] = true
+	if r.fullNext == 0 {
+		r.fullNext = 1
+	}
+	moved := false
+	for r.fullPassed[r.fullNext] {
+		r.fullNext++
+		moved = true
+	}
+	if moved && r.fullWake != nil {
+		close(r.fullWake)
+		r.fullWake = nil
 	}
 }
 
@@ -1301,11 +1375,11 @@ func (r *run) fullRangeScan(ctx context.Context, g *group, up []probe.Host, rate
 
 // fullRangeFinish describes the new open ports of the full-range scan and
 // adds them to results.
-func (r *run) fullRangeFinish(ctx context.Context, g *group, up []probe.Host, results []model.HostResult, fs fullScan, attempts, rate int, gs *groupStats) error {
+func (r *run) fullRangeFinish(ctx context.Context, g *group, up []probe.Host, results []model.HostResult, claimed map[string]bool, fs fullScan, attempts, rate int, gs *groupStats) error {
 	var ips []string
 	byIP := map[string]int{}
 	for i, res := range results {
-		if res.Up {
+		if res.Up && claimed[res.IP] { // only the hosts the pass scanned
 			ips = append(ips, res.IP)
 			byIP[res.IP] = i
 		}
