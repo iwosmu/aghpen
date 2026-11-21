@@ -78,6 +78,26 @@
   match:
     class: [staging, dev-tool]
 
+- id: unfinished-install-page
+  name: Niedokończona instalacja aplikacji
+  severity: high
+  description: Aplikacja pokazuje kreator instalacji (np. instalator Gitea, wp-admin/install.php WordPressa). Każdy, kto pierwszy go dokończy, ustawi konto administratora i przejmie aplikację.
+  remediation: Dokończ instalację od razu albo wyłącz usługę; do czasu instalacji nie wystawiaj jej do sieci.
+  match:
+    class: install-page
+
+- id: unauthenticated-control-api
+  name: API sterujące bez uwierzytelniania
+  severity: high
+  description: API do sterowania usługą odpowiada bez logowania (np. API Toxiproxy, Traefik z api.insecure, API Dockera na porcie 2375). Kto je osiągnie, zmienia konfigurację usługi albo uruchamia kontenery.
+  remediation: Zwiąż API z adresem lokalnym albo włącz uwierzytelnianie (Traefik bez api.insecure, Docker przez gniazdo lub TLS na 2376).
+  match:
+    any:
+      - class: unauth-control-api
+      - all:
+          - port: [2375]
+          - service: [docker]
+
 - id: default-server-page
   name: Domyślna strona serwera
   severity: low

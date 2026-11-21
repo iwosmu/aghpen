@@ -9,7 +9,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 OUT=${TO_OUT:-e2e/out/tradeoff-$(date +%Y%m%d-%H%M%S)}
 mkdir -p "$OUT"
-export CZUJKA_VERSION=${CZUJKA_VERSION:-acc2}
+export CZUJKA_VERSION=${CZUJKA_VERSION:-acc}
 # name|profile override (merged into the seeded default profile)
 VARIANTS='
 default|{}
@@ -28,14 +28,14 @@ row() { # name dir
   [ -f "$s" ] || { echo "| $1 | failed |"; return; }
   local wall tx
   wall=$(sed -n 's/.*wall=\([0-9]*\).*/\1/p' "$d/runs.txt"); tx=$(sed -n 's/.*tx=\([0-9]*\).*/\1/p' "$d/runs.txt")
-  printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" "$1" "$wall" "$tx" \
-    "$(jq '.stats.avg_pps | floor' "$r")" "$(jq '"\(.raw_max_per_s) / \(.cap)"' -r "$d/pps-t0.json")" "$(jq .raw_p99_per_s "$d/pps-t0.json")" "$(jq .stats.http_requests "$r")" \
-    "$(jq -r '.metrics[0] | "\(.tp)/\(.tp + .fn)"' "$s")" "$(jq -r '.metrics[1] | "\(.tp)/\(.tp + .fn)"' "$s")" \
+  printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" "$1" "$wall" "$tx" \
+    "$(jq '.stats.avg_pps | floor' "$r")" "$(jq '"\(.raw_max_per_s) / \(.cap)"' -r "$d/pps-t0.json")" "$(jq .all_max_per_s "$d/pps-t0.json")" "$(jq .raw_p99_per_s "$d/pps-t0.json")" "$(jq .stats.http_requests "$r")" \
+    "$(jq -r '.metrics[0] | "\(.tp)/\(.tp + .fn)"' "$s")" "$(jq -r '.metrics[1] | "\(.tp)/\(.tp + .fn)"' "$s")" "$(jq -r '.metrics[3] | "\(.tp)/\(.tp + .fn)"' "$s")" \
     "$(jq -r '.metrics[0].f1 * 1000 | floor / 1000' "$s")" "$(jq -r '.metrics[1].f1 * 1000 | floor / 1000' "$s")" \
     "$(jq -r '.metrics[1].f1 * 1000 | floor / 1000' "$d/score-strict-t0.json")"
 }
-echo "| wariant | czas [s] | pakiety | śr. pps | maks. pps (1 s, nmap) | p99 pps | żądania HTTP | hosty | porty | F1 hostów | F1 portów | F1 portów (strict) |" > "$OUT/table.md"
-echo "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |" >> "$OUT/table.md"
+echo "| wariant | czas [s] | pakiety | śr. pps | maks. pps (1 s, nmap) / limit | maks. pps (1 s, wszystko) | p99 pps (nmap) | żądania HTTP | hosty | porty | technologie | F1 hostów | F1 portów | F1 portów (strict) |" > "$OUT/table.md"
+echo "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |" >> "$OUT/table.md"
 echo "$VARIANTS" | while IFS='|' read -r name over; do
   [ -n "$name" ] || continue
   case " ${TO_ONLY:-$name} " in *" $name "*) ;; *) continue ;; esac

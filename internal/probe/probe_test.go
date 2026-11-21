@@ -441,3 +441,25 @@ func TestParseXMLTimedOutHost(t *testing.T) {
 		t.Errorf("finished host = %+v", h)
 	}
 }
+
+func TestServiceBatchesKeepAProcessUnderItsRate(t *testing.T) {
+	ports := make([]int, 64)
+	for i := range ports {
+		ports[i] = 1000 + i
+	}
+	// one host with 64 ports at a share of 210 pps: 4 ports per process
+	b := serviceBatches(serviceGroup{IPs: []string{"10.0.0.1"}, Ports: ports}, 210/svPacketsPerPort)
+	if len(b) != 16 || len(b[0].Ports) != 4 || len(b[15].Ports) != 4 {
+		t.Fatalf("%d batches, first %d ports", len(b), len(b[0].Ports))
+	}
+	// ten hosts with two ports each: two hosts per process
+	ips := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"}
+	b = serviceBatches(serviceGroup{IPs: ips, Ports: []int{22, 80}}, 4)
+	if len(b) != 5 || len(b[0].IPs) != 2 {
+		t.Fatalf("%d batches, first %d hosts", len(b), len(b[0].IPs))
+	}
+	// one host, 7 ports, the whole cap of 840: one process
+	if b = serviceBatches(serviceGroup{IPs: []string{"x"}, Ports: ports[:7]}, 840/svPacketsPerPort); len(b) != 1 {
+		t.Fatalf("7 ports at 840 pps: %d batches", len(b))
+	}
+}

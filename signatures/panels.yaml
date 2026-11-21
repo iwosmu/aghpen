@@ -239,7 +239,7 @@
   technology: Gitea
   description: Strona instalatora Gitea jest dostępna. Kto ją wypełni, zostaje administratorem serwera.
   interest: 80
-  classes: [dev-tool, admin-panel]
+  classes: [dev-tool, admin-panel, install-page]
   match:
     rules:
       - {type: title, regex: '^Installation - Gitea', weight: 0.95}
@@ -316,14 +316,14 @@
       - {type: body, regex: 'PVE\.UserName|/pve2/(?:css|ext6|js)/|proxmoxlib\.js', weight: 0.9}
 
 - id: rabbitmq
-  name: RabbitMQ Management
+  name: RabbitMQ
   category: panel
-  description: Panel zarządzania brokerem RabbitMQ.
+  description: Broker RabbitMQ i jego panel zarządzania (RabbitMQ Management). Jedna nazwa technologii dla AMQP (5672) i panelu (15672).
   tags: [erlang, kolejki]
   interest: 50
   classes: [admin-panel, login]
   cpe: cpe:2.3:a:vmware:rabbitmq
-  aliases: [RabbitMQ]
+  aliases: [RabbitMQ Management]
   match:
     min_confidence: 0.5
     rules:

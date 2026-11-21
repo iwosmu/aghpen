@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net"
 	"reflect"
 	"sort"
@@ -118,7 +119,12 @@ func (f *fakeNet) PortScan(ctx context.Context, req probe.PortScanRequest) (*pro
 		h.Responded = ok
 		for _, p := range ports {
 			if req.Ports.Has(p) {
-				h.Ports = append(h.Ports, probe.Port{Port: p, Proto: "tcp", State: "open", Reason: "syn-ack", Name: "unknown", Confidence: 0.3})
+				// like nmap: the port table names the well-known ports (method="table")
+				name := map[int]string{22: "ssh", 80: "http", 443: "https"}[p]
+				if name == "" {
+					name = "unknown"
+				}
+				h.Ports = append(h.Ports, probe.Port{Port: p, Proto: "tcp", State: "open", Reason: "syn-ack", Name: name, Confidence: 0.3})
 			}
 		}
 		res.Hosts = append(res.Hosts, h)
@@ -190,7 +196,7 @@ func (m *memSink) OnProgress(_ context.Context, _ int64, s model.RunStats) error
 func (m *memSink) host(ip string) *model.HostResult {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for i := range m.hosts {
+	for i := len(m.hosts) - 1; i >= 0; i-- { // the last report: a partial one may come first
 		if m.hosts[i].IP == ip {
 			return &m.hosts[i]
 		}
@@ -560,7 +566,7 @@ func (f *fakeFP) Fingerprint(_ context.Context, req model.FingerprintRequest) (*
 		h.Paths = append(h.Paths, model.PathProbe{Path: p, Status: 404})
 	}
 	var tl *model.TLSInfo
-	if req.TLSHint {
+	if req.TLSHint || req.NameHint == "https" { // like httpfp's tlsFirst
 		h.Scheme = "https"
 		tl = &model.TLSInfo{SubjectCN: "x"}
 	}
@@ -609,8 +615,8 @@ func TestHTTPAndSignatureStage(t *testing.T) {
 	if h == nil || !reflect.DeepEqual(h.Hostnames, []string{"panel.example.com"}) {
 		t.Fatalf("host = %+v", h)
 	}
-	if len(fp.reqs) != 3 {
-		t.Fatalf("fingerprint calls = %d, want one per open TCP port", len(fp.reqs))
+	if len(fp.reqs) != 2 {
+		t.Fatalf("fingerprint calls = %d, want one per open TCP port except ssh (not HTTP)", len(fp.reqs))
 	}
 	for _, r := range fp.reqs {
 		if r.IP != "10.7.0.5" || r.Hostname != "panel.example.com" || r.UserAgent != "Czujka-test" || !r.Opts.Enabled {
@@ -619,8 +625,10 @@ func TestHTTPAndSignatureStage(t *testing.T) {
 		if !reflect.DeepEqual(r.Paths, []string{"/login", "/admin"}) {
 			t.Errorf("paths must be capped by the policy: %v", r.Paths)
 		}
-		if r.TLSHint != (r.Port == 443) {
-			t.Errorf("TLS hint on %d = %v", r.Port, r.TLSHint)
+		// small run: the HTTP stage runs before version detection, so the
+		// hint is the port table's name ("https"); otherwise nmap's tunnel
+		if hint := r.TLSHint || r.NameHint == "https"; hint != (r.Port == 443) {
+			t.Errorf("TLS hint on %d = %v (%q)", r.Port, r.TLSHint, r.NameHint)
 		}
 	}
 	for _, s := range h.Services {
@@ -638,9 +646,9 @@ func TestHTTPAndSignatureStage(t *testing.T) {
 			}
 		}
 	}
-	// 3 calls pay one request each (also the port that is not HTTP), the two
-	// HTTP answers carry two extra paths each
-	if out.Stats.HTTPServices != 2 || out.Stats.HTTPRequests != 7 {
+	// 2 calls pay one request each (ssh is not HTTP and gets no request),
+	// the two HTTP answers carry two extra paths each
+	if out.Stats.HTTPServices != 2 || out.Stats.HTTPRequests != 6 {
 		t.Errorf("http stats = %+v", out.Stats)
 	}
 
@@ -828,5 +836,326 @@ func TestPortScanTimeoutGrowsWithTheWork(t *testing.T) {
 	}
 	if got := portScanTimeout(10, 100, 0); got < portScanHostTimeout {
 		t.Errorf("rate 0: %v", got)
+	}
+}
+
+// A host with many open ports in the profile's list gets one more scan over
+// the rest of ports 1-10000; a host with a few open ports does not.
+func TestDenseHostGetsAWidePortPass(t *testing.T) {
+	many := []int{}
+	for p := 100; p < 110; p++ {
+		many = append(many, p)
+	}
+	many = append(many, 9001, 47001) // 47001 is above the wide range
+	net := &fakeNet{hosts: map[string][]int{"10.0.0.10": many, "10.0.0.11": {22, 9002}}}
+	sink := newSink()
+	plan := basePlan("10.0.0.0/24")
+	plan.Profile.Ports = "1-1000"
+	out := New(Deps{Prober: net, Logger: quiet}).Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	if h := sink.host("10.0.0.10"); h == nil || len(h.Services) != 11 {
+		t.Fatalf("dense host = %+v, want 11 ports with 9001", h)
+	}
+	if h := sink.host("10.0.0.11"); h == nil || len(h.Services) != 1 {
+		t.Fatalf("sparse host = %+v, want only port 22", h)
+	}
+}
+
+func TestNameServiceNeverEmpty(t *testing.T) {
+	for _, c := range []struct {
+		in   model.ServiceResult
+		want string
+	}{
+		{model.ServiceResult{Name: "ssh"}, "ssh"},
+		{model.ServiceResult{Name: "tcpwrapped"}, "tcpwrapped"},
+		{model.ServiceResult{Name: "tcpwrapped", HTTP: &model.HTTPFingerprint{}}, "http"},
+		{model.ServiceResult{}, "unknown"},
+		{model.ServiceResult{Name: "unknown", HTTP: &model.HTTPFingerprint{}}, "http"},
+		{model.ServiceResult{HTTP: &model.HTTPFingerprint{}, Tunnel: "ssl"}, "https"},
+	} {
+		s := c.in
+		if nameService(&s); s.Name != c.want {
+			t.Errorf("%+v: %q, want %q", c.in, s.Name, c.want)
+		}
+	}
+}
+
+func TestNotHTTPSkipsKnownProtocolsOnly(t *testing.T) {
+	for _, c := range []struct {
+		s    model.ServiceResult
+		want bool
+	}{
+		{model.ServiceResult{Name: "ssh"}, true},
+		{model.ServiceResult{Name: "postgresql"}, true},
+		{model.ServiceResult{Name: "amqp"}, true},
+		{model.ServiceResult{Name: "imap", Tunnel: "ssl"}, false},
+		{model.ServiceResult{Name: "tcpwrapped"}, false},
+		{model.ServiceResult{Name: "unknown"}, false},
+		{model.ServiceResult{Name: "http-proxy"}, false},
+		{model.ServiceResult{Name: ""}, false},
+	} {
+		if got := notHTTP(&c.s); got != c.want {
+			t.Errorf("%+v: %v, want %v", c.s, got, c.want)
+		}
+	}
+}
+
+// slowSV is a network whose version detection hangs on HTTP ports, like
+// nmap's -sV on Gitea (42 s for one port).
+type slowSV struct{ *fakeNet }
+
+func (s slowSV) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*probe.Result, error) {
+	for _, hp := range req.Hosts {
+		for _, p := range hp.Ports {
+			if p == 80 || p == 8080 {
+				select {
+				case <-ctx.Done():
+					return nil, context.Cause(ctx)
+				case <-time.After(20 * time.Second):
+				}
+			}
+		}
+	}
+	return s.fakeNet.ServiceScan(ctx, req)
+}
+
+func TestQuickPathHTTPStopsSlowVersionDetection(t *testing.T) {
+	netw := slowSV{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 80, 8080}}}}
+	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	plan.Policy.MaxPerHostRPS = 100
+	start := time.Now()
+	sink := newSink()
+	out := e.Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	if d := time.Since(start); d > 10*time.Second {
+		t.Errorf("run took %v: the HTTP answer must stop version detection on port 80", d)
+	}
+	h := sink.host("10.7.0.5")
+	if h == nil || len(h.Services) != 3 {
+		t.Fatalf("host = %+v", h)
+	}
+	for _, s := range h.Services {
+		switch s.Port {
+		case 22:
+			if s.Name != "ssh" || s.Product != "OpenSSH" || s.HTTP != nil {
+				t.Errorf("ssh = %+v", s)
+			}
+		case 80, 8080: // 8080: the port table says "unknown" here (nmap says "ppp" for 3000), the page says http
+			if s.Name != "http" || s.HTTP == nil {
+				t.Errorf("http = %+v", s)
+			}
+		}
+	}
+}
+
+// slowSSH is a network whose version detection on port 22 takes a while,
+// like nmap on AMQP (22 s).
+type slowSSH struct{ *fakeNet }
+
+func (s slowSSH) ServiceScan(ctx context.Context, req probe.ServiceRequest) (*probe.Result, error) {
+	if len(req.Hosts) == 1 && len(req.Hosts[0].Ports) == 1 && req.Hosts[0].Ports[0] == 22 {
+		select {
+		case <-ctx.Done():
+			return nil, context.Cause(ctx)
+		case <-time.After(300 * time.Millisecond):
+		}
+	}
+	return s.fakeNet.ServiceScan(ctx, req)
+}
+
+func TestQuickPathStoresAPartialResultFirst(t *testing.T) {
+	defer func(d time.Duration) { quickStoreEvery = d }(quickStoreEvery)
+	quickStoreEvery = 50 * time.Millisecond
+	netw := slowSSH{&fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 80, 8080}}}}
+	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	plan.Policy.MaxPerHostRPS = 100
+	sink := newSink()
+	out := e.Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	sink.mu.Lock()
+	reports := append([]model.HostResult(nil), sink.hosts...)
+	sink.mu.Unlock()
+	if len(reports) < 2 {
+		t.Fatalf("reports = %d, want partial ones and the final one", len(reports))
+	}
+	part, final := reports[0], reports[len(reports)-1]
+	for _, p := range reports[:len(reports)-1] {
+		if !p.PortsUnknown || !p.Interim {
+			t.Errorf("a partial result must be marked PortsUnknown and Interim: %+v", p)
+		}
+	}
+	// the first partial comes before the slow version detection of ssh ended
+	for _, s := range part.Services {
+		if s.Port == 22 && s.Product != "" {
+			t.Errorf("partial = %+v", part)
+		}
+	}
+	if len(part.Services) == 0 {
+		t.Errorf("empty partial")
+	}
+	if final.PortsUnknown || final.Services[0].Product != "OpenSSH" {
+		t.Errorf("final = %+v", final)
+	}
+	for _, p := range reports[:len(reports)-1] {
+		// the store keeps the latest observation of a run by time
+		if !final.ObservedAt.After(p.ObservedAt) {
+			t.Errorf("final observed at %v, a partial at %v", final.ObservedAt, p.ObservedAt)
+		}
+	}
+	if out.Stats.HostsUp != 1 || out.Stats.ServicesOpen != 3 || out.Stats.HTTPServices != 2 {
+		t.Errorf("stats counted the partial result twice: %+v", out.Stats)
+	}
+}
+
+func TestSmallScopeGetsTheFullPortRange(t *testing.T) {
+	netw := &fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 80, 40000}}}
+	e := New(Deps{Prober: netw, Logger: quiet, Fingerprinter: &fakeFP{}, Signatures: fakeSig{}})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.Ports = "top-100"
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	plan.Policy.MaxPerHostRPS = 100
+	sink := newSink()
+	out := e.Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	h := sink.host("10.7.0.5")
+	if h == nil || len(h.Services) != 3 || h.Services[2].Port != 40000 || h.PortsUnknown {
+		t.Fatalf("final host = %+v", h)
+	}
+	sink.mu.Lock()
+	first := sink.hosts[0]
+	sink.mu.Unlock()
+	if !first.PortsUnknown || len(first.Services) != 2 {
+		t.Errorf("the top ports must be stored first as a partial result: %+v", first)
+	}
+	p := out.Stats.Passes
+	if len(p) != 2 || p[0].Name != model.PassTopPorts || p[1].Name != model.PassFullRange {
+		t.Fatalf("passes = %+v", p)
+	}
+	if p[0].State != model.PassDone || p[0].PortsTotal != 100 || p[0].PortsDone != 100 || p[0].Hosts != 1 {
+		t.Errorf("top ports pass = %+v", p[0])
+	}
+	if p[1].State != model.PassDone || p[1].PortsTotal != 65535-100 || p[1].PortsDone != p[1].PortsTotal {
+		t.Errorf("full range pass = %+v", p[1])
+	}
+	if out.Stats.ServicesOpen != 3 || out.Stats.HostsUp != 1 {
+		t.Errorf("stats = %+v", out.Stats)
+	}
+
+	// an explicit port list is scanned as written: one pass, no array
+	plan = basePlan("10.7.0.5")
+	plan.Profile.HTTP = model.HTTPOpts{Enabled: true}
+	sink = newSink()
+	out = e.Run(context.Background(), plan, sink)
+	if h := sink.host("10.7.0.5"); h == nil || len(h.Services) != 2 || out.Stats.Passes != nil {
+		t.Errorf("explicit list: host %+v, passes %+v", h, out.Stats.Passes)
+	}
+}
+
+func TestFullRangeHostBudget(t *testing.T) {
+	hosts := map[string][]int{}
+	for i := 1; i <= 20; i++ {
+		hosts[fmt.Sprintf("10.7.0.%d", i)] = []int{80, 40000}
+	}
+	netw := &fakeNet{hosts: hosts}
+	e := New(Deps{Prober: netw, Logger: quiet})
+	plan := basePlan("10.7.0.0/27")
+	plan.Profile.Ports = "top-100"
+	sink := newSink()
+	out := e.Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	if h := sink.host("10.7.0.3"); h == nil || len(h.Services) != 1 {
+		t.Errorf("20 live hosts are over the budget of %d: host %+v", fullRangeMaxHosts, h)
+	}
+	p := out.Stats.Passes
+	if len(p) != 2 || p[1].State != model.PassSkipped {
+		t.Errorf("passes = %+v", p)
+	}
+}
+
+func TestEstimateCountsTheFullRange(t *testing.T) {
+	e := New(Deps{Prober: &fakeNet{}, Logger: quiet})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.Ports = "top-1000"
+	est := e.Estimate(plan)
+	if est.FullRangeMaxHosts != fullRangeMaxHosts || est.EstPackets < 64000 || est.EstDurationSec < 60 ||
+		est.FullRangeMaxAddresses != 256 || est.FullRangePorts != 64535 || math.Abs(est.EstFullRangeSecPerHost-64535/(float64(EffectiveLimits(plan.Profile, plan.Policy).ProbePPS())*0.9)) > 0.1 {
+		t.Errorf("one host with top-1000: %+v", est)
+	}
+	plan.Profile.Ports = "22,80,443"
+	if est := e.Estimate(plan); est.FullRangeMaxHosts != 0 || est.EstPackets > 1000 {
+		t.Errorf("explicit list: %+v", est)
+	}
+}
+
+// The extra passes keep the policy's port lists: a stack whose policy allows
+// only its own published ports must never see another port probed.
+func TestExtraPassesKeepTheAllowedPorts(t *testing.T) {
+	netw := &recordingNet{fakeNet: &fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 80, 40000}}}}
+	e := New(Deps{Prober: netw, Logger: quiet})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.Ports = "top-100"
+	plan.Policy.AllowedPorts = "22,80,8080"
+	sink := newSink()
+	if out := e.Run(context.Background(), plan, sink); out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	allowed, _ := probe.ParsePorts("22,80,8080")
+	for _, ps := range netw.scanned {
+		for _, p := range ps.List() {
+			if !allowed.Has(p) {
+				t.Fatalf("port %d probed outside allowed_ports", p)
+			}
+		}
+	}
+	if h := sink.host("10.7.0.5"); h == nil || len(h.Services) != 2 {
+		t.Errorf("host = %+v", h)
+	}
+}
+
+type recordingNet struct {
+	*fakeNet
+	mu      sync.Mutex
+	scanned []*probe.PortSet
+}
+
+func (n *recordingNet) PortScan(ctx context.Context, req probe.PortScanRequest) (*probe.Result, error) {
+	n.mu.Lock()
+	n.scanned = append(n.scanned, req.Ports)
+	n.mu.Unlock()
+	return n.fakeNet.PortScan(ctx, req)
+}
+
+func TestExplicitFullRangeGoesTopPortsFirst(t *testing.T) {
+	netw := &recordingNet{fakeNet: &fakeNet{hosts: map[string][]int{"10.7.0.5": {22, 40000}}}}
+	e := New(Deps{Prober: netw, Logger: quiet})
+	plan := basePlan("10.7.0.5")
+	plan.Profile.Ports = "1-65535"
+	sink := newSink()
+	out := e.Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	if len(netw.scanned) < 2 || netw.scanned[0].Count() != 1000 || netw.scanned[0].Count()+netw.scanned[len(netw.scanned)-1].Count() != 65535 {
+		t.Errorf("scans: %d", len(netw.scanned))
+	}
+	if h := sink.host("10.7.0.5"); h == nil || len(h.Services) != 2 {
+		t.Errorf("host = %+v", h)
+	}
+	if p := out.Stats.Passes; len(p) != 2 || p[1].PortsTotal != 64535 {
+		t.Errorf("passes = %+v", p)
 	}
 }

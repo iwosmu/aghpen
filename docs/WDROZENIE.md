@@ -17,33 +17,41 @@ Instrukcja dla administratora. Polecenia z tego dokumentu zostały wykonane 2026
 
 ## 2. Start
 
+W katalogu głównym świeżego klonu, bez żadnego innego kroku:
+
 ```sh
 git clone <adres repozytorium> czujka && cd czujka
-make init                                 # deploy/.env: losowe hasło bazy, hasło administratora, klucz główny
-docker compose -f deploy/docker-compose.yml up -d --build --wait
+docker compose up -d
+docker compose logs czujka | grep -A3 "first administrator"     # login i hasło, pokazane raz
 ```
 
-Skrót: `make up`. `make init` drukuje raz hasło administratora i nie nadpisuje istniejącego `deploy/.env` (`FORCE=1` nadpisuje; stary klucz główny jest wtedy stracony). Zrób kopię `deploy/.env` poza maszyną.
+Plik `compose.yaml` w katalogu głównym włącza `deploy/docker-compose.yml` (Compose 2.20 lub nowszy). `docker compose up -d` buduje obrazy, gdy ich nie ma; po zmianie kodu: `docker compose up -d --build`. Polecenia `docker compose -f deploy/docker-compose.yml …` i `make up` działają jak dotąd i dają ten sam projekt `czujka`.
 
-Zmierzony czas od `git clone` do zdrowego stosu (`deploy/e2e/clone-timing.sh`, commit 19d57d8, Docker 29.6.2, 15 CPU, 29 GB RAM). Koniec pomiaru to `/healthz` z `status: ok`, `tde: true`, `engine: true`.
+Bez `deploy/.env` sekrety powstają przy pierwszym starcie:
 
-| Start | Klon + `make init` | Budowa + start | Razem |
-| --- | --- | --- | --- |
-| zimny: obraz Czujki bez cache (`--no-cache`, npm i moduły Go pobrane od nowa) | 0 s | 32 s | **32 s** |
-| ciepły: drugi czysty klon, cache budowania pełny | 1 s | 13 s | **14 s** |
-
-W obu pomiarach obrazy bazowe (node, golang, alpine) i `czujka-db:17` były już na maszynie. Pierwsze pobranie tych obrazów zależy od łącza i dochodzi do czasu zimnego startu.
-
-Stos startuje także bez `deploy/.env`. Wtedy:
-
-- hasło roli bazy ma wartość domyślną (baza nie ma portu ani trasy na zewnątrz),
-- klucz główny powstaje w wolumenie `czujka-keys`,
+- jednorazowa usługa `secrets` (Alpine, bez sieci) zapisuje losowe hasło roli bazy w wolumenie `czujka-secrets`; baza czyta je przez `POSTGRES_PASSWORD_FILE`, a Czujka przez `CZUJKA_DB_PASSWORD_FILE`. W repozytorium nie ma hasła bazy;
+- klucz główny powstaje w wolumenie `czujka-keys`;
 - losowe hasło pierwszego administratora pojawia się raz w logu.
+
+Własne wartości: `make init` zapisuje `deploy/.env` z losowymi sekretami (`FORCE=1` nadpisuje; stary klucz główny jest wtedy stracony). `docker compose up -d` w katalogu głównym czyta `deploy/.env`. `CZUJKA_DB_PASSWORD` z `deploy/.env` ma pierwszeństwo przed hasłem z wolumenu. Baza utworzona przed wersją z usługą `secrets` zachowuje swoje dotychczasowe hasło. Zrób kopię `deploy/.env` poza maszyną.
+
+Zmierzone na czystej maszynie: `docker:28-dind` na Docker Desktop (arm64), 0 obrazów na starcie, klon z pakietu git gałęzi (zapis: `deploy/e2e/fresh-clone-dind.txt`). Koniec pomiaru to `/api/v1/healthz` z `status: ok` i 21 z 21 tabel zaszyfrowanych.
+
+| Start | Klon | `docker compose up -d` do zdrowego API | Razem |
+| --- | --- | --- | --- |
+| obrazy pobrane z Docker Hub i zbudowane na maszynie (commit f964d6e) | 1 s | 79 s | **80 s** |
+| to samo przez mirror.gcr.io (Docker Hub odrzucał wtedy pobrania anonimowe: `toomanyrequests`), commit d250e29 | 1 s | 115 s | **116 s** |
+| to samo przez mirror.gcr.io, gałąź po scaleniu (commit 607c91e, z `pull_policy: build`) | 2 s | 51 s | **53 s** |
+| paczka offline (§2.2) zamiast budowy, bez sieci | 3 s (rozpakowanie) | 23 s (`sh install.sh`) | **26 s** |
+
+Dalej, w tej samej instancji: logowanie, „Ten komputer”, „Uruchom skan” w 9 s (przeglądarka sterowana skryptem), skan 41 s. Wynik na tej maszynie: nginx na 8787 (wersja i tytuł), API Dockera z TLS na 2376 i Czujka. Host ma etykietę „Host dockera (ten komputer)”. Czas pobierania obrazów zależy od łącza.
+
+Wcześniejszy pomiar na maszynie z obrazami bazowymi w pamięci (`deploy/e2e/clone-timing.sh`, commit 19d57d8): 32 s z budową bez cache, 14 s z cache.
 
 Sprawdzenie:
 
 ```sh
-docker compose -f deploy/docker-compose.yml ps
+docker compose ps
 curl -s http://127.0.0.1:8080/healthz
 ```
 
@@ -53,8 +61,9 @@ curl -s http://127.0.0.1:8080/healthz
 
 | Usługa | Obraz | Sieć i porty | Wolumeny |
 | --- | --- | --- | --- |
-| `db` | `deploy/db`: PostgreSQL 17 (Percona) z `pg_tde` | sieć `internal`, bez portu na hoście | `czujka-pgdata` (dane), `czujka-tde-keys` (klucze `pg_tde`) |
-| `czujka` | `deploy/Dockerfile`: binarka Go, interfejs WWW, nmap 7.97, Alpine | sieci `internal` i `scan`; `127.0.0.1:8080` | `czujka-keys` (klucz główny) |
+| `secrets` | `alpine:3.22`, uruchamiana raz przed bazą | bez sieci | `czujka-secrets` (hasło roli bazy) |
+| `db` | `deploy/db`: PostgreSQL 17 (Percona) z `pg_tde` | sieć `internal`, bez portu na hoście | `czujka-pgdata` (dane), `czujka-tde-keys` (klucze `pg_tde`), `czujka-secrets` (tylko odczyt) |
+| `czujka` | `deploy/Dockerfile`: binarka Go, interfejs WWW, nmap 7.97, Alpine | sieci `internal` i `scan`; `127.0.0.1:8080` | `czujka-keys` (klucz główny), `czujka-secrets` (tylko odczyt) |
 
 ### 2.1 Sprawdzenie instalacji: `czujka doctor`
 
@@ -66,14 +75,14 @@ Polecenie sprawdza: połączenie z bazą, `pg_tde` (zaszyfrowane tabele i WAL), 
 
 ### 2.2 Instalacja offline: `make bundle`
 
-`make bundle` tworzy `dist/czujka-bundle-<wersja>.tar.gz`: oba obrazy (`docker save`), pliki compose bez sekcji budowania, `.env.example`, `init.sh`, `install.sh` i instrukcję `CZYTAJ.txt`. Na maszynie docelowej wystarczy Docker z wtyczką compose, bez dostępu do rejestru obrazów:
+`make bundle` tworzy `dist/czujka-bundle-<wersja>.tar.gz`: obrazy `czujka`, `czujka-db:17` i `alpine:3.22` (`docker save`), pliki compose bez sekcji budowania, `.env.example`, `init.sh`, `install.sh` i instrukcję `CZYTAJ.txt`. Na maszynie docelowej wystarczy Docker z wtyczką compose, bez dostępu do rejestru obrazów:
 
 ```sh
 tar -xzf czujka-bundle-<wersja>.tar.gz && cd czujka-bundle-<wersja>
 sh install.sh      # docker load, .env z losowymi sekretami, start stosu, czujka doctor
 ```
 
-Sprawdzone (`deploy/e2e/bundle-proof.sh`, 9 z 9 kontroli): paczka (350 MiB) trafia do czystego kontenera `docker:28-dind` z `--network none`, czyli bez dostępu do sieci. `install.sh` ładuje obrazy, tworzy `deploy/.env` i uruchamia stos w 29 s. `/healthz` zwraca `ok` z aktywnym `pg_tde`, a administrator loguje się hasłem z instalatora.
+Sprawdzone (`deploy/e2e/bundle-proof.sh`, 9 z 9 kontroli): paczka (350 MiB) trafia do czystego kontenera `docker:28-dind` z `--network none`, czyli bez dostępu do sieci. `install.sh` ładuje obrazy, tworzy `deploy/.env` i uruchamia stos w 29 s. Pomiar 2026-11-21 (commit d250e29, paczka 354 MiB, czysty `docker:28-dind`): 26 s od rozpakowania do zdrowego stosu. Ponownie po scaleniu (commit 607c91e, z obrazem `alpine:3.22` usługi `secrets`): 9 z 9 kontroli, instalacja 29 s. `/healthz` zwraca `ok` z aktywnym `pg_tde`, a administrator loguje się hasłem z instalatora.
 
 ### 2.3 Bez kontenerów: `make release`
 
@@ -83,7 +92,54 @@ Sprawdzone (`deploy/e2e/bundle-proof.sh`, 9 z 9 kontroli): paczka (350 MiB) traf
 
 `.github/workflows/ci.yml`: gofmt, build, vet i testy jednostkowe Go; testy integracyjne na PostgreSQL 17 z `pg_tde` w kontenerze; typecheck, lint, testy i build interfejsu; budowa obrazu produktu.
 
-Kilka instalacji na jednej maszynie: dodaj `-p <nazwa>` i inny port, na przykład `CZUJKA_PORT=18480 docker compose -p czujka-test -f deploy/docker-compose.yml up -d --build --wait`. Nazwy kontenerów i wolumenów dostają wtedy przedrostek `czujka-test`.
+Kilka instalacji na jednej maszynie: dodaj `-p <nazwa>` i inny port, na przykład `CZUJKA_PORT=18480 docker compose -p czujka-test up -d`. Nazwy kontenerów i wolumenów dostają wtedy przedrostek `czujka-test`.
+
+### 2.5 Test na szablonie organizatorów (`lab/jury`)
+
+Szablon organizatorów to jedna maszyna: usługi w Dockerze na portach hosta (`lab/jury/README.md`). Są dwa tryby.
+
+| Tryb | Kiedy | Co znaczy `localhost` |
+| --- | --- | --- |
+| domyślny (`deploy/docker-compose.yml`) | Docker Desktop (macOS, Windows) i Linux | host dockera: adres, na który wskazuje `host.docker.internal` (Docker Desktop: 192.168.65.254, Linux: brama mostu, np. 172.17.0.1). Czujka skanuje porty opublikowane przez hosta. |
+| sieć hosta (`deploy/docker-compose.host-network.yml`) | tylko Linux | sam `127.0.0.1` maszyny; Czujka widzi też bezpośrednio każdą sieć mostkową Dockera na tej maszynie |
+
+Tryb domyślny, od zera do pierwszego wyniku:
+
+```sh
+CZUJKA_PORT=9180 docker compose up -d
+docker compose logs czujka | grep -A3 "first administrator"
+(cd lab/jury && ./quickstart.sh up)
+```
+
+Szablon zajmuje port 8080, dlatego Czujka dostaje 9180. W interfejsie (`http://127.0.0.1:9180`) naciśnij „Ten komputer” i „Uruchom skan”. Profil domyślny (top 1000 i porty infrastruktury) obejmuje też porty szablonu spoza top 1000: `2223,5673,8474,8787,15432,15673,21000-21010`. Na stacji roboczej host dockera to ten sam komputer: pełny zakres portów (`1-65535`, `top-1000`) trafia sondami wykrywania wersji także w lokalne usługi innych programów. Gdy na komputerze działają inne programy, skanuj tylko porty szablonu (`21,80,81,443,2223,3001,5673,6379,8080,8081,8085,8086,8088,8089,8090,8474,8787,8888,15432,15673,21000-21010`) i ustaw tę samą listę w `allowed_ports` polityki bezpieczeństwa. Podgląd celu pokazuje „skanowany jako 192.168.65.254” (pole `maps_to` w API), a `/api/v1/healthz` podaje `host_gateway`. Host trafia do inwentarza raz, pod adresem bramy, z nazwą `localhost` i etykietą „Host dockera (ten komputer)”. Usługa Czujki na porcie `CZUJKA_PORT` tego hosta dostaje tag `czujka` i nie daje znalezisk. Wykluczenia i blokada operatora dotyczą adresu bramy, nie `127.0.0.1`.
+
+Sieć hosta (Linux):
+
+```sh
+CZUJKA_PORT=9180 docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.host-network.yml up -d --build --wait
+# compose.yaml w katalogu głównym nie łączy się z tym plikiem: podaj oba pliki -f
+```
+
+Interfejs słucha wtedy na `CZUJKA_BIND:CZUJKA_PORT` samego hosta (domyślnie `127.0.0.1`). Baza zostaje w swojej sieci i jest dostępna z hosta tylko na `127.0.0.1:CZUJKA_DB_HOST_PORT` (domyślnie 55432). Plik wymaga Docker Compose 2.24 lub nowszego.
+
+Zmierzone 2026-11-21:
+
+- Docker Desktop, tryb domyślny, cel `localhost`, własne kontenery na `127.0.0.1` (nginx i Toxiproxy), porty `18950,28787,28085`: `host_gateway` 192.168.65.254. Przebieg 1: 3 usługi, Czujka z tagiem `czujka`. Przebieg 2 (nginx zatrzymany, Toxiproxy +500 ms): `service_gone` na 28787 i `response_slower` na 28085 (509 ms, baza 5 ms). Przebieg 3: `service_returned` na 28787 (83 s nieobecności, 1 skan) i `response_recovered` (4 ms). Każdy przebieg 39–45 s dla jednego hosta i 3 portów.
+- Linux (serwer z Ubuntu 24.04, ufw przepuszcza tylko 22), tryb domyślny, cel `localhost`, własne kontenery nginx opublikowane tylko na adresie mostu `172.17.0.1`, porty `28787,28788`: `host.docker.internal` w kontenerze to `172.17.0.1`, `host_gateway` 172.17.0.1, podgląd `localhost` → `maps_to` 172.17.0.1. Przebieg 1: obie usługi i etykieta „Host dockera (ten komputer)”. Przebieg 2 (nginx na 28787 zatrzymany): `service_gone` na 28787. Przebieg 3: `service_returned` (41 s nieobecności, 1 skan). Każdy przebieg 18–22 s.
+  Na Linuksie port opublikowany tylko na `127.0.0.1` hosta (`-p 127.0.0.1:P:P`) nie jest osiągalny z kontenera przez `172.17.0.1`. Szablon publikuje porty na wszystkich adresach, więc tryb domyślny je widzi. Usługę związaną z `127.0.0.1` skanuje tryb sieci hosta.
+  Za zaporą, która odrzuca pakiety bez odpowiedzi (ufw), zatrzymana usługa daje stan `filtered`, a nie `closed`. Port otwartej wcześniej usługi w stanie `filtered` na hoście, który odpowiada, to `service_gone`, a nie „usługa nieosiągalna”.
+- Linux, sieć hosta, po zmianie sekretów (commit 607c91e, bez `.env`): `up -d --build --wait` 31 s, usługa `secrets` wygenerowała hasło bazy, interfejs i baza słuchają tylko na `127.0.0.1` (18090 i 55491). Cel `127.0.0.1`, porty `18090,28787`: przebieg 1 obie usługi (Czujka z tagiem `czujka`), przebieg 2 `service_gone` na 28787, przebieg 3 `service_returned` (1 min, 1 skan). Każdy przebieg 33–38 s.
+- Linux (serwer z Ubuntu 24.04), sieć hosta, cel `127.0.0.1`, porty `18090,28787`: `network_mode=host`, interfejs i baza tylko na `127.0.0.1`, `host_gateway` puste. Przebiegi 1–3: `service_gone`, potem `service_returned` na 28787; usługa Czujki z tagiem `czujka`, bez znalezisk. Każdy przebieg 32–39 s.
+
+Zmiany między skanami (`docs/API.md`, rodzaje zmian):
+
+| Rodzaj | Kiedy |
+| --- | --- |
+| `service_returned` „Usługa wróciła” | usługa (ten sam host, port i protokół) była otwarta we wcześniejszym przebiegu, w poprzednim nie, teraz znów jest otwarta. Zmiana podaje, kiedy była otwarta ostatnio, ile sekund jej nie było i w ilu skanach. Usługa widziana wcześniej nigdy nie jest „nowa”. |
+| `response_slower` „Wolniejsza odpowiedź” | czas odpowiedzi HTTP jest co najmniej 2 razy większy od bazy usługi i większy o co najmniej 300 ms; albo port jest otwarty, a HTTP nie odpowiedział (`"error": "no_answer"`), choć wcześniej odpowiadał. Baza: mediana ostatnich 5 pomiarów, które same nie były wolne; wystarczy jeden pomiar. Zgłaszane raz, przy przejściu. |
+| `response_recovered` „Odpowiedź w normie” | wolna usługa znów odpowiada w zwykłym czasie |
+
+Czas odpowiedzi to czas pierwszego żądania `GET` do usługi (`http.response_ms` w zapisie obserwacji). Seria do wykresu: `GET /api/v1/services/{id}/response-times`.
 
 ## 3. Zmienne `CZUJKA_*`
 
@@ -91,7 +147,7 @@ Kilka instalacji na jednej maszynie: dodaj `-p <nazwa>` i inny port, na przykła
 
 | Zmienna | Domyślnie | Znaczenie |
 | --- | --- | --- |
-| `CZUJKA_DB_PASSWORD` | `czujka-internal-network-only` | hasło roli bazy; ustaw własne przed pierwszym startem |
+| `CZUJKA_DB_PASSWORD` | puste | hasło roli bazy; puste = losowe, zapisane przy pierwszym starcie w wolumenie `czujka-secrets` (usługa `secrets`). Działa przy tworzeniu bazy; zmiana później wymaga też `ALTER ROLE` w bazie |
 | `CZUJKA_ADMIN_EMAIL` | `admin@czujka.local` | pierwszy administrator, tworzony przy pierwszym starcie |
 | `CZUJKA_ADMIN_PASSWORD` | puste | hasło pierwszego administratora (co najmniej 10 znaków); puste = losowe, pokazane raz w logu |
 | `CZUJKA_MASTER_KEY` | puste | klucz główny szyfrowania pól: 32 bajty jako base64 albo hex; puste = klucz w pliku w wolumenie |
@@ -104,13 +160,17 @@ Kilka instalacji na jednej maszynie: dodaj `-p <nazwa>` i inny port, na przykła
 | `CZUJKA_ALLOWED_NETWORKS` | puste | blokada operatora: sieci CIDR po przecinku. Czujka nie skanuje nic poza nimi. Żaden użytkownik, także administrator, nie poszerzy jej w interfejsie ani w API |
 | `CZUJKA_TZ` | `Europe/Warsaw` | strefa czasowa histogramu dostępności hostów (godzina tygodnia) |
 | `CZUJKA_VERSION` | `dev` | etykieta obrazu i wersja w `/healthz` |
+| `CZUJKA_HOST_GATEWAY` | puste | adres, pod którym Czujka w kontenerze skanuje cele `localhost`, `127.x` i `::1`. Puste: adres IPv4 `host.docker.internal` (tylko w kontenerze); `off`: pętla zwrotna zostaje pętlą zwrotną; adres IPv4: ten adres. Odpowiedź tylko IPv6 wyłącza mapowanie (ostrzeżenie w logu) |
+| `CZUJKA_DB_HOST_PORT` | `55432` | tylko w trybie sieci hosta: port bazy na `127.0.0.1` hosta |
 
 ### 3.2 Zmienne binarki ustawiane przez obraz albo compose
 
 | Zmienna | Wartość w stosie | Znaczenie |
 | --- | --- | --- |
 | `CZUJKA_DB_URL` | `postgres://czujka:…@db:5432/czujka?sslmode=disable` | adres bazy; wymagana |
+| `CZUJKA_DB_PASSWORD_FILE` | puste (w compose: `/run/czujka-secrets/db_password`) | plik z hasłem bazy; hasło trafia do `CZUJKA_DB_URL` w miejsce hasła z adresu |
 | `CZUJKA_LISTEN` | `:8080` | adres nasłuchu w kontenerze |
+| `CZUJKA_PUBLISHED_PORT` | `CZUJKA_PORT` | port, na którym host publikuje interfejs; usługa Czujki na tym porcie hosta dockera dostaje tag `czujka`. Puste: port z `CZUJKA_LISTEN` |
 | `CZUJKA_WEB_DIR` | `/app/web` | katalog ze zbudowanym interfejsem |
 | `CZUJKA_MASTER_KEY_FILE` | `/var/lib/czujka/master.key` | plik klucza głównego; powstaje z prawami 0600, gdy go nie ma i `CZUJKA_MASTER_KEY` jest puste |
 
@@ -293,7 +353,8 @@ Kontener `czujka` jest w sieci `scan` (zwykły most Dockera). Przez nią i przez
 | Kontenery laboratorium w innej sieci Dockera | `docker network connect <sieć_laboratorium> czujka-czujka-1` | Polecenie sprawdzone: kontener dostaje adres w dołączonej sieci. Skan z produktu: do weryfikacji po integracji silnika. |
 | To samo na stałe | plik override z siecią zewnętrzną (niżej) | niesprawdzone |
 | Sieć fizyczna za hostem | Ruch wychodzi przez NAT hosta. Wykrywanie ARP nie działa przez NAT; działają ICMP i TCP. | do weryfikacji po integracji silnika |
-| Ten sam segment L2 z ARP | `network_mode: host` (tylko Linux) | niesprawdzone |
+| Usługi opublikowane na portach hosta dockera | cel `localhost` (mapowany na `host.docker.internal`, §2.5) | sprawdzone na Docker Desktop 2026-11-21 |
+| `127.0.0.1` maszyny i wszystkie sieci mostkowe Dockera; ten sam segment L2 z ARP | `deploy/docker-compose.host-network.yml` (`network_mode: host`, tylko Linux, §2.5) | cel `127.0.0.1` sprawdzony na Linuksie 2026-11-21; sieci mostkowe i ARP niesprawdzone |
 
 ```yaml
 # deploy/docker-compose.override.yml

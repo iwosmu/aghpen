@@ -109,7 +109,8 @@ type PrevHost struct {
 	Up         bool      `json:"up"`
 	Status     string    `json:"status"` // model status at that observation; "" when it was never analysed
 	At         time.Time `json:"at"`
-	ServiceRun int64     `json:"service_run"` // newest earlier run in which the host answered; 0 = never
+	ServiceRun int64     `json:"service_run"` // newest earlier run in which the host answered with a finished port scan; 0 = never
+	Reason     string    `json:"reason"`      // reason of the newest observation ("ports-unknown": its services are a subset)
 }
 
 // PrevHosts returns, for each given host, its newest observation in a run before runID.
@@ -119,10 +120,11 @@ func (s *Store) PrevHosts(ctx context.Context, runID int64, hostIDs []int64) (ma
 	if len(hostIDs) == 0 {
 		return out, nil
 	}
-	err := eachJSON(ctx, s.db, wrapJSON(`SELECT p.host_id, p.run_id, p.up, p.status, p.at, COALESCE(u.run_id, 0) AS service_run
-		FROM (SELECT DISTINCT ON (host_id) host_id, run_id, up, status, at FROM host_observations
+	err := eachJSON(ctx, s.db, wrapJSON(`SELECT p.host_id, p.run_id, p.up, p.status, p.at, p.reason, COALESCE(u.run_id, 0) AS service_run
+		FROM (SELECT DISTINCT ON (host_id) host_id, run_id, up, status, at, reason FROM host_observations
 			WHERE host_id = ANY($1) AND run_id < $2 ORDER BY host_id, run_id DESC, at DESC) p
-		LEFT JOIN (SELECT host_id, max(run_id) AS run_id FROM host_observations WHERE host_id = ANY($1) AND run_id < $2 AND up GROUP BY host_id) u
+		LEFT JOIN (SELECT host_id, max(run_id) AS run_id FROM host_observations WHERE host_id = ANY($1) AND run_id < $2 AND up
+			AND reason IS DISTINCT FROM '`+model.ReasonPortsUnknown+`' GROUP BY host_id) u
 			ON u.host_id = p.host_id`), []any{hostIDs, runID}, func(p *PrevHost) error {
 		out[p.HostID] = *p
 		return nil
@@ -322,7 +324,12 @@ const DefaultPorts = "top-1000," +
 	"1883,4369,5671,5672,8883,15672,15692,25672,61613,61616," + // message brokers
 	"2375,2376,4243,6443,9443,10250,10255," + // container and cluster APIs
 	"3000,5601,9090,9093,9100,9113,9187,9216," + // monitoring and metrics
-	"5985,5986,18080,50000" // remote management, CI agents
+	"5985,5986,18080,50000," + // remote management, CI agents
+	// Ports that containers publish on a single machine and top 1000 leaves
+	// out: alternative SSH, Vite dev server, second RabbitMQ (AMQP and
+	// management), Toxiproxy API, Flask/RStudio, second PostgreSQL, and a
+	// containerised FTP passive range. "Ten komputer" copies this profile.
+	"2223,5173,5673,8474,8787,15432,15673,21000-21010"
 
 // DefaultProfile is the scan profile of a new installation: the profile we
 // measured on the 70-host lab (docs/WYNIKI.md), under the caps of the default

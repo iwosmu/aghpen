@@ -34,6 +34,105 @@ type statsKeeper struct {
 	sessionPk int64
 	flights   map[int]flight // paced probe stages that run now
 	flightSeq int
+	passes    []*passRec // port passes in execution order (RunStats.Passes)
+}
+
+// passRec is one port pass. Its running port scans count in PortsDone at
+// their pinned rate until they end.
+type passRec struct {
+	st      model.PassStat
+	running map[int]passFlight
+}
+
+type passFlight struct {
+	start time.Time
+	rate  int
+	pairs int64
+}
+
+func (k *statsKeeper) passLocked(name string) *passRec {
+	for _, p := range k.passes {
+		if p.st.Name == name {
+			return p
+		}
+	}
+	p := &passRec{st: model.PassStat{Name: name, State: model.PassPending}, running: map[int]passFlight{}}
+	k.passes = append(k.passes, p)
+	return p
+}
+
+// addPass lists a pass that will run (pending) so the run page shows it
+// from the start.
+func (k *statsKeeper) addPass(name string) {
+	k.mu.Lock()
+	k.passLocked(name)
+	k.mu.Unlock()
+}
+
+// passBegin marks a port scan of a pass as started; call end when it ends.
+func (k *statsKeeper) passBegin(name string, hosts int, pairs int64, rate int) (end func()) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	p := k.passLocked(name)
+	p.st.State = model.PassRunning
+	p.st.Hosts += hosts
+	p.st.PortsTotal += pairs
+	k.flightSeq++
+	id := k.flightSeq
+	p.running[id] = passFlight{start: k.now(), rate: max(1, rate), pairs: pairs}
+	return func() {
+		k.mu.Lock()
+		defer k.mu.Unlock()
+		if f, ok := p.running[id]; ok {
+			p.st.PortsDone += f.pairs
+			delete(p.running, id)
+		}
+	}
+}
+
+// passState sets the state of a pass (done when the engine knows no more
+// scan of it will come, skipped when it will not run).
+func (k *statsKeeper) passState(name, state string) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	p := k.passLocked(name)
+	if len(p.running) == 0 {
+		p.st.State = state
+	}
+}
+
+// finishPasses closes the passes when the run ends: a completed run has
+// every pass done or skipped.
+func (k *statsKeeper) finishPasses(completed bool) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if !completed {
+		return
+	}
+	for _, p := range k.passes {
+		switch {
+		case p.st.State == model.PassPending:
+			p.st.State = model.PassSkipped
+		case len(p.running) == 0:
+			p.st.State = model.PassDone
+		}
+	}
+}
+
+// passesLocked is the Passes value of a snapshot: present only with more
+// than one pass.
+func (k *statsKeeper) passesLocked(now time.Time) []model.PassStat {
+	if len(k.passes) < 2 {
+		return nil
+	}
+	out := make([]model.PassStat, len(k.passes))
+	for i, p := range k.passes {
+		out[i] = p.st
+		for _, f := range p.running {
+			out[i].PortsDone += min(f.pairs, int64(now.Sub(f.start).Seconds()*float64(f.rate)))
+		}
+	}
+	return out
 }
 
 // flight is a probe stage that is still running. Its packet count is known
@@ -113,6 +212,7 @@ func (k *statsKeeper) snapshot() model.RunStats {
 	active := now.Sub(k.started)
 	s := k.s
 	s.ElapsedSec = k.prevSec + int64(active.Seconds())
+	s.Passes = k.passesLocked(now)
 
 	// current speed: packets of recent stages that fall into the window
 	from := now.Add(-ppsWindow)

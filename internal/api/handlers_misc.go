@@ -21,6 +21,7 @@ import (
 
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/runner"
+	"github.com/iwosmu/aghpen/internal/targets"
 )
 
 // ---------- signatures ----------
@@ -495,6 +496,12 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 	out["engine"] = s.d.Runner != nil && s.d.Runner.EngineWired()
 	if s.d.EngineInfo != nil {
 		out["probe"] = s.d.EngineInfo()
+	}
+	// The docker host as loopback targets are scanned ("" when the mapping is
+	// off): the UI offers it as "Ten komputer".
+	out["host_gateway"] = ""
+	if gw := targets.HostGateway(); gw.IsValid() {
+		out["host_gateway"] = gw.String()
 	}
 	writeJSON(w, http.StatusOK, out)
 }

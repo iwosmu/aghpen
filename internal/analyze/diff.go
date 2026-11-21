@@ -59,6 +59,9 @@ type HostSnapshot struct {
 	PortsUnknown bool
 	// ServiceIDs maps "port/proto" to the store id, when known.
 	ServiceIDs map[string]int64
+	// History maps "port/proto" to what earlier runs know about the service
+	// (service_returned, response time). Nil: no history.
+	History map[string]ServiceHistory
 }
 
 // Snapshot is the state of the inventory after one run.
@@ -112,6 +115,7 @@ type DiffOptions struct {
 var sensitiveClasses = map[string]bool{
 	model.ClassAdminPanel: true, model.ClassDatabase: true, model.ClassRemoteAccess: true,
 	model.ClassDevTool: true, model.ClassIoT: true, model.ClassLogin: true,
+	model.ClassInstallPage: true, model.ClassUnauthControlAPI: true,
 }
 
 // volatileHeaders are header names that change between two requests to the
@@ -194,6 +198,10 @@ func Diff(prev *Snapshot, cur Snapshot, opts DiffOptions) ([]model.Change, model
 			sum.ServicesGone++
 		case model.ChangeServiceChanged:
 			sum.ServicesChanged++
+		case model.ChangeServiceReturned:
+			sum.ServicesReturned++
+		case model.ChangeResponseSlower:
+			sum.ResponsesSlower++
 		}
 	}
 	sum.ServicesUnreachable = d.unreachable
@@ -307,7 +315,7 @@ func (d *differ) host(prev, cur *HostSnapshot) {
 		// New host: every open service is a new exposure.
 		for i := range cur.Services {
 			if s := &cur.Services[i]; isOpen(s) {
-				d.serviceNew(cur, s)
+				d.serviceNewOrReturned(cur, s)
 			}
 		}
 		return
@@ -335,8 +343,11 @@ func (d *differ) host(prev, cur *HostSnapshot) {
 	for _, s := range order {
 		if p, ok := prevSvc[svcKey(s)]; ok {
 			d.service(cur, p, s)
+			if hist, ok := cur.History[svcKey(s)]; ok {
+				d.response(cur, s, hist)
+			}
 		} else {
-			d.serviceNew(cur, s)
+			d.serviceNewOrReturned(cur, s)
 		}
 	}
 	gone := make([]*model.ServiceResult, 0)
@@ -366,6 +377,17 @@ func (d *differ) host(prev, cur *HostSnapshot) {
 		d.add(cur, p, model.ChangeServiceGone, model.SevLow, "state", "open", after, false,
 			fmt.Sprintf("Usługa %s zniknęła%s", addr(cur.IP, p.Port), productNote(p)))
 	}
+}
+
+// serviceNewOrReturned reports an open service that the previous run did
+// not have open: returned when an earlier run saw it open, else new. An
+// identity seen before is never service_new.
+func (d *differ) serviceNewOrReturned(h *HostSnapshot, s *model.ServiceResult) {
+	if hist, ok := h.History[svcKey(s)]; ok && hist.LastOpenRun != 0 {
+		d.serviceReturned(h, s, hist)
+		return
+	}
+	d.serviceNew(h, s)
 }
 
 func (d *differ) serviceNew(h *HostSnapshot, s *model.ServiceResult) {
@@ -846,6 +868,7 @@ var classPL = map[string]string{
 	model.ClassIoT: "urządzenie IoT", model.ClassDefaultPage: "strona domyślna", model.ClassAPI: "API",
 	model.ClassDevTool: "narzędzie deweloperskie", model.ClassDatabase: "baza danych", model.ClassRemoteAccess: "zdalny dostęp",
 	model.ClassDirListing: "listing katalogu", model.ClassErrorPage: "strona błędu",
+	model.ClassInstallPage: "niedokończona instalacja", model.ClassUnauthControlAPI: "API sterujące bez logowania",
 }
 
 func classNames(cs []string) []string {

@@ -211,6 +211,37 @@ Kubełki modelu mają domyślnie szerokość 1 h i okres 1 tygodnia (168 kubełk
 
 Reguły: szerokość co najmniej 1 s, okres jest całkowitą wielokrotnością szerokości, najwyżej 168 kubełków. Przy innym zegarze model liczy kubełek jako `(czas Unix mod okres) / szerokość`, kurczy częstość kubełka prosto do częstości globalnej (bez poziomu dnia tygodnia) i opisuje rytm jako „zegar laboratoryjny”. To ustawienie służy tylko do pokazu. W produkcji zostaw wartości domyślne.
 
+### 2.11 Skan portów: limit czasu, porty nieznane, kontrola poprawności
+
+nmap skanuje hosty jednego procesu równolegle, w tempie przydzielonym grupie (limit pakietów minus rezerwa HTTP, podzielony między równoległe grupy). Jeden host może więc potrzebować całego czasu procesu. Limit czasu na host (`--host-timeout`) rośnie z pracą: `max(5 min, hosty × porty × 3 / tempo)`. Pomiar na serwerze publicznym przed zmianą: 8 równoległych grup po 105 pps, grupa z około 35 hostami i 1000 portów potrzebowała ponad 330 s; stały limit 5 minut odciął wszystkie hosty tej grupy. Przebieg skończył się bez błędu z 8 usługami zamiast 107, a porównanie zgłosiło 100 usług, które „zniknęły".
+
+- nmap z `-Pn` w sieci Ethernet zapisuje host po limicie czasu jako `timedout="true"` z powodem `arp-response`. Czujka czyta ten atrybut. Taki host dostaje drugi skan portów.
+- Host, którego skan i tak się nie skończył, trafia do wyniku z `ports_unknown` (powód `ports-unknown`). Baza nie oznacza jego usług jako zniknięte, a porównanie liczy je jako nieosiągalne (`services_unreachable`).
+- Przebieg dostaje ostrzeżenie (`stats.warnings`, widoczne w API i na stronie przebiegu), gdy port scan nie skończył się dla jakiegoś hosta albo gdy na skan portów odpowiedziała mniej niż połowa hostów znalezionych przez wykrywanie (co najmniej 8 hostów).
+- Host z co najmniej 10 otwartymi portami z listy profilu dostaje dodatkowy skan portów 1–10000 (najwyżej 4 hosty na grupę). Host z wieloma usługami zwykle nasłuchuje też na nietypowych portach. W laboratorium host z 64 portami pokazał 33 porty z listy domyślnej i ukrywał 31 portów o randze 1045–7379 w tabeli częstości nmap (albo bez rangi), wszystkie poniżej 10000.
+
+Każda zmiana silnika przechodzi przez `e2e/lab-gate.sh` (pełny /16 laboratorium przez API produktu, progi czułości, kontrola pakietów w każdej sekundzie, tablica sąsiadów). Wyniki: `docs/WYNIKI.md`.
+
+### 2.12 Mały zakres: szybka ścieżka, pełny zakres portów, wyniki częściowe
+
+**Szybka ścieżka.** Grupa z co najwyżej 32 otwartymi portami TCP (wszystkie hosty razem) nie czeka na wykrywanie wersji całej grupy. Dla każdego portu działa osobny proces `nmap -sV` (najwyżej 8 naraz), a obok niego etap HTTP. Gdy GET na port zwróci stronę, wykrywanie wersji tego portu kończy się: stronę opisuje kolektor HTTP. Port, którego wykrywanie wersji trwa dłużej niż 30 s, zostaje z nazwą z tablicy portów nmap lub z etapu HTTP. Pomiar na jednym hoście z 7 usługami (nginx, Apache, RabbitMQ AMQP i panel, Gitea, PostgreSQL, OpenSSH): `nmap -sV` na porcie Gitea (3000) trwa 42 s przy każdej intensywności 0–9, bo nmap najpierw wysyła sondy przypisane do portu 3000, a Gitea na nie nie odpowiada (5 s oczekiwania na każdą). Kolektor HTTP rozpoznaje Gitea w mniej niż 1 s. Etap HTTP pomija porty protokołów, które nigdy nie mówią HTTP (ssh, postgresql, amqp, mysql, redis ...), chyba że mają tunel TLS. Druga runda ścieżek sygnatur nie pobiera ponownie strony głównej.
+
+**Pełny zakres portów.** Zakres do 256 adresów z profilem z listą rankingową (`top-N`) albo z `1-65535` dostaje drugi przebieg: reszta zakresu 1-65535 dla żywych hostów, najwyżej 16 w całym przebiegu. Skan reszty zaczyna się zaraz po skanie portów z listy, obok opisu tych portów, z 90 % szybkości grupy. Pozostałe 10 % zostaje dla wykrywania wersji. Jawna lista portów (`80,443,8080`) jest skanowana tak, jak ją zapisano. Oba przebiegi respektują `allowed_ports` i `denied_ports` polityki. Gdy reszta zakresu nie skończy się (limit czasu nmap), host dostaje `ports_unknown`: usługi spoza listy nie znikają.
+
+**Wyniki częściowe.** Na szybkiej ścieżce opisane usługi trafiają do bazy co 2 s, zanim przebieg się skończy. Wynik częściowy ma `ports_unknown`, więc baza nie oznacza żadnej innej usługi hosta jako zniknętej. Liczniki `services_open` i `http_services` rosną od razu; wynik końcowy zastępuje w nich częściowy. Porównanie z poprzednim przebiegiem, ustalenia i reguły powstają raz, na końcu przebiegu.
+
+**`RunStats.passes`.** Tablica jest obecna tylko wtedy, gdy przebieg ma więcej niż jeden przebieg portów: `top_ports` i `full_range` (mały zakres) albo `top_ports` i `dense` (/16). `ports_total` i `ports_done` liczą pary host-port. W trakcie skanu `ports_done` wynika z przypiętej szybkości nmap (`--min-rate` = `--max-rate`); po skanie jest dokładne. Szacunek przebiegu (`full_range_max_hosts`) liczy pakiety drugiego przebiegu.
+
+Pomiar na hoście „jury" (jeden adres w sieci laboratorium, 7 usług, limit 1000 pps, `e2e/small-bench.sh`):
+
+| profil | przed: czas przebiegu | po: pierwsza usługa | po: czas przebiegu | porty |
+| --- | --- | --- | --- | --- |
+| 7 portów z nazwy | 68 s | 3,6 s | 23,6 s | 7 |
+| top-1000 | 63 s | 4,2 s | 117 s | 1-65535 (dwa przebiegi) |
+| profil domyślny | — | 4,1 s | 87 s | 1-65535 (dwa przebiegi) |
+
+Czas „7 portów" ogranicza wykrywanie wersji AMQP (RabbitMQ odpowiada na sondę AMQP nmap dopiero po 22 s). Etap HTTP przy domyślnej polityce (2 żądania/s na host) opisuje 4 usługi WWW w około 20 s.
+
 ## 3. Wykrywanie zmian
 
 `Diff(prev, cur)` porównuje dwa obrazy sieci i zwraca listę zmian oraz podsumowanie. Gdy nie ma poprzedniego przebiegu, nie ma zmian: pierwszy skan to punkt odniesienia.
@@ -407,7 +438,7 @@ Ponowny skan tej samej rzeczy daje ten sam klucz. Baza aktualizuje więc obserwa
 | --- | --- | --- |
 | `admin-panel` | 75 | |
 | `debug-page` | 75 | |
-| `database-exposed` | 70 | |
+| `database-exposed` | 70 | tylko protokół bazy; narzędzie WWW do baz (phpMyAdmin, Adminer, pgAdmin) dostaje `admin-panel` |
 | `remote-access-exposed` | 20 | telnet, rlogin: 70; RDP, VNC: 50; SSH: 20 |
 | `expired-cert` | 40 | na stronie logowania: 70 |
 | `dev-tool` | 60 | |
@@ -423,7 +454,7 @@ Ponowny skan tej samej rzeczy daje ten sam klucz. Baza aktualizuje więc obserwa
 | `default-page` | 15 | |
 | `interesting-cookie` | 10 | ciasteczko sesyjne bez flag: 25; wartość JWT: 20; z sygnatury: 5–25 |
 
-Modyfikatory: krytyczność zakresu 4 dodaje 5, krytyczność 5 dodaje 10 (`FindingInput.ScopeCriticality`); usługa nowa od poprzedniego przebiegu dodaje 10. Wynik jest obcięty do 100.
+Modyfikatory: krytyczność zakresu 4 dodaje 5, krytyczność 5 dodaje 10 (`FindingInput.ScopeCriticality`); usługa nowa od poprzedniego przebiegu dodaje 10. Ocena usługi rozstrzyga remisy w obrębie typu: dodaje 0–4 punkty (jeden punkt na każde 10 ponad 50). W laboratorium 15 obserwacji miało wcześniej tę samą ocenę 75; teraz panel routera po zwykłym HTTP (usługa 96) stoi nad stroną logowania WordPressa (usługa 80). Wynik jest obcięty do 100. Obserwacje z reguł ekspozycji mają najwyżej 69, więc stoją pod obserwacją silnika o tym samym fakcie (`docs/REGULY.md`).
 
 **Bliskie duplikaty na jednej usłudze** łączą się w jedną obserwację z kilkoma wierszami dowodów:
 

@@ -143,3 +143,29 @@ func TestFindingKeyIsStableAcrossRescans(t *testing.T) {
 		t.Errorf("FindingKey = %q", got)
 	}
 }
+
+// Inside one finding type the service interest breaks the tie (0..4), and a
+// web tool for databases gets the admin-panel finding, not "database open to
+// the network".
+func TestFindingTieBreakAndWebDatabaseTool(t *testing.T) {
+	b := &findingBuilder{fs: &FindingService{Interest: 96}, s: &model.ServiceResult{}, in: &FindingInput{}}
+	hi := b.interest(FindingAdminPanel, nil)
+	b.fs.Interest = 55
+	lo := b.interest(FindingAdminPanel, nil)
+	if hi != 79 || lo != 75 {
+		t.Errorf("admin panel: %d (service 96), %d (service 55)", hi, lo)
+	}
+	web := model.ServiceResult{Port: 80, Proto: "tcp", State: "open", Name: "http", Classes: []string{model.ClassDatabase, model.ClassAdminPanel},
+		HTTP: &model.HTTPFingerprint{URL: "http://10.0.0.5/", Status: 200, Title: "phpMyAdmin"}}
+	db := model.ServiceResult{Port: 5432, Proto: "tcp", State: "open", Name: "postgresql", Classes: []string{model.ClassDatabase}}
+	fs := DeriveFindings(FindingInput{IP: "10.0.0.5", Services: []FindingService{{Result: web, Interest: 90}, {Result: db, Interest: 70}}})
+	var dbPorts []int
+	for _, f := range fs {
+		if f.Type == FindingDatabase {
+			dbPorts = append(dbPorts, f.Port)
+		}
+	}
+	if len(dbPorts) != 1 || dbPorts[0] != 5432 {
+		t.Errorf("database findings on ports %v, want only 5432", dbPorts)
+	}
+}

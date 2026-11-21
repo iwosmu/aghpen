@@ -1,0 +1,13 @@
+# Czujka: in the repository root, without any other step,
+#
+#   docker compose up -d
+#
+# starts the product stack from deploy/docker-compose.yml on http://127.0.0.1:8080.
+# Secrets create themselves on the first start; the first administrator password:
+#
+#   docker compose logs czujka | grep -A3 "first administrator"
+#
+# Your own values (make init writes deploy/.env) are read from deploy/.env.
+name: czujka
+include:
+  - deploy/docker-compose.yml

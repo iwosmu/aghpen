@@ -2,6 +2,7 @@ package scan
 
 import (
 	"context"
+	"strings"
 	"sync/atomic"
 
 	"github.com/iwosmu/aghpen/internal/model"
@@ -12,6 +13,12 @@ import (
 // extra paths for one service after its root page is known (internal/sig).
 type pathPlanner interface {
 	PathsFor(svc *model.ServiceResult, limit int) []string
+}
+
+// pathFetcher is the optional part of a fingerprinter that requests only the
+// extra paths of a service whose root page is known (internal/httpfp).
+type pathFetcher interface {
+	FetchPaths(ctx context.Context, req model.FingerprintRequest, fp *model.HTTPFingerprint) (*model.HTTPFingerprint, *model.TLSInfo, error)
 }
 
 // hostMatcher is the optional part of a signature engine that also uses the
@@ -74,12 +81,19 @@ func (r *run) httpWait(ctx context.Context, host *probe.Limiter, n int) error {
 // counts the requests in the answer and pays them after the call, so the
 // average rate still holds.
 func (r *run) fingerprint(ctx context.Context, host *probe.Limiter, req model.FingerprintRequest) (*model.HTTPFingerprint, *model.TLSInfo, error) {
+	return r.paced(ctx, host, func(ctx context.Context) (*model.HTTPFingerprint, *model.TLSInfo, error) {
+		return r.e.deps.Fingerprinter.Fingerprint(ctx, req)
+	})
+}
+
+// paced runs one collector call under the HTTP limits (see fingerprint).
+func (r *run) paced(ctx context.Context, host *probe.Limiter, call func(context.Context) (*model.HTTPFingerprint, *model.TLSInfo, error)) (*model.HTTPFingerprint, *model.TLSInfo, error) {
 	if err := r.httpWait(ctx, host, 1); err != nil {
 		return nil, nil, err
 	}
 	p := &pacer{r: r, host: host}
 	p.prepaid.Store(1)
-	h, t, err := r.e.deps.Fingerprinter.Fingerprint(context.WithValue(ctx, pacerKey{}, p), req)
+	h, t, err := call(context.WithValue(ctx, pacerKey{}, p))
 	if p.n.Load() == 0 && h != nil {
 		rest := len(h.Paths) + len(h.Redirects)
 		if h.FaviconSHA256 != "" || h.FaviconMMH3 != nil {
@@ -95,6 +109,9 @@ func (r *run) fingerprint(ctx context.Context, host *probe.Limiter, req model.Fi
 // httpStage fingerprints one open TCP service: the root page and favicon
 // first, then the extra signature paths that fit this service.
 func (r *run) httpStage(ctx context.Context, host *probe.Limiter, res *model.HostResult, svc *model.ServiceResult, hostname string) {
+	if notHTTP(svc) {
+		return
+	}
 	req := model.FingerprintRequest{
 		IP: res.IP, Port: svc.Port, Hostname: hostname, TLSHint: svc.Tunnel == "ssl", NameHint: svc.Name,
 		Opts: r.plan.Profile.HTTP, UserAgent: r.plan.Policy.UserAgent,
@@ -120,7 +137,18 @@ func (r *run) httpStage(ctx context.Context, host *probe.Limiter, res *model.Hos
 			req2 := req
 			req2.Paths = paths
 			req2.Opts.Favicon = false
-			if h2, t2, err2 := r.fingerprint(ctx, host, req2); err2 == nil && h2 != nil {
+			var h2 *model.HTTPFingerprint
+			var t2 *model.TLSInfo
+			var err2 error
+			if pf, ok := r.e.deps.Fingerprinter.(pathFetcher); ok {
+				// only the paths: the root page is already known
+				h2, t2, err2 = r.paced(ctx, host, func(ctx context.Context) (*model.HTTPFingerprint, *model.TLSInfo, error) {
+					return pf.FetchPaths(ctx, req2, h)
+				})
+			} else {
+				h2, t2, err2 = r.fingerprint(ctx, host, req2)
+			}
+			if err2 == nil && h2 != nil {
 				h2.FaviconMMH3, h2.FaviconSHA256 = h.FaviconMMH3, h.FaviconSHA256
 				h = h2
 				if t2 != nil {
@@ -160,4 +188,28 @@ func (r *run) match(svc *model.ServiceResult, hostnames []string) {
 	if c != nil {
 		svc.Classes = c
 	}
+}
+
+// nonHTTPNames are nmap service names of protocols that never answer HTTP.
+// The HTTP stage skips such a port when it has no TLS tunnel: a GET there
+// only costs requests of the per-host budget (2 per second by default), and
+// on a small run those requests were most of the run time.
+var nonHTTPNames = map[string]bool{
+	"ssh": true, "ftp": true, "smtp": true, "submission": true, "pop3": true, "imap": true,
+	"postgresql": true, "mysql": true, "redis": true, "mongodb": true, "mongod": true, "amqp": true,
+	"mqtt": true, "domain": true, "ldap": true, "microsoft-ds": true, "netbios-ssn": true,
+	"msrpc": true, "ms-wbt-server": true, "vnc": true, "telnet": true, "rpcbind": true, "nfs": true,
+	"memcached": true, "kerberos-sec": true, "ms-sql-s": true, "oracle-tns": true, "rsync": true,
+	"x11": true, "epmd": true, "zookeeper": true, "nntp": true, "sip": true, "rtsp": false,
+}
+
+func notHTTP(svc *model.ServiceResult) bool {
+	if svc.Tunnel == "ssl" {
+		return false // TLS: the collector reads the certificate even when HTTP is not inside
+	}
+	n := strings.ToLower(svc.Name)
+	if nonHTTPNames[n] {
+		return true
+	}
+	return strings.HasPrefix(n, "mosquitto version") // nmap's service name for Mosquitto
 }

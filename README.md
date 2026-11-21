@@ -1,8 +1,29 @@
 # Czujka: skaner, który rozumie czas
 
+```sh
+git clone https://github.com/iwosmu/aghpen.git czujka && cd czujka
+docker compose up -d
+```
+
+Otwórz `http://127.0.0.1:8080` i naciśnij **„Ten komputer”**, potem **„Uruchom skan”**. Login i hasło pierwszego administratora: `docker compose logs czujka | grep -A3 "first administrator"`.
+
+Wynik: usługi na portach tego komputera, także kontenery Dockera z opublikowanymi portami, z wersjami, tytułami stron i czasem odpowiedzi. Kolejny skan pokazuje, co zniknęło, co wróciło i co zwolniło.
+
+Zmierzone na czystej maszynie (`docker:dind`, 0 obrazów; zapis: [`deploy/e2e/fresh-clone-dind.txt`](deploy/e2e/fresh-clone-dind.txt)):
+
+| Krok | Czas |
+| --- | --- |
+| `git clone` | 1 s |
+| `docker compose up -d` do zdrowego API (pobranie obrazów i budowa) | 51–115 s, zależnie od łącza (trzy pomiary: 79 s z Docker Hub, 115 s i 51 s przez mirror.gcr.io) |
+| zamiast tego paczka offline (`make bundle`, 354 MiB): rozpakowanie i `sh install.sh` | 26–29 s, bez sieci |
+| logowanie, „Ten komputer”, „Uruchom skan” (przeglądarka sterowana skryptem) | 9 s |
+| skan „Ten komputer” (profil domyślny: top 1000 portów i porty infrastruktury, wykrywanie usług, HTTP) | 41 s |
+
+Nie trzeba `.env`: hasło bazy i klucz główny powstają przy pierwszym starcie w wolumenach, a losowe hasło administratora pojawia się raz w logu. Własne wartości: `make init` zapisuje `deploy/.env`, który `docker compose up -d` też czyta.
+
 Czujka cyklicznie i bezpiecznie skanuje duże sieci (ponad 10 000 adresów): znajduje hosty, usługi, technologie WWW, panele, środowiska testowe, nagłówki i ciasteczka.
 Uczy się tygodniowego rytmu każdego hosta, więc odróżnia „pracownia jest wyłączona na noc, jak zawsze” od „ten serwer zniknął”.
-Wysyła tylko `GET` i `HEAD`, nigdy się nie loguje, a cały produkt to jedna binarka w Go i PostgreSQL z szyfrowaniem, uruchamiane jednym poleceniem.
+Wysyła tylko `GET` i `HEAD` i nigdy się nie loguje. Cały produkt to jedna binarka w Go i PostgreSQL z szyfrowaniem.
 
 Zgłoszenie do zadania „Attack Surface Intelligence” Centrum Bezpieczeństwa Informacji AGH, HackNation 2026. Zespół: Iwo Smura, Iwo Wojtakajtis.
 
@@ -16,23 +37,30 @@ Zgłoszenie do zadania „Attack Surface Intelligence” Centrum Bezpieczeństwa
 | Film demo (około 2 minut, nagrany skryptem z prawdziwego interfejsu) | [`docs/demo/czujka-demo.mp4`](docs/demo/czujka-demo.mp4), tekst lektora [`docs/demo/lektor.txt`](docs/demo/lektor.txt) |
 | Scenariusz pokazu, notatki do slajdów, pytania | [`docs/DEMO.md`](docs/DEMO.md) |
 | Zgodność z treścią zadania: każde wymaganie, 12 punktów weryfikacji, 6 kryteriów, z dowodem | [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md) |
-| Wyniki zmierzone na laboratorium 70 hostów (precyzja, czułość, czas /16) | `docs/WYNIKI.md` (w przygotowaniu) |
+| Wyniki zmierzone na laboratorium 70 hostów (precyzja, czułość, czas /16) | [`docs/WYNIKI.md`](docs/WYNIKI.md) |
 | Działająca instancja z laboratorium 70 hostów | `https://czujka.dev`, konto do odczytu: dane logowania w zgłoszeniu |
 | Spis całej dokumentacji | [`docs/DOKUMENTACJA.md`](docs/DOKUMENTACJA.md) |
 
-## Szybki start
+Skanuj tylko sieci, do których masz uprawnienia.
 
-Wymagania: Docker z Compose v2; internet tylko przy pierwszym budowaniu.
+## Test na szablonie organizatorów
+
+Szablon `lab/jury` to jedna maszyna z usługami w Dockerze na portach hosta. Czujka działa w kontenerze, więc cel `localhost` (także `127.0.0.1` i `::1`) skanuje hosta dockera (`host.docker.internal`), a nie własny kontener. Podgląd celu pokazuje adres, pod którym cel jest skanowany. Szablon zajmuje port 8080, dlatego Czujka dostaje port 9180.
 
 ```sh
-git clone <adres repozytorium> czujka && cd czujka
-docker compose -f deploy/docker-compose.yml up -d --build --wait
-docker compose -f deploy/docker-compose.yml logs czujka | grep -A3 "first administrator"
+git clone https://github.com/iwosmu/aghpen.git czujka && cd czujka
+CZUJKA_PORT=9180 docker compose up -d
+docker compose logs czujka | grep -A3 "first administrator"
+cd lab/jury && ./quickstart.sh up
 ```
 
-Ostatnie polecenie pokazuje login (`admin@czujka.local`) i losowe hasło pierwszego administratora. Otwórz `http://127.0.0.1:8080`. Kreator prowadzi od logowania do pierwszego skanu w pięciu krokach (zmierzone: 19,9 s, `web/REPORT-LAB.md` §5).
+1. Otwórz `http://127.0.0.1:9180` i zaloguj się danymi z logu.
+2. Naciśnij „Ten komputer” i „Uruchom skan”. Profil domyślny obejmuje porty szablonu spoza top 1000 (`2223,5673,8474,8787,15432,15673,21000-21010`). Na komputerze z innymi programami nie skanuj `localhost` pełnym zakresem portów: sondy wykrywania wersji trafiają wtedy także w lokalne usługi tych programów.
+3. Wykonaj `./quickstart.sh change`, uruchom drugi skan („Przebiegi skanów” → „Uruchom skan”, profil „Ten komputer: …”): „Usługa …:8787 zniknęła”. Wykonaj `./quickstart.sh up`, skanuj trzeci raz: „Usługa …:8787 wróciła” z czasem nieobecności i liczbą skanów bez niej.
 
-Skanuj tylko sieci, do których masz uprawnienia.
+Czas odpowiedzi: Czujka zapisuje czas odpowiedzi HTTP każdej usługi i porównuje go z jej własną bazą (mediana ostatnich 5 pomiarów). Odpowiedź co najmniej 2 razy wolniejsza i dłuższa o co najmniej 300 ms to zmiana „Wolniejsza odpowiedź”. Powrót do normy to „Odpowiedź w normie”. Na stosie `modern-proxy` skanuj raz bez opóźnienia i raz z `ENABLE_LATENCY=true` w `.env`. Port otwarty, na którym HTTP nie odpowiada w czasie, to „HTTP nie odpowiedział”, a nie zniknięcie usługi.
+
+Usługa Czujki na porcie 9180 hosta dockera ma tag `czujka` i nie daje znalezisk. Na Linuksie można też uruchomić Czujkę w sieci hosta (`deploy/docker-compose.host-network.yml`, [`docs/WDROZENIE.md`](docs/WDROZENIE.md) §2.5).
 
 ## Teza: skaner, który rozumie czas
 
@@ -69,11 +97,12 @@ curl -s http://127.0.0.1:8080/healthz
 
 `"tde":true` oznacza, że wszystkie tabele są zaszyfrowane. `"mode":"nmap-raw"` oznacza nmap z surowymi gniazdami w kontenerze bez roota.
 
-- Port zajęty: `CZUJKA_PORT=18080 docker compose -f deploy/docker-compose.yml up -d --build --wait`.
-- Własne hasła i klucz: `cp deploy/.env.example deploy/.env`, potem edycja.
+- Port zajęty: `CZUJKA_PORT=18080 docker compose up -d`.
+- Po zmianie kodu: `docker compose up -d --build` (samo `up -d` buduje obraz tylko wtedy, gdy go nie ma).
+- Własne hasła i klucz: `cp deploy/.env.example deploy/.env`, potem edycja. `docker compose up -d` w katalogu głównym czyta `deploy/.env` (plik `compose.yaml` włącza `deploy/docker-compose.yml`); `docker compose -f deploy/docker-compose.yml …` działa jak dotąd.
 - Skan sieci dockerowej (na macOS host nie ma trasy do kontenerów): `CZUJKA_SCAN_NETWORK=<sieć> docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.scan-network.yml up -d --wait`.
 - Laboratorium testowe 70 hostów: `lab/lab.sh up`, stany `lab/scenario.sh t0|t1|t2` ([`lab/README.md`](lab/README.md)).
-- Własny `deploy/.env` jednym poleceniem: `make init` (losowe hasła i klucz główny, hasło administratora wydrukowane raz), potem `make up`. Od klonu do zdrowego stosu: 32 s bez cache, 14 s z cache (`docs/WDROZENIE.md` §2).
+- Własny `deploy/.env` jednym poleceniem: `make init` (losowe hasła i klucz główny, hasło administratora wydrukowane raz), potem `make up` albo `docker compose up -d`.
 - Diagnoza instalacji: `docker compose -f deploy/docker-compose.yml exec czujka czujka doctor` (baza, `pg_tde`, klucz, nmap, surowe gniazda, tablica sąsiadów).
 - Bez internetu: `make bundle` buduje paczkę z obrazami i instalatorem. Bez kontenerów: `make release` buduje statyczne binarki i plik usługi systemd.
 - Kopia zapasowa: `czujka backup -o plik` i `czujka restore -i plik` (archiwum szyfrowane kluczem głównym).

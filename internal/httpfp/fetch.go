@@ -13,6 +13,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"sort"
 	"strconv"
@@ -69,6 +70,14 @@ func (s *session) do(ctx context.Context, method string, u *url.URL, maxBody int
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Encoding", "gzip")
 
+	// elapsed is the time to the first response byte: from the start of the
+	// round trip (on a new connection: TCP connect and TLS handshake
+	// included) to the first byte of the answer. Header parsing and body
+	// transfer are not in it, so a slow link does not stretch it.
+	var first time.Time
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), &httptrace.ClientTrace{
+		GotFirstResponseByte: func() { first = time.Now() },
+	}))
 	start := time.Now()
 	resp, err := s.transport().RoundTrip(req)
 	if s.c.OnRequest != nil {
@@ -78,7 +87,11 @@ func (s *session) do(ctx context.Context, method string, u *url.URL, maxBody int
 		return nil, err
 	}
 	defer resp.Body.Close()
-	r := &response{url: u, status: resp.StatusCode, header: resp.Header, elapsed: time.Since(start)}
+	elapsed := time.Since(start)
+	if !first.IsZero() {
+		elapsed = first.Sub(start)
+	}
+	r := &response{url: u, status: resp.StatusCode, header: resp.Header, elapsed: elapsed}
 	r.cookies = cookiesOf(resp)
 
 	// Read at most maxBody+1 bytes: the extra byte tells "exactly the limit" from "more".
@@ -337,6 +350,37 @@ func SafePath(p string) bool {
 
 // paths fetches the extra safe paths of the request. Redirects are recorded
 // in Location and never followed.
+// FetchPaths requests only the extra paths of req for a service whose root
+// page fp is already known: the second pass of the engine's HTTP stage. It
+// sends no root request and no favicon request, so the root page is not
+// fetched twice. It returns a copy of fp with the new path probes added.
+func (c *Collector) FetchPaths(ctx context.Context, req model.FingerprintRequest, fp *model.HTTPFingerprint) (*model.HTTPFingerprint, *model.TLSInfo, error) {
+	if fp == nil {
+		return nil, nil, fmt.Errorf("httpfp: FetchPaths needs the root fingerprint")
+	}
+	s, err := c.newSession(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		if s.tr != nil {
+			s.tr.CloseIdleConnections()
+		}
+	}()
+	scheme := fp.Scheme
+	if scheme != "https" {
+		scheme = "http"
+	}
+	out := *fp
+	out.Paths = append([]model.PathProbe(nil), fp.Paths...)
+	s.paths(ctx, scheme, &out)
+	var ti *model.TLSInfo
+	if scheme == "https" {
+		ti = s.tlsInfo()
+	}
+	return &out, ti, ctx.Err()
+}
+
 func (s *session) paths(ctx context.Context, scheme string, fp *model.HTTPFingerprint) {
 	maxPaths := pickInt(s.c.MaxPaths, DefaultMaxPaths)
 	seen := map[string]bool{}

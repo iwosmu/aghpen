@@ -63,6 +63,7 @@ func Build(cfg config.Config, st *store.Store, log *slog.Logger) *Wiring {
 		ForceNative: cfg.ForceNative,
 	}).(*scan.Engine)
 	an := NewAnalysis(st, loc, log)
+	an.SelfPort = cfg.PublishedPort
 	dojo := Dojo{st: st, log: log}
 	an.Auto = dojo
 	pol := rules.New(st, log)

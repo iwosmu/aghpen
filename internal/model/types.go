@@ -133,6 +133,10 @@ type Target struct {
 	Addresses int64      `json:"addresses"`
 	CreatedAt time.Time  `json:"created_at"`
 	CreatedBy *int64     `json:"created_by"`
+	// MapsTo is the address the target is scanned as, set only when it differs
+	// from Value: a loopback target (localhost, 127.x, ::1) scanned as the
+	// docker host when Czujka runs in a container. Computed, not stored.
+	MapsTo string `json:"maps_to,omitempty"`
 }
 
 // TargetPreview is the answer of POST /targets/preview and of an import dry run.
@@ -318,6 +322,17 @@ type ScanEstimate struct {
 	PrevDurationSec int64      `json:"prev_duration_sec"`
 	PrevHostsUp     int        `json:"prev_hosts_up"`
 	PrevAddresses   int64      `json:"prev_addresses"`
+	// FullRangeMaxHosts > 0: a small scope with a top-N port list; after the
+	// list, up to this many live hosts also get the rest of 1-65535 (counted
+	// in the packets and the duration).
+	FullRangeMaxHosts int `json:"full_range_max_hosts,omitempty"`
+	// FullRangeMaxAddresses is the scope size up to which the second pass
+	// applies; FullRangePorts the ports per host it scans (policy applied);
+	// EstFullRangeSecPerHost its seconds for one live host at this profile's
+	// effective rate (the pass gets 90 % of it). Set with FullRangeMaxHosts.
+	FullRangeMaxAddresses  int     `json:"full_range_max_addresses,omitempty"`
+	FullRangePorts         int     `json:"full_range_ports,omitempty"`
+	EstFullRangeSecPerHost float64 `json:"est_full_range_sec_per_host,omitempty"`
 }
 
 // ---------- Scan runs ----------
@@ -371,6 +386,10 @@ type RunStats struct {
 	// Warnings are the engine's sanity checks that failed: the run ended,
 	// but its result is not complete. The API and the UI show them.
 	Warnings []string `json:"warnings,omitempty"`
+	// Passes lists the port passes of a run in execution order, only when
+	// the run has more than one (a small scope gets top ports, then the
+	// full range; the /16 gets a dense pass for hosts with many open ports).
+	Passes []PassStat `json:"passes,omitempty"`
 }
 
 type ScanRun struct {
@@ -459,7 +478,50 @@ type HostResult struct {
 	// listed services are what was measured; services it does not list are
 	// unknown, not gone.
 	PortsUnknown bool `json:"ports_unknown,omitempty"`
+	// Interim: a partial result sent while the host is still being described
+	// (the engine's quick path). The final result of the same run replaces
+	// it. The store keeps the service's change hash and its known fields.
+	Interim bool `json:"interim,omitempty"`
 }
+
+// VendorForMAC returns the vendor to show for a MAC address. A locally
+// administered address (bit 0x02 of the first byte: second hex digit 2, 6,
+// A or E), as Docker, virtual machines and phones with random MACs use, has
+// no registered vendor: an OUI lookup on it names an unrelated company
+// (the lab's Docker addresses showed "Applicon").
+func VendorForMAC(mac, vendor string) string {
+	if len(mac) >= 2 {
+		switch mac[1] {
+		case '2', '6', 'a', 'A', 'e', 'E':
+			return ""
+		}
+	}
+	return vendor
+}
+
+// PassStat is one port pass of a run. PortsTotal and PortsDone count
+// host-port pairs (for one host: ports). While a pass runs, PortsDone is
+// computed from the pinned nmap send rate (--min-rate = --max-rate); it is
+// exact when the pass is done.
+type PassStat struct {
+	Name       string `json:"name"`  // top_ports, full_range or dense
+	State      string `json:"state"` // pending, running, done or skipped
+	Hosts      int    `json:"hosts"`
+	PortsTotal int64  `json:"ports_total"`
+	PortsDone  int64  `json:"ports_done"`
+}
+
+// Port pass names and states (RunStats.Passes).
+const (
+	PassTopPorts  = "top_ports"
+	PassFullRange = "full_range"
+	PassDense     = "dense"
+
+	PassPending = "pending"
+	PassRunning = "running"
+	PassDone    = "done"
+	PassSkipped = "skipped"
+)
 
 // ReasonPortsUnknown is the HostResult.Reason of a host that answered but
 // whose port scan did not finish. The reason is stored with the host
@@ -513,6 +575,12 @@ const (
 	ClassRemoteAccess = "remote-access"
 	ClassDirListing   = "directory-listing"
 	ClassErrorPage    = "error-page"
+	// ClassInstallPage: an unfinished installer anyone can complete (Gitea
+	// install form, WordPress wp-admin/install.php).
+	ClassInstallPage = "install-page"
+	// ClassUnauthControlAPI: a control API that answers without
+	// authentication (Toxiproxy API, Traefik api.insecure, Docker API on 2375).
+	ClassUnauthControlAPI = "unauth-control-api"
 )
 
 type Cookie struct {
@@ -749,6 +817,11 @@ type Service struct {
 	LastChanged  *time.Time          `json:"last_changed"`
 	Overrides    map[string]Override `json:"overrides"`
 	Latest       *ServiceObservation `json:"latest,omitempty"` // only on GET /services/{id}
+	// ResponseMs is the HTTP response time of the latest observation in ms;
+	// nil for a service without an HTTP answer. ResponseSlow: that time is
+	// slow against the service's own baseline (analyze.ResponseSeries).
+	ResponseMs   *int `json:"response_ms"`
+	ResponseSlow bool `json:"response_slow"`
 }
 
 type InterestReason struct {
@@ -800,6 +873,16 @@ const (
 	ChangeContent        ChangeKind = "content_changed" // body differs strongly (simhash distance)
 	ChangeRedirect       ChangeKind = "redirect_changed"
 	ChangeClass          ChangeKind = "class_changed" // for example became an admin panel
+	// ChangeServiceReturned: a service reported gone (or missing from the
+	// previous run) is open again. Before holds {state, last_open_run_id,
+	// last_open_at, away_seconds, runs_away}; After is "open".
+	ChangeServiceReturned ChangeKind = "service_returned"
+	// ChangeResponseSlower: the HTTP response time is clearly above the
+	// service's own baseline, or HTTP stopped answering while the port is
+	// open. Before {baseline_ms, ms}; After {ms} or {ms: null, error: "no_answer"}.
+	ChangeResponseSlower ChangeKind = "response_slower"
+	// ChangeResponseRecovered: a slow service answers in normal time again.
+	ChangeResponseRecovered ChangeKind = "response_recovered"
 )
 
 type Severity string
@@ -840,6 +923,9 @@ type RunDiffSummary struct {
 	ServicesNew     int    `json:"services_new"`
 	ServicesGone    int    `json:"services_gone"`
 	ServicesChanged int    `json:"services_changed"`
+	// ServicesReturned counts service_returned; ResponsesSlower counts response_slower.
+	ServicesReturned int `json:"services_returned"`
+	ResponsesSlower  int `json:"responses_slower"`
 	// HostsMissing counts host_missing changes. ServicesUnreachable counts
 	// the open services of silent hosts that are not reported inactive yet:
 	// they are unknown in this run, not gone.

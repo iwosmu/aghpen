@@ -284,40 +284,102 @@ type serviceGroup struct {
 	Ports []int
 }
 
-// ServiceScan runs version detection. The port-list groups run in parallel:
-// nmap waits several seconds for slow banners, and that wait does not add
-// up this way. The groups split the packet rate between them.
+// svPacketsPerPort is what nmap's version detection sends to one open port:
+// it opens a new TCP connection for each probe it tries, and these
+// ordinary sockets are not paced by --max-rate. Measured on the lab (64
+// HTTP ports, 8 per process): 75 connections in one second, about 4.7
+// packets each (SYN, ACK, request, FIN, ACK), so about 9 connections and 45
+// packets per port, sent within a fraction of a second.
+const svPacketsPerPort = 45
+
+// serviceBatches splits a group so that one nmap process probes at most
+// maxPairs host-port pairs: a host with more ports than that gets several
+// processes, hosts with few ports share one.
+func serviceBatches(g serviceGroup, maxPairs int) []serviceGroup {
+	maxPairs = max(1, maxPairs)
+	var out []serviceGroup
+	if len(g.Ports) > maxPairs {
+		for _, ip := range g.IPs {
+			for i := 0; i < len(g.Ports); i += maxPairs {
+				out = append(out, serviceGroup{IPs: []string{ip}, Ports: g.Ports[i:min(i+maxPairs, len(g.Ports))]})
+			}
+		}
+		return out
+	}
+	per := max(1, maxPairs/max(1, len(g.Ports)))
+	for i := 0; i < len(g.IPs); i += per {
+		out = append(out, serviceGroup{IPs: g.IPs[i:min(i+per, len(g.IPs))], Ports: g.Ports})
+	}
+	return out
+}
+
+// ServiceScan runs version detection. Hosts that share a port list go into
+// one nmap process, in batches of at most rate/svPacketsPerPort host-port
+// pairs. The batches start on a pacing clock: the next one starts when the
+// previous one's estimated packets fit into the rate, so the connects of
+// version detection (not paced by nmap's --max-rate) stay under the rate in
+// every second. Up to maxServiceGroups batches run at the same time: nmap
+// waits several seconds for slow banners, and those waits overlap. Measured
+// before the batches: a host with 64 web ports got 570-720 packets per
+// second at a share of 210 (the lab gate, 2026-11-21).
 func (n *Nmap) ServiceScan(ctx context.Context, req ServiceRequest) (*Result, error) {
 	total := &Result{}
 	start := time.Now()
-	groups := groupByPorts(req.Hosts, maxServiceGroups)
-	if len(groups) == 0 {
+	rate := max(1, req.MaxRate)
+	var batches []serviceGroup
+	for _, g := range groupByPorts(req.Hosts, 0) {
+		batches = append(batches, serviceBatches(g, rate/svPacketsPerPort)...)
+	}
+	if len(batches) == 0 {
 		return total, nil
 	}
-	rate := req.MaxRate / len(groups)
 	var mu sync.Mutex
 	var firstErr error
 	var wg sync.WaitGroup
-	for _, g := range groups {
+	sem := make(chan struct{}, maxServiceGroups)
+	byIP := map[string]int{}
+	next := time.Now()
+	for _, b := range batches {
+		if wait := time.Until(next); wait > 0 {
+			select {
+			case <-time.After(wait):
+			case <-ctx.Done():
+			}
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+		}
+		if ctx.Err() != nil {
+			break
+		}
+		next = time.Now().Add(time.Duration(float64(len(b.IPs)*len(b.Ports)*svPacketsPerPort) / float64(rate) * float64(time.Second)))
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			args := n.ServiceArgs(g.Ports, req.Intensity, rate, req.HostTimeout, req.IPv6)
-			res, err := n.run(ctx, "service", args, g.IPs)
+			defer func() { <-sem }()
+			args := n.ServiceArgs(b.Ports, req.Intensity, rate, req.HostTimeout, req.IPv6)
+			res, err := n.run(ctx, "service", args, b.IPs)
 			mu.Lock()
 			defer mu.Unlock()
 			if res != nil {
-				total.Hosts = append(total.Hosts, res.Hosts...)
-				pk := res.Packets
-				if !res.PacketsExact {
-					pk = int64(len(g.IPs) * len(g.Ports))
-				}
-				// Version probes use ordinary sockets; nmap does not count them. Add an estimate.
 				open := 0
 				for _, h := range res.Hosts {
 					open += len(h.Ports)
+					// a host split over several batches comes back once per batch
+					if i, ok := byIP[h.IP]; ok {
+						total.Hosts[i].Ports = append(total.Hosts[i].Ports, h.Ports...)
+						continue
+					}
+					byIP[h.IP] = len(total.Hosts)
+					total.Hosts = append(total.Hosts, h)
 				}
-				total.Packets += pk + int64(open)*12
+				pk := res.Packets
+				if !res.PacketsExact {
+					pk = int64(len(b.IPs) * len(b.Ports))
+				}
+				// Version probes use ordinary sockets; nmap does not count them. Add an estimate.
+				total.Packets += pk + int64(open)*svPacketsPerPort
 			}
 			if err != nil && firstErr == nil {
 				firstErr = err
