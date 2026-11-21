@@ -1,0 +1,15 @@
+# Override for e2e/lab-run.sh: Czujka joins the lab network (czujka-lab) at a
+# fixed scanner address and uses the lab DNS server, so the domain targets of
+# lab/ground-truth/targets-domains.txt resolve. Use it together with
+# deploy/docker-compose.yml and deploy/docker-compose.scan-network.yml.
+services:
+  czujka:
+    networks:
+      target:
+        ipv4_address: ${LR_IP:-10.66.0.30}
+    dns: [10.66.0.53]
+    environment:
+      # Lab setting of the availability model (internal/analyze/clock.go):
+      # empty means the default, 1h buckets over 1 week.
+      CZUJKA_AVAIL_BUCKET: ${CZUJKA_AVAIL_BUCKET:-}
+      CZUJKA_AVAIL_PERIOD: ${CZUJKA_AVAIL_PERIOD:-}

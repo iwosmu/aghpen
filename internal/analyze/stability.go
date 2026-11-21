@@ -80,7 +80,12 @@ type Profile struct {
 }
 
 // BucketIndex returns weekday*24 + hour of t in loc (weekday 0 = Sunday).
+// Under a non-default clock (see Clock) it returns (unix time mod period) /
+// width, and loc does not matter.
 func BucketIndex(t time.Time, loc *time.Location) int {
+	if !clock.IsDefault() {
+		return clock.index(t)
+	}
 	if loc == nil {
 		loc = time.UTC
 	}
@@ -249,6 +254,9 @@ type rates struct {
 //	hdt[k][h] = (U_kh + m*hod[h]) / (N_kh + m)     k = working day or weekend
 //	how[i]    = (U_i + c*hdt[k(i)][i%24]) / (N_i + c)      c = CellShrinkStrength
 func buildRates(b *[168]model.AvailBucket) rates {
+	if !clock.IsDefault() {
+		return buildFlatRates(b, clock.Buckets())
+	}
 	var r rates
 	var hodUp, hodAll [24]float64
 	var dtUp, dtAll [2][24]float64
@@ -280,6 +288,31 @@ func buildRates(b *[168]model.AvailBucket) rates {
 		k, h := dayType(i/24), i%24
 		hdt := (dtUp[k][h] + ShrinkStrength*r.hod[h]) / (dtAll[k][h] + ShrinkStrength)
 		r.how[i] = (u + CellShrinkStrength*hdt) / (n + CellShrinkStrength)
+	}
+	return r
+}
+
+// buildFlatRates is buildRates for a non-default clock: the first n buckets
+// are one cycle, and each one shrinks straight to the global rate.
+//
+//	how[i] = (U_i + c*global) / (N_i + c)      c = CellShrinkStrength
+func buildFlatRates(b *[168]model.AvailBucket, n int) rates {
+	var r rates
+	for i := 0; i < n; i++ {
+		r.nUp += max(b[i].Up, 0)
+		r.nAll += max(b[i].Up, 0) + max(b[i].Down, 0)
+	}
+	r.global = (float64(r.nUp) + BetaPriorA) / (float64(r.nAll) + BetaPriorA + BetaPriorB)
+	for h := range r.hod {
+		r.hod[h] = r.global
+	}
+	for i := range r.how {
+		r.how[i] = r.global
+		if i < n {
+			u := float64(max(b[i].Up, 0))
+			all := float64(max(b[i].Up, 0) + max(b[i].Down, 0))
+			r.how[i] = (u + CellShrinkStrength*r.global) / (all + CellShrinkStrength)
+		}
 	}
 	return r
 }
@@ -346,6 +379,10 @@ func AssessWith(p Profile, loc *time.Location, opt AssessOptions) Assessment {
 		loc = time.UTC
 	}
 	p = NormalizeProfile(p, loc)
+	if !clock.IsDefault() {
+		// The stored histogram is hour-of-week; rebuild it under the lab clock.
+		p.Buckets = rebucket(p.Recent, clock)
+	}
 	rule := max(opt.DownAfterMisses, 0)
 	var a Assessment
 	a.Rule = rule

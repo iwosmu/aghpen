@@ -132,6 +132,10 @@ func (n *Nmap) commonArgs(maxRate, maxRetries int, hostTimeout time.Duration, v6
 func (n *Nmap) DiscoverArgs(req DiscoverRequest) []string {
 	o := NormalizeDiscovery(req.Opts)
 	args := []string{"-sn"}
+	if n.privileged && req.ARPOnly && !req.IPv6 {
+		args = append(args, "-PR")
+		return append(args, n.commonArgs(req.MaxRate, req.MaxRetries, req.HostTimeout, req.IPv6)...)
+	}
 	if n.privileged {
 		if o.ICMPEcho && !req.IPv6 {
 			args = append(args, "-PE")

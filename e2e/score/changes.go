@@ -23,6 +23,7 @@ type ChangeReport struct {
 	Metric     Metric   `json:"metric"`
 	Matched    []string `json:"matched"`
 	NotChecked []string `json:"not_checked"` // expected changes the exports cannot show (no classifier or technology data)
+	Source     string   `json:"source"`      // where the observed changes come from
 }
 
 func changeLabel(c truth.Change) string {
@@ -264,7 +265,73 @@ func normChangeKey(c truth.Change) string {
 // CompareChanges checks that the observed changes are exactly the expected ones.
 // before and after are the ground truth of the two states.
 func CompareChanges(expected *truth.ChangeFile, before, after *truth.File, from, to []model.HostResult) *ChangeReport {
-	rep := &ChangeReport{From: expected.From, To: expected.To, Metric: Metric{Name: "changes " + expected.From + " -> " + expected.To}}
+	return CompareChangeList(expected, before, after, from, to, nil)
+}
+
+// ProductChanges converts the change list of one Czujka run (GET
+// /changes?run_id=N) into the scorer's vocabulary. Changes the availability
+// model marks as expected are left out: the product does not report them as
+// alarms. host_missing (silent in this run, not yet reported inactive) counts
+// as the disappearance of the host, host_back as its return.
+func ProductChanges(list []model.Change) []truth.Change {
+	var out []truth.Change
+	for _, c := range list {
+		if c.Expected {
+			continue
+		}
+		kind := string(c.Kind)
+		switch c.Kind {
+		case model.ChangeHostMissing:
+			kind = "host_gone"
+		case model.ChangeHostBack:
+			kind = "host_new"
+		case model.ChangeHostUnstable, model.ChangeContent:
+			continue
+		}
+		tc := truth.Change{Kind: kind, IP: c.IP, Port: c.Port, Field: c.Field, Before: anyString(c.Before), After: anyString(c.After)}
+		switch kind {
+		case "host_new", "host_gone":
+			tc.Port, tc.Field = 0, ""
+		case "service_new", "service_gone":
+			tc.Field = ""
+		case "class_changed":
+			tc.Field = "classes"
+		case "title_changed":
+			tc.Field = "title"
+		case "status_changed":
+			tc.Field = "status"
+		case "redirect_changed":
+			tc.Field = "location"
+		case "cert_changed":
+			tc.Field = "certificate"
+		}
+		out = append(out, tc)
+	}
+	return out
+}
+
+func anyString(v any) string {
+	switch x := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return x
+	case []any:
+		parts := make([]string, 0, len(x))
+		for _, p := range x {
+			parts = append(parts, anyString(p))
+		}
+		return strings.Join(parts, ",")
+	default:
+		return fmt.Sprint(x)
+	}
+}
+
+// CompareChangeList is CompareChanges with an observed change list given
+// (for example the product's own, from ProductChanges). With observed nil it
+// derives the changes from the two exports.
+func CompareChangeList(expected *truth.ChangeFile, before, after *truth.File, from, to []model.HostResult, observed []truth.Change) *ChangeReport {
+	rep := &ChangeReport{From: expected.From, To: expected.To, Source: "diff of the two exports", Metric: Metric{Name: "changes " + expected.From + " -> " + expected.To}}
 	skip := map[string]bool{}
 	anyValue := map[string]bool{}
 	techAlias := map[string]string{}
@@ -336,7 +403,19 @@ func CompareChanges(expected *truth.ChangeFile, before, after *truth.File, from,
 		want[canon(c)] = c
 	}
 	seen := map[string]bool{}
-	for _, c := range ObservedChanges(from, to, skip, anyValue) {
+	if observed == nil {
+		observed = ObservedChanges(from, to, skip, anyValue)
+	} else {
+		rep.Source = "product change list"
+		kept := observed[:0:0]
+		for _, c := range observed {
+			if !skip[c.IP] {
+				kept = append(kept, c)
+			}
+		}
+		observed = kept
+	}
+	for _, c := range observed {
 		k := canon(c)
 		if seen[k] {
 			continue

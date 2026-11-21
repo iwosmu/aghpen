@@ -266,6 +266,15 @@ func (d *differ) host(prev, cur *HostSnapshot) {
 	case cur.Up && prev.Status == model.HostExpectedOffline:
 		d.add(cur, nil, model.ChangeHostBack, model.SevInfo, "status", string(prev.Status), string(model.HostUp), true,
 			fmt.Sprintf("Host %s znów odpowiada, zgodnie z profilem dostępności%s", cur.IP, patternNote))
+	case cur.Up && prev.Status == model.HostUnstable && !prev.Up:
+		// It was silent (host_missing or unstable) and answers again, for
+		// example to a confirmation probe: say so instead of going back to
+		// "up" without a trace.
+		// A host known to answer irregularly (the rule that marks its misses
+		// as expected) comes back as expected too: no alarm for a flapper.
+		irregular := cur.Observations >= MinObsForExpected && cur.Stability > 0 && cur.Stability < FlakyStability
+		d.add(cur, nil, model.ChangeHostBack, model.SevInfo, "status", string(prev.Status), string(model.HostUp), irregular,
+			fmt.Sprintf("Host %s znów odpowiada po chwilowym braku odpowiedzi", cur.IP))
 	case !cur.Up && known && cur.Status == model.HostDown && !wasDown:
 		d.add(cur, nil, model.ChangeHostGone, model.SevMedium, "status", string(prev.Status), string(model.HostDown), false, goneSummary(cur))
 		d.servicesGone(cur, prev)
