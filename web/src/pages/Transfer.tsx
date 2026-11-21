@@ -5,7 +5,7 @@ import { download, qs, upload, type Query } from '../api/client';
 import type { FindingsImportReport, ImportReport, ScanRun } from '../api/types';
 import { t } from '../i18n';
 import { fmtBytes, fmtDateTime, fmtInt } from '../lib/format';
-import { Button, Field, InlineError, KV, PageHeader, Panel, Select, toast, toastError } from '../ui/kit';
+import { Button, Field, InlineError, KV, PageHeader, Panel, Select, toast, toastError, FileInput } from '../ui/kit';
 import { FINDING_STATUSES, Glyph, HOST_STATUSES, findingStatusInfo, hostStatusInfo } from '../ui/marks';
 import { useSession } from '../session';
 import { NoAccess } from '../shell/Layout';
@@ -51,7 +51,7 @@ function FindingsImport() {
   return (
     <div className="space-y-3">
       <Field label={t('Plik ze znaleziskami', 'Findings file')} hint={t('DefectDojo Generic Findings (JSON albo CSV), lista znalezisk z API DefectDojo albo eksport znalezisk Czujki. Format rozpoznajemy sami. Ponowny import aktualizuje znaleziska zamiast je dublować.', 'DefectDojo Generic Findings (JSON or CSV), a findings list from the DefectDojo API, or a Czujka findings export. The format is detected. A second import updates the findings instead of duplicating them.')}>
-        <input ref={input} data-testid="findings-import-file" type="file" accept=".json,.csv,application/json,text/csv" className="field py-1" onChange={(e) => { setF(e.target.files?.[0] ?? null); setRep(null); }} />
+        <FileInput inputRef={input} testId="findings-import-file" accept=".json,.csv,application/json,text/csv" file={f} onFile={(x) => { setF(x); setRep(null); }} />
       </Field>
       <Button variant="primary" icon="upload" busy={imp.isPending} disabled={!f} onClick={() => f && imp.mutate(f)}>{t('Importuj znaleziska', 'Import the findings')}</Button>
       <InlineError error={imp.error} />
@@ -129,7 +129,7 @@ export default function Transfer() {
           {canImport ? (
             <div className="space-y-3">
               <Field label={t('Plik z wynikami', 'Result file')} hint={t('nmap XML (-oX), JSON Czujki albo CSV z kolumnami ip, port, proto, usługa. Import tworzy osobny przebieg i przechodzi przez tę samą analizę zmian co skan.', 'nmap XML (-oX), Czujka JSON or a CSV with the columns ip, port, proto, service. An import makes its own run and goes through the same change analysis as a scan.')}>
-                <input ref={input} type="file" accept=".xml,.json,.csv,text/xml,application/json,text/csv" className="field py-1" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setReport(null); }} />
+                <FileInput inputRef={input} accept=".xml,.json,.csv,text/xml,application/json,text/csv" file={file} onFile={(x) => { setFile(x); setReport(null); }} />
               </Field>
               <Button variant="primary" icon="upload" busy={imp.isPending} disabled={!file} onClick={() => file && imp.mutate(file)}>{t('Importuj wyniki', 'Import the results')}</Button>
               <InlineError error={imp.error} />
