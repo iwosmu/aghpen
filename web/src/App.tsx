@@ -26,6 +26,8 @@ const ProfileEdit = lazy(() => import('./pages/ProfileEdit'));
 const Transfer = lazy(() => import('./pages/Transfer'));
 const Admin = lazy(() => import('./pages/Admin'));
 const Setup = lazy(() => import('./pages/Setup'));
+const TimeMachine = lazy(() => import('./pages/TimeMachine'));
+const Rules = lazy(() => import('./pages/Rules'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -76,6 +78,8 @@ export default function App() {
               <Route path="transfer" element={<Transfer />} />
               <Route path="admin" element={<Admin />} />
               <Route path="setup" element={<Setup />} />
+              <Route path="time" element={<TimeMachine />} />
+              <Route path="rules" element={<Rules />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

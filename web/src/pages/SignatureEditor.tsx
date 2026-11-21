@@ -61,7 +61,7 @@ export default function SignatureEditor() {
   const navigate = useNavigate();
   const { can } = useSession();
   const q = useItem<Signature>('/signatures/' + (isNew ? fromId : id), undefined, { enabled: !isNew || fromId > 0 });
-  const [yaml, setYaml] = useState<string | null>(isNew && !fromId ? TEMPLATE : null);
+  const [yaml, setYaml] = useState<string | null>(isNew && !fromId ? (sp.get('suggest') ? sessionStorage.getItem('czujka.suggest.yaml') ?? TEMPLATE : TEMPLATE) : null);
   const [enabled, setEnabled] = useState(true);
   const [hunt, setHunt] = useState<{ yaml: string; result: RetroHuntResult } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);

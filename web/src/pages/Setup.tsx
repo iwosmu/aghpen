@@ -7,7 +7,7 @@ import type { SafetyPolicy, ScanProfile, ScanRun, Scope, Session, TargetPreview 
 import { windowOpen } from '../lib/windows';
 import { t } from '../i18n';
 import { cx, fmtInt } from '../lib/format';
-import { Button, Field, InlineError } from '../ui/kit';
+import { Button, Check, Field, InlineError } from '../ui/kit';
 import { Glyph } from '../ui/marks';
 import { Icon } from '../ui/Icon';
 import { useDebounced } from '../ui/edit';
@@ -133,6 +133,7 @@ export default function Setup() {
     setProfile(base); setStep(5);
   });
   const outside = profile ? !windowOpen(profile.schedule.windows ?? []) : false;
+  const [reprobe, setReprobe] = useState(true);
   const start = () => go(async () => {
     let id = profile!.id;
     if (outside) {
@@ -143,6 +144,9 @@ export default function Setup() {
       id = once.id;
     }
     const run = await post<ScanRun>('/runs', { profile_id: id });
+    // Re-probing is off in a fresh installation. The wizard turns it on when the box stays checked;
+    // a server without the module (404/405/501) does not block the first scan.
+    if (reprobe) await put('/settings/reprobe', { enabled: true }).catch(() => undefined);
     try { localStorage.setItem(SETUP_DONE_KEY, String(Math.round((Date.now() - startedAt) / 1000))); } catch { /* ignore */ }
     invalidate(qc, '/runs', '/dashboard', '/profiles');
     navigate('/runs/' + run.id, { replace: true });
@@ -221,6 +225,10 @@ export default function Setup() {
           {outside ? (
             <p className="mt-3 flex items-start gap-2 text-sm text-ink-2"><Glyph name="pause" tone="changed" /><span>{t('Okno czasowe profilu jest teraz zamknięte. Pierwszy skan wystartuje od razu z jednorazowej kopii profilu bez okien; kolejne pójdą według harmonogramu.', 'The time window of the profile is closed now. The first scan starts at once from a one-off copy of the profile without windows; the next ones follow the schedule.')}</span></p>
           ) : null}
+          <div className="mt-3">
+            <Check checked={reprobe} onChange={setReprobe} label={t('Sprawdzaj ponownie hosty, które przestały odpowiadać', 'Re-probe hosts that went silent')} />
+            <p className="ml-6 text-xs text-ink-3">{t('Kilka pojedynczych sond na godzinę (domyślnie najwyżej 200 adresów), tylko w oknach profilu, zamiast czekać z potwierdzeniem do następnego pełnego skanu.', 'A few single probes per hour (at most 200 addresses by default), only inside the profile windows, instead of waiting for the next full scan to confirm.')}</p>
+          </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Button variant="primary" icon="play" busy={busy} onClick={start} data-testid="setup-start">{t('Uruchom pierwszy skan', 'Start the first scan')}</Button>
             <span className="text-xs text-ink-3">{t('Stop awaryjny w górnym pasku zatrzymuje skan w każdej chwili.', 'The emergency stop in the top bar halts the scan at any time.')}</span>

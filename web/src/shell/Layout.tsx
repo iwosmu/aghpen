@@ -25,6 +25,7 @@ function navItems(): { title: string; items: NavItem[] }[] {
         { to: '/hosts', label: t('Hosty', 'Hosts'), icon: 'hosts', perms: ['results:read'] },
         { to: '/services', label: t('Usługi', 'Services'), icon: 'services', perms: ['results:read'] },
         { to: '/changes', label: t('Zmiany', 'Changes'), icon: 'changes', perms: ['results:read'] },
+        { to: '/time', label: t('Wehikuł czasu', 'Time machine'), icon: 'history', perms: ['results:read'] },
         { to: '/findings', label: t('Znaleziska', 'Findings'), icon: 'findings', perms: ['results:read'] },
       ],
     },
@@ -32,6 +33,7 @@ function navItems(): { title: string; items: NavItem[] }[] {
       title: t('Konfiguracja', 'Configuration'),
       items: [
         { to: '/signatures', label: t('Sygnatury', 'Signatures'), icon: 'signatures', perms: ['signatures:read'] },
+        { to: '/rules', label: t('Reguły ekspozycji', 'Exposure rules'), icon: 'shield', perms: ['results:read'] },
         { to: '/targets', label: t('Cele', 'Targets'), icon: 'targets', perms: ['targets:read'] },
         { to: '/profiles', label: t('Profile skanów', 'Scan profiles'), icon: 'profiles', perms: ['scans:read'] },
         { to: '/transfer', label: t('Import / eksport', 'Import / export'), icon: 'transfer', perms: ['results:create', 'export:run'] },

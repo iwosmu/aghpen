@@ -12,6 +12,7 @@ import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, type GlyphName, t
 import { AddressMap } from '../viz/AddressMap';
 import { BarList, ProgressBar, RateGauge, TrendRows } from '../viz/charts';
 import { useSession } from '../session';
+import { ReprobePanel } from './Reprobe';
 
 function Count({ n, glyph, tone, label, to }: { n: number; glyph: GlyphName; tone: Tone; label: string; to: string }) {
   const zero = n === 0;
@@ -405,6 +406,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
+        <div className="min-w-0 space-y-4">
         <Panel title={t('Hosty niestabilne', 'Unstable hosts')} count={d.headline.hosts_unstable} flush actions={<Link to="/hosts?status=unstable" className="link">{t('Wszystkie', 'All')}</Link>}>
           {(d.unstable_hosts ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Każdy znany host odpowiada zgodnie ze swoim profilem.', 'Every known host answers as its profile predicts.')}</p> : null}
           <ul>
@@ -419,6 +421,8 @@ export default function Dashboard() {
             ))}
           </ul>
         </Panel>
+        <ReprobePanel limit={5} />
+        </div>
         <Panel title={t('Wygasające certyfikaty', 'Expiring certificates')} count={(d.certs_expiring ?? []).length} flush>
           {(d.certs_expiring ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Żaden certyfikat nie wygasa w ciągu 30 dni.', 'No certificate expires within 30 days.')}</p> : null}
           <ul>
