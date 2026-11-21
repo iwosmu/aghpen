@@ -1,0 +1,170 @@
+# Real applications used as fingerprint evidence for internal/httpfp and internal/sig.
+# Every port binds to 127.0.0.1 only. Start: docker compose -p czfp -f cmd/fpprobe/testlab/docker-compose.yml up -d
+# Stop and remove: docker compose -p czfp -f cmd/fpprobe/testlab/docker-compose.yml down -v
+name: czfp
+services:
+  db:
+    image: mariadb:11
+    container_name: czfp-db
+    environment:
+      MARIADB_ROOT_PASSWORD: czfp-root
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: czfp
+      MARIADB_PASSWORD: czfp-pass
+    volumes:
+      - ./initdb.sql:/docker-entrypoint-initdb.d/initdb.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      retries: 40
+  wordpress:
+    image: wordpress:6-apache
+    container_name: czfp-wordpress
+    depends_on: {db: {condition: service_healthy}}
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: czfp
+      WORDPRESS_DB_PASSWORD: czfp-pass
+      WORDPRESS_DB_NAME: wordpress
+    volumes: [wp:/var/www/html]
+    ports: ["127.0.0.1:19101:80"]
+  wpcli:
+    image: wordpress:cli
+    container_name: czfp-wpcli
+    depends_on: [wordpress]
+    user: "33:33"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: czfp
+      WORDPRESS_DB_PASSWORD: czfp-pass
+      WORDPRESS_DB_NAME: wordpress
+    volumes: [wp:/var/www/html]
+    entrypoint: ["sh", "-c", "for i in $$(seq 1 40); do wp core install --url=http://127.0.0.1:19101 --title=CzujkaLab --admin_user=labadmin --admin_password=czfp-lab-only --admin_email=lab@example.org --skip-email && exit 0; sleep 3; done; exit 1"]
+  drupal:
+    image: drupal:11-apache
+    container_name: czfp-drupal
+    ports: ["127.0.0.1:19102:80"]
+  joomla:
+    image: joomla:5-apache
+    container_name: czfp-joomla
+    depends_on: {db: {condition: service_healthy}}
+    environment:
+      JOOMLA_DB_HOST: db
+      JOOMLA_DB_USER: czfp
+      JOOMLA_DB_PASSWORD: czfp-pass
+      JOOMLA_DB_NAME: joomla
+    ports: ["127.0.0.1:19103:80"]
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: czfp-grafana
+    ports: ["127.0.0.1:19104:3000"]
+  jenkins:
+    image: jenkins/jenkins:lts-jdk21
+    container_name: czfp-jenkins
+    ports: ["127.0.0.1:19105:8080"]
+  phpmyadmin:
+    image: phpmyadmin:5
+    container_name: czfp-phpmyadmin
+    environment: {PMA_ARBITRARY: "1"}
+    ports: ["127.0.0.1:19106:80"]
+  tomcat:
+    image: tomcat:10-jdk21
+    container_name: czfp-tomcat
+    command: ["sh", "-c", "cp -r webapps.dist/* webapps/ && catalina.sh run"]
+    ports: ["127.0.0.1:19107:8080"]
+  gitea:
+    image: gitea/gitea:1
+    container_name: czfp-gitea
+    ports: ["127.0.0.1:19108:3000"]
+  nginx:
+    image: nginx:stable
+    container_name: czfp-nginx
+    ports: ["127.0.0.1:19109:80"]
+  httpd:
+    image: httpd:2.4
+    container_name: czfp-httpd
+    ports: ["127.0.0.1:19110:80"]
+  moodle:
+    image: bitnamilegacy/moodle:latest
+    container_name: czfp-moodle
+    depends_on: {db: {condition: service_healthy}}
+    environment:
+      MOODLE_DATABASE_HOST: db
+      MOODLE_DATABASE_USER: czfp
+      MOODLE_DATABASE_PASSWORD: czfp-pass
+      MOODLE_DATABASE_NAME: moodle
+      MOODLE_HOST: 127.0.0.1:19111
+      MOODLE_REVERSEPROXY: "no"
+      BITNAMI_DEBUG: "true"
+    ports: ["127.0.0.1:19111:8080"]
+  nextcloud:
+    image: nextcloud:stable-apache
+    container_name: czfp-nextcloud
+    ports: ["127.0.0.1:19112:80"]
+  portainer:
+    image: portainer/portainer-ce:lts
+    container_name: czfp-portainer
+    ports: ["127.0.0.1:19113:9000", "127.0.0.1:19213:9443"]
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: czfp-rabbitmq
+    ports: ["127.0.0.1:19114:15672"]
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: czfp-prometheus
+    ports: ["127.0.0.1:19115:9090"]
+  traefik:
+    image: traefik:v3
+    container_name: czfp-traefik
+    command: ["--api.insecure=true", "--api.dashboard=true"]
+    ports: ["127.0.0.1:19116:8080"]
+  adminer:
+    image: adminer:latest
+    container_name: czfp-adminer
+    ports: ["127.0.0.1:19117:8080"]
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: czfp-keycloak
+    command: ["start-dev"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: labadmin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: czfp-lab-only
+    ports: ["127.0.0.1:19119:8080"]
+  mediawiki:
+    image: mediawiki:stable
+    container_name: czfp-mediawiki
+    ports: ["127.0.0.1:19120:80"]
+  ghost:
+    image: ghost:5-alpine
+    container_name: czfp-ghost
+    environment:
+      NODE_ENV: development
+      url: http://127.0.0.1:19121
+    ports: ["127.0.0.1:19121:2368"]
+  caddy:
+    image: caddy:2
+    container_name: czfp-caddy
+    ports: ["127.0.0.1:19122:80"]
+  jupyterhub:
+    image: quay.io/jupyterhub/jupyterhub:latest
+    container_name: czfp-jupyterhub
+    ports: ["127.0.0.1:19123:8000"]
+  roundcube:
+    image: roundcube/roundcubemail:latest
+    container_name: czfp-roundcube
+    environment: {ROUNDCUBEMAIL_DEFAULT_HOST: "localhost"}
+    ports: ["127.0.0.1:19125:80"]
+  swagger:
+    image: swaggerapi/swagger-ui:latest
+    container_name: czfp-swagger
+    ports: ["127.0.0.1:19126:8080"]
+  registry:
+    image: registry:2
+    container_name: czfp-registry
+    ports: ["127.0.0.1:19127:5000"]
+  dokuwiki:
+    image: dokuwiki/dokuwiki:stable
+    container_name: czfp-dokuwiki
+    ports: ["127.0.0.1:19128:8080"]
+volumes:
+  wp: {}
