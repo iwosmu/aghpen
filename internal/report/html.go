@@ -116,18 +116,18 @@ var htmlTemplate = template.Must(template.New("report").Parse(`<!doctype html>
 </section>
 {{end}}{{end}}{{if .Expected}}<p class="expected">{{.Expected}}</p>
 {{end}}{{if .Findings}}<section>
-<h2>Najważniejsze obserwacje</h2>{{range .Findings}}
+<h2>Najważniejsze znaleziska</h2>{{range .Findings}}
 <article class="finding">
 <header><span class="sev sev-{{.Sev}}">{{.SevLabel}}</span><h3>{{.Title}}</h3><span class="score">ciekawość <b>{{.Interest}}</b>/100</span></header>
 <p class="where"><span class="mono">{{.Addr}}</span>{{range .Notes}} · {{.}}{{end}}</p>
-{{if .Evidence}}<ul class="ev">{{range .Evidence}}<li><code>{{.Where}}</code><span>{{.Snippet}}</span></li>{{end}}{{if .EvidenceMore}}<li><code></code><span>i {{.EvidenceMore}} więcej w aplikacji</span></li>{{end}}</ul>{{end}}
+{{if .Evidence}}<ul class="ev">{{range .Evidence}}<li><code>{{.Where}}</code><span>{{.Snippet}}</span></li>{{end}}{{if .EvidenceMore}}<li><code></code><span>pozostałe ({{.EvidenceMore}}) w aplikacji</span></li>{{end}}</ul>{{end}}
 </article>{{end}}
 {{if .FindingsMore}}<p class="more">{{.FindingsMore}}</p>{{end}}
 </section>
 {{end}}{{if .Services}}<section>
 <h2>Najciekawsze usługi</h2>
 <div class="scroll"><table>
-<thead><tr><th>Adres</th><th>Usługa</th><th>Dlaczego</th><th class="r">Ciekawość</th></tr></thead>
+<thead><tr><th>Adres</th><th>Usługa</th><th>Powody</th><th class="r">Ciekawość</th></tr></thead>
 <tbody>{{range .Services}}
 <tr><td class="mono">{{.Addr}}</td><td>{{.What}}</td><td>{{range $i, $w := .Why}}{{if $i}}<br>{{end}}{{$w}}{{end}}</td><td class="r"><b>{{.Interest}}</b></td></tr>{{end}}
 </tbody></table></div>
@@ -135,9 +135,9 @@ var htmlTemplate = template.Must(template.New("report").Parse(`<!doctype html>
 {{end}}{{if .Hosts}}<section>
 <h2>Hosty niestabilne i nieaktywne</h2>
 <div class="scroll"><table>
-<thead><tr><th>Host</th><th>Stan</th><th>Zwykły rytm</th><th class="r">Szansa, że nadal istnieje</th><th class="r">Odpowiada w</th><th class="r">Braki z rzędu</th></tr></thead>
+<thead><tr><th>Host</th><th>Stan</th><th>Wzorzec dostępności</th><th class="r">Szansa, że działa</th><th class="r">Aktywny (% skanów)</th><th class="r">Skany bez odpowiedzi z rzędu</th></tr></thead>
 <tbody>{{range .Hosts}}
-<tr><td><span class="mono">{{.IP}}</span>{{if .Name}}<small>{{.Name}}</small>{{end}}</td><td>{{.Status}}</td><td>{{.Pattern}}</td><td class="r">{{.PAlive}}</td><td class="r">{{.Stability}} skanów</td><td class="r">{{.Misses}}</td></tr>{{end}}
+<tr><td><span class="mono">{{.IP}}</span>{{if .Name}}<small>{{.Name}}</small>{{end}}</td><td>{{.Status}}</td><td>{{.Pattern}}</td><td class="r">{{.PAlive}}</td><td class="r">{{.Stability}}</td><td class="r">{{.Misses}}</td></tr>{{end}}
 </tbody></table></div>
 {{if .HostsMore}}<p class="more">{{.HostsMore}}</p>{{end}}
 </section>
@@ -147,12 +147,12 @@ var htmlTemplate = template.Must(template.New("report").Parse(`<!doctype html>
 <table class="kv">{{range .Params}}<tr><th scope="row">{{.K}}</th><td>{{.V}}</td></tr>{{end}}</table>
 </div>
 <div>
-<h2>Ruch faktycznie wysłany</h2>
+<h2>Wysłany ruch</h2>
 <table class="kv">{{range .Traffic}}<tr><th scope="row">{{.K}}</th><td>{{.V}}</td></tr>{{end}}</table>
 </div>
 </section>
-<p class="safety">{{.Safety}}</p>
-<p class="foot">{{.Footer}}</p>
+{{if .Safety}}<p class="safety">{{.Safety}}</p>{{end}}
+{{if .Footer}}<p class="foot">{{.Footer}}</p>{{end}}
 </main>
 </body>
 </html>

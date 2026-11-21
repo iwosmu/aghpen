@@ -12,7 +12,7 @@ describe('format', () => {
 
   it('formats sizes and hashes', () => {
     expect(fmtBytes(512)).toBe('512 B');
-    expect(fmtBytes(74035)).toBe('72.3 kB');
+    expect(fmtBytes(74035)).toBe('72,3 kB');
     expect(shortHash('7880d9e95d4fe30315772178ff', 8)).toBe('7880d9e9…');
     expect(shortHash(null)).toBe('–');
   });

@@ -81,7 +81,7 @@ if [ "${LR_FRESH:-1}" != 0 ] || ! curl -fsS "$BASE/healthz" >/dev/null 2>&1; the
   if [ "${LR_SKIP_BUILD:-0}" = 1 ]; then $DC up -d --wait >"$OUT/compose.log" 2>&1
   else $DC up -d --build --wait >"$OUT/compose.log" 2>&1; fi || { tail -30 "$OUT/compose.log"; exit 1; }
 fi
-curl -sS "$BASE/healthz" | jq -c '{status, version, engine, probe}' | tee -a "$OUT/run.log"
+curl -sS "$BASE/healthz" | jq -c '{status, version}' | tee -a "$OUT/run.log"
 LOGIN=$(curl -sS -c "$JAR" -H "Content-Type: application/json" -d "{\"email\":\"$ADMIN\",\"password\":\"$ADMIN_PW\"}" $API/auth/login)
 CSRF=$(echo "$LOGIN" | jq -r .csrf_token)
 [ -n "$CSRF" ] && [ "$CSRF" != null ] || { echo "login failed: $LOGIN"; exit 1; }

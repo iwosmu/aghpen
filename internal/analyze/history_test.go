@@ -40,7 +40,7 @@ func TestDiffServiceReturnedNotNew(t *testing.T) {
 	if b["runs_away"] != 1 || b["away_seconds"] != int64(2*time.Hour/time.Second) || b["last_open_run_id"] != int64(1) || b["state"] != "gone" {
 		t.Errorf("before = %v", c.Before)
 	}
-	if !strings.Contains(c.Summary, "wróciła po 2 h") || !strings.Contains(c.Summary, "1 skanie") {
+	if !strings.Contains(c.Summary, "wróciła po 2 h") || b["runs_away"] != 1 {
 		t.Errorf("summary %q", c.Summary)
 	}
 

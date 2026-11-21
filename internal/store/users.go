@@ -169,10 +169,27 @@ func (s *Store) CountOtherAdmins(ctx context.Context, exceptUserID int64) (int, 
 
 // RecordLoginFailure counts a failed login and locks the account after maxFails failures.
 func (s *Store) RecordLoginFailure(ctx context.Context, userID int64, maxFails int, lockout time.Duration) (locked bool, err error) {
-	err = s.db.QueryRow(ctx, `UPDATE users SET failed_logins = failed_logins + 1,
-		locked_until = CASE WHEN failed_logins + 1 >= $2 THEN now() + make_interval(secs => $3) ELSE locked_until END
-		WHERE id = $1 RETURNING locked_until IS NOT NULL AND locked_until > now()`, userID, maxFails, lockout.Seconds()).Scan(&locked)
+	// An expired lock starts the count again (security review M4): one wrong
+	// password per lockout period must not keep an account locked for ever.
+	err = s.db.QueryRow(ctx, `WITH c AS (SELECT CASE WHEN locked_until IS NOT NULL AND locked_until <= now() THEN 1 ELSE failed_logins + 1 END AS n
+			FROM users WHERE id = $1)
+		UPDATE users SET failed_logins = c.n,
+			locked_until = CASE WHEN c.n >= $2 THEN now() + make_interval(secs => $3)
+				WHEN users.locked_until <= now() THEN NULL ELSE users.locked_until END
+		FROM c WHERE users.id = $1 RETURNING users.locked_until IS NOT NULL AND users.locked_until > now()`, userID, maxFails, lockout.Seconds()).Scan(&locked)
 	return locked, mapErr(err)
+}
+
+// UnlockUser clears the failure counter and the lock of an account.
+func (s *Store) UnlockUser(ctx context.Context, userID int64) error {
+	tag, err := s.db.Exec(ctx, `UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = $1`, userID)
+	if err != nil {
+		return mapErr(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // RecordLoginSuccess clears the failure counter and stores the login time.
@@ -221,6 +238,12 @@ func (s *Store) DeleteSession(ctx context.Context, tokenHash []byte) error {
 // DeleteUserSessions ends every session of a user (after a password or role change).
 func (s *Store) DeleteUserSessions(ctx context.Context, userID int64) error {
 	_, err := s.db.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID)
+	return err
+}
+
+// DeleteOtherSessions deletes the sessions of a user except the one with keepHash.
+func (s *Store) DeleteOtherSessions(ctx context.Context, userID int64, keepHash []byte) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2`, userID, keepHash)
 	return err
 }
 

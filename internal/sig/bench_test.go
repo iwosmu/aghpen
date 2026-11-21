@@ -155,7 +155,10 @@ func TestMatchTenThousandServices(t *testing.T) {
 	perService := res.NsPerOp()
 	total, _ := e.Count()
 	t.Logf("%d signatures: %d ns per service, %.2f s for 10 000 services on one core", total, perService, float64(perService)*10000/1e9)
-	if perService > 3_000_000 { // 3 ms per service = 30 s for 10 000; a generous bound for slow CI machines
+	// The bound catches a broken prefilter (about 50 times slower), not noise:
+	// a CI runner that tests four packages at once measured 5 ms per service,
+	// an idle laptop measures about 1 ms. docs/SIGNATURES.md has the numbers.
+	if perService > 20_000_000 {
 		t.Errorf("Match is too slow: %d ns per service", perService)
 	}
 }

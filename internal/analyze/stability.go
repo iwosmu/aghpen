@@ -317,6 +317,38 @@ func buildFlatRates(b *[168]model.AvailBucket, n int) rates {
 	return r
 }
 
+// youngRates is buildRates for a profile with fewer than MinObsForExpected
+// observations. Such a profile knows nothing about the time of day yet, so
+// every hour gets one up-rate: the rate of an hour that holds all of the
+// observations. Without this, a miss in the hour of the last answer and a
+// miss one minute later in the next hour (or the next day, a weekend or a
+// DST change) gave different verdicts: the host seen once was confirmed
+// gone in the first case (p_alive 0.36, then 0.19) and never in the second
+// (0.41, then 0.26), because the empty hour borrowed only half of its
+// neighbour's answers.
+func youngRates(b *[168]model.AvailBucket) rates {
+	var all [168]model.AvailBucket
+	for i := range b {
+		all[0].Up += max(b[i].Up, 0)
+		all[0].Down += max(b[i].Down, 0)
+	}
+	flat := buildRates(&all).how[0]
+	r := buildRates(b)
+	for i := range r.how {
+		r.how[i] = flat
+	}
+	return r
+}
+
+// ratesFor picks the rates of a histogram: flat for a young profile, by hour otherwise.
+func ratesFor(b *[168]model.AvailBucket) rates {
+	r := buildRates(b)
+	if r.nAll < MinObsForExpected {
+		return youngRates(b)
+	}
+	return r
+}
+
 // dayType is 1 for Saturday and Sunday, 0 for a working day.
 func dayType(weekday int) int {
 	if weekday == 0 || weekday == 6 {
@@ -403,7 +435,7 @@ func AssessWith(p Profile, loc *time.Location, opt AssessOptions) Assessment {
 		a.Status = model.HostUp
 		a.PAlive = 1
 		a.Prior = prior(full.nUp)
-		a.DownAfterMisses = downAfterFrom(full, a.Prior, p.Recent, loc)
+		a.DownAfterMisses = downAfterFrom(ratesFor(&p.Buckets), a.Prior, p.Recent, loc)
 		if rule > 0 {
 			a.DownAfterMisses = rule
 		}
@@ -424,7 +456,7 @@ func AssessWith(p Profile, loc *time.Location, opt AssessOptions) Assessment {
 			before[i].Down--
 		}
 	}
-	r := buildRates(&before)
+	r := ratesFor(&before) // flat for a young profile: the verdict must not depend on the clock hour
 	a.Prior = prior(r.nUp)
 	a.ConsecutiveMisses = len(misses)
 

@@ -19,7 +19,7 @@ export function ServiceStory({ s }: { s: Service }) {
   const hasStory = events.some((c) => c.kind !== 'service_new');
   if (!hasStory) return null;
   return (
-    <Panel title={t('Historia usługi', 'Service story')} flush>
+    <Panel title={t('Historia', 'History')} flush>
       <ol className="divide-y divide-rule" data-testid="service-story">
         <li className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-start gap-x-2 px-3 py-1.5 text-sm">
           <span className="mt-[3px]"><Glyph name="plus" tone="new" /></span>
@@ -58,13 +58,13 @@ export function ResponseTimeChart({ serviceId }: { serviceId: number }) {
   const max = Math.max(1, threshold ?? 0, ...pts.map((p) => Math.max(p.ms ?? 0, p.baseline_ms ?? 0)));
   const H = 72;
   return (
-    <Panel title={t('Czas odpowiedzi HTTP', 'HTTP response time')} actions={<span className="text-ink-3">{t('ostatnio', 'last')} <span className={cx('num', last.slow ? 'text-st-changed' : 'text-ink')}>{last.ms === null ? t('brak odpowiedzi', 'no answer') : fmtMs(last.ms)}</span>{base !== null ? <> · {t('zwykle', 'usually')} <span className="num text-ink-2">{fmtMs(base)}</span></> : null}</span>}>
-      <div className="relative" style={{ height: H }} data-testid="response-chart" role="img" aria-label={t('Czas odpowiedzi w kolejnych skanach', 'Response time over runs')}>
+    <Panel title={t('Czas odpowiedzi HTTP', 'HTTP response time')} actions={<span className="text-ink-3">{t('ostatnio', 'last')} <span className={cx('num', last.slow ? 'text-st-changed' : 'text-ink')}>{last.ms === null ? t('brak odpowiedzi', 'no response') : fmtMs(last.ms)}</span>{base !== null ? <> · {t('zwykle', 'usually')} <span className="num text-ink-2">{fmtMs(base)}</span></> : null}</span>}>
+      <div className="relative" style={{ height: H }} data-testid="response-chart" role="img" aria-label={t('Czas odpowiedzi w kolejnych skanach', 'Response time over scans')}>
         {base !== null ? <div className="absolute inset-x-0 border-t border-dashed border-ink-3" style={{ bottom: (base / max) * H }} title={t('zwykły czas (mediana)', 'usual time (median)')} /> : null}
         {threshold !== null ? <div className="absolute inset-x-0 border-t border-dotted border-st-changed/60" style={{ bottom: (threshold / max) * H }} title={t('próg „wolniej”: ', 'the "slower" threshold: ') + fmtMs(threshold)} /> : null}
         <div className="absolute inset-0 flex items-end gap-[3px]">
           {pts.map((p) => (
-            <Link key={p.run_id} to={'/runs/' + p.run_id} className="group relative flex h-full min-w-[4px] max-w-[22px] flex-1 items-end" title={'#' + p.run_id + ' · ' + fmtDateTime(p.at) + ' · ' + (p.ms === null ? t('brak odpowiedzi HTTP', 'no HTTP answer') : fmtMs(p.ms)) + (p.slow ? ' · ' + t('wolniej niż zwykle', 'slower than usual') : '')}>
+            <Link key={p.run_id} to={'/runs/' + p.run_id} className="group relative flex h-full min-w-[4px] max-w-[22px] flex-1 items-end" title={'#' + p.run_id + ' · ' + fmtDateTime(p.at) + ' · ' + (p.ms === null ? t('brak odpowiedzi HTTP', 'no HTTP response') : fmtMs(p.ms)) + (p.slow ? ' · ' + t('wolniej niż zwykle', 'slower than usual') : '')}>
               {p.ms === null
                 ? <span className="mb-0 w-full text-center text-xs leading-none text-st-gone">×</span>
                 : <span className={cx('w-full group-hover:opacity-80', p.slow ? 'bg-st-changed' : 'bg-accent')} style={{ height: Math.max(2, (p.ms / max) * H) }} />}
@@ -76,7 +76,12 @@ export function ResponseTimeChart({ serviceId }: { serviceId: number }) {
         <span className="num">#{pts[0].run_id}</span>
         <span className="num">#{last.run_id}</span>
       </div>
-      <p className="mt-1 text-2xs text-ink-3">{t('słupek = skan; wyróżniony = wolniej niż zwykle (', 'bar = run; highlighted = slower than usual (') + String(q.data.rule.slow_factor) + '× ' + t('i', 'and') + ' +' + fmtMs(q.data.rule.slow_min_ms) + (threshold !== null ? t(', próg ', ', threshold ') + fmtMs(threshold) : '') + t('); × = brak odpowiedzi HTTP', '); × = no HTTP answer')}</p>
+      {pts.some((p) => p.slow && p.ms !== null) || pts.some((p) => p.ms === null) ? (
+        <p className="mt-1 flex gap-4 text-2xs text-ink-3" data-testid="response-legend">
+          {pts.some((p) => p.slow && p.ms !== null) ? <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-2 bg-st-changed" aria-hidden="true" />{t('wolniej', 'slower')}</span> : null}
+          {pts.some((p) => p.ms === null) ? <span className="inline-flex items-center gap-1.5"><span className="leading-none text-st-gone" aria-hidden="true">×</span>{t('brak odpowiedzi', 'no response')}</span> : null}
+        </p>
+      ) : null}
     </Panel>
   );
 }

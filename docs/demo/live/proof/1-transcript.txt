@@ -1,0 +1,11 @@
+$ docs/demo/live/live.sh 1; live.sh 1 change; live.sh run "Ten komputer"; live.sh 1 up; live.sh run "Ten komputer"
+[22:08:33] scan: run 1 completed in 99 s (7 services)
+[22:08:33] READY in 131 s. Open http://127.0.0.1:18730, log in as admin@czujka.local (password: live.sh pass).
+
+  Next: live.sh 1 change, then 'Uruchom skan' on the profile 'Ten komputer: ...' (about 100 s)
+[22:08:34] quickstart change: 8787 stopped. Start the scan now.
+[22:10:13] scan: run 2 completed in 99 s (6 services)
+    service_gone: Usługa 172.18.0.1:8787 zniknęła (nginx 1.31.9)
+[22:10:13] quickstart up: 8787 is back. Start the scan now.
+[22:12:07] scan: run 3 completed in 113 s (7 services)
+    service_returned: Usługa 172.18.0.1:8787 wróciła po 1 min (nie było jej w 1 skanie) (nginx 1.31.9)

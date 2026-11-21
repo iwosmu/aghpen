@@ -1,0 +1,51 @@
+[21:45:11] starting the product (project czacc, port 18520, lab address 10.66.0.30)
+{"status":"ok","version":"acc22","engine":true,"probe":{"mode":"nmap-raw","prober":"nmap","raw_sockets":true}}
+{"max_pps":1000,"max_http_rps":50,"max_per_host_rps":2,"exclusions":["10.66.0.1-10.66.0.49"]}
+{"saved":74,"address_count":65609,"excluded":49,"invalid":0}
+{"id":399,"slug":"lab-infokiosk","enabled":true}
+[21:45:31] profile 2: {"ports":"top-1000,1521,2379,2380,5984,6379,7474,8086,9042,9200,9300,11211,27017,28017,1883,4369,5671,5672,8883,15672,15692,25672,61613,61616,2375,2376,4243,6443,9443,10250,10255,3000,5601,9090,9093,9100,9113,9187,9216,5985,5986,18080,50000,5173","discovery":{"icmp_echo":true,"icmp_timestamp":false,"tcp_syn_ports":[22,80,443,3389,8080],"tcp_ack_ports":[80],"arp":true,"skip_discovery":false,"mode":"balanced"},"udp":{"enabled":true,"ports":""},"version_intensity":7,"rate":{"max_pps":1000,"max_parallel_chunks":4,"max_parallel_hosts":16,"http_rps":20,"per_host_concurrency":1,"per_host_delay_ms":0},"retry":{"unstable_retries":2,"backoff_ms":500,"down_after_misses":0}}
+{"addresses":65560,"chunks":257,"est_packets":4263694,"est_duration_sec":5947,"effective_pps":1000,"fits_window":true,"window_sec":0,"based_on_history":false,"expected_live_rate":0.05,"discovery_mode":"balanced","est_packets_low":1272322,"est_duration_low_sec":1690,"in_window":true,"prev_duration_sec":0,"prev_hosts_up":0,"prev_addresses":0}
+[21:45:31] before: neighbour table: 328 entries, gc_thresh3 131072, table_fulls 1489752, overflow lines 0
+[21:45:31] === state t0 (t0) ===
+lab is in state t0
+[21:45:37] run 1 started
+nmap raw packets per second: max 842, p99 841, avg 292.5, top5 [842 842 841 841 841]; seconds over cap 0 (over cap+5%: 0)
+all sent packets per second: max 973, p99 847; seconds over cap 0
+[21:58:22] run 1 completed in 763 s; tx packets on the lab interface: 238272, peak 883 pps; {"hosts_up":70,"services":157,"packets":230914,"avg_pps":302,"peak_pps":null,"http_requests":1366,"elapsed":762}
+[21:58:23] after t0: neighbour table: 373 entries, gc_thresh3 131072, table_fulls 1489752, overflow lines 0
+Ground truth state t0 (hard cases excused)
+
+category                  TP    FP    FN  precision   recall       F1
+hosts                     67     0     0      1.000    1.000    1.000
+ports                    154     0     1      1.000    0.994    0.997
+service names            150     0     1      1.000    0.993    0.997
+technologies             102     1     2      0.990    0.981    0.986
+classes                   51     1     1      0.981    0.981    0.981
+
+check (recall only)                              right   share
+service versions                                30/32    0.938
+technology versions                             55/56    0.982
+[21:58:24] === state t0 (t0-2) ===
+lab is in state t0
+[21:58:29] run 2 started
+nmap raw packets per second: max 874, p99 846, avg 219.3, top5 [874 868 865 864 854]; seconds over cap 0 (over cap+5%: 0)
+all sent packets per second: max 903, p99 853; seconds over cap 0
+[22:15:27] run 2 completed in 1016 s; tx packets on the lab interface: 238588, peak 913 pps; {"hosts_up":70,"services":157,"packets":231371,"avg_pps":228,"peak_pps":null,"http_requests":1384,"elapsed":1012}
+[22:15:28] after t0-2: neighbour table: 373 entries, gc_thresh3 131072, table_fulls 1489752, overflow lines 0
+Ground truth state t0 (hard cases excused)
+
+category                  TP    FP    FN  precision   recall       F1
+hosts                     67     0     0      1.000    1.000    1.000
+ports                    154     0     1      1.000    0.994    0.997
+service names            150     0     1      1.000    0.993    0.997
+technologies             102     1     2      0.990    0.981    0.986
+classes                   51     1     1      0.981    0.981    0.981
+
+check (recall only)                              right   share
+service versions                                30/32    0.938
+technology versions                             55/56    0.982
+[22:15:30] memory of the Czujka container: max 99.5 MiB (540 samples)
+[22:15:30] database size: 18 MB
+lab is in state t0
+[22:15:36] product stopped (LR_KEEP=1 keeps it)
+[22:15:36] output: e2e/out/gate-acc22

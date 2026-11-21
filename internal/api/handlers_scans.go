@@ -105,7 +105,7 @@ func (s *Server) checkProfile(r *http.Request, p *model.ScanProfile) error {
 	case p.Rate.MaxPPS < 1:
 		return invalid("rate.max_pps must be at least 1")
 	case p.Rate.MaxPPS > policy.MaxPPS:
-		return invalid("rate.max_pps %d is above the cap of the safety policy (%d)", p.Rate.MaxPPS, policy.MaxPPS)
+		return invalid("Tempo %d pps przekracza limit polityki bezpieczeństwa (%d pps).", p.Rate.MaxPPS, policy.MaxPPS)
 	case p.Rate.HTTPRPS < 0 || p.Rate.HTTPRPS > policy.MaxHTTPRPS:
 		return invalid("rate.http_rps %g is above the cap of the safety policy (%g)", p.Rate.HTTPRPS, policy.MaxHTTPRPS)
 	case p.Rate.MaxParallelChunks < 1 || p.Rate.MaxParallelChunks > 64:

@@ -8,7 +8,7 @@ import { useAction, useItem, usePage } from '../api/hooks';
 import { post } from '../api/client';
 import type { Host, ManualEntryResult, NameCount, Page, Scope } from '../api/types';
 import { t, plural } from '../i18n';
-import { cx, fmtDateTime, fmtInt, fmtRelative } from '../lib/format';
+import { cx, fmtDateTime, fmtDec, fmtInt, fmtRelative } from '../lib/format';
 import { useUrlState, useWidth } from '../lib/hooks';
 import { Button, Dialog, Empty, ErrorState, Field, InlineError, PageHeader, Select, SkeletonRows, Spinner, Tags } from '../ui/kit';
 import { Icon } from '../ui/Icon';
@@ -20,7 +20,7 @@ import { useCan } from '../session';
 const PAGE = 500;
 /** What a host without open ports is: it answers, but the profile found no open port on it. */
 function noPortsText(status: string): string {
-  return status === 'down' ? t('nie odpowiada', 'not answering') : t('odpowiada, brak otwartych portów w profilu', 'answers, no open port in the profile');
+  return status === 'down' ? t('nie odpowiada', 'not responding') : t('odpowiada, brak otwartych portów w profilu', 'responds, no open port in the profile');
 }
 const LIVE_STATUSES = 'up,unstable,expected-offline,unknown';
 const FILTERS = ['q', 'status', 'scope_id', 'tag', 'tech', 'port', 'min_interest', 'cidr'];
@@ -85,8 +85,8 @@ export default function Hosts() {
     { id: 'ports', header: t('Otwarte porty', 'Open ports'), width: 'minmax(120px, 1fr)', min: 900, sort: 'service_count', cell: (h) => (h.open_ports ?? []).length ? <span className="mono block truncate text-ink-2">{(h.open_ports ?? []).join(' ')}</span> : <span className="block truncate text-xs text-ink-3" title={noPortsText(h.status)}>{h.status === 'down' ? noPortsText(h.status) : t('brak otwartych portów', 'no open port')}</span> },
     { id: 'tech', header: t('Technologie', 'Technologies'), width: 'minmax(140px, 1.2fr)', min: 1080, cell: (h) => <span className="block truncate text-ink-2">{(h.technologies ?? []).join(', ') || ((h.open_ports ?? []).length ? '–' : '')}</span> },
     { id: 'tags', header: t('Tagi', 'Tags'), width: '150px', min: 1320, cell: (h) => <Tags tags={h.tags} max={2} /> },
-    { id: 'palive', header: t('Obecność', 'Presence'), width: '62px', min: 760, sort: 'p_alive', align: 'right', cell: (h) => <span className="num text-ink-2">{h.p_alive.toFixed(2)}</span> },
-    { id: 'seen', header: t('Ostatnio widziany', 'Last seen'), width: '128px', min: 700, sort: 'last_seen', cell: (h) => <span className="num text-ink-2" title={fmtDateTime(h.last_seen)}>{fmtRelative(h.last_seen)}</span> },
+    { id: 'palive', header: t('Obecność', 'Presence'), width: '62px', min: 760, sort: 'p_alive', align: 'right', cell: (h) => <span className="num text-ink-2">{fmtDec(h.p_alive)}</span> },
+    { id: 'seen', header: t('Ostatnia obserwacja', 'Last seen'), width: '128px', min: 700, sort: 'last_seen', cell: (h) => <span className="num text-ink-2" title={fmtDateTime(h.last_seen)}>{fmtRelative(h.last_seen)}</span> },
     { id: 'interest', header: t('Ciekawość', 'Interest'), width: '86px', min: 0, sort: 'interest', align: 'right', cell: (h) => <InterestScore value={h.interest} /> },
   ];
   const cols = allCols.filter((c) => width === 0 || width >= c.min);
@@ -98,15 +98,15 @@ export default function Hosts() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title={t('Hosty', 'Hosts')}
-        sub={inf.data ? <><span className="num text-ink">{fmtInt(total)}</span> {plural(total, ['host', 'hosty', 'hostów'], ['host', 'hosts'])}{active ? t(' po filtrach', ' after filters') : u.get('status') ? '' : t(' w inwentarzu bez nieaktywnych (filtr „Stan”)', ' in the inventory, inactive ones hidden (filter "Status")')}</> : t('Wczytywanie…', 'Loading…')}
+        sub={inf.data ? <><span className="num text-ink">{fmtInt(total)}</span> {plural(total, ['host', 'hosty', 'hostów'], ['host', 'hosts'])}{active ? t(' po filtrach', ' after filters') : u.get('status') ? '' : t(', bez nieaktywnych', ', down hosts hidden')}</> : t('Wczytywanie…', 'Loading…')}
         readOnly={!canEdit}
-        actions={<>{canCreate ? <Button icon="plus" onClick={() => setManual(true)} data-testid="host-manual">{t('Dodaj host ręcznie', 'Add a host by hand')}</Button> : null}<ExportButtons kind="hosts" query={query} /></>}
+        actions={<>{canCreate ? <Button icon="plus" onClick={() => setManual(true)} data-testid="host-manual">{t('Dodaj host', 'Add host')}</Button> : null}<ExportButtons kind="hosts" query={query} /></>}
       />
       {manual ? <ManualHostDialog onClose={() => setManual(false)} /> : null}
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
         <SearchField value={q} onChange={setQ} placeholder={t('IP, nazwa, etykieta', 'IP, name, label')} width={200} />
         <FilterField label={t('Stan', 'Status')} width={150}>
-          <Select value={u.get('status', 'live')} onChange={(v) => u.set({ status: v === 'live' ? null : v })} options={[{ value: 'live', label: t('bez nieaktywnych', 'not inactive') }, { value: 'all', label: t('wszystkie', 'all') }, ...HOST_STATUSES.map((s) => ({ value: s, label: hostStatusInfo(s).label }))]} />
+          <Select value={u.get('status', 'live')} onChange={(v) => u.set({ status: v === 'live' ? null : v })} options={[{ value: 'live', label: t('bez nieaktywnych', 'hide down') }, { value: 'all', label: t('wszystkie', 'all') }, ...HOST_STATUSES.map((s) => ({ value: s, label: hostStatusInfo(s).label }))]} />
         </FilterField>
         <FilterField label={t('Zakres', 'Scope')} width={160}>
           <Select value={u.get('scope_id')} onChange={(v) => u.set({ scope_id: v })} options={[{ value: '', label: t('wszystkie', 'all') }, ...(scopes.data?.items ?? []).map((s) => ({ value: String(s.id), label: s.name }))]} />
@@ -124,9 +124,7 @@ export default function Hosts() {
 
       <div ref={wrapRef} className="flex min-h-0 flex-1 flex-col">
         {inf.error ? <ErrorState error={inf.error} retry={() => inf.refetch()} /> : inf.isPending ? <SkeletonRows rows={14} /> : rows.length === 0 ? (
-          <Empty icon="hosts" title={active ? t('Żaden host nie pasuje do filtrów', 'No host matches the filters') : t('Inwentarz jest pusty', 'The inventory is empty')}
-            hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Hosty pojawią się po pierwszym skanie albo po imporcie wyników.', 'Hosts appear after the first scan or after an import of results.')}
-            action={active ? undefined : <NextSteps />} />
+          <Empty icon="hosts" title={active ? t('Żaden host nie pasuje do filtrów', 'No hosts match the filters') : t('Brak hostów', 'No hosts yet')}            action={active ? undefined : <NextSteps />} />
         ) : (
           <>
             {!narrow ? (
@@ -166,8 +164,8 @@ export default function Hosts() {
               </div>
             </div>
             <div className="flex h-[30px] flex-none items-center justify-between gap-3 border-t border-rule px-4 text-xs text-ink-3 sm:px-6">
-              <span>{t('Wczytano', 'Loaded')} <span className="num text-ink-2">{fmtInt(rows.length)}</span> {t('z', 'of')} <span className="num text-ink-2">{fmtInt(total)}</span>{t('. Lista rysuje tylko widoczne wiersze.', '. The list draws only the visible rows.')}</span>
-              {isFetchingNextPage ? <span className="inline-flex items-center gap-1.5"><Spinner />{t('kolejna porcja', 'next batch')}</span> : null}
+              <span>{t('Wczytano', 'Loaded')} <span className="num text-ink-2">{fmtInt(rows.length)}</span> {t('z', 'of')} <span className="num text-ink-2">{fmtInt(total)}</span></span>
+              {isFetchingNextPage ? <span className="inline-flex items-center gap-1.5"><Spinner /></span> : null}
             </div>
           </>
         )}
@@ -203,13 +201,13 @@ function ManualHostDialog({ onClose }: { onClose: () => void }) {
     onSuccess: (r) => { onClose(); if (r?.host?.id) navigate('/hosts/' + r.host.id); },
   });
   return (
-    <Dialog open onClose={onClose} width={540} title={t('Dodaj host ręcznie', 'Add a host by hand')}
-      footer={<><Button onClick={onClose}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="plus" busy={add.isPending} disabled={!ipOk || parsed.bad.length > 0} onClick={() => add.mutate(undefined)} data-testid="host-manual-save">{t('Dodaj host', 'Add the host')}</Button></>}>
+    <Dialog open onClose={onClose} width={540} title={t('Dodaj host', 'Add host')}
+      footer={<><Button onClick={onClose}>{t('Anuluj', 'Cancel')}</Button><Button variant="primary" icon="plus" busy={add.isPending} disabled={!ipOk || parsed.bad.length > 0} onClick={() => add.mutate(undefined)} data-testid="host-manual-save">{t('Dodaj host', 'Add host')}</Button></>}>
       <div className="space-y-3">
-        <p className="text-sm text-ink-2">{t('Dla urządzeń, których skaner nie widzi (za zaporą, wyłączone na noc). Wpis przechodzi przez tę samą analizę co skan, jako osobny przebieg „wpis ręczny”. Usług, których nie wpiszesz, Czujka nie uzna za zniknięte.', 'For devices the scanner cannot see (behind a firewall, off at night). The entry goes through the same analysis as a scan, as its own "manual entry" run. Services that you do not enter are not marked gone.')}</p>
-        <Field label={t('Adres IP', 'IP address')} error={ip && !ipOk ? t('to nie jest adres IPv4', 'this is not an IPv4 address') : undefined}><input className="field mono" autoFocus value={ip} onChange={(e) => setIp(e.target.value)} placeholder="10.66.20.15" data-testid="host-manual-ip" /></Field>
-        <Field label={t('Nazwy hosta', 'Host names')} hint={t('oddzielone spacją lub przecinkiem', 'separated by a space or a comma')}><input className="field mono" value={names} onChange={(e) => setNames(e.target.value)} placeholder="drukarka-b1.lab.czujka.test" /></Field>
-        <Field label={t('Usługi', 'Services')} hint={t('jedna w wierszu: port[/proto] nazwa produkt wersja, np. 443/tcp https nginx 1.24', 'one per line: port[/proto] name product version, for example 443/tcp https nginx 1.24')} error={parsed.bad.length ? t('Nie rozumiem: ', 'Cannot read: ') + parsed.bad.join(', ') : undefined}>
+        <p className="text-sm text-ink-2">{t('Dla urządzeń, których skaner nie widzi. Usług, których nie wpiszesz, Czujka nie uzna za zniknięte.', 'For devices the scanner cannot see. Services you do not enter are not marked gone.')}</p>
+        <Field label={t('Adres IP', 'IP address')} error={ip && !ipOk ? t('błędny adres IPv4', 'invalid IPv4 address') : undefined}><input className="field mono" autoFocus value={ip} onChange={(e) => setIp(e.target.value)} placeholder="10.66.20.15" data-testid="host-manual-ip" /></Field>
+        <Field label={t('Nazwy hosta', 'Host names')} hint={t('oddzielone spacją lub przecinkiem', 'separated by a space or a comma')}><input className="field mono" value={names} onChange={(e) => setNames(e.target.value)} placeholder="drukarka-b1.example.edu" /></Field>
+        <Field label={t('Usługi', 'Services')} hint={t('jedna w wierszu: port[/proto] nazwa produkt wersja, np. 443/tcp https nginx 1.24', 'one per line: port[/proto] name product version, for example 443/tcp https nginx 1.24')} error={parsed.bad.length ? t('Błędny wiersz: ', 'Invalid line: ') + parsed.bad.join(', ') : undefined}>
           <textarea className="field mono" rows={4} value={svc} onChange={(e) => setSvc(e.target.value)} placeholder={'22/tcp ssh OpenSSH 9.6\n443/tcp https nginx 1.24'} data-testid="host-manual-services" />
         </Field>
         <InlineError error={add.error} />

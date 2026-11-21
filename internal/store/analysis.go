@@ -7,13 +7,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/iwosmu/aghpen/internal/analyze"
 	"github.com/iwosmu/aghpen/internal/model"
 )
 
 // ---------- changes ----------
 
 const changeCols = `c.id, c.run_id, c.prev_run_id, c.at, c.kind, c.severity, c.host_id, COALESCE(host(c.ip), '') AS ip, c.service_id, c.port,
-  c.summary, c.field, c.before, c.after, c.expected, c.acked_by, c.acked_at, c.deep_pass`
+  c.summary, c.field, c.before, c.after, c.expected, c.detail, c.acked_by, c.acked_at, c.deep_pass`
 
 // ChangeFilter are the filters of GET /changes.
 type ChangeFilter struct {
@@ -67,12 +68,20 @@ var changeSort = map[string]string{"id": "c.id", "at": "c.at", "kind": "c.kind",
 
 // ListChanges returns a page of changes, newest first by default.
 func (s *Store) ListChanges(ctx context.Context, f ChangeFilter) (model.Page[model.Change], error) {
-	return listPage[model.Change](ctx, s.db, changeCols, "changes c", f.where(), orderBy(f.Sort, changeSort, "c.at DESC", "c.id DESC"), f.ListOpts, nil)
+	p, err := listPage[model.Change](ctx, s.db, changeCols, "changes c", f.where(), orderBy(f.Sort, changeSort, "c.at DESC", "c.id DESC"), f.ListOpts, nil)
+	for i := range p.Items {
+		p.Items[i].Summary = analyze.ChangeSummary(p.Items[i])
+	}
+	return p, err
 }
 
 // EachChange streams every change that matches the filter.
 func (s *Store) EachChange(ctx context.Context, f ChangeFilter, fn func(*model.Change) error) error {
-	return streamAll[model.Change](ctx, s.db, changeCols, "changes c", f.where(), orderBy(f.Sort, changeSort, "c.at DESC", "c.id DESC"), nil, fn)
+	return streamAll[model.Change](ctx, s.db, changeCols, "changes c", f.where(), orderBy(f.Sort, changeSort, "c.at DESC", "c.id DESC"), nil,
+		func(c *model.Change) error {
+			c.Summary = analyze.ChangeSummary(*c)
+			return fn(c)
+		})
 }
 
 // InsertChanges stores the changes that the analysis found, in one statement.
@@ -101,11 +110,11 @@ func (s *Store) InsertChanges(ctx context.Context, changes []model.Change) error
 		rows = append(rows, r)
 	}
 	// deep_pass: the service was scanned by the deep pass of this run (services.deep_run_id)
-	_, err := s.db.Exec(ctx, `INSERT INTO changes (run_id, prev_run_id, at, kind, severity, host_id, ip, service_id, port, summary, field, before, after, expected, deep_pass)
-		SELECT d.run_id, d.prev_run_id, d.at, d.kind, d.severity, d.host_id, d.ip_addr, d.service_id, d.port, d.summary, d.field, d.before, d.after, d.expected,
+	_, err := s.db.Exec(ctx, `INSERT INTO changes (run_id, prev_run_id, at, kind, severity, host_id, ip, service_id, port, summary, field, before, after, expected, detail, deep_pass)
+		SELECT d.run_id, d.prev_run_id, d.at, d.kind, d.severity, d.host_id, d.ip_addr, d.service_id, d.port, d.summary, d.field, d.before, d.after, d.expected, d.detail,
 			d.deep_pass OR EXISTS (SELECT 1 FROM services s WHERE s.id = d.service_id AND s.deep_run_id = d.run_id)
 		FROM jsonb_to_recordset($1::jsonb) AS d(run_id bigint, prev_run_id bigint, at timestamptz, kind text, severity text, host_id bigint, ip_addr inet,
-			service_id bigint, port int, summary text, field text, before jsonb, after jsonb, expected boolean, deep_pass boolean)`, js(rows))
+			service_id bigint, port int, summary text, field text, before jsonb, after jsonb, expected boolean, detail jsonb, deep_pass boolean)`, js(rows))
 	return mapErr(err)
 }
 
@@ -123,7 +132,9 @@ func (s *Store) AckChanges(ctx context.Context, ids []int64, by string) (int, er
 
 // GetChange returns one change.
 func (s *Store) GetChange(ctx context.Context, id int64) (model.Change, error) {
-	return jsonRow[model.Change](ctx, s.db, wrapJSON("SELECT "+changeCols+" FROM changes c WHERE c.id = $1"), id)
+	c, err := jsonRow[model.Change](ctx, s.db, wrapJSON("SELECT "+changeCols+" FROM changes c WHERE c.id = $1"), id)
+	c.Summary = analyze.ChangeSummary(c)
+	return c, err
 }
 
 // ---------- findings ----------

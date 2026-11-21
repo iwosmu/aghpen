@@ -28,10 +28,10 @@ Skrypt nagrywa też plik napisów `docs/demo/czujka-demo.pl.srt` i tekst lektora
 | # | Ujęcie | Ekran i kliknięcia | Napis (do 6 słów) |
 | --- | --- | --- | --- |
 | 1 | Instalacja i kreator | Świeża instalacja: logowanie hasłem z logu, w kreatorze nowe hasło, nazwa sieci „Kampus AGH”, zakres `10.66.0.0/16`, podgląd liczby adresów, krok 3 z limitami. | Jedno polecenie, potem kreator |
-| 2 | Skan /16 na żywo | „Przebiegi skanów” → „Uruchom skan” → profil „Laboratorium /16: pełny przegląd” → „Uruchom”. Ekran przebiegu: mapa 256 bloków /24 wypełnia się. Dwie minuty skanu pokazane w ×8, ze znakiem „×8” w rogu. | Skan całej sieci /16 |
+| 2 | Skan /16 na żywo | „Skany” → „Uruchom skan” → profil „Laboratorium /16: pełny przegląd” → „Uruchom”. Ekran przebiegu: mapa 256 bloków /24 wypełnia się. Dwie minuty skanu pokazane w ×8, ze znakiem „×8” w rogu. | Skan całej sieci /16 |
 | 3 | Zmiana między skanami | „Porównanie dwóch skanów” dla dwóch ostatnich pełnych przebiegów: nowe, zniknięte, zmienione. | Co się zmieniło między skanami |
 | 4 | Host niestabilny | Szczegóły hosta `10.66.70.20`: mapa cieplna tygodnia, `p_alive`, potem „Plan ponownych sprawdzeń”. | Rytm hosta i ponowne sprawdzenia |
-| 5 | Wehikuł czasu | „Wehikuł czasu”: strzałka w lewo przebieg po przebiegu, potem z powrotem. | Wehikuł czasu |
+| 5 | Oś czasu | „Oś czasu”: strzałka w lewo przebieg po przebiegu, potem z powrotem. | Oś czasu |
 | 6 | Reguła i sygnatura z przykładu | „Reguły ekspozycji”: reguła „Panel administracyjny poza siecią zarządzania” i jej naruszenia; potem usługa `10.66.1.10:80` → „Zaproponuj sygnaturę”. | Reguła i sygnatura z przykładu |
 | 7 | Stop awaryjny | Przycisk „Stop awaryjny” w górnym pasku, potwierdzenie; trwający skan staje. Po nagraniu skrypt zwalnia stop i anuluje ten przebieg. | Stop awaryjny |
 | 8 | Plansza końcowa | Ikona, „Czujka”, `czujka.dev`. | (bez napisu) |
@@ -62,7 +62,7 @@ Na slajdzie jest tylko obraz i podpis. Szczegóły mówi prowadzący; źródło 
 | 3 | Cała sieć /16 w jednym przebiegu. | Planista dzieli sieć na bloki /24 i łączy puste w większe grupy, a rozmiar grupy idzie za zmierzonym tempem. W sieci lokalnej silnik najpierw robi jedno przeszukanie ARP, potem skanuje porty tylko na odpowiadających adresach. Czas przebiegu /16 podaje `docs/WYNIKI.md` (bramka laboratorium `e2e/lab-gate.sh`, limit 1000 pps). |
 | 4 | Czujka rozpoznaje usługę i podaje powody oceny. | 398 sygnatur w YAML rozpoznaje panele, CMS, urządzenia, frameworki i środowiska testowe; pewność łączy wszystkie dowody. Ocena ciekawości 0–100 zawsze pokazuje swoje powody, tu siedem powodów dla WordPressa z formularzem logowania przez HTTP. |
 | 5 | Gdy host milczy, Czujka sprawdza tylko ten adres. | Host, który zamilkł poza swoim rytmem, dostaje trzy krótkie sprawdzenia jednego adresu: po 10, 30 i 90 minutach, najwyżej 200 adresów na godzinę i tylko w oknie skanu. Gdy dalej milczy, Czujka zgłasza go jako zniknięty; gdy odpowie, wraca bez alarmu. |
-| 6 | Wehikuł czasu pokazuje sieć po dowolnym skanie. | Suwak cofa się przebieg po przebiegu i pokazuje hosty, usługi i znaleziska z tamtej chwili. Obok jest różnica do dziś: co zniknęło i co zmieniło produkt, wersję albo tytuł. |
+| 6 | Oś czasu pokazuje sieć po dowolnym skanie. | Suwak cofa się przebieg po przebiegu i pokazuje hosty, usługi i znaleziska z tamtej chwili. Obok jest różnica do dziś: co zniknęło i co zmieniło produkt, wersję albo tytuł. |
 | 7 | Reguła opisuje, czego w sieci być nie może. | Reguły w YAML mówią, czego w sieci być nie może albo co musi być; Czujka sprawdza je po każdym skanie i imporcie, bez wysyłania pakietów. Pakiet startowy ma 14 reguł; ta jedna znajduje w laboratorium 11 paneli administracyjnych poza siecią zarządzania. |
 | 8 | Czujka wysyła tylko żądania GET i HEAD. | Skaner nigdy się nie loguje i nie wysyła ładunków; walidator odrzuca sygnaturę z inną metodą, treścią albo hasłem, a limity polityki zawsze wygrywają z profilem. Wywołanie stopu awaryjnego trwało 0,09 s; po stopie wyszło 5 pakietów IP, ostatni po 0,01 s, i żaden później niż po 1 s (jądro wysłało jeszcze 3 zapytania ARP). Na łączu najwięcej 641 pakietów nmapa na sekundę przy limicie 800; retro-hunt nie wysyła żadnego pakietu. |
 | 9 | Czujka startuje jednym poleceniem w dwóch kontenerach. | Produkt to binarka Go z interfejsem i nmapem oraz PostgreSQL z pg_tde; uruchamia go `docker compose up -d` w katalogu głównym repozytorium. SecureCodeBox wymaga klastra Kubernetes i Helm, osobnego chartu na każdy skaner i magazynu S3. Kreator prowadzi od logowania do pierwszego skanu w 19,9 s. |
@@ -137,7 +137,7 @@ Skrypt `lab/story.sh` wprowadza w laboratorium zaplanowaną serię prawdziwych z
 | --- | --- | --- |
 | skanów w co najmniej 8 różnych godzinach | 5 | Model nazywa rytm i nadaje `expected-offline` dopiero od 8 obserwacji (`MinObsForExpected`); mapa cieplna z jednej godziny jest pusta |
 | hosta, który milknie poza swoim rytmem | 5 | plan ponownych sprawdzeń i zmiana `host_gone` po krokach `[10, 30, 90]` min (host z mniej niż 8 obserwacjami: `[1, 3, 10]`) |
-| przejścia `t0` → `t1` między dwoma skanami | 4, 6, 7 | zmiany, dwa punkty na suwaku wehikułu, `shadow-adminer` dla reguły |
+| przejścia `t0` → `t1` między dwoma skanami | 4, 6, 7 | zmiany, dwa punkty na suwaku osi czasu, `shadow-adminer` dla reguły |
 | kiosków `kiosk-1` i `kiosk-2` w obu stanach | 8 | „Zaproponuj sygnaturę” potrzebuje przykładu i podobnej instancji |
 | stanu końcowego zapisanego w wolumenie bazy | wszystkie | pokaz nie może czekać godzinami: archiwum `czujka backup` (szyfrowane) przed wyjazdem, na miejscu `czujka restore` |
 

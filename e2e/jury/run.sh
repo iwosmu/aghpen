@@ -169,6 +169,7 @@ juror() { # stack: what a juror sees with the default profile on target $TARGET
   [ -n "$DEFPROF" ] || return 0
   scan "$1 with the default profile" "$DEFPROF"
   JUROR_RUN=$RUN
+  SVJ=$SV
   local port s found=0 total=0
   for port in $(grep -v '^#' "$E/truth.tsv" | awk -F'\t' -v s="$1" '$1 == s && $3 == "open" {print $2}'); do
     s=$(svc "$port")
@@ -192,6 +193,20 @@ juror() { # stack: what a juror sees with the default profile on target $TARGET
   row "juror:$1" all open "every published port, default profile" "" $ok "$nfound/$npub found${miss:+; missing: $miss}${extra:+; other open ports: $extra}"
   JUROR+=("$(printf '%s\t%s/%s\t%s\t%s\t%s\t%s' "$1" "$nfound" "$npub" "${FIRSTSVC:-?}" "$last (port $lastp)" "$RUNSECS" "$RUN")")
 }
+stable() { # stack: the template-profile run right after the default-profile run sees the same stack, unchanged
+  [ -n "${JUROR_RUN:-}" ] || return 0
+  local port a b diff= ch
+  for port in $(grep -v '^#' "$E/truth.tsv" | awk -F'\t' -v s="$1" '$1 == s && $3 == "open" {print $2}'); do
+    a=$(echo "$SVJ" | jq -r --argjson p "$port" '[.items[] | select(.port == $p and .proto == "tcp")][0] | if . == null then "-" else "\(.product // "") \(.version // "") | \([.technologies[]? | "\(.name)@\(.version // "")"] | sort | join(","))" end')
+    b=$(echo "$SV" | jq -r --argjson p "$port" '[.items[] | select(.port == $p and .proto == "tcp")][0] | if . == null then "-" else "\(.product // "") \(.version // "") | \([.technologies[]? | "\(.name)@\(.version // "")"] | sort | join(","))" end')
+    [ "$a" = "$b" ] || diff="$diff $port: [$a] vs [$b];"
+  done
+  [ -z "$diff" ] && ok=1 || ok=0
+  row "stable:$1" all tech "same products, versions and technologies in both runs" "" $ok "${diff:-runs $JUROR_RUN and $RUN agree on every template port}"
+  ch=$(echo "$CH" | jq -r '[.items[] | select(.kind | test("^(tech_|service_changed|version)")) | "\(.port) \(.kind)"] | join("; ")')
+  [ -z "$ch" ] && ok=1 || ok=0
+  row "stable:$1" all change "no tech or version change in the second run" "" $ok "${ch:-none in run $RUN}"
+}
 truth() { # stack
   # awk keeps empty columns (read with a tab IFS would merge them); \x1f is not whitespace.
   while IFS=$'\x1f' read -r st port ck val owner; do
@@ -213,8 +228,9 @@ status_of() { local id; id=$(svc "$1" | jq -r '.id // empty'); [ -n "$id" ] && a
 
 # ---------- run ----------
 echo "=== Czujka on the organisers' template (lab/jury), $(date '+%Y-%m-%d %H:%M %Z') ==="
-echo "Czujka $(curl -s "$CZ_URL/healthz" | jq -c '{version, engine, tde}'); docker host $(uname -m); target $TARGET"
+echo "Czujka $(curl -s "$CZ_URL/healthz" | jq -c '{status, version}'); docker host $(uname -m); target $TARGET"
 setup
+echo "Czujka with a session: $(curl -s -b "$JAR" "$CZ_URL/healthz" | jq -c '{version, engine, tde}')"
 all_down
 want() { [[ " $ONLY " == *" $1 "* ]]; }
 
@@ -231,12 +247,36 @@ if want quickstart; then
   open_row "quickstart: 8787 open again" 8787 ""
   change_row "quickstart: 8787 reported as back" 8787 '^service_returned$' 'wróci' ""
 fi
+if want quickstart && [ -n "$DEFPROF" ]; then
+  echo; echo "=== Quickstart on the default profile: the juror's exact flow (\"Ten komputer\") ==="
+  scan "quickstart up, default profile" "$DEFPROF"
+  for p in 2223 3001 5673 8787 15673; do open_row "quickstart, default profile: open after up" $p ""; done
+  ( cd "$J" && bash quickstart.sh change >/dev/null 2>&1 ); sleep 2
+  scan "quickstart change, default profile" "$DEFPROF"
+  change_row "quickstart, default profile: 8787 gone after change" 8787 '^service_gone$' '' ""
+  ( cd "$J" && bash quickstart.sh up >/dev/null 2>&1 ) && wait_ready quickstart "${READY_quick[0]}" "${READY_quick[1]}"
+  scan "quickstart up again, default profile" "$DEFPROF"
+  open_row "quickstart, default profile: 8787 open again" 8787 ""
+  change_row "quickstart, default profile: 8787 reported as back" 8787 '^service_returned$' 'wróci' ""
+  # Negative: a run whose port list does not name 8787, right after a run that found it: 8787 stays open, no change.
+  P3=$(api GET "/profiles?limit=100" | jq -r '[.items[] | select(.name == "Szablon jury (e2e): quickstart bez 8787")][0].id // empty')
+  [ -n "$P3" ] || P3=$(api GET "/profiles/$PROF" | jq -c 'del(.id, .created_at, .updated_at, .next_run_at, .last_run_id) | .name = "Szablon jury (e2e): quickstart bez 8787" | .ports = "2223,3001,5673,15673"' \
+    | { read -r body; api POST /profiles "$body"; } | jq -r .id)
+  scan "quickstart, a run that does not name 8787" "$P3"
+  open_row "run without 8787 in its port list: 8787 stays open" 8787 ""
+  c=$(echo "$CH" | jq -r '[.items[] | select(.port == 8787) | .kind] | join(",")')
+  [ -z "$c" ] && ok=1 || ok=0
+  row scenario 8787 change "run without 8787 in its port list: no change on 8787" "" $ok "${c:-none in run $RUN}"
+  c=$(api GET "/services?run_id=$RUN&port=8787&limit=10" | jq -r '[.items[]? | select(.proto == "tcp") | .carried] | first // "absent"')
+  [ "$c" = true ] && ok=1 || ok=0
+  row scenario 8787 carried "run without 8787 in its port list: 8787 listed with carried=true" "" $ok "carried=$c in /services?run_id=$RUN"
+fi
 
 if want custom-network; then
   echo; echo "=== custom-network: httpbin, PostgreSQL, RabbitMQ, Gitea, nginx ==="
   compose custom-network -- up -d >/dev/null 2>&1; wait_ready custom-network "${READY_custom[0]}" "${READY_custom[1]}"
   juror custom-network
-  scan custom-network; truth custom-network
+  scan custom-network; truth custom-network; stable custom-network
 fi
 
 if want modern; then
@@ -244,7 +284,7 @@ if want modern; then
   compose custom-network -- down -v >/dev/null 2>&1
   compose modern -- up -d >/dev/null 2>&1; wait_ready modern "${READY_modern[0]}" "${READY_modern[1]}"
   juror modern
-  scan modern; truth modern
+  scan modern; truth modern; stable modern
   if want custom-network; then
     # The swap shows in the first scan of the stage: the default-profile scan when it ran, else the template scan.
     CH=$(api GET "/changes?limit=1000" | jq -c --argjson r "${JUROR_RUN:-$RUN}" '{items: [.items[] | select(.run_id >= $r)]}')
@@ -269,7 +309,7 @@ if want vulnerable; then
   compose modern -- down -v >/dev/null 2>&1
   compose vulnerable -- up -d >/dev/null 2>&1; wait_ready vulnerable "${READY_vulnerable[0]}" "${READY_vulnerable[1]}"
   juror vulnerable
-  scan vulnerable; truth vulnerable
+  scan vulnerable; truth vulnerable; stable vulnerable
   compose vulnerable -- down -v >/dev/null 2>&1
 fi
 
@@ -277,7 +317,7 @@ if want proxy; then
   echo; echo "=== modern-proxy: WordPress behind Traefik and Toxiproxy; then the four toxics ==="
   compose proxy proxy-base -- up -d >/dev/null 2>&1; wait_ready proxy "${READY_proxy[0]}" ""
   juror proxy
-  scan "proxy, no toxic"; truth proxy
+  scan "proxy, no toxic"; truth proxy; stable proxy
   RT0=$(rt_of 8085); log "8085 response time without a toxic: ${RT0:-?} ms"
   for tox in latency timeout bandwidth slowclose; do
     compose proxy proxy-$tox -- up -d >/dev/null 2>&1

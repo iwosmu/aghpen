@@ -1,0 +1,16 @@
+$ docs/demo/live/live.sh 3
+[23:22:29] scan: run 1 completed in 18 s (3 services)
+[23:22:48] scan: run 2 completed in 19 s (3 services)
+[23:22:48] READY in 73 s. Open http://127.0.0.1:18730, log in as admin@czujka.local (password: live.sh pass).
+
+  Next: live.sh 3 slow, then 'Uruchom skan' on 'WordPress za proxy' (about 20 s)
+$ docs/demo/live/live.sh 3 slow
+[23:22:56] Toxiproxy adds 500 ms to 8085. Start the scan now.
+$ docs/demo/live/live.sh run "WordPress za proxy"   (= Uruchom skan)
+[23:23:15] scan: run 3 completed in 18 s (3 services)
+    response_slower: Usługa 172.18.0.1:8085 odpowiada wolniej: 585 ms (zwykle 39 ms)
+$ docs/demo/live/live.sh 3 fast
+[23:23:35] no toxic on 8085. Start the scan now.
+$ docs/demo/live/live.sh run "WordPress za proxy"
+[23:23:54] scan: run 4 completed in 18 s (3 services)
+    response_recovered: Usługa 172.18.0.1:8085 znów odpowiada w zwykłym czasie: 44 ms (zwykle 39 ms)

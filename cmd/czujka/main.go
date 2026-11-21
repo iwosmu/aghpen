@@ -50,6 +50,7 @@ Usage:
   czujka serve
   czujka migrate
   czujka user create --email E [--name N] [--role admin|editor|analyst|viewer|<slug>] [--password P] [--reset]
+  czujka user unlock EMAIL     clear the login lock of an account (the password stays)
   czujka rotate-key
   czujka genkey
   czujka healthcheck
@@ -134,6 +135,11 @@ func openWith(ctx context.Context, withOldKeys bool, mutate func(*config.Config)
 	log := newLogger(cfg)
 	if err := cfg.RequireDB(); err != nil {
 		return cfg, nil, log, err
+	}
+	if f := strings.TrimSpace(os.Getenv("CZUJKA_DB_PASSWORD_FILE")); f != "" {
+		if err := adoptLegacyDBPassword(ctx, cfg.DBURL, f+"_legacy", log); err != nil {
+			return cfg, nil, log, err
+		}
 	}
 	var old []string
 	if withOldKeys {
@@ -303,8 +309,11 @@ func serve() error {
 }
 
 func userCmd(args []string) error {
+	if len(args) == 2 && args[0] == "unlock" {
+		return userUnlock(args[1])
+	}
 	if len(args) == 0 || args[0] != "create" {
-		return errors.New("usage: czujka user create --email E [--name N] [--role R] [--password P] [--reset]")
+		return errors.New("usage: czujka user create --email E [--name N] [--role R] [--password P] [--reset]\n       czujka user unlock EMAIL")
 	}
 	fs := flag.NewFlagSet("user create", flag.ContinueOnError)
 	email := fs.String("email", "", "e-mail address (login)")
@@ -359,6 +368,24 @@ func userCmd(args []string) error {
 	if generated {
 		fmt.Printf("password: %s\n", *password)
 	}
+	return nil
+}
+
+// userUnlock clears the login lock of an account without changing its
+// password: the way back in for the first administrator when someone keeps
+// the account locked with wrong passwords.
+func userUnlock(email string) error {
+	ctx := context.Background()
+	_, st, _, err := open(ctx, true)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	if err := auth.New(st, auth.Config{}).UnlockByEmail(ctx, email); err != nil {
+		return fmt.Errorf("unlock %s: %w", email, err)
+	}
+	_ = st.InsertAudit(ctx, model.AuditEntry{Action: "user.unlock", Entity: "user", UserEmail: "cli", Detail: map[string]any{"email": strings.ToLower(strings.TrimSpace(email)), "via": "cli"}})
+	fmt.Printf("account %s unlocked\n", strings.ToLower(strings.TrimSpace(email)))
 	return nil
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Ref } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import { cx } from '../lib/format';
@@ -10,11 +10,11 @@ import { ApiError, isUnavailable } from '../api/client';
 // ---------- Button ----------
 type BtnVariant = 'primary' | 'default' | 'ghost' | 'danger' | 'dangerSolid';
 const BTN: Record<BtnVariant, string> = {
-  primary: 'bg-accent text-accent-ink border-accent hover:bg-accent-strong hover:border-accent-strong font-medium',
-  default: 'bg-raised text-ink border-rule-strong hover:border-ink-3',
+  primary: 'bg-primary text-primary-ink border-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-press font-semibold shadow-[0_1px_0_rgb(255_255_255/0.35)_inset]',
+  default: 'bg-raised text-ink border-rule-strong hover:border-ink-3 hover:bg-[color-mix(in_oklch,var(--raised),var(--ink)_6%)]',
   ghost: 'bg-transparent text-ink-2 border-transparent hover:bg-raised hover:text-ink',
   danger: 'bg-transparent text-danger border-danger/60 hover:bg-st-gone-wash',
-  dangerSolid: 'bg-danger-solid text-danger-ink border-danger-solid hover:brightness-110 font-medium',
+  dangerSolid: 'bg-danger-solid text-danger-ink border-danger-solid hover:brightness-110 font-semibold',
 };
 
 export function Button({
@@ -27,8 +27,8 @@ export function Button({
       disabled={rest.disabled || busy}
       className={cx(
         'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-sm border transition-colors duration-150',
-        'disabled:opacity-50 active:translate-y-px',
-        size === 'sm' ? 'h-[26px] px-2 text-xs' : 'h-[30px] px-3 text-sm',
+        'disabled:opacity-50 disabled:pointer-events-none active:translate-y-px',
+        size === 'sm' ? 'h-[28px] px-2.5 text-xs' : 'h-[34px] px-3.5 text-sm',
         BTN[variant], className,
       )}
     >
@@ -44,7 +44,7 @@ export function LinkButton({ to, icon, children, variant = 'default', size = 'md
       to={to}
       className={cx(
         'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-sm border transition-colors duration-150',
-        size === 'sm' ? 'h-[26px] px-2 text-xs' : 'h-[30px] px-3 text-sm', BTN[variant],
+        size === 'sm' ? 'h-[28px] px-2.5 text-xs' : 'h-[34px] px-3.5 text-sm', BTN[variant],
       )}
     >
       {icon ? <Icon name={icon} size={size === 'sm' ? 14 : 16} /> : null}
@@ -57,7 +57,7 @@ export function IconButton({ icon, label, className, ...rest }: { icon: string; 
   return (
     <button
       type="button" aria-label={label} title={label} {...rest}
-      className={cx('inline-flex h-[30px] w-[30px] items-center justify-center rounded-sm border border-transparent text-ink-2 hover:bg-raised hover:text-ink disabled:opacity-50', className)}
+      className={cx('inline-flex h-[34px] w-[34px] items-center justify-center rounded-sm border border-transparent text-ink-2 hover:bg-raised hover:text-ink disabled:opacity-50', className)}
     >
       <Icon name={icon} />
     </button>
@@ -71,14 +71,14 @@ export function Spinner() {
 // ---------- Layout pieces ----------
 export function PageHeader({ title, sub, actions, readOnly, back }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode; readOnly?: boolean; back?: { to: string; label: string } }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-rule px-4 pb-3 pt-4 sm:px-6">
+    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-rule/70 px-4 pb-4 pt-5 sm:px-6 lg:px-8">
       <div className="min-w-0">
         {back ? (
           <Link to={back.to} className="mb-1 inline-flex items-center gap-1 text-xs text-ink-3 hover:text-ink">
             <Icon name="chevronLeft" size={12} />{back.label}
           </Link>
         ) : null}
-        <h1 className="text-lg font-semibold tracking-[-0.01em] text-ink">{title}</h1>
+        <h1 className="font-display text-[30px] font-normal leading-[1.05] tracking-[-0.005em] text-ink sm:text-[36px]">{title}</h1>
         {sub ? <p className="mt-0.5 max-w-[80ch] text-sm text-ink-2">{sub}</p> : null}
         {readOnly ? <ReadOnlyNote /> : null}
       </div>
@@ -98,9 +98,9 @@ export function ReadOnlyNote({ text }: { text?: string }) {
 
 export function Panel({ title, count, actions, children, className, flush }: { title?: ReactNode; count?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; flush?: boolean }) {
   return (
-    <section className={cx('min-w-0 border border-rule bg-panel', className)}>
+    <section className={cx('card min-w-0', className)}>
       {title ? (
-        <div className="flex min-h-[36px] items-center justify-between gap-3 border-b border-rule px-3">
+        <div className="flex min-h-[40px] items-center justify-between gap-3 border-b border-rule/70 px-4">
           <h2 className="flex items-baseline gap-2 text-sm font-semibold text-ink">
             {title}
             {count !== undefined ? <span className="num text-xs font-normal text-ink-3">{count}</span> : null}
@@ -108,7 +108,7 @@ export function Panel({ title, count, actions, children, className, flush }: { t
           {actions ? <div className="flex items-center gap-2 text-xs">{actions}</div> : null}
         </div>
       ) : null}
-      <div className={flush ? '' : 'p-3'}>{children}</div>
+      <div className={flush ? '' : 'p-4'}>{children}</div>
     </section>
   );
 }
@@ -151,8 +151,8 @@ export function Tabs({ tabs, value, onChange }: { tabs: { id: string; label: Rea
         <button
           key={tab.id} role="tab" type="button" aria-selected={value === tab.id} onClick={() => onChange(tab.id)}
           className={cx(
-            '-mb-px flex h-[36px] items-center gap-1.5 whitespace-nowrap border-b-2 px-3 text-sm',
-            value === tab.id ? 'border-accent font-medium text-ink' : 'border-transparent text-ink-2 hover:text-ink',
+            '-mb-px flex h-[40px] items-center gap-1.5 whitespace-nowrap border-b-2 px-3 text-sm',
+            value === tab.id ? 'border-primary font-medium text-ink' : 'border-transparent text-ink-2 hover:text-ink',
           )}
         >
           {tab.label}
@@ -165,7 +165,7 @@ export function Tabs({ tabs, value, onChange }: { tabs: { id: string; label: Rea
 
 export function Chip({ children, onRemove, tone = 'plain', title }: { children: ReactNode; onRemove?: () => void; tone?: 'plain' | 'accent'; title?: string }) {
   return (
-    <span title={title} className={cx('inline-flex h-[20px] max-w-full items-center gap-1 rounded-sm border px-1.5 text-xs', tone === 'accent' ? 'border-accent/50 bg-accent-wash text-ink' : 'border-rule-strong text-ink-2')}>
+    <span title={title} className={cx('inline-flex h-[22px] max-w-full items-center gap-1 rounded-sm border px-2 text-xs', tone === 'accent' ? 'border-accent/50 bg-accent-wash text-ink' : 'border-rule-strong text-ink-2')}>
       <span className="truncate">{children}</span>
       {onRemove ? (
         <button type="button" onClick={onRemove} aria-label={t('Usuń', 'Remove')} className="-mr-0.5 text-ink-3 hover:text-ink"><Icon name="x" size={10} /></button>
@@ -194,21 +194,21 @@ export function explainError(error: unknown): Explained {
   const msg = e?.message ?? String(error ?? '');
   if (!(e instanceof ApiError)) return { title: t('Wystąpił błąd', 'Something went wrong'), detail: msg, code: 'error', calm: false, icon: 'alert', retryable: true };
   const base = { code: e.code, calm: false, icon: 'alert', retryable: false };
-  if (e.status === 0) return { ...base, title: t('Brak połączenia z serwerem Czujki', 'Cannot reach the Czujka server'), detail: t('Sprawdź połączenie i spróbuj ponownie.', 'Check the connection and try again.'), retryable: true };
-  if (e.status === 501 || e.code === 'not_wired') return { ...base, calm: true, icon: 'info', title: t('Funkcja niedostępna w tej instalacji', 'This function is not available in this installation'), detail: t('Ten moduł nie jest podłączony do serwera. Pozostałe funkcje działają normalnie.', 'This module is not connected to the server. Everything else works as usual.') + ' (' + msg + ')' };
-  if (e.status === 401) return { ...base, icon: 'lock', title: t('Sesja wygasła', 'The session has expired'), detail: t('Zaloguj się ponownie.', 'Sign in again.') };
-  if (e.status === 403 && /csrf/i.test(msg)) return { ...base, icon: 'lock', title: t('Sesja wymaga odświeżenia', 'The session needs a refresh'), detail: t('Odśwież stronę i powtórz operację.', 'Reload the page and repeat the operation.') };
+  if (e.status === 0) return { ...base, title: t('Brak połączenia z serwerem', 'Cannot reach the server'), detail: t('Sprawdź połączenie i spróbuj ponownie.', 'Check the connection and try again.'), retryable: true };
+  if (e.status === 501 || e.code === 'not_wired') return { ...base, calm: true, icon: 'info', title: t('Funkcja niedostępna w tej instalacji', 'Not available in this installation'), detail: t('Ten moduł nie jest podłączony do serwera. Pozostałe funkcje działają normalnie.', 'This module is not connected to the server. Everything else works as usual.') + ' (' + msg + ')' };
+  if (e.status === 401) return { ...base, icon: 'lock', title: t('Sesja wygasła', 'Session expired'), detail: t('Zaloguj się ponownie.', 'Sign in again.') };
+  if (e.status === 403 && /csrf/i.test(msg)) return { ...base, icon: 'lock', title: t('Odśwież stronę', 'Reload the page'), detail: t('Potem powtórz operację.', 'Then repeat the operation.') };
   if (e.status === 403) return { ...base, icon: 'lock', title: t('Brak uprawnień', 'No permission'), detail: t('Twoja rola nie pozwala na tę operację.', 'Your role does not allow this operation.') + ' (' + msg + ')' };
   if (e.status === 404) return { ...base, title: t('Nie znaleziono', 'Not found'), detail: t('Ten obiekt nie istnieje albo został usunięty.', 'This object does not exist or was deleted.') };
-  if (e.code === 'emergency_stop') return { ...base, icon: 'stop', title: t('Stop awaryjny jest aktywny', 'The emergency stop is active'), detail: t('Żaden skan nie wystartuje, dopóki blokada nie zostanie zwolniona.', 'No scan starts until the stop is released.') };
-  if (e.status === 409) return { ...base, title: t('Operacja jest sprzeczna z bieżącym stanem', 'The operation conflicts with the current state'), detail: msg };
+  if (e.code === 'emergency_stop') return { ...base, icon: 'stop', title: t('Stop awaryjny jest włączony', 'The emergency stop is on'), detail: t('Najpierw wyłącz stop awaryjny.', 'Turn off the emergency stop first.') };
+  if (e.status === 409) return { ...base, title: t('Tej operacji nie można teraz wykonać', 'This operation is not possible now'), detail: msg };
   if (e.code === 'dojo_unconfirmed') return { ...base, icon: 'alert', retryable: true, title: t('Wysłano, nie potwierdzono', 'Sent, not confirmed'), detail: getLang() === 'pl' ? msg.replace(/^Wysłano, nie potwierdzono:\s*(\S)/, (_m, c: string) => c.toUpperCase()) : 'Repeat the export. DefectDojo accepted the data but stopped answering before it confirmed it. Repeating the export, or pulling the statuses, links these findings by key, without duplicates.' };
   const locked = e.status === 422 ? lockMessage(msg, getLang()) : null;
-  if (locked) return { ...base, icon: 'lock', title: t('Zablokowane przez operatora wdrożenia', 'Blocked by the deployment operator'), detail: locked };
-  if (e.status === 422 || e.code === 'validation') return { ...base, title: t('Dane nie przeszły walidacji', 'The data did not pass validation'), detail: msg };
+  if (locked) return { ...base, icon: 'lock', title: t('Blokada operatora', 'Operator lock'), detail: locked };
+  if (e.status === 422 || e.code === 'validation') return { ...base, title: t('Błędne dane', 'Invalid data'), detail: msg };
   if (e.status === 429) return { ...base, icon: 'clock', title: t('Zbyt wiele prób', 'Too many attempts'), detail: t('Spróbuj ponownie za kilka minut.', 'Try again in a few minutes.') + ' (' + msg + ')' };
   if (e.status === 400) return { ...base, title: t('Nieprawidłowe żądanie', 'Bad request'), detail: msg };
-  if (e.status === 502 || e.status === 503 || e.status === 504) return { ...base, title: t('Usługa zewnętrzna nie odpowiada', 'An external service does not answer'), detail: msg, retryable: true };
+  if (e.status === 502 || e.status === 503 || e.status === 504) return { ...base, title: t('Usługa zewnętrzna nie odpowiada', 'An external service is not responding'), detail: msg, retryable: true };
   return { ...base, title: t('Błąd serwera', 'Server error'), detail: msg, retryable: true };
 }
 
@@ -231,8 +231,8 @@ export function Unavailable({ what, error }: { what?: ReactNode; error?: unknown
     <div role="status" data-testid="unavailable" className="flex items-start gap-2 border border-rule bg-sunk px-3 py-2.5 text-sm">
       <Icon name="info" className="mt-0.5 flex-none text-ink-3" size={14} />
       <div className="min-w-0">
-        <p className="font-medium text-ink">{t('Funkcja niedostępna w tej instalacji', 'This function is not available in this installation')}</p>
-        <p className="text-xs text-ink-2">{what ?? t('Ten moduł nie jest podłączony do serwera. Pozostałe funkcje działają normalnie.', 'This module is not connected to the server. Everything else works as usual.')}</p>
+        <p className="font-medium text-ink">{t('Funkcja niedostępna w tej instalacji', 'Not available in this installation')}</p>
+        {what ? <p className="text-xs text-ink-2">{what}</p> : null}
         {msg ? <p className="mono mt-0.5 break-words text-2xs text-ink-3">{msg}</p> : null}
       </div>
     </div>
@@ -400,7 +400,7 @@ export function CopyText({ text, className }: { text: string; className?: string
 
 export function Select({ value, onChange, options, label, className }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; label?: string; className?: string }) {
   return (
-    <select aria-label={label} className={cx('field pr-6', className)} value={value} onChange={(e) => onChange(e.target.value)}>
+    <select aria-label={label} className={cx('field', className)} value={value} onChange={(e) => onChange(e.target.value)}>
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   );
@@ -414,11 +414,11 @@ export function TagInput({ value, onChange, placeholder }: { value: string[]; on
     setDraft('');
   };
   return (
-    <div className="flex min-h-[30px] flex-wrap items-center gap-1 rounded-sm border border-rule-strong bg-raised px-1.5 py-1 focus-within:outline focus-within:outline-2 focus-within:outline-accent">
+    <div className="flex min-h-[34px] flex-wrap items-center gap-1 rounded-sm border border-rule-strong bg-sunk px-1.5 py-1 focus-within:border-transparent focus-within:outline focus-within:outline-[1.5px] focus-within:outline-offset-1 focus-within:outline-focus">
       {value.map((x) => <Chip key={x} onRemove={() => onChange(value.filter((y) => y !== x))}>{x}</Chip>)}
       <input
         className="h-[20px] min-w-[90px] flex-1 bg-transparent text-sm outline-none placeholder:text-ink-3"
-        value={draft} placeholder={placeholder ?? t('dodaj tag i Enter', 'add a tag, press Enter')}
+        value={draft} placeholder={placeholder ?? t('dodaj tag', 'add a tag')}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(); }
@@ -427,5 +427,16 @@ export function TagInput({ value, onChange, placeholder }: { value: string[]; on
         onBlur={add}
       />
     </div>
+  );
+}
+
+/** A file picker with a translated button and the chosen name; the native input stays in the DOM (sr-only) for tests and the keyboard. */
+export function FileInput({ accept, file, onFile, inputRef, testId }: { accept?: string; file: File | null; onFile: (f: File | null) => void; inputRef?: Ref<HTMLInputElement>; testId?: string }) {
+  return (
+    <span className="field flex cursor-pointer items-center gap-3 overflow-hidden pl-0 pr-3 focus-within:border-transparent focus-within:outline focus-within:outline-[1.5px] focus-within:outline-offset-1 focus-within:outline-focus">
+      <input ref={inputRef} type="file" accept={accept} data-testid={testId} className="sr-only" onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
+      <span className="flex h-full flex-none items-center border-r border-rule-strong bg-raised px-3 text-sm font-medium text-ink">{t('Wybierz plik', 'Choose a file')}</span>
+      <span className={'min-w-0 truncate text-sm ' + (file ? 'mono text-ink' : 'text-ink-3')}>{file ? file.name : t('nie wybrano pliku', 'no file chosen')}</span>
+    </span>
   );
 }

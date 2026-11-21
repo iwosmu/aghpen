@@ -13,9 +13,11 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/time/rate"
 
 	"github.com/iwosmu/aghpen/internal/auth"
 	"github.com/iwosmu/aghpen/internal/model"
@@ -32,7 +34,18 @@ type Server struct {
 	lookup  runner.LookupFunc
 	handler http.Handler
 	mux     chi.Routes
+	// anonAudit bounds the audit entries of requests without a session
+	// (failed logins, rejected calls): anyone who reaches the port can send
+	// them (security review M4). anonDropped counts the entries it dropped.
+	anonAudit   *rate.Limiter
+	anonDropped atomic.Int64
 }
+
+// Audit budget of requests without a session: a burst, then one per second.
+const (
+	anonAuditPerSec = 1
+	anonAuditBurst  = 60
+)
 
 // New builds the server and its routes.
 func New(d Deps) *Server {
@@ -45,7 +58,7 @@ func New(d Deps) *Server {
 	if d.Version == "" {
 		d.Version = "dev"
 	}
-	s := &Server{d: d, st: d.Store, log: d.Logger, targets: d.TargetParser, lookup: d.Lookup}
+	s := &Server{d: d, st: d.Store, log: d.Logger, targets: d.TargetParser, lookup: d.Lookup, anonAudit: rate.NewLimiter(anonAuditPerSec, anonAuditBurst)}
 	if s.targets == nil {
 		s.targets = BasicTargetParser{}
 	}
@@ -75,6 +88,7 @@ func (s *Server) routes() http.Handler {
 		r.Get("/healthz", s.healthz)
 		r.Post("/auth/login", s.login)
 		r.With(session).Post("/auth/logout", s.logout)
+		r.With(session).Post("/auth/password", s.changePassword)
 		r.With(session).Get("/me", s.me)
 		r.With(session).Get("/permissions", s.permissions)
 		r.With(session).Get("/roles", s.listRoles)
@@ -134,6 +148,7 @@ func (s *Server) routes() http.Handler {
 		r.With(can(model.PermResultsRead)).Get("/technologies", s.listTechnologies)
 		r.With(can(model.PermResultsRead)).Get("/tags", s.listTags)
 		r.With(can(model.PermResultsRead)).Get("/changes", s.listChanges)
+		r.With(can(model.PermResultsRead)).Get("/changes/{id}", s.getChange)
 		r.With(can(model.PermResultsUpdate)).Post("/changes/{id}/ack", s.ackChange)
 		r.With(can(model.PermResultsUpdate)).Post("/changes/ack", s.ackChanges)
 		r.With(can(model.PermResultsRead)).Get("/diff", s.diff)
@@ -233,7 +248,7 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.As(err, new(*runner.ActiveRunError)):
 		var a *runner.ActiveRunError
 		errors.As(err, &a)
-		writeErrDetails(w, http.StatusConflict, "run_active", fmt.Sprintf("Ten profil ma już aktywny przebieg #%d (w kolejce, trwający albo wstrzymany). Wstrzymaj, wznów albo anuluj go, zanim uruchomisz nowy.", a.RunID), map[string]int64{"run_id": a.RunID})
+		writeErrDetails(w, http.StatusConflict, "run_active", fmt.Sprintf("Ten profil ma już skan #%d. Zakończ albo anuluj go przed nowym.", a.RunID), map[string]int64{"run_id": a.RunID})
 	case errors.Is(err, auth.ErrLastAdmin), errors.Is(err, store.ErrConflict), errors.Is(err, runner.ErrActiveRun), errors.Is(err, runner.ErrBadState):
 		writeErr(w, http.StatusConflict, "conflict", msg)
 	case errors.Is(err, auth.ErrForbidden), errors.Is(err, auth.ErrBuiltinRole):
@@ -694,6 +709,15 @@ func (s *Server) audit(next http.Handler) http.Handler {
 		a.detail["path"] = r.URL.Path
 		if sw.status >= 400 {
 			a.detail["ok"] = false
+		}
+		if a.user == nil {
+			if !s.anonAudit.Allow() {
+				s.anonDropped.Add(1)
+				return
+			}
+			if n := s.anonDropped.Swap(0); n > 0 {
+				a.detail["dropped_before"] = n // entries without a session dropped by the budget
+			}
 		}
 		e := model.AuditEntry{Action: action, Entity: entity, EntityID: a.entityID, Detail: a.detail, IP: s.clientIP(r)}
 		if a.user != nil {

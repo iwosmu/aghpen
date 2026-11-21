@@ -163,6 +163,7 @@ func (s *Server) hostChanges(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	localize(r, page.Items)
 	writeJSON(w, http.StatusOK, page)
 }
 
@@ -305,6 +306,7 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	localize(r, d.RecentChanges)
 	writeJSON(w, http.StatusOK, d)
 }
 
@@ -321,6 +323,7 @@ func (s *Server) listChanges(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	localize(r, page.Items)
 	writeJSON(w, http.StatusOK, page)
 }
 
@@ -342,6 +345,7 @@ func (s *Server) ackChange(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	c.Summary = analyze.RenderSummary(c, reqLang(r))
 	writeJSON(w, http.StatusOK, c)
 }
 
@@ -393,6 +397,7 @@ func (s *Server) diff(w http.ResponseWriter, r *http.Request) {
 	if rep.Changes == nil {
 		rep.Changes = []model.Change{}
 	}
+	localize(r, rep.Changes)
 	writeJSON(w, http.StatusOK, rep)
 }
 
@@ -561,7 +566,7 @@ func (s *Server) exportDojo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !settings.Enabled || settings.URL == "" || settings.APIKey == "" {
-		writeErr(w, http.StatusConflict, "conflict", "DefectDojo is not configured: set the URL and the API key and enable the integration")
+		writeErr(w, http.StatusConflict, "conflict", "DefectDojo nie jest skonfigurowane. Podaj adres i klucz API na stronie Administracja.")
 		return
 	}
 	f := store.FindingFilter{IDs: in.IDs, ListOpts: store.ListOpts{Limit: 1000}}
@@ -596,8 +601,7 @@ func (s *Server) exportDojo(w http.ResponseWriter, r *http.Request) {
 		// The import went through and DefectDojo stopped answering before the
 		// read that confirms it. No raw transport error for the analyst.
 		writeErrDetails(w, http.StatusBadGateway, "dojo_unconfirmed",
-			"Wysłano, nie potwierdzono: powtórz eksport. DefectDojo przyjął dane, ale przestał odpowiadać przed potwierdzeniem. "+
-				"Ponowny eksport albo pobranie statusów połączy te obserwacje po kluczu, bez duplikatów.", res)
+			"DefectDojo nie potwierdził eksportu. Powtórz eksport.", res)
 		return
 	}
 	if err != nil {

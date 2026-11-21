@@ -498,7 +498,7 @@ func TestDescriptionTagsSeverity(t *testing.T) {
 	f.Note = "Zgłoszone do właściciela."
 	f.Status = model.FindingAccepted
 	d := Description(f)
-	for _, want := range []string{"Pod tym adresem odpowiada panel administracyjny.", "**Host:** 10.66.0.1 · **Port:** 8080", "**Typ obserwacji:** admin-panel",
+	for _, want := range []string{"Pod tym adresem odpowiada panel administracyjny.", "**Host:** 10.66.0.1 · **Port:** 8080", "**Typ znaleziska:** admin-panel",
 		"**Sygnatura:** jenkins", "- header:X-Jenkins (header): `2.440`", "**Notatka analityka:** Zgłoszone do właściciela.", "Klucz: admin-panel/10.66.0.1/tcp-8080/jenkins"} {
 		if !strings.Contains(d, want) {
 			t.Errorf("description lacks %q:\n%s", want, d)

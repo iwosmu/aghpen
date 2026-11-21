@@ -36,6 +36,9 @@ func TestUserCommandNeedsArguments(t *testing.T) {
 	if err := userCmd(nil); err == nil {
 		t.Fatal("no subcommand must be an error")
 	}
+	if err := userCmd([]string{"unlock"}); err == nil || !strings.Contains(err.Error(), "user unlock EMAIL") {
+		t.Fatalf("unlock without an e-mail: %v", err)
+	}
 	if err := userCmd([]string{"create"}); err == nil || !strings.Contains(err.Error(), "--email") {
 		t.Fatalf("missing --email: %v", err)
 	}

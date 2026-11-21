@@ -1,0 +1,67 @@
+{
+  "name": "lab-run: gate 214531",
+  "description": "Top 1000 portów i porty infrastruktury, wybrane usługi UDP, wykrywanie usług, odcisk HTTP i TLS. Przypisz zakres, aby uruchomić.",
+  "scope_ids": [
+    1
+  ],
+  "ports": "top-1000,1521,2379,2380,5984,6379,7474,8086,9042,9200,9300,11211,27017,28017,1883,4369,5671,5672,8883,15672,15692,25672,61613,61616,2375,2376,4243,6443,9443,10250,10255,3000,5601,9090,9093,9100,9113,9187,9216,5985,5986,18080,50000,5173",
+  "discovery": {
+    "icmp_echo": true,
+    "icmp_timestamp": false,
+    "tcp_syn_ports": [
+      22,
+      80,
+      443,
+      3389,
+      8080
+    ],
+    "tcp_ack_ports": [
+      80
+    ],
+    "arp": true,
+    "skip_discovery": false,
+    "mode": "balanced"
+  },
+  "service_detection": true,
+  "version_intensity": 7,
+  "http": {
+    "enabled": true,
+    "max_redirects": 3,
+    "signature_paths": true,
+    "max_body_bytes": 262144,
+    "timeout_ms": 5000,
+    "favicon": true
+  },
+  "udp": {
+    "enabled": true,
+    "ports": ""
+  },
+  "rate": {
+    "max_pps": 1000,
+    "max_parallel_chunks": 4,
+    "max_parallel_hosts": 16,
+    "http_rps": 20,
+    "per_host_concurrency": 1,
+    "per_host_delay_ms": 0
+  },
+  "chunking": {
+    "adaptive": true,
+    "initial_size": 256,
+    "min_size": 64,
+    "max_size": 4096,
+    "target_seconds": 60
+  },
+  "retry": {
+    "unstable_retries": 2,
+    "backoff_ms": 500,
+    "down_after_misses": 0
+  },
+  "schedule": {
+    "enabled": false,
+    "cron": "",
+    "interval_minutes": 0,
+    "windows": [],
+    "timezone": "Europe/Warsaw"
+  },
+  "enabled": true
+}

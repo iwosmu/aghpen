@@ -231,7 +231,7 @@ docker compose -f deploy/docker-compose.yml exec -T czujka \
 # user analityk@example.org created with role analyst (id 3)
 ```
 
-Bez `--password` polecenie drukuje losowe hasło. Polecenia binarki: `serve`, `migrate`, `user create`, `rotate-key`, `genkey`, `healthcheck`, `doctor`, `backup`, `restore`, `version`.
+Bez `--password` polecenie drukuje losowe hasło. Konto zablokowane po nieudanych logowaniach odblokowuje `czujka user unlock admin@czujka.local` (hasło się nie zmienia). Polecenia binarki: `serve`, `migrate`, `user create`, `user unlock`, `rotate-key`, `genkey`, `healthcheck`, `doctor`, `backup`, `restore`, `version`.
 
 ## 5. Dostęp z innych maszyn
 
@@ -388,6 +388,7 @@ go run ./cmd/scanprobe -targets 127.0.0.1 -ports 8080 -pps 50
 | `/healthz` pokazuje `"tde":false` | nie wszystkie tabele są w `tde_heap` | `tde_detail.reason` podaje liczbę tabel; sprawdź zapytaniem z `docs/BEZPIECZENSTWO.md` §2.1 |
 | Port 8080 zajęty | inna usługa na hoście | `CZUJKA_PORT=18080` w `deploy/.env` |
 | Nie znam hasła administratora | log został usunięty | `czujka user create --email … --reset --password …` (rozdz. 4) |
+| Konto administratora jest zablokowane | ktoś wpisał złe hasło `CZUJKA_LOGIN_MAX_FAILURES` razy | `czujka user unlock admin@czujka.local` albo odczekać `CZUJKA_LOGIN_LOCKOUT` |
 | Logowanie: konto zablokowane | 5 nieudanych prób | odczekaj 15 minut albo ustaw nowe hasło poleceniem z rozdz. 4 |
 | Odpowiedź `403 missing or wrong CSRF token` przy wywołaniach API | brak nagłówka `X-CSRF-Token` | weź `csrf_token` z `GET /api/v1/me` |
 | Odpowiedź `501 not_wired` | moduł nie jest podłączony w tej wersji binarki | `docs/ZGODNOSC.md`; `/healthz` pole `engine` |

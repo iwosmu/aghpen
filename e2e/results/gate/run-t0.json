@@ -1,0 +1,70 @@
+{
+  "id": 1,
+  "profile_id": 2,
+  "profile_name": "lab-run: gate 214531",
+  "status": "completed",
+  "pause_reason": "",
+  "trigger": "manual",
+  "created_by": 1,
+  "created_at": "2026-11-21T20:45:37.207401Z",
+  "started_at": "2026-11-21T20:45:37.213783Z",
+  "finished_at": "2026-11-21T20:58:19.668021Z",
+  "window_end": null,
+  "resume_at": null,
+  "stats": {
+    "addresses_total": 65487,
+    "addresses_done": 65487,
+    "chunks_total": 256,
+    "chunks_done": 256,
+    "hosts_up": 70,
+    "services_open": 157,
+    "http_services": 135,
+    "packets_sent": 230914,
+    "http_requests": 1366,
+    "current_pps": 0,
+    "packets_estimated": 7106,
+    "current_pps_basis": "measured",
+    "avg_pps": 302.9,
+    "elapsed_sec": 762,
+    "eta_sec": 0,
+    "retried": 0,
+    "errors": 0,
+    "ports_unknown": 0,
+    "passes": [
+      {
+        "name": "top_ports",
+        "state": "done",
+        "hosts": 70,
+        "ports_total": 72380,
+        "ports_done": 72380
+      },
+      {
+        "name": "dense",
+        "state": "done",
+        "hosts": 1,
+        "ports_total": 9156,
+        "ports_done": 9156
+      }
+    ]
+  },
+  "summary": {
+    "prev_run_id": null,
+    "hosts_new": 0,
+    "hosts_gone": 0,
+    "hosts_back": 0,
+    "hosts_unstable": 0,
+    "services_new": 0,
+    "services_gone": 0,
+    "services_changed": 0,
+    "services_returned": 0,
+    "responses_slower": 0,
+    "hosts_missing": 0,
+    "services_unreachable": 0,
+    "by_kind": {},
+    "findings_new": 282
+  },
+  "error": "",
+  "import_file": "",
+  "note": "",
+  "label": ""
+}

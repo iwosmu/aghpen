@@ -1,0 +1,173 @@
+{
+  "state": "t0",
+  "strict": true,
+  "metrics": [
+    {
+      "name": "hosts",
+      "tp": 67,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "missed": [],
+      "false_positives": []
+    },
+    {
+      "name": "ports",
+      "tp": 154,
+      "fp": 0,
+      "fn": 1,
+      "precision": 1,
+      "recall": 0.9935483870967742,
+      "f1": 0.9967637540453074,
+      "missed": [
+        "10.66.70.11:18443/tcp http (stealth-high)"
+      ],
+      "false_positives": []
+    },
+    {
+      "name": "service names",
+      "tp": 154,
+      "fp": 0,
+      "fn": 1,
+      "precision": 1,
+      "recall": 0.9935483870967742,
+      "f1": 0.9967637540453074,
+      "missed": [
+        "10.66.70.11:18443/tcp http (stealth-high)"
+      ],
+      "false_positives": [],
+      "note": "open ports whose service name is right"
+    },
+    {
+      "name": "technologies",
+      "tp": 102,
+      "fp": 1,
+      "fn": 2,
+      "precision": 0.9902912621359223,
+      "recall": 0.9807692307692307,
+      "f1": 0.9855072463768114,
+      "missed": [
+        "10.66.0.53:53/udp dnsmasq",
+        "10.66.70.11:18443/tcp nginx"
+      ],
+      "false_positives": [
+        "10.66.10.40:8000/tcp Nagios NSCA"
+      ]
+    },
+    {
+      "name": "classes",
+      "tp": 51,
+      "fp": 1,
+      "fn": 1,
+      "precision": 0.9807692307692307,
+      "recall": 0.9807692307692307,
+      "f1": 0.9807692307692307,
+      "missed": [
+        "10.66.70.11:18443/tcp login"
+      ],
+      "false_positives": [
+        "10.66.60.10:80/tcp staging"
+      ]
+    }
+  ],
+  "accuracies": [
+    {
+      "name": "service versions",
+      "right": 30,
+      "total": 32,
+      "share": 0.9375,
+      "wrong": [
+        "10.66.0.53:53/udp dnsmasq: want 2.92rel2, got \"\"",
+        "10.66.20.41:123/udp NTP: want v4, got \"\""
+      ],
+      "comment": "product version where the truth knows it"
+    },
+    {
+      "name": "technology versions",
+      "right": 55,
+      "total": 56,
+      "share": 0.9821428571428571,
+      "wrong": [
+        "10.66.0.53:53/tcp dnsmasq: want 2.92, got \"2.92rel2\""
+      ]
+    },
+    {
+      "name": "page titles",
+      "right": 122,
+      "total": 122,
+      "share": 1,
+      "wrong": []
+    },
+    {
+      "name": "interesting headers and cookies: collected",
+      "right": 68,
+      "total": 68,
+      "share": 1,
+      "wrong": [],
+      "comment": "the header or cookie is present in the export"
+    },
+    {
+      "name": "interesting headers and cookies: flagged",
+      "right": 68,
+      "total": 68,
+      "share": 1,
+      "wrong": [],
+      "comment": "a signature match points at it"
+    },
+    {
+      "name": "cookie flags",
+      "right": 24,
+      "total": 24,
+      "share": 1,
+      "wrong": [],
+      "comment": "Secure and HttpOnly as in the truth"
+    },
+    {
+      "name": "TLS: self-signed and expired",
+      "right": 12,
+      "total": 12,
+      "share": 1,
+      "wrong": []
+    },
+    {
+      "name": "favicon hash",
+      "right": 14,
+      "total": 14,
+      "share": 1,
+      "wrong": []
+    },
+    {
+      "name": "custom signatures",
+      "right": 2,
+      "total": 2,
+      "share": 1,
+      "wrong": []
+    }
+  ],
+  "hard_misses": [],
+  "unstable": [
+    {
+      "ip": "10.66.70.20",
+      "name": "flapper",
+      "seen_up": true,
+      "expected_up": true,
+      "observed_at": "2026-11-21T20:52:58Z"
+    },
+    {
+      "ip": "10.66.70.21",
+      "name": "tod-office",
+      "seen_up": true,
+      "expected_up": false,
+      "observed_at": "2026-11-21T20:52:58Z"
+    },
+    {
+      "ip": "10.66.70.22",
+      "name": "tod-night",
+      "seen_up": true,
+      "expected_up": false,
+      "observed_at": "2026-11-21T20:52:58Z"
+    }
+  ]
+}

@@ -17,11 +17,38 @@ import (
 // single confirmation miss is enough for the model to report it inactive,
 // with its services gone.
 func TestVanishedHostInTwoScans(t *testing.T) {
+	vanishedHostInTwoScans(t, time.Now().UTC().Truncate(time.Second))
+}
+
+// The same scenario at fixed clock times: the last answer in the previous
+// clock hour and the miss and the confirmation in the new one (every hour
+// boundary, midnight in Warsaw, Saturday to Sunday, Sunday to Monday, both
+// DST changes, the year boundary), and the same minutes inside one hour.
+// analyze.TestYoungHostVerdictAtEveryTime sweeps the model alone over 8 days.
+func TestVanishedHostAtClockBoundaries(t *testing.T) {
+	for _, at := range []string{
+		"2026-11-21T23:05:00Z",                                                 // 00:05 Warsaw: midnight, Saturday to Sunday
+		"2026-11-21T22:05:00Z",                                                 // 23:05 Warsaw: an hour boundary
+		"2026-11-22T10:05:00Z",                                                 // 11:05 Warsaw
+		"2026-11-22T23:05:00Z",                                                 // Sunday to Monday
+		"2026-03-29T01:05:00Z",                                                 // 03:05 CEST, right after the spring DST change
+		"2026-10-25T01:05:00Z",                                                 // 02:05 CET, right after the autumn DST change
+		"2026-12-31T23:05:00Z",                                                 // the year boundary in Warsaw
+		"2026-11-21T23:30:00Z", "2026-11-21T20:30:00Z", "2026-11-22T10:30:00Z", // inside one hour
+	} {
+		now, err := time.Parse(time.RFC3339, at)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Run(at, func(t *testing.T) { vanishedHostInTwoScans(t, now) })
+	}
+}
+
+func vanishedHostInTwoScans(t *testing.T, now time.Time) {
 	st := storetest.New(t)
 	ctx := context.Background()
 	waw, _ := time.LoadLocation("Europe/Warsaw") // the zone the store counts the histogram in (CZUJKA_TZ default)
 	an := NewAnalysis(st, waw, quiet())
-	now := time.Now().UTC().Truncate(time.Second)
 	const ip = "172.30.0.7"
 	svcs := []model.ServiceResult{
 		{Port: 80, Proto: "tcp", State: "open", Name: "http", Product: "nginx", HTTP: &model.HTTPFingerprint{Scheme: "http", URL: "http://x/", Status: 200, Title: "Shop"}},

@@ -15,6 +15,8 @@ import { ServiceHistoryPanel } from './TimeMachine';
 import { ServiceStory, ResponseTimeChart } from '../ui/ServiceStory';
 import { serviceName, isSelf } from '../lib/serviceName';
 import { SelfTag } from '../ui/serviceBits';
+import { shownProduct } from '../lib/shownProduct';
+import { FromSignature } from '../ui/ProductValue';
 
 function Flag({ on, label, bad }: { on: boolean; label: string; bad?: boolean }) {
   return (
@@ -32,7 +34,7 @@ function HttpPanel({ h, tls }: { h: HTTPFingerprint; tls: boolean }) {
     <div className="space-y-4">
       <dl className="grid gap-x-8 sm:grid-cols-2">
         <div>
-          <KV k={t('Status', 'Status')}><span className="num font-medium">{h.status || '–'}</span>{h.error ? <span className="ml-2 text-xs text-danger">{h.error}</span> : null}</KV>
+          <KV k={t('Kod HTTP', 'Kod HTTP')}><span className="num font-medium">{h.status || '–'}</span>{h.error ? <span className="ml-2 text-xs text-danger">{h.error}</span> : null}</KV>
           <KV k={t('Tytuł', 'Title')}>{h.title || '–'}</KV>
           <KV k="URL" mono><span className="break-all">{h.final_url || h.url}</span></KV>
           <KV k="Server" mono>{h.server || '–'}</KV>
@@ -76,12 +78,12 @@ function HttpPanel({ h, tls }: { h: HTTPFingerprint; tls: boolean }) {
             ))}
           </dl>
         )}
-        {headers.length > 8 ? <button type="button" className="link mt-1.5 text-xs" onClick={() => setAllHeaders((x) => !x)}>{allHeaders ? t('Pokaż mniej', 'Show fewer') : t('Pokaż wszystkie ' + headers.length, 'Show all ' + headers.length)}</button> : null}
+        {headers.length > 8 ? <button type="button" className="link mt-1.5 text-xs" onClick={() => setAllHeaders((x) => !x)}>{allHeaders ? t('Pokaż mniej', 'Show less') : t('Pokaż wszystkie ' + headers.length, 'Show all ' + headers.length)}</button> : null}
       </div>
 
       <div>
         <h3 className="label mb-1.5">{t('Ciasteczka', 'Cookies')} <span className="num text-ink-3">{(h.cookies ?? []).length}</span></h3>
-        {(h.cookies ?? []).length === 0 ? <p className="text-sm text-ink-3">{t('Usługa nie ustawia ciasteczek.', 'The service sets no cookie.')}</p> : (
+        {(h.cookies ?? []).length === 0 ? <p className="text-sm text-ink-3">{t('Brak ciasteczek.', 'No cookies.')}</p> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="border-b border-rule-strong text-left text-xs text-ink-3"><th className="h-[26px] pr-4 font-medium">{t('Nazwa', 'Name')}</th><th className="pr-4 font-medium">{t('Flagi', 'Flags')}</th><th className="pr-4 font-medium">{t('Ścieżka', 'Path')}</th><th className="font-medium">{t('Wartość', 'Value')}</th></tr></thead>
@@ -120,7 +122,7 @@ function HttpPanel({ h, tls }: { h: HTTPFingerprint; tls: boolean }) {
 }
 
 function TlsPanel({ c }: { c: TLSInfo }) {
-  const state: [ReactNode, 'gone' | 'changed' | 'new'] = c.expired ? [t('wygasł ' + Math.abs(c.days_left) + ' dni temu', 'expired ' + Math.abs(c.days_left) + ' days ago'), 'gone'] : c.days_left <= 14 ? [t('wygasa za ' + c.days_left + ' dni', 'expires in ' + c.days_left + ' days'), 'changed'] : [t('ważny jeszcze ' + c.days_left + ' dni', 'valid for ' + c.days_left + ' more days'), 'new'];
+  const state: [ReactNode, 'gone' | 'changed' | 'new'] = c.expired ? [t('wygasł ' + Math.abs(c.days_left) + ' ' + plural(Math.abs(c.days_left), ['dzień', 'dni', 'dni'], ['day', 'days']) + ' temu', 'expired ' + Math.abs(c.days_left) + ' ' + plural(Math.abs(c.days_left), ['dzień', 'dni', 'dni'], ['day', 'days']) + ' ago'), 'gone'] : c.days_left <= 14 ? [t('wygasa za ' + c.days_left + ' ' + plural(c.days_left, ['dzień', 'dni', 'dni'], ['day', 'days']), 'expires in ' + c.days_left + ' ' + plural(c.days_left, ['dzień', 'dni', 'dni'], ['day', 'days'])), 'changed'] : [t('ważny jeszcze ' + c.days_left + ' ' + plural(c.days_left, ['dzień', 'dni', 'dni'], ['day', 'days']), 'valid for ' + c.days_left + ' more ' + plural(c.days_left, ['dzień', 'dni', 'dni'], ['day', 'days'])), 'new'];
   return (
     <div>
       <div className="mb-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
@@ -148,7 +150,7 @@ function TlsPanel({ c }: { c: TLSInfo }) {
 
 function TechList({ s, matches }: { s: Service; matches: SigMatch[] }) {
   const techs = s.technologies ?? [];
-  if (techs.length === 0 && matches.length === 0) return <p className="text-sm text-ink-2">{t('Żadna sygnatura nie rozpoznała technologii tej usługi.', 'No signature recognised a technology on this service.')}</p>;
+  if (techs.length === 0 && matches.length === 0) return <p className="text-sm text-ink-2">{t('Brak rozpoznanych technologii.', 'No technologies recognised.')}</p>;
   const rest = matches.filter((m) => !techs.some((x) => x.name === m.name));
   const row = (name: string, category: string, version: string, confidence: number, ms: SigMatch[], sources: string[] | null, cpe: string) => (
     <li key={name} className="border-b border-rule py-2 last:border-b-0">
@@ -166,7 +168,7 @@ function TechList({ s, matches }: { s: Service; matches: SigMatch[] }) {
         )))}
         {ms.length === 0 ? <li className="text-xs text-ink-3">{t('źródło:', 'source:')} {(sources ?? []).join(', ') || 'nmap'}{cpe ? ' · ' + cpe : ''}</li> : null}
       </ul>
-      {ms.length ? <div className="mt-1 text-2xs text-ink-3">{plural(ms.length, ['sygnatura', 'sygnatury', 'sygnatury'], ['signature', 'signatures'])}: {ms.map((m) => m.signature).join(', ')}{ms.length > 1 || (ms[0].evidence ?? []).length > 1 ? t(' · pewność łączona ze wszystkich dowodów', ' · confidence combined over all evidence') : ''}</div> : null}
+      {ms.length ? <div className="mt-1 text-2xs text-ink-3">{plural(ms.length, ['sygnatura', 'sygnatury', 'sygnatury'], ['signature', 'signatures'])}: {ms.map((m) => m.signature).join(', ')}</div> : null}
     </li>
   );
   return (
@@ -202,17 +204,21 @@ export default function ServiceDetail() {
   const s = q.data;
   const r = s.latest?.result;
   const ov = s.overrides ?? {};
+  const sig = shownProduct(s);
   return (
     <div>
       <PageHeader
         back={{ to: '/services', label: t('Usługi', 'Services') }}
-        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono">{s.ip}:{s.port}</span><span className="text-base font-normal"><ServiceStateMark state={s.state} /></span></span>}
+        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono text-[26px] font-medium tracking-[-0.01em] sm:text-[30px]">{s.ip}:{s.port}</span><span className="font-sans text-base font-normal"><ServiceStateMark state={s.state} /></span></span>}
         sub={<><Link to={'/hosts/' + s.host_id} className="link">{t('host', 'host')} <span className="mono">{s.hostname || s.ip}</span></Link> · {serviceName(s)}{isSelf(s) ? <SelfTag /> : null}{s.tls ? ' · TLS' : ''}{s.url ? <> · <a className="link mono inline-flex items-center gap-1" href={s.url} target="_blank" rel="noreferrer noopener">{s.url}<Icon name="external" size={11} /></a></> : null}</>}
         readOnly={!canEdit}
         actions={<span className="flex items-center gap-3 text-sm text-ink-2">{canSuggest ? <SuggestButton serviceId={s.id} /> : null}<span className="flex items-center gap-2">{t('Ciekawość', 'Interest')} <InterestScore value={s.interest} /></span></span>}
       />
-      <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
-        <div className="min-w-0 space-y-4">
+      <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,400px)] xl:grid-rows-[auto_1fr]">
+        <div className="min-w-0 xl:col-start-2 xl:row-start-1">
+          <Panel title={t('Ocena ciekawości', 'Interest score')}><InterestBreakdown value={s.interest} reasons={s.interest_why} /></Panel>
+        </div>
+        <div className="min-w-0 space-y-4 xl:col-start-1 xl:row-span-2 xl:row-start-1">
           <ServiceStory s={s} />
           {r?.http || s.name === 'http' || s.name === 'https' ? <ResponseTimeChart serviceId={s.id} /> : null}
           <Panel title={t('Identyfikacja', 'Identification')} actions={<span className="flex items-center gap-2 text-ink-2">{t('pewność', 'confidence')} <Confidence value={s.confidence} width={48} /></span>}>
@@ -222,11 +228,11 @@ export default function ServiceDetail() {
                 <OverrideNote o={ov.name} canEdit={canEdit} onRevert={() => save.mutate({ name: null })} />
               </KV>
               <KV k={t('Produkt', 'Product')}>
-                <InlineText label={t('Produkt', 'Product')} value={s.product} canEdit={canEdit} placeholder={t('nie rozpoznano', 'not recognised')} onSave={(v) => save.mutate({ product: v })} />
+                <InlineText label={t('Produkt', 'Product')} value={s.product} canEdit={canEdit} placeholder={t('nie rozpoznano', 'not recognised')} display={sig.fromSignature ? <span className="text-ink">{sig.product}<FromSignature /></span> : undefined} onSave={(v) => save.mutate({ product: v })} />
                 <OverrideNote o={ov.product} canEdit={canEdit} onRevert={() => save.mutate({ product: null })} />
               </KV>
               <KV k={t('Wersja', 'Version')}>
-                <InlineText label={t('Wersja', 'Version')} mono value={s.version} canEdit={canEdit} placeholder="–" onSave={(v) => save.mutate({ version: v })} />
+                <InlineText label={t('Wersja', 'Version')} mono value={s.version} canEdit={canEdit} placeholder="–" display={sig.fromSignature && sig.version ? <span className="text-ink">{sig.version}<FromSignature /></span> : undefined} onSave={(v) => save.mutate({ version: v })} />
                 <OverrideNote o={ov.version} canEdit={canEdit} onRevert={() => save.mutate({ version: null })} />
               </KV>
               <KV k={t('Klasy', 'Classes')}>
@@ -237,21 +243,21 @@ export default function ServiceDetail() {
               </KV>
               {s.banner ? <KV k={t('Baner', 'Banner')} mono><span className="break-all text-xs">{s.banner}</span></KV> : null}
               {r?.cpe?.length ? <KV k="CPE" mono><span className="break-all text-xs">{r.cpe.join(', ')}</span></KV> : null}
-              <KV k={t('Pierwszy raz', 'First seen')}><span className="num">{fmtDateTime(s.first_seen)}</span></KV>
-              <KV k={t('Ostatnio', 'Last seen')}><span className="num">{fmtDateTime(s.last_seen)}</span> <span className="text-ink-3">{fmtRelative(s.last_seen)}</span></KV>
+              <KV k={t('Pierwsza obserwacja', 'First seen')}><span className="num">{fmtDateTime(s.first_seen)}</span></KV>
+              <KV k={t('Ostatnia obserwacja', 'Last seen')}><span className="num">{fmtDateTime(s.last_seen)}</span> <span className="text-ink-3">{fmtRelative(s.last_seen)}</span></KV>
               {s.last_changed ? <KV k={t('Ostatnia zmiana', 'Last change')}><span className="num">{fmtDateTime(s.last_changed)}</span></KV> : null}
             </dl>
           </Panel>
 
-          {r?.http ? <Panel title="HTTP"><HttpPanel h={r.http} tls={s.tls} /></Panel> : s.name === 'http' ? <Panel title="HTTP"><p className="text-sm text-ink-2">{t('Kolektor HTTP nie zebrał danych z tej usługi w ostatnim skanie.', 'The HTTP collector got no data from this service in the last scan.')}</p></Panel> : null}
+          {r?.http ? <Panel title="HTTP"><HttpPanel h={r.http} tls={s.tls} /></Panel> : s.name === 'http' ? <Panel title="HTTP"><p className="text-sm text-ink-2">{t('Brak danych HTTP z ostatniego skanu.', 'No HTTP data from the last scan.')}</p></Panel> : null}
           {r?.tls ? <Panel title={t('Certyfikat TLS', 'TLS certificate')}><TlsPanel c={r.tls} /></Panel> : null}
 
           <ServiceHistoryPanel serviceId={s.id} />
-          <Panel title={t('Historia obserwacji', 'Observation history')} count={obs.data?.total} flush>
+          <Panel title={t('Obserwacje', 'Observations')} count={obs.data?.total} flush>
             {obs.error ? <ErrorState error={obs.error} retry={() => obs.refetch()} /> : !obs.data ? <SkeletonRows rows={4} /> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead><tr className="border-b border-rule-strong text-left text-xs text-ink-3"><th className="h-[30px] px-3 font-medium">{t('Skan', 'Run')}</th><th className="px-3 font-medium">{t('Czas', 'Time')}</th><th className="px-3 font-medium">{t('Stan', 'State')}</th><th className="px-3 font-medium">HTTP</th><th className="px-3 font-medium">{t('Tytuł', 'Title')}</th><th className="px-3 font-medium">{t('Produkt', 'Product')}</th><th className="px-3 font-medium">{t('Treść', 'Body')}</th></tr></thead>
+                  <thead><tr className="border-b border-rule-strong text-left text-xs text-ink-3"><th className="h-[30px] px-3 font-medium">{t('Skan', 'Scan')}</th><th className="px-3 font-medium">{t('Czas', 'Time')}</th><th className="px-3 font-medium">{t('Stan', 'Status')}</th><th className="px-3 font-medium">HTTP</th><th className="px-3 font-medium">{t('Tytuł', 'Title')}</th><th className="px-3 font-medium">{t('Produkt', 'Product')}</th><th className="px-3 font-medium">{t('Treść', 'Body')}</th></tr></thead>
                   <tbody>
                     {obs.data.items.map((o, i) => {
                       const prev = obs.data!.items[i + 1]?.result;
@@ -277,8 +283,7 @@ export default function ServiceDetail() {
           </Panel>
         </div>
 
-        <div className="min-w-0 space-y-4">
-          <Panel title={t('Dlaczego ciekawa', 'Why it is interesting')}><InterestBreakdown value={s.interest} reasons={s.interest_why} /></Panel>
+        <div className="min-w-0 space-y-4 self-start xl:col-start-2 xl:row-start-2">
           <Panel title={t('Technologie i dowody', 'Technologies and evidence')} count={(s.technologies ?? []).length}><TechList s={s} matches={r?.matches ?? []} /></Panel>
           <Panel title={t('Opis analityka', 'Analyst notes')}>
             <dl>
@@ -289,7 +294,7 @@ export default function ServiceDetail() {
           {s.group_size > 1 ? (
             <Panel title={t('Podobne usługi', 'Similar services')}>
               <p className="text-sm text-ink-2">{t('Ta sama treść strony i zestaw technologii na ', 'The same page content and technology set on ')}<span className="num text-ink">{s.group_size}</span> {plural(s.group_size, ['usłudze', 'usługach', 'usługach'], ['service', 'services'])}.</p>
-              <Link to={'/services?group_key=' + encodeURIComponent(s.group_key)} className="link mt-1 inline-block text-sm">{t('Pokaż całą grupę', 'Show the whole group')}</Link>
+              <Link to={'/services?group_key=' + encodeURIComponent(s.group_key)} className="link mt-1 inline-block text-sm">{t('Pokaż całą grupę', 'Show the group')}</Link>
             </Panel>
           ) : null}
         </div>

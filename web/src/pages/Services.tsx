@@ -13,8 +13,10 @@ import { ExportButtons, useDraft } from '../ui/edit';
 import { useCan } from '../session';
 import { serviceName, isSelf } from '../lib/serviceName';
 import { ResponseCell, SelfTag } from '../ui/serviceBits';
+import { ProductValue } from '../ui/ProductValue';
+import { productLine, shownProduct } from '../lib/shownProduct';
 
-const FILTERS = ['q', 'state', 'port', 'name', 'tech', 'class', 'tag', 'min_interest', 'tls', 'group_key', 'host_id'];
+const FILTERS = ['q', 'state', 'port', 'name', 'tech', 'class', 'tag', 'min_interest', 'tls', 'group_key', 'host_id', 'run_id'];
 
 export default function Services() {
   const u = useUrlState();
@@ -42,11 +44,11 @@ export default function Services() {
   const anyTime = (list.data?.items ?? []).some((s) => s.response_ms !== undefined);
   const cols: Col<Service>[] = [
     { id: 'addr', header: t('Adres', 'Address'), sort: 'ip', cell: (s) => <Link to={'/services/' + s.id} className="mono link">{s.ip}:{s.port}</Link> },
-    { id: 'state', header: t('Stan', 'State'), hide: 'lg', cell: (s) => <ServiceStateMark state={s.state} /> },
+    { id: 'state', header: t('Stan', 'Status'), hide: 'lg', cell: (s) => <ServiceStateMark state={s.state} /> },
     { id: 'name', header: t('Usługa', 'Service'), sort: 'name', cell: (s) => <span>{serviceName(s)}{s.tls ? <span className="ml-1.5 text-2xs text-ink-3">TLS</span> : null}{isSelf(s) ? <SelfTag /> : null}</span> },
     { id: 'title', header: t('Tytuł / produkt', 'Title / product'), cell: (s) => (
-      <span className="block max-w-[300px] truncate" title={s.title}>{s.title || <span className="text-ink-2">{[s.product, s.version].filter(Boolean).join(' ') || '–'}</span>}
-        {s.overrides && Object.keys(s.overrides).length ? <span className="ml-1.5 text-2xs text-st-changed" title={t('wartość poprawiona przez analityka', 'value corrected by an analyst')}>{t('popr.', 'edited')}</span> : null}</span>
+      <span className="block max-w-[300px] truncate" title={s.title}>{s.title || <span className="text-ink-2"><ProductValue s={s} /></span>}
+        {s.overrides && Object.keys(s.overrides).length ? <span className="ml-1.5 text-2xs text-st-changed" title={t('wartość poprawiona przez analityka', 'value corrected by an analyst')}>{t('poprawione', 'edited')}</span> : null}</span>
     ) },
     { id: 'tech', header: t('Technologie', 'Technologies'), hide: 'md', cell: (s) => <span className="block max-w-[210px] truncate text-ink-2">{(s.technologies ?? []).map((x) => x.name + (x.version ? ' ' + x.version : '')).join(', ') || '–'}</span> },
     { id: 'class', header: t('Klasy', 'Classes'), hide: 'lg', cell: (s) => <span className="inline-flex whitespace-nowrap"><ClassChips classes={s.classes} max={1} /></span> },
@@ -67,17 +69,16 @@ export default function Services() {
     <div>
       <PageHeader
         title={t('Usługi', 'Services')}
-        sub={t('Każda otwarta para adres:port z tym, co skaner o niej ustalił. Grupy łączą usługi o tej samej treści, żeby 80 identycznych drukarek było jednym wierszem.', 'Every open address:port pair with what the scanner learned about it. Groups join services with the same content, so 80 identical printers are one row.')}
         readOnly={!canEdit}
         actions={view === 'list' ? <ExportButtons kind="services" query={filters} /> : null}
       />
       <div className="px-4 pt-2 sm:px-6">
-        <Tabs value={view} onChange={(v) => u.set({ view: v === 'list' ? null : v })} tabs={[{ id: 'list', label: t('Lista', 'List') }, { id: 'groups', label: t('Grupy podobnych', 'Groups of similar') }]} />
+        <Tabs value={view} onChange={(v) => u.set({ view: v === 'list' ? null : v })} tabs={[{ id: 'list', label: t('Lista', 'List') }, { id: 'groups', label: t('Grupy', 'Groups') }]} />
       </div>
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
         <SearchField value={q} onChange={setQ} placeholder={t('adres, tytuł, produkt, technologia', 'address, title, product, technology')} width={250} />
-        <FilterField label={t('Stan', 'State')} width={120}>
-          <Select value={state} onChange={(v) => u.set({ state: v === 'open' ? null : v })} options={[{ value: 'open', label: t('otwarte', 'open') }, { value: 'all', label: t('wszystkie', 'all') }, { value: 'gone', label: t('zniknięte', 'gone') }, { value: 'filtered', label: t('filtrowane', 'filtered') }]} />
+        <FilterField label={t('Stan', 'Status')} width={120}>
+          <Select value={state} onChange={(v) => u.set({ state: v === 'open' ? null : v })} options={[{ value: 'open', label: t('otwarte', 'open') }, { value: 'all', label: t('wszystkie', 'all') }, { value: 'gone', label: t('zniknęły', 'gone') }, { value: 'filtered', label: t('filtrowane', 'filtered') }]} />
         </FilterField>
         <FilterField label={t('Klasa', 'Class')} width={170}>
           <Select value={u.get('class')} onChange={(v) => u.set({ class: v })} options={[{ value: '', label: t('dowolna', 'any') }, ...SERVICE_CLASSES.map((c) => ({ value: c, label: classLabel(c) }))]} />
@@ -94,10 +95,11 @@ export default function Services() {
           <Select value={u.get('min_interest')} onChange={(v) => u.set({ min_interest: v })} options={[{ value: '', label: '0' }, { value: '25', label: '25' }, { value: '50', label: '50' }, { value: '75', label: '75' }]} />
         </FilterField>
       </FilterBar>
-      {u.get('group_key') || u.get('host_id') || u.get('tag') ? (
+      {u.get('group_key') || u.get('host_id') || u.get('tag') || u.get('run_id') ? (
         <div className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-1.5 text-xs text-ink-2 sm:px-6">
-          {u.get('group_key') ? <Chip tone="accent" onRemove={() => u.set({ group_key: null })}>{t('grupa podobnych', 'group of similar')} <span className="mono">{u.get('group_key').slice(0, 12)}</span></Chip> : null}
+          {u.get('group_key') ? <Chip tone="accent" onRemove={() => u.set({ group_key: null })}>{t('grupa', 'group')} <span className="mono">{u.get('group_key').slice(0, 12)}</span></Chip> : null}
           {u.get('host_id') ? <Chip tone="accent" onRemove={() => u.set({ host_id: null })}>{t('host', 'host')} #{u.get('host_id')}</Chip> : null}
+          {u.get('run_id') ? <Chip tone="accent" onRemove={() => u.set({ run_id: null })}>{t('skan', 'scan')} #{u.get('run_id')}</Chip> : null}
           {u.get('tag') ? <Chip tone="accent" onRemove={() => u.set({ tag: null })}>{t('tag', 'tag')} {u.get('tag')}</Chip> : null}
         </div>
       ) : null}
@@ -105,11 +107,11 @@ export default function Services() {
         <DataTable
           rows={list.data?.items} cols={cols} rowKey={(s) => s.id} rowHref={(s) => '/services/' + s.id} loading={list.isPending} error={list.error} retry={() => list.refetch()} dim={list.isPlaceholderData}
           sort={u.get('sort', '-interest')} onSort={(s) => u.set({ sort: s })} rowClass={(s) => (s.state === 'gone' ? 'text-ink-3' : undefined)}
-          empty={<Empty icon="services" title={active ? t('Żadna usługa nie pasuje do filtrów', 'No service matches the filters') : t('Nie ma jeszcze żadnej usługi', 'There is no service yet')} hint={active ? t('Zmień albo wyczyść filtry.', 'Change or clear the filters.') : t('Usługi pojawią się po pierwszym skanie albo po imporcie wyników.', 'Services appear after the first scan or after an import of results.')} action={active ? undefined : <NextSteps />} />}
+          empty={<Empty icon="services" title={active ? t('Żadna usługa nie pasuje do filtrów', 'No services match the filters') : t('Brak usług', 'No services yet')} action={active ? undefined : <NextSteps />} />}
           mobile={(s) => (
             <div>
               <div className="flex items-center justify-between gap-2"><span className="mono text-sm">{s.ip}:{s.port}</span><InterestScore value={s.interest} /></div>
-              <div className="mt-0.5 truncate text-sm text-ink-2">{s.title || [s.product, s.version].filter(Boolean).join(' ') || serviceName(s)}</div>
+              <div className="mt-0.5 truncate text-sm text-ink-2">{s.title || productLine(shownProduct(s)) || serviceName(s)}</div>
               <div className="mt-1"><ClassChips classes={s.classes} max={2} /></div>
             </div>
           )}
@@ -118,7 +120,7 @@ export default function Services() {
         <DataTable
           rows={groups.data?.items} cols={gcols} rowKey={(g) => g.key} rowHref={(g) => '/services?group_key=' + encodeURIComponent(g.key)} loading={groups.isPending} error={groups.error} retry={() => groups.refetch()} dim={groups.isPlaceholderData}
           sort={u.get('gsort', '-count')} onSort={(s) => u.set({ gsort: s })}
-          empty={<Empty icon="services" title={t('Brak grup dla tych filtrów', 'No group for these filters')} />}
+          empty={<Empty icon="services" title={t('Brak grup dla tych filtrów', 'No groups for these filters')} />}
           mobile={(g) => (
             <div>
               <div className="flex items-center justify-between gap-2"><span className="text-sm font-medium">{g.label}</span><span className="num text-sm">×{g.count}</span></div>
@@ -128,7 +130,7 @@ export default function Services() {
         />
       )}
       {total !== undefined ? <Pager total={total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}
-      {view === 'groups' && groups.data ? <p className="px-4 py-2 text-xs text-ink-3 sm:px-6">{fmtInt(groups.data.total)} {plural(groups.data.total, ['grupa', 'grupy', 'grup'], ['group', 'groups'])}{t(': klucz grupy to skrót treści strony, tytułu i zestawu technologii.', ': the group key is a hash of the page content, the title and the technology set.')}</p> : null}
+      {view === 'groups' && groups.data ? <p className="px-4 py-2 text-xs text-ink-3 sm:px-6">{fmtInt(groups.data.total)} {plural(groups.data.total, ['grupa', 'grupy', 'grup'], ['group', 'groups'])}</p> : null}
     </div>
   );
 }

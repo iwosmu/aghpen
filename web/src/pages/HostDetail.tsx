@@ -3,7 +3,7 @@ import { useAction, useItem, usePage } from '../api/hooks';
 import { patch } from '../api/client';
 import type { AvailabilityProfile, Change, Host, Scope, Service } from '../api/types';
 import { t, plural } from '../i18n';
-import { fmtDateTime, fmtRelative } from '../lib/format';
+import { fmtDateTime, fmtDec, fmtRelative } from '../lib/format';
 import { ErrorState, KV, PageHeader, Panel, Select, SkeletonRows, TagInput, Tags, useTip } from '../ui/kit';
 import { DataTable, type Col } from '../ui/table';
 import { ChangeMark, ClassChips, Crit, HostStatusMark, InterestScore, ServiceStateMark, Sev } from '../ui/marks';
@@ -15,7 +15,8 @@ import { HostLifePanel } from './TimeMachine';
 import { isLocalMac } from '../lib/mac';
 import { serviceName, isSelf } from '../lib/serviceName';
 import { ResponseCell, SelfTag } from '../ui/serviceBits';
-import { changeSummary } from '../lib/changeText';
+import { ProductValue } from '../ui/ProductValue';
+import { productLine, shownProduct } from '../lib/shownProduct';
 
 /** Fewer observations than the model needs: the probes as a strip and when the weekly pattern appears. */
 const MIN_OBS = 8;
@@ -23,11 +24,10 @@ function FewObservations({ a, n }: { a: AvailabilityProfile; n: number }) {
   const recent = [...(a.recent ?? [])].slice(0, MIN_OBS).reverse();
   return (
     <div data-testid="few-observations">
-      <p className="text-sm text-ink">{t('Model zna ten host dopiero z ' + n + ' ' + plural(n, ['obserwacji', 'obserwacji', 'obserwacji'], ['', '']) + '.', 'The model knows this host from only ' + n + ' ' + (n === 1 ? 'observation' : 'observations') + '.')}</p>
-      <p className="mt-1 text-sm text-ink-2">{t('Wzorzec tygodniowy (mapa 7 × 24 godzin) pojawi się, gdy będzie co najmniej ' + MIN_OBS + ' obserwacji: jeszcze ' + (MIN_OBS - n) + ' ' + plural(MIN_OBS - n, ['skan', 'skany', 'skanów'], ['', '']) + ' tego hosta. Do tego czasu „nieaktywny” wynika z progu braków odpowiedzi.', 'The weekly pattern (a 7 × 24 hour map) appears from ' + MIN_OBS + ' observations: ' + (MIN_OBS - n) + ' more scans of this host. Until then "inactive" follows the miss threshold.')}</p>
+      <p className="text-sm text-ink">{t('Za mało obserwacji: ' + n + ' z ' + MIN_OBS + '.', 'Too few observations: ' + n + ' of ' + MIN_OBS + '.')}</p>
       <ol className="mt-3 grid grid-cols-8 gap-1.5" data-testid="probe-strip">
         {recent.map((o, i) => {
-          const label = fmtDateTime(o.at) + ': ' + (o.up ? t('odpowiedź', 'answer') : t('brak odpowiedzi', 'no answer'));
+          const label = fmtDateTime(o.at) + ': ' + (o.up ? t('odpowiedź', 'response') : t('brak odpowiedzi', 'no response'));
           return <li key={i} className="block h-[22px] min-w-0" style={o.up ? { background: 'var(--seq-4)' } : { boxShadow: 'inset 0 0 0 1px var(--rule-strong)' }} title={label} aria-label={label} />;
         })}
         {Array.from({ length: Math.max(0, MIN_OBS - recent.length) }).map((_, i) => (
@@ -37,8 +37,8 @@ function FewObservations({ a, n }: { a: AvailabilityProfile; n: number }) {
       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-2xs text-ink-3" data-testid="probe-legend">
         <span className="num">{recent.length ? fmtDateTime(recent[0].at) + (recent.length > 1 ? ' → ' + fmtDateTime(recent[recent.length - 1].at) : '') : ''}</span>
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5" style={{ background: 'var(--seq-4)' }} aria-hidden="true" />{t('odpowiedź', 'answer')}</span>
-          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5" style={{ boxShadow: 'inset 0 0 0 1px var(--rule-strong)' }} aria-hidden="true" />{t('brak odpowiedzi', 'no answer')}</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5" style={{ background: 'var(--seq-4)' }} aria-hidden="true" />{t('odpowiedź', 'response')}</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5" style={{ boxShadow: 'inset 0 0 0 1px var(--rule-strong)' }} aria-hidden="true" />{t('brak odpowiedzi', 'no response')}</span>
           {recent.length < MIN_OBS ? <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 border border-dashed border-rule" aria-hidden="true" />{t('kolejne skany', 'next scans')}</span> : null}
         </span>
       </div>
@@ -54,40 +54,41 @@ function ModelOutput({ h, a, compact }: { h: Host; a: AvailabilityProfile; compa
     <div className="space-y-3">
       <dl className="border-t border-rule">
         <div className="grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-3 border-b border-rule py-1.5">
-          <dt className="num text-lg font-semibold">{a.p_alive.toFixed(2)}</dt>
+          <dt className="num text-lg font-semibold">{fmtDec(a.p_alive)}</dt>
           <dd className="text-sm text-ink-2">{t('prawdopodobieństwo, że host nadal istnieje', 'probability that the host still exists')} <span className="mono text-xs text-ink-3">p_alive</span></dd>
         </div>
         <div className="grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-3 border-b border-rule py-1.5">
           <dt className="num text-lg font-semibold">{a.down_after_misses > 0 ? a.down_after_misses : '–'}</dt>
           <dd className="text-sm text-ink-2">{a.down_after_misses > 0
-            ? <>{plural(a.down_after_misses, ['brak odpowiedzi z rzędu', 'braki odpowiedzi z rzędu', 'braków odpowiedzi z rzędu'], ['miss in a row', 'misses in a row'])} {t('i host zostaje uznany za nieaktywny', 'and the host is declared inactive')}</>
-            : t('próg braków odpowiedzi: serwer go nie podał dla tego hosta', 'miss threshold: the server did not give one for this host')}</dd>
+            ? <>{plural(a.down_after_misses, ['brak odpowiedzi z rzędu', 'braki odpowiedzi z rzędu', 'braków odpowiedzi z rzędu'], ['miss in a row', 'misses in a row'])} {t('i host zostaje uznany za nieaktywny', 'and the host is reported down')}</>
+            : t('próg braków odpowiedzi nieznany', 'miss threshold unknown')}</dd>
         </div>
         <div className="grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-3 border-b border-rule py-1.5">
           <dt className="num text-lg font-semibold">{h.consecutive_misses}</dt>
           <dd className="text-sm text-ink-2">
             {plural(h.consecutive_misses, ['brak z rzędu teraz', 'braki z rzędu teraz', 'braków z rzędu teraz'], ['miss in a row now', 'misses in a row now'])}
-            {h.status !== 'down' && h.consecutive_misses > 0 ? <span className="text-ink-3"> · {t('jeszcze ' + left + ' do „nieaktywny”', left + ' more to "inactive"')}</span> : null}
+            {h.status !== 'down' && h.consecutive_misses > 0 ? <span className="text-ink-3"> · {t('jeszcze ' + left + ' do „nieaktywny”', left + ' more to "down"')}</span> : null}
           </dd>
         </div>
       </dl>
       {compact ? null : <p className="border-l border-rule-strong pl-3 text-sm text-ink">{a.pattern || t('Za mało obserwacji, aby opisać wzorzec.', 'Too few observations to describe a pattern.')}</p>}
-      <p className="text-xs text-ink-2">
-        {h.status === 'expected-offline' ? t('Host nie odpowiada, ale o tej porze zwykle nie odpowiada. Zmiana nie trafia do alertów.', 'The host does not answer, but at this hour it usually does not. The change raises no alert.')
-          : h.status === 'unstable' ? t('Host odpowiada nieregularnie. Skaner ponawia próby, zanim zapisze brak odpowiedzi.', 'The host answers irregularly. The scanner retries before it records a miss.')
-          : h.status === 'down' ? t('Liczba kolejnych braków odpowiedzi przekroczyła próg wynikający z profilu dostępności.', 'The run of misses passed the threshold that follows from the availability profile.')
-          : t('Host odpowiada zgodnie z profilem.', 'The host answers as its profile predicts.')}
-      </p>
+      {h.status === 'expected-offline' || h.status === 'unstable' || h.status === 'down' ? (
+        <p className="text-xs text-ink-2">
+          {h.status === 'expected-offline' ? t('O tej porze host zwykle nie odpowiada.', 'The host usually does not respond at this hour.')
+            : h.status === 'unstable' ? t('Host odpowiada nieregularnie.', 'The host responds irregularly.')
+            : t('Braków odpowiedzi z rzędu jest więcej niż próg.', 'More misses in a row than the threshold.')}
+        </p>
+      ) : null}
       {recent.length && !compact ? (
         <div>
           <div className="mb-1 text-xs text-ink-3">{t('Ostatnie próby (najnowsza po prawej)', 'Recent probes (latest on the right)')}</div>
           <div className="flex flex-wrap gap-[3px]">
             {recent.map((o, i) => (
               <span key={i} tabIndex={0}
-                onPointerEnter={(e) => tip.show(e, <div><div className="num text-ink">#{o.run_id} · {fmtDateTime(o.at)}</div><div className="text-ink-2">{o.up ? t('odpowiedź', 'answered') + (o.rtt_ms ? ', ' + o.rtt_ms.toFixed(1) + ' ms' : '') : t('brak odpowiedzi', 'no answer')} · {o.attempts} {plural(o.attempts, ['próba', 'próby', 'prób'], ['attempt', 'attempts'])}{o.reason ? ' · ' + o.reason : ''}</div></div>)}
-                onPointerLeave={tip.hide} onFocus={(e) => tip.showAt(e.currentTarget, <span className="num">#{o.run_id} · {o.up ? t('odpowiedź', 'answered') : t('brak odpowiedzi', 'no answer')}</span>)} onBlur={tip.hide}
+                onPointerEnter={(e) => tip.show(e, <div><div className="num text-ink">#{o.run_id} · {fmtDateTime(o.at)}</div><div className="text-ink-2">{o.up ? t('odpowiedź', 'response') + (o.rtt_ms ? ', ' + fmtDec(o.rtt_ms, 1) + ' ms' : '') : t('brak odpowiedzi', 'no response')} · {o.attempts} {plural(o.attempts, ['próba', 'próby', 'prób'], ['probe', 'probes'])}{o.reason ? ' · ' + o.reason : ''}</div></div>)}
+                onPointerLeave={tip.hide} onFocus={(e) => tip.showAt(e.currentTarget, <span className="num">#{o.run_id} · {o.up ? t('odpowiedź', 'response') : t('brak odpowiedzi', 'no response')}</span>)} onBlur={tip.hide}
                 className="block h-[14px] w-[10px]" style={o.up ? { background: 'var(--seq-4)' } : { boxShadow: 'inset 0 0 0 1px var(--rule-strong)' }}
-                aria-label={'#' + o.run_id + ' ' + (o.up ? t('odpowiedź', 'answered') : t('brak odpowiedzi', 'no answer'))} />
+                aria-label={'#' + o.run_id + ' ' + (o.up ? t('odpowiedź', 'response') : t('brak odpowiedzi', 'no response'))} />
             ))}
           </div>
         </div>
@@ -112,9 +113,9 @@ export default function HostDetail() {
   const now = new Date();
   const svcCols: Col<Service>[] = [
     { id: 'port', header: t('Port', 'Port'), width: 90, cell: (s) => <Link to={'/services/' + s.id} className="mono link">{s.port}/{s.proto}</Link> },
-    { id: 'state', header: t('Stan', 'State'), cell: (s) => <ServiceStateMark state={s.state} /> },
+    { id: 'state', header: t('Stan', 'Status'), cell: (s) => <ServiceStateMark state={s.state} /> },
     { id: 'name', header: t('Usługa', 'Service'), cell: (s) => <span>{serviceName(s)}{s.tls ? <span className="ml-1.5 text-2xs text-ink-3">TLS</span> : null}{isSelf(s) ? <SelfTag /> : null}</span> },
-    { id: 'product', header: t('Produkt', 'Product'), hide: 'md', cell: (s) => <span className="text-ink-2">{[s.product, s.version].filter(Boolean).join(' ') || '–'}</span> },
+    { id: 'product', header: t('Produkt', 'Product'), hide: 'md', cell: (s) => <span className="text-ink-2"><ProductValue s={s} /></span> },
     { id: 'title', header: t('Tytuł / technologie', 'Title / technologies'), wrap: true, cell: (s) => <span className="block min-w-[160px] max-w-[420px] truncate text-ink-2">{s.title || (s.technologies ?? []).map((x) => x.name).join(', ') || '–'}</span> },
     { id: 'class', header: t('Klasy', 'Classes'), hide: 'lg', cell: (s) => <ClassChips classes={s.classes} max={2} /> },
     ...((services.data ?? []).some((s) => s.response_ms !== undefined) ? [{ id: 'rt', header: t('Czas odpowiedzi', 'Response time'), align: 'right' as const, hide: 'md' as const, cell: (s: Service) => <ResponseCell s={s} /> }] : []),
@@ -124,7 +125,7 @@ export default function HostDetail() {
     <div>
       <PageHeader
         back={{ to: '/hosts', label: t('Hosty', 'Hosts') }}
-        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono">{h.ip}</span><span className="text-base font-normal"><HostStatusMark status={h.status} /></span></span>}
+        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono text-[26px] font-medium tracking-[-0.01em] sm:text-[30px]">{h.ip}</span><span className="font-sans text-base font-normal"><HostStatusMark status={h.status} /></span></span>}
         sub={<>{h.label ? <span className="text-ink">{h.label} · </span> : null}<span className="mono">{(h.hostnames ?? []).join(', ') || t('bez nazwy DNS', 'no DNS name')}</span></>}
         readOnly={!canEdit}
         actions={<span className="flex items-center gap-2 text-sm text-ink-2">{t('Ciekawość', 'Interest')} <InterestScore value={h.interest} /></span>}
@@ -154,12 +155,12 @@ export default function HostDetail() {
                 {(h.hostnames ?? []).join(', ') || '–'}
                 <OverrideNote o={h.overrides?.hostnames} canEdit={canEdit} onRevert={() => save.mutate({ hostnames: null })} />
               </KV>
-              {h.mac ? <KV k="MAC" mono>{h.mac}{isLocalMac(h.mac) ? <span className="ml-2 font-sans text-ink-3" title={t('Adres administrowany lokalnie (kontener, maszyna wirtualna): nie należy do żadnego producenta.', 'A locally administered address (container, virtual machine): no vendor owns it.')} data-testid="mac-local">{t('adres lokalny', 'local address')}</span> : h.vendor ? <span className="ml-2 font-sans text-ink-3">{h.vendor}</span> : null}</KV> : null}
+              {h.mac ? <KV k="MAC" mono>{h.mac}{isLocalMac(h.mac) ? <span className="ml-2 font-sans text-ink-3" title={t('Adres MAC nadany lokalnie (kontener, maszyna wirtualna).', 'A locally assigned MAC address (container, virtual machine).')} data-testid="mac-local">{t('adres lokalny', 'local address')}</span> : h.vendor ? <span className="ml-2 font-sans text-ink-3">{h.vendor}</span> : null}</KV> : null}
               <KV k={t('Zakresy', 'Scopes')}>{(h.scope_ids ?? []).map((sid) => scopes.data?.items.find((s) => s.id === sid)?.name ?? '#' + sid).join(', ') || '–'}</KV>
-              <KV k={t('Pierwszy raz', 'First seen')}><span className="num">{fmtDateTime(h.first_seen)}</span></KV>
-              <KV k={t('Ostatnio widziany', 'Last seen')}><span className="num">{fmtDateTime(h.last_seen)}</span> <span className="text-ink-3">{fmtRelative(h.last_seen)}</span></KV>
-              <KV k={t('Ostatnia odpowiedź', 'Last answer')}><span className="num">{h.last_up ? fmtDateTime(h.last_up) : '–'}</span></KV>
-              <KV k={t('Stabilność', 'Stability')}><span className="num">{h.stability.toFixed(2)}</span> <span className="text-xs text-ink-3">{t('udział prób z odpowiedzią', 'share of probes answered')}</span></KV>
+              <KV k={t('Pierwsza obserwacja', 'First seen')}><span className="num">{fmtDateTime(h.first_seen)}</span></KV>
+              <KV k={t('Ostatnia obserwacja', 'Last seen')}><span className="num">{fmtDateTime(h.last_seen)}</span> <span className="text-ink-3">{fmtRelative(h.last_seen)}</span></KV>
+              <KV k={t('Ostatnia odpowiedź', 'Last response')}><span className="num">{h.last_up ? fmtDateTime(h.last_up) : '–'}</span></KV>
+              <KV k={t('Stabilność', 'Stability')}><span className="num">{fmtDec(h.stability)}</span> <span className="text-xs text-ink-3">{t('udział prób z odpowiedzią', 'share of probes with a response')}</span></KV>
               <KV k={t('Źródło', 'Source')}>{h.source === 'import' ? t('import pliku', 'file import') : t('skan', 'scan')}</KV>
             </dl>
           </Panel>
@@ -169,16 +170,16 @@ export default function HostDetail() {
           <Panel title={t('Usługi', 'Services')} count={services.data?.length} flush>
             <DataTable inPanel rows={services.data} cols={svcCols} rowKey={(s) => s.id} rowHref={(s) => '/services/' + s.id} loading={services.isPending} error={services.error} retry={() => services.refetch()}
               rowClass={(s) => (s.state === 'gone' ? 'text-ink-3' : undefined)}
-              empty={<p className="p-3 text-sm text-ink-2">{t('Skan nie wykrył otwartych usług na tym hoście.', 'The scan found no open service on this host.')}</p>}
+              empty={<p className="p-3 text-sm text-ink-2">{t('Brak otwartych usług.', 'No open services.')}</p>}
               mobile={(s) => (
                 <div>
                   <div className="flex items-center justify-between gap-2"><span className="mono text-sm">{s.port}/{s.proto} <span className="font-sans text-ink-2">{serviceName(s)}</span></span><InterestScore value={s.interest} /></div>
-                  <div className="mt-0.5 truncate text-xs text-ink-3">{s.title || [s.product, s.version].filter(Boolean).join(' ') || '–'}</div>
+                  <div className="mt-0.5 truncate text-xs text-ink-3">{s.title || productLine(shownProduct(s)) || '–'}</div>
                 </div>
               )} />
           </Panel>
 
-          <Panel title={t('Dostępność w tygodniu', 'Availability over the week')} actions={<span className="text-ink-3">{t('model decyduje, kiedy host jest „nieaktywny”', 'the model decides when the host is "inactive"')}</span>}>
+          <Panel title={t('Dostępność w tygodniu', 'Availability over the week')}>
             {avail.error ? <ErrorState error={avail.error} retry={() => avail.refetch()} /> : !avail.data ? <div className="skeleton h-[220px]" /> : obsCount(avail.data) < MIN_OBS ? (
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
                 <FewObservations a={avail.data} n={obsCount(avail.data)} />
@@ -194,9 +195,9 @@ export default function HostDetail() {
           <ReprobePanel hostId={h.id} />
           <HostLifePanel hostId={h.id} />
 
-          <Panel title={t('Historia zmian', 'Change timeline')} count={changes.data?.total} flush>
+          <Panel title={t('Historia zmian', 'Change history')} count={changes.data?.total} flush>
             {changes.error ? <ErrorState error={changes.error} retry={() => changes.refetch()} /> : !changes.data ? <SkeletonRows rows={4} /> : changes.data.items.length === 0 ? (
-              <p className="p-3 text-sm text-ink-2">{t('Od pierwszej obserwacji nic się na tym hoście nie zmieniło.', 'Nothing has changed on this host since it was first seen.')}</p>
+              <p className="p-3 text-sm text-ink-2">{t('Brak zmian.', 'No changes.')}</p>
             ) : (
               <ol>
                 {changes.data.items.map((c) => (
@@ -204,7 +205,7 @@ export default function HostDetail() {
                     <span className="num hidden text-xs text-ink-3 sm:block" title={fmtDateTime(c.at)}>{fmtDateTime(c.at)}</span>
                     <span><ChangeMark kind={c.kind} expected={c.expected} /></span>
                     <span className="col-span-2 min-w-0 text-sm sm:col-span-1">
-                      {changeSummary(c)}
+                      {c.summary}
                       {c.port ? <Link to={'/services/' + c.service_id} className="mono link ml-2 text-xs">:{c.port}</Link> : null}
                       <span className="num ml-2 text-xs text-ink-3 sm:hidden">{fmtRelative(c.at)}</span>
                     </span>

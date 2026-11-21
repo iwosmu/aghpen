@@ -818,8 +818,10 @@ func TestSanityCheckWarnsWhenPortsAreLost(t *testing.T) {
 	}
 	net := &fakeNet{hosts: hosts, portMiss: miss}
 	out := New(Deps{Prober: net, Logger: quiet}).Run(context.Background(), basePlan("10.0.0.0/24"), newSink())
-	if out.Stats.HostsUp != 12 || len(out.Stats.Warnings) != 1 || !strings.Contains(out.Stats.Warnings[0], "tylko 2") {
-		t.Errorf("hosts up %d, warnings %q", out.Stats.HostsUp, out.Stats.Warnings)
+	// the ratio warning, and the 10 silent hosts have unknown ports (their services are not gone)
+	if out.Stats.HostsUp != 12 || out.Stats.PortsUnknown != 10 || len(out.Stats.Warnings) != 2 ||
+		!slices.ContainsFunc(out.Stats.Warnings, func(w string) bool { return strings.Contains(w, "tylko 2") }) {
+		t.Errorf("hosts up %d, ports unknown %d, warnings %q", out.Stats.HostsUp, out.Stats.PortsUnknown, out.Stats.Warnings)
 	}
 	net = &fakeNet{hosts: hosts}
 	if out = New(Deps{Prober: net, Logger: quiet}).Run(context.Background(), basePlan("10.0.0.0/24"), newSink()); len(out.Stats.Warnings) != 0 {

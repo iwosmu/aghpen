@@ -184,18 +184,23 @@ func (m *Manager) BuildPlan(ctx context.Context, profile model.ScanProfile, run 
 		m.log.Warn("target outside the allowed networks dropped from the plan", "target", d.Value, "reason", d.Reason)
 	}
 	if len(kept) == 0 {
-		where := "dozwolonymi sieciami polityki bezpieczeństwa"
+		msg := "Każdy cel leży poza dozwolonymi sieciami"
 		if len(plan.Policy.OperatorNetworks) > 0 {
-			where += " albo blokadą operatora (CZUJKA_ALLOWED_NETWORKS: " + strings.Join(plan.Policy.OperatorNetworks, ", ") + ")"
+			msg += " albo poza blokadą operatora (" + strings.Join(plan.Policy.OperatorNetworks, ", ") + ")"
 		}
-		msg := "każdy cel leży poza " + where
+		msg += "."
 		if len(dropped) > 0 {
-			msg += "; " + dropped[0].Value + ": " + dropped[0].Reason
+			msg += " " + dropped[0].Value + ": " + dropped[0].Reason
 		}
 		return plan, fmt.Errorf("%w: %s", ErrInvalid, msg)
 	}
 	plan.Targets = kept
 	if adHoc {
+		// Only addresses inside an enabled target (security review H1); a
+		// resume checks again, so a target switched off meanwhile stops it.
+		if err = m.checkAdHocScope(ctx, plan.Targets); err != nil {
+			return plan, err
+		}
 		// Every known address of the ad-hoc list is a hint, whatever its scope:
 		// a silent one then gets a down observation (a confirmation probe).
 		plan.Hints, err = m.st.HostHintsIn(ctx, run.AdHoc.Addresses)

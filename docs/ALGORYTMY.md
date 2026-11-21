@@ -195,7 +195,7 @@ Wszystkie stałe są w `stability.go` i `diff.go`, każda z komentarzem. Zmiana 
 Pakiet `internal/reprobe` dopytuje hosty, o których model wie za mało. Mechanizm jest włączony od pierwszego startu. Trasy: [`docs/API.md`](API.md) (`/reprobe/plan`, `/settings/reprobe`).
 
 - **Potwierdzenie.** Host dostał `host_missing` (status `unstable`, wcześniej odpowiadał). Czujka sprawdza go ponownie 10, 30 i 90 minut po pierwszym braku odpowiedzi (`backoff_minutes`). Seria starsza niż ostatni krok plus 12 godzin nie jest już potwierdzana.
-- **Szybkie potwierdzenie młodego hosta.** Host z mniej niż 8 obserwacjami (`MinObsForExpected`, rytm jeszcze nieznany) jest sprawdzany 1, 3 i 10 minut po pierwszym braku (`reprobe.YoungBackoffMinutes`). Dla hosta widzianego raz model zgłasza nieaktywność po drugim braku z rzędu (`p_alive` 0,36, potem 0,19 < 0,2). Pierwsza sonda potwierdzająca daje więc `host_gone` i `service_gone` po około 1–2 minutach od drugiego skanu: krok wynosi 1 minutę od pierwszego braku, a wykonawca (`reprobe.Executor`) sprawdza plan raz na minutę, potem sonda sama trwa kilkanaście sekund (zmierzone w maszynie jury: 105–110 s od skanu do `host_gone`). Test: `TestVanishedHostInTwoScans` (`internal/wire`, prawdziwa baza).
+- **Szybkie potwierdzenie młodego hosta.** Host z mniej niż 8 obserwacjami (`MinObsForExpected`, rytm jeszcze nieznany) jest sprawdzany 1, 3 i 10 minut po pierwszym braku (`reprobe.YoungBackoffMinutes`). Dla hosta widzianego raz model zgłasza nieaktywność po drugim braku z rzędu (`p_alive` 0,36, potem 0,19 < 0,2). Młody profil nie zna jeszcze pory dnia, więc model daje mu jedną częstość odpowiedzi dla każdej godziny: tę, którą miałaby godzina ze wszystkimi jego obserwacjami (`youngRates`). Werdykt nie zależy więc od zegara. Wcześniej brak w następnej godzinie po ostatniej odpowiedzi (przejście pełnej godziny, północ, weekend, zmiana czasu) dawał 0,41, potem 0,26 i host nigdy nie dostawał potwierdzenia (około 1 na 6 przypadków, zależnie od minuty). Testy: `TestYoungHostVerdictAtEveryTime` (`internal/analyze`: co 5 minut przez 8 dni, obie zmiany czasu, przełom roku; host młody, zwykle aktywny i zwykle wyłączony o tej porze) i `TestVanishedHostAtClockBoundaries` (`internal/wire`, prawdziwa baza). Pierwsza sonda potwierdzająca daje więc `host_gone` i `service_gone` po około 1–2 minutach od drugiego skanu: krok wynosi 1 minutę od pierwszego braku, a wykonawca (`reprobe.Executor`) sprawdza plan raz na minutę, potem sonda sama trwa kilkanaście sekund (zmierzone w maszynie jury: 105–110 s od skanu do `host_gone`). Test: `TestVanishedHostInTwoScans` (`internal/wire`, prawdziwa baza).
 - **Prawdopodobnie aktywny.** Host niestabilny jest sprawdzany 5 minut po początku najbliższej godziny, w której model daje częstość odpowiedzi co najmniej `likely_up_rate` (domyślnie 0,6). Warunek: co najmniej 8 obserwacji i prawdziwa odpowiedź w tym samym typie dnia (dzień roboczy albo weekend, godzina ±1).
 - **Bezpieczeństwo.** Sondy działają tylko w oknach skanowania profilu (`sched.NextAllowed`) i pod polityką bezpieczeństwa: wykluczenia, limity pakietów i HTTP, wyłącznik awaryjny. Budżet to 200 adresów na godzinę (`budget_per_hour`), liczony razem dla wszystkich sond z ostatniej godziny. Nadmiar przechodzi na następną godzinę. Sonda sprawdza najwyżej 32 znane porty hosta.
 - Wykonawca startuje co minutę. Zbiera należne sondy w jeden przebieg na profil (`trigger = reprobe`) i nie startuje nowego, dopóki poprzedni trwa.
@@ -319,17 +319,17 @@ Jury robi co najmniej dwa przebiegi i może zatrzymać kontener między nimi. Ho
 Zdania z testu `TestTwoPassMissingHost` (`go test ./internal/analyze -run TwoPass -v`):
 
 ```text
-jedna wcześniejsza obserwacja, model:
-  Host 10.66.3.17 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 3 otwarte usługi: 22/tcp ssh OpenSSH, 80/tcp http nginx, 8080/tcp http Jenkins; model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku
-40 obserwacji, zawsze odpowiadał, model:
-  … model: p_alive 0,26, zgłoszenie nieaktywności po kolejnym braku
+jedna wcześniejsza obserwacja, model (p_alive 0,36):
+  Host 10.66.3.17 nie odpowiada (niepotwierdzone), miał 3 otwarte usługi
+40 obserwacji, zawsze odpowiadał, model (p_alive 0,26):
+  Host 10.66.3.17 nie odpowiada (niepotwierdzone), miał 3 otwarte usługi
 reguła N = 1:
-  Host 10.66.3.17 zgłoszony jako nieaktywny: brak odpowiedzi w 1 przebiegu z rzędu (reguła profilu: zgłoszenie po 1 braku)
+  Host 10.66.3.17 nieaktywny, nie odpowiada od 1 skanu
 reguła N = 2:
-  … model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku, reguła profilu: 2 braki z rzędu
+  Host 10.66.3.17 nie odpowiada (niepotwierdzone), miał 3 otwarte usługi
 ```
 
-Bez reguły model zgłasza nieaktywność po drugim braku z rzędu: jeden brak nigdy nie wystarcza (`ε = 0,10`, rozdz. 2.3). Liczby `p_alive` i „po kolejnym braku" trafiają do zdania, gdy wywołujący wypełni migawkę przez `HostSnapshot.SetAssessment`. Brak, który tłumaczy rytm hosta, zostaje zmianą oczekiwaną (`host_gone` z `expected = true`), nie `host_missing`.
+Bez reguły model zgłasza nieaktywność po drugim braku z rzędu: jeden brak nigdy nie wystarcza (`ε = 0,10`, rozdz. 2.3). Zdanie zmiany nie podaje miar wewnętrznych. `p_alive`, liczba braków do zgłoszenia, reguła profilu i otwarte usługi trafiają do pola `detail` zmiany, gdy wywołujący wypełni migawkę przez `HostSnapshot.SetAssessment`. Pola `before`/`after` niosą prawdziwy stan hosta: `up`, `missing` (nie odpowiada, niepotwierdzone), `down`, `unstable`, `expected-offline` (poza godzinami). Łańcuch `up → missing → down` i `down → up` zgadza się więc z kolejnymi zmianami jednego hosta. Brak, który tłumaczy rytm hosta, zostaje zmianą oczekiwaną (`host_gone` z `expected = true`), nie `host_missing`.
 
 Każda otwarta usługa takiego hosta dostaje zmianę `service_unreachable` („Usługa … nie odpowiada (niepotwierdzone)”): drugi skan pokazuje, co zniknęło razem z hostem, zanim sonda potwierdzi stan. Raport z przebiegu mówi to w zdaniu wstępnym: „Nie odpowiada (niepotwierdzone): 1 host, z nimi 2 usługi. Ponowne sondowanie potwierdzi, czy wróciły, czy zniknęły.” Wiersze stoją w sekcji „Co zniknęło”.
 

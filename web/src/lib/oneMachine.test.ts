@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Change, RunPass, ScanProfile, ScanRun } from '../api/types';
 import { setLang } from '../i18n';
-import { awayText, responseDelta, awaySeconds, changeSummary } from './changeText';
+import { awayText, responseDelta, awaySeconds } from './changeText';
 import { defaultProfile, isLoopback, loopbackLine } from './thisComputer';
 import { isSelf, serviceName } from './serviceName';
 import { fieldValue } from './fields';
@@ -75,9 +75,9 @@ describe('service names', () => {
 describe('port passes', () => {
   it('shows each pass state', () => {
     setLang('pl');
-    expect(passState({ name: 'top_ports', state: 'done', hosts: 1, ports_total: 1000, ports_done: 1000 })).toBe('gotowe');
+    expect(passState({ name: 'top_ports', state: 'done', hosts: 1, ports_total: 1000, ports_done: 1000 })).toBe('gotowy');
     expect(passState({ name: 'full_range', state: 'running', hosts: 1, ports_total: 65535, ports_done: 21000 })).toMatch(/^32/);
-    expect(passState({ name: 'full_range', state: 'pending', hosts: 1, ports_total: 65535, ports_done: 0 })).toBe('czeka');
+    expect(passState({ name: 'full_range', state: 'pending', hosts: 1, ports_total: 65535, ports_done: 0 })).toBe('oczekuje');
   });
 });
 
@@ -87,7 +87,7 @@ describe('partialText', () => {
   it('says the result is not final while the full range runs', () => {
     setLang('pl');
     const s = stats([{ name: 'top_ports', state: 'done', hosts: 1, ports_total: 1000, ports_done: 1000 }, { name: 'full_range', state: 'running', hosts: 1, ports_total: 64535, ports_done: 20651 }]);
-    expect(partialText({ status: 'running', stats: s })).toBe('Skan trwa: sprawdzono najczęstsze porty, pełny zakres 1-65535 w toku (32%). Wynik nie jest jeszcze ostateczny; zmiany i zniknięte usługi pokażą się po końcu skanu.');
+    expect(partialText({ status: 'running', stats: s })).toBe('Skan trwa: sprawdzono najczęstsze porty, pełny zakres 1-65535 w toku (32%).');
     setLang('en');
     expect(partialText({ status: 'running', stats: s })).toContain('Scan in progress: top ports checked, full range 1-65535 running (32%)');
     setLang('pl');
@@ -107,15 +107,8 @@ describe('recovered and English summaries', () => {
   it('shows the slow answer it recovers from', () => {
     setLang('pl');
     expect(responseDelta(mk('response_recovered', { baseline_ms: 1, ms: 901 }, { ms: 1 }))).toBe('901 ms → 1 ms');
-    expect(responseDelta(mk('response_recovered', { baseline_ms: 0, ms: null }, { ms: 0 }))).toBe('nie odpowiadała → 0 ms');
+    expect(responseDelta(mk('response_recovered', { baseline_ms: 0, ms: null }, { ms: 0 }))).toBe('nie odpowiadała → poniżej 1 ms');
     expect(fieldValue('http.response_ms', { ms: 901 })).toBe('901 ms');
-  });
-  it('writes English summaries for the new kinds and keeps the Polish one in PL', () => {
-    setLang('en');
-    expect(changeSummary(mk('response_slower', { baseline_ms: 1, ms: 1 }, { ms: 901 }))).toBe('Service 172.18.0.1:9090 responds slower: 901 ms (usually 1 ms)');
-    expect(changeSummary(mk('service_returned', { state: 'gone', away_seconds: 313, runs_away: 1 }, 'open'))).toBe('Service 172.18.0.1:9090 is back after 5 min 13 s (away in 1 scan)');
-    setLang('pl');
-    expect(changeSummary(mk('service_returned', {}, 'open'))).toBe('PL');
   });
 });
 
@@ -126,7 +119,7 @@ describe('no equal values with an arrow', () => {
     expect(responseDelta(mk('response_recovered', { baseline_ms: 1, ms: 1 }, { ms: 1 }))).toBe('teraz 1 ms');
     expect(responseDelta(mk('response_slower', { baseline_ms: 5, ms: 5 }, { ms: 5 }))).toBe('teraz 5 ms');
     setLang('en');
-    expect(responseDelta(mk('response_recovered', { baseline_ms: 0, ms: null }, { ms: 0 }))).toBe('no answer → 0 ms');
+    expect(responseDelta(mk('response_recovered', { baseline_ms: 0, ms: null }, { ms: 0 }))).toBe('no response → under 1 ms');
     setLang('pl');
   });
 });

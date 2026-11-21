@@ -12,6 +12,7 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 | [`docs/slides/czujka.pdf`](slides/czujka.pdf) | polski | jury: prezentacja, 10 slajdów |
 | [`docs/DEMO.md`](DEMO.md) | polski | jury, zespół: lista ujęć, pokaz, notatki do slajdów, przygotowanie, pytania |
 | [`docs/demo/README.md`](demo/README.md) | polski | zespół: nagrywanie filmu demo jednym poleceniem |
+| [`docs/demo/LIVE.md`](demo/LIVE.md) | polski | prowadzący: ściąga pokazu na żywo, 7 przypadków w maszynie jury (`docs/demo/live/live.sh`) |
 | [`docs/WYNIKI.md`](WYNIKI.md) | polski | jury: pomiary na laboratorium 70 hostów |
 | [`docs/WDROZENIE.md`](WDROZENIE.md) | polski | administrator |
 | [`docs/BEZPIECZENSTWO.md`](BEZPIECZENSTWO.md) | polski | jury, administrator, zespół bezpieczeństwa |
@@ -41,7 +42,7 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 
 **[ALGORYTMY.md](ALGORYTMY.md): algorytmy.** Odpowiedzi na trzy pytania z zadania: jak raportować zmianę, jak określić pewność identyfikacji technologii, po jakim czasie uznać host za nieaktywny. Model dostępności hosta ze wzorami i zmierzonymi scenariuszami, reguły szumu w porównaniu przebiegów, tabela wag zmian, tabela punktów oceny ciekawości, grupowanie usług, klucze obserwacji, raport z przebiegu.
 
-**Funkcje czasu.** Model rytmu hosta: `ALGORYTMY.md` §2. Wehikuł czasu (`/timeline`) i ponowne sprawdzenia (`/reprobe/plan`, `/settings/reprobe`): trasy i definicje w `API.md`, kod w `internal/timeline` i `internal/reprobe`.
+**Funkcje czasu.** Model rytmu hosta: `ALGORYTMY.md` §2. Oś czasu (`/timeline`) i ponowne sprawdzenia (`/reprobe/plan`, `/settings/reprobe`): trasy i definicje w `API.md`, kod w `internal/timeline` i `internal/reprobe`.
 
 **[SIGNATURES.md](SIGNATURES.md): sygnatury.** Język sygnatur w YAML: pola, 14 typów reguł, dopasowania, forma skrócona. Tryb bezpieczny walidatora z przykładami odrzuceń. Liczenie pewności. Silnik dopasowań, „miękkie 404”, retro-hunt. Biblioteka wbudowana (386 sygnatur). Kolektor HTTP/TLS. Narzędzie `fpprobe` i wyniki z laboratorium.
 
@@ -75,7 +76,7 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 
 | Polecenie | Do czego |
 | --- | --- |
-| `czujka` (`cmd/czujka`) | produkt: `serve`, `migrate`, `user create`, `rotate-key`, `genkey`, `healthcheck`, `doctor` (diagnoza instalacji), `backup` i `restore` (kopia szyfrowana), `version` |
+| `czujka` (`cmd/czujka`) | produkt: `serve`, `migrate`, `user create`, `user unlock`, `rotate-key`, `genkey`, `healthcheck`, `doctor` (diagnoza instalacji), `backup` i `restore` (kopia szyfrowana), `version` |
 | `scanprobe` (`cmd/scanprobe`) | sam silnik skanu, bez bazy i API |
 | `fpprobe` (`cmd/fpprobe`) | kolektor HTTP/TLS i sygnatury dla jednego adresu; walidacja sygnatur |
 | `dojoprobe` (`cmd/dojoprobe`) | import, konwersja formatów, wysyłka do DefectDojo |

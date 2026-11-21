@@ -63,25 +63,37 @@ func (s *Store) GetSafetyPolicy(ctx context.Context) (model.SafetyPolicy, error)
 	return p, nil
 }
 
-// PutSafetyPolicy stores the global safety policy.
+// PutSafetyPolicy stores the global safety policy. It never changes the
+// emergency stop flag of a stored policy: the stored flag is kept in the same
+// statement, so a policy read before a stop and written after it cannot
+// clear the stop (security review M3). Only SetEmergencyStop changes it.
 func (s *Store) PutSafetyPolicy(ctx context.Context, p model.SafetyPolicy) (model.SafetyPolicy, error) {
 	p.Exclusions = nonNil(p.Exclusions)
 	p.AllowedMethods = nonNil(p.AllowedMethods)
 	p.OperatorNetworks = nil // never stored: see GetSafetyPolicy
-	if err := s.putSetting(ctx, keySafety, p, ""); err != nil {
-		return p, err
+	p.EmergencyStop = false  // a new row starts released; an existing row keeps its flag
+	_, err := s.db.Exec(ctx, `INSERT INTO settings (key, value, secret, updated_at) VALUES ($1, $2::jsonb, '', now())
+		ON CONFLICT (key) DO UPDATE SET
+			value = EXCLUDED.value || jsonb_build_object('emergency_stop', COALESCE(settings.value->'emergency_stop', 'false'::jsonb)),
+			secret = '', updated_at = now()`, keySafety, js(p))
+	if err != nil {
+		return p, mapErr(err)
 	}
 	return s.GetSafetyPolicy(ctx)
 }
 
-// SetEmergencyStop sets or clears the emergency stop flag of the safety policy.
+// SetEmergencyStop sets or clears the emergency stop flag of the safety
+// policy in one atomic statement (jsonb_set); the other fields stay as they are.
 func (s *Store) SetEmergencyStop(ctx context.Context, on bool) (model.SafetyPolicy, error) {
-	p, err := s.GetSafetyPolicy(ctx)
+	def := DefaultSafetyPolicy()
+	def.EmergencyStop = on
+	_, err := s.db.Exec(ctx, `INSERT INTO settings (key, value, secret, updated_at) VALUES ($1, $2::jsonb, '', now())
+		ON CONFLICT (key) DO UPDATE SET value = jsonb_set(settings.value, '{emergency_stop}', to_jsonb($3::boolean), true), updated_at = now()`,
+		keySafety, js(def), on)
 	if err != nil {
-		return p, err
+		return model.SafetyPolicy{}, mapErr(err)
 	}
-	p.EmergencyStop = on
-	return s.PutSafetyPolicy(ctx, p)
+	return s.GetSafetyPolicy(ctx)
 }
 
 // GetDefectDojo returns the DefectDojo settings. withKey also decrypts the API

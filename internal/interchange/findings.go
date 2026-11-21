@@ -248,7 +248,7 @@ func DojoDescription(f model.Finding) string {
 		fmt.Fprintf(&b, " · **URL:** %s", f.URL)
 	}
 	b.WriteString("\n\n")
-	fmt.Fprintf(&b, "**Typ obserwacji:** %s · **Ocena ciekawości:** %d/100", f.Type, f.Interest)
+	fmt.Fprintf(&b, "**Typ znaleziska:** %s · **Ciekawość:** %d/100", f.Type, f.Interest)
 	if f.Signature != "" {
 		fmt.Fprintf(&b, " · **Sygnatura:** %s", f.Signature)
 	}
@@ -267,7 +267,7 @@ func DojoDescription(f model.Finding) string {
 	if strings.TrimSpace(f.Note) != "" {
 		fmt.Fprintf(&b, "**Notatka analityka:** %s\n\n", strings.TrimSpace(f.Note))
 	}
-	fmt.Fprintf(&b, "_Źródło: Czujka. Bezpieczna detekcja obecności cech: bez prób logowania, bez payloadów. Klucz: %s_", f.Key)
+	fmt.Fprintf(&b, "_Źródło: Czujka. Klucz: %s_", f.Key)
 	return b.String()
 }
 
@@ -294,10 +294,10 @@ type dojoAdvice struct {
 
 var adviceByType = map[string]dojoAdvice{
 	analyze.FindingAdminPanel: {284, "Ogranicz dostęp do panelu (VPN, lista dozwolonych adresów) albo usuń go z sieci publicznej.",
-		"Panel administracyjny dostępny z sieci zwiększa powierzchnię ataku na konta uprzywilejowane."},
+		"Panel dostępny z sieci jest celem prób logowania na konta administratorów."},
 	analyze.FindingLoginPlainHTTP: {319, "Wymuś HTTPS dla formularza logowania i przekierowanie z HTTP.",
 		"Dane logowania mogą zostać przechwycone w sieci."},
-	analyze.FindingStaging: {200, "Ukryj środowisko testowe za VPN albo uwierzytelnieniem; nie trzymaj w nim prawdziwych danych.",
+	analyze.FindingStaging: {200, "Ukryj środowisko testowe za VPN albo logowaniem. Nie trzymaj w nim prawdziwych danych.",
 		"Środowiska testowe są zwykle słabiej chronione niż produkcja."},
 	analyze.FindingDebugPage: {489, "Wyłącz tryb debug i strony diagnostyczne w środowisku dostępnym z sieci.",
 		"Strona diagnostyczna ujawnia szczegóły konfiguracji i ścieżki aplikacji."},
@@ -309,7 +309,7 @@ var adviceByType = map[string]dojoAdvice{
 		"Baza dostępna z sieci jest celem prób odgadnięcia haseł i ataków na znane podatności."},
 	analyze.FindingRemoteAccess: {284, "Udostępniaj zdalny dostęp tylko przez VPN albo bastion.",
 		"Usługi zdalnego dostępu są celem prób logowania."},
-	analyze.FindingExpiredCert:  {298, "Odnów certyfikat TLS.", "Przeglądarki ostrzegają użytkowników; uczy to ignorowania ostrzeżeń."},
+	analyze.FindingExpiredCert:  {298, "Odnów certyfikat TLS.", "Przeglądarki ostrzegają użytkowników, a ci uczą się ignorować ostrzeżenia."},
 	analyze.FindingCertExpiring: {298, "Odnów certyfikat TLS przed datą wygaśnięcia.", "Po wygaśnięciu usługa straci zaufanie klientów."},
 	analyze.FindingSelfSigned: {295, "Użyj certyfikatu wystawionego przez zaufany urząd certyfikacji.",
 		"Klient nie może sprawdzić tożsamości serwera."},
@@ -321,7 +321,7 @@ var adviceByType = map[string]dojoAdvice{
 	analyze.FindingDirListing: {548, "Wyłącz listowanie katalogów na serwerze WWW.", "Listing ujawnia pliki, których nikt nie miał publikować."},
 	analyze.FindingDefaultPage: {1188, "Usuń stronę domyślną albo wyłącz nieużywany serwer.",
 		"Strona domyślna wskazuje na niedokończoną albo zapomnianą instalację."},
-	analyze.FindingNewExposure: {0, "Sprawdź, czy ta usługa ma być dostępna z sieci.", "Nowa usługa w sieci zmienia powierzchnię ataku."},
+	analyze.FindingNewExposure: {0, "Sprawdź, czy ta usługa ma być dostępna z sieci.", ""},
 }
 
 // ToDojoGeneric converts a Czujka finding to a Generic Findings Import finding.
@@ -387,8 +387,12 @@ func WriteDojoGenericCSV(w io.Writer, findings []model.Finding) error {
 		if g.CWE != 0 {
 			cwe = strconv.Itoa(g.CWE)
 		}
-		if err := cw.Write([]string{date, g.Title, cwe, u, g.Severity, g.Description, g.Mitigation, g.Impact, g.References,
-			b(g.Active), b(g.Verified), b(g.FalseP), b(g.IsMitigated), "False"}); err != nil {
+		row := []string{date, g.Title, cwe, u, g.Severity, g.Description, g.Mitigation, g.Impact, g.References,
+			b(g.Active), b(g.Verified), b(g.FalseP), b(g.IsMitigated), "False"}
+		for i := range row {
+			row[i] = guard(row[i]) // CSV injection: a title can come from a scanned page
+		}
+		if err := cw.Write(row); err != nil {
 			return err
 		}
 	}
@@ -863,7 +867,7 @@ func (im *findingImporter) foreign(n int, in foreignFinding, value string) {
 
 func (im *findingImporter) add(n int, f model.Finding, value string) {
 	if im.keys[f.Key] {
-		im.rep.invalid(n, value, "powtórzona obserwacja (ten sam klucz "+f.Key+" wystąpił wcześniej w pliku)")
+		im.rep.invalid(n, value, "powtórzone znalezisko (klucz "+f.Key+" jest już w pliku)")
 		return
 	}
 	im.keys[f.Key] = true
@@ -977,7 +981,7 @@ func (im *findingImporter) genericCSV(r io.Reader) error {
 		}
 		get := func(name string) string {
 			if i, ok := col[name]; ok && i < len(rec) {
-				return strings.TrimSpace(rec[i])
+				return unCSVSafe(strings.TrimSpace(rec[i])) // undo the formula guard of WriteDojoGenericCSV
 			}
 			return ""
 		}
@@ -1011,7 +1015,7 @@ func (im *findingImporter) czujkaJSON(r io.Reader) error {
 	dec := json.NewDecoder(r)
 	tok, err := dec.Token()
 	if err != nil || tok != json.Delim('[') {
-		return errors.New("eksport obserwacji Czujki musi być tablicą JSON")
+		return errors.New("eksport znalezisk Czujki musi być tablicą JSON")
 	}
 	n := 0
 	for dec.More() {

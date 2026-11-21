@@ -70,7 +70,7 @@ func TestBuildScenarios(t *testing.T) {
 	}{
 		{"missing server: first confirmation 10 min after the miss",
 			Input{Now: at(17, 2, 6), Candidates: []Candidate{missingServer("10.66.3.17", at(17, 2, 5), 0)}},
-			want{probes: 1, notBefore: at(17, 2, 15), kind: KindConfirm, step: 1, reason: []string{"Potwierdzenie 1 z 3, 10 min", "17.11 02:05"}}},
+			want{probes: 1, notBefore: at(17, 2, 15), kind: KindConfirm, step: 1, reason: []string{"Nie odpowiada od 17.11 02:05. Sprawdzenie 1 z 3."}}},
 		{"missing server: second confirmation 30 min after the miss",
 			Input{Now: at(17, 2, 16), Candidates: []Candidate{missingServer("10.66.3.17", at(17, 2, 5), 1)}},
 			want{probes: 1, notBefore: at(17, 2, 35), kind: KindConfirm, step: 2}},
@@ -83,13 +83,13 @@ func TestBuildScenarios(t *testing.T) {
 				c.LastAttempt = ptr(at(17, 3, 35))
 				return c
 			}()}},
-			want{probes: 1, notBefore: at(17, 4, 5), kind: KindLikelyUp, reason: []string{"odpowiada nieregularnie", "wt 04:00–05:00"}}},
+			want{probes: 1, notBefore: at(17, 4, 5), kind: KindLikelyUp, reason: []string{"Host niestabilny.", "wt 04:00–05:00"}}},
 		{"old miss streak is not confirmed any more",
 			Input{Now: at(17, 2, 10), Candidates: []Candidate{missingServer("10.66.3.17", at(15, 2, 5), 0)}},
 			want{probes: 1, notBefore: at(17, 2, 10), kind: KindLikelyUp, due: 1}},
 		{"expected-offline workstation at night: probe at 08:05",
 			Input{Now: at(17, 2, 15), Candidates: []Candidate{workstation("10.66.20.5", at(17, 2, 5))}},
-			want{probes: 1, notBefore: at(17, 8, 5), kind: KindLikelyUp, reason: []string{"zgodnie ze swoim rytmem", "wt 08:00–09:00"}}},
+			want{probes: 1, notBefore: at(17, 8, 5), kind: KindLikelyUp, reason: []string{"Host poza godzinami.", "wt 08:00–09:00"}}},
 		{"workstation on Saturday waits for Monday",
 			Input{Now: at(21, 10, 0), Candidates: []Candidate{workstation("10.66.20.5", at(21, 2, 5))}},
 			want{probes: 1, notBefore: at(23, 8, 5), kind: KindLikelyUp, reason: []string{"pn 08:00–09:00"}}},
@@ -120,7 +120,7 @@ func TestBuildScenarios(t *testing.T) {
 				c.Windows = []model.Window{{Start: "03:00", End: "05:00"}}
 				return c
 			}()}},
-			want{probes: 1, notBefore: at(17, 3, 0), kind: KindConfirm, reason: []string{"Przesunięte do okna skanowania (start 17.11 03:00)"}}},
+			want{probes: 1, notBefore: at(17, 3, 0), kind: KindConfirm, reason: []string{"Przesunięte do okna czasowego (start 17.11 03:00)"}}},
 		{"no likely-up hour inside any window: skipped",
 			Input{Now: at(17, 2, 15), Candidates: []Candidate{func() Candidate {
 				c := workstation("10.66.20.5", at(17, 2, 5))
@@ -283,7 +283,7 @@ func TestExecutorStartsDueProbesPerProfile(t *testing.T) {
 		t.Fatalf("started %+v recorded %d", fb.started, len(fb.recorded))
 	}
 	for _, r := range fb.started {
-		if r.Trigger != Trigger || len(r.Targets) != 1 || len(r.Targets[0].Ports) != 3 || !strings.Contains(r.Reason, "1 potwierdzenie braku") {
+		if r.Trigger != Trigger || len(r.Targets) != 1 || len(r.Targets[0].Ports) != 3 || r.Reason != "Ponowne sprawdzenie: 1 host" {
 			t.Errorf("request %+v", r)
 		}
 	}
@@ -329,7 +329,7 @@ func TestYoungHostConfirmsWithinMinutes(t *testing.T) {
 		byIP[pr.IP] = pr
 	}
 	y, o := byIP["10.0.0.5"], byIP["10.0.0.6"]
-	if y.Kind != KindConfirm || !y.NotBefore.Equal(miss.Add(time.Minute)) || y.Steps != 3 || !strings.Contains(y.Reason, "rytm nie jest jeszcze znany") {
+	if y.Kind != KindConfirm || !y.NotBefore.Equal(miss.Add(time.Minute)) || y.Steps != 3 || !strings.Contains(y.Reason, "Sprawdzenie 1 z 3.") {
 		t.Errorf("young host: %+v", y)
 	}
 	if !o.NotBefore.Equal(miss.Add(10 * time.Minute)) {

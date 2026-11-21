@@ -101,7 +101,8 @@ func New(cfg Config) (*Client, error) {
 		}
 		tr := http.DefaultTransport.(*http.Transport).Clone()
 		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: !cfg.VerifyTLS, MinVersion: tls.VersionTLS12} //nolint:gosec // the switch is the user's explicit choice
-		hc = &http.Client{Timeout: timeout, Transport: tr}
+		// No redirect: the API key would go with it to the new address (security review L2).
+		hc = &http.Client{Timeout: timeout, Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	}
 	it := cfg.ImportTimeout
 	if it <= 0 {
@@ -149,15 +150,22 @@ type APIError struct {
 	Body   string
 }
 
+// Error names the status only: Body stays out of what the UI and the audit
+// log show (security review L2); the server log gets it through Detail.
 func (e *APIError) Error() string {
-	switch e.Status {
-	case http.StatusUnauthorized, http.StatusForbidden:
-		return fmt.Sprintf("DefectDojo odrzucił token API lub brak uprawnień (HTTP %d, %s %s): %s", e.Status, e.Method, e.Path, e.Body)
-	case http.StatusNotFound:
+	switch {
+	case e.Status == http.StatusUnauthorized || e.Status == http.StatusForbidden:
+		return fmt.Sprintf("DefectDojo odrzucił token API lub brak uprawnień (HTTP %d, %s %s)", e.Status, e.Method, e.Path)
+	case e.Status == http.StatusNotFound:
 		return fmt.Sprintf("DefectDojo nie zna tego zasobu (HTTP 404, %s %s); sprawdź adres URL instancji", e.Method, e.Path)
+	case e.Status >= 300 && e.Status < 400:
+		return fmt.Sprintf("DefectDojo odpowiedział przekierowaniem HTTP %d (%s %s); Czujka nie podąża za przekierowaniem, podaj właściwy adres URL instancji", e.Status, e.Method, e.Path)
 	}
-	return fmt.Sprintf("DefectDojo zwrócił błąd HTTP %d (%s %s): %s", e.Status, e.Method, e.Path, e.Body)
+	return fmt.Sprintf("DefectDojo zwrócił błąd HTTP %d (%s %s)", e.Status, e.Method, e.Path)
 }
+
+// Detail is Error with the start of the response body, for the server log only.
+func (e *APIError) Detail() string { return e.Error() + ": " + e.Body }
 
 func (c *Client) endpoint(path string, q url.Values) string {
 	u := *c.base
@@ -454,7 +462,7 @@ func (c *Client) Ensure(ctx context.Context, t Target) (Location, error) {
 	if !ok {
 		var created named
 		body := map[string]any{"name": t.ProductName, "prod_type": loc.ProductTypeID,
-			"description": "Powierzchnia ataku obserwowana przez Czujkę: hosty, usługi i obserwacje z cyklicznych skanów discovery."}
+			"description": "Hosty, usługi i znaleziska z cyklicznych skanów Czujki."}
 		if err := c.sendJSON(ctx, http.MethodPost, "products/", body, &created); err != nil {
 			return loc, fmt.Errorf("nie można utworzyć produktu %q: %w", t.ProductName, err)
 		}
@@ -473,7 +481,7 @@ func (c *Client) Ensure(ctx context.Context, t Target) (Location, error) {
 		body := map[string]any{
 			"name": t.EngagementName, "product": loc.ProductID, "status": "In Progress", "engagement_type": "CI/CD",
 			"target_start": today.Format("2006-01-02"), "target_end": today.AddDate(1, 0, 0).Format("2006-01-02"),
-			"description": "Ciągłe obserwacje Czujki (bezpieczna detekcja, bez eksploatacji).", "deduplication_on_engagement": true,
+			"description": "Znaleziska Czujki.", "deduplication_on_engagement": true,
 		}
 		if err := c.sendJSON(ctx, http.MethodPost, "engagements/", body, &created); err != nil {
 			return loc, fmt.Errorf("nie można utworzyć engagementu %q: %w", t.EngagementName, err)

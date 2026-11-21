@@ -1,0 +1,17 @@
+$ docs/demo/live/live.sh 2; live.sh 2 stop; live.sh run "Serwer w pracowni"
+[22:13:37] scan: run 1 completed in 9 s (1 services)
+[22:13:37] READY in 40 s. Open http://127.0.0.1:18730, log in as admin@czujka.local (password: live.sh pass).
+
+  Next: live.sh 2 stop, then 'Uruchom skan' on 'Serwer w pracowni: port 80' (6 s); then wait about 100 s without a click
+[22:13:41] the host 172.31.250.10 is off. Start the scan now.
+[22:13:49] scan: run 2 completed in 7 s (0 services)
+    service_unreachable: Usługa 172.31.250.10:80 (http nginx) nie odpowiada (niepotwierdzone): host nie odpowiedział w tym przebiegu
+    host_missing: Host 172.31.250.10 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 1 otwartą usługę: 80/tcp http nginx; model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku
+
+$ docs/demo/live/live.sh changes_after 1   (no click after run 2)
+  run 2 (manual), finished 2026-11-21T22:13:48.847469Z
+    service_unreachable: Usługa 172.31.250.10:80 (http nginx) nie odpowiada (niepotwierdzone): host nie odpowiedział w tym przebiegu
+    host_missing: Host 172.31.250.10 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 1 otwartą usługę: 80/tcp http nginx; model: p_alive 0,36, zgłoszenie nieaktywności po kolejnym braku
+  run 3 (reprobe), finished 2026-11-21T22:15:25.906916Z
+    service_gone: Usługa 172.31.250.10:80 zniknęła (nginx 1.31.9): host zgłoszony jako nieaktywny
+    host_gone: Host 172.31.250.10 zgłoszony jako nieaktywny: nie odpowiada w godzinach, w których zwykle odpowiadał; model: p_alive 0,19

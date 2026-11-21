@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/iwosmu/aghpen/internal/model"
+	"github.com/iwosmu/aghpen/internal/sig"
 )
 
 // Defaults used when the request leaves a limit at zero.
@@ -456,6 +457,12 @@ func (s *session) root(ctx context.Context, scheme string) (fp *model.HTTPFinger
 		redirects = append(redirects, model.Redirect{From: cur.String(), To: next.String(), Status: r.status})
 		if !sameOrigin(cur, next) {
 			notes = append(notes, "redirect leaves the scanned origin, not followed: "+next.Scheme+"://"+next.Host)
+			break
+		}
+		if reason := sig.CheckRedirect(next); reason != "" {
+			// The same safe-path rules as signature paths (security review L3):
+			// a redirect to /logout or /api/resetPassword is not fetched.
+			notes = append(notes, "redirect target fails the safe-path check, not followed: "+reason)
 			break
 		}
 		if hop >= maxHops {

@@ -47,14 +47,14 @@ Sygnatury dla usług szablonu, których brakowało w bibliotece, są w [`signatu
 
 ## Wyniki
 
-Pomiar z 21 listopada 2026 na kodzie `a7ead6a`: świeża instalacja w maszynie jury `docker:28-dind` na Macu z procesorem arm64, cel `localhost`, profil domyślny bez dopisanych portów szablonu. Profil skanuje pełny zakres w dwóch przejściach: najpierw 1034 porty z listy top, potem pozostałe 64 501. Każdy wiersz pochodzi z [`e2e/jury/transcript.txt`](../e2e/jury/transcript.txt).
+Pomiar z 21 listopada 2026 na kodzie `7dd6f32`: świeża instalacja w maszynie jury `docker:28-dind` na Macu z procesorem arm64, cel `localhost`, profil domyślny bez dopisanych portów szablonu. Profil skanuje pełny zakres w dwóch przejściach: najpierw 1034 porty z listy top, potem pozostałe 64 501. Każdy wiersz pochodzi z [`e2e/jury/transcript.txt`](../e2e/jury/transcript.txt).
 
 | Stos | Porty szablonu znalezione | Pierwsza usługa | Ostatni port szablonu | Cały przebieg | Co rozpoznane |
 | --- | --- | --- | --- | --- | --- |
 | `custom-network` | 7/7 | 8 s | 101 s (15432) | 101 s | httpbin 0.9.2, PostgreSQL, RabbitMQ 3.13.7 (AMQP i panel), Gitea 28.4.0 z niedokończonym instalatorem, OpenSSH 10.3, strona domyślna nginx 1.31.9 |
-| `modern` | 6/6 | 7 s | 10 s (443) | 89 s | WordPress 7.1.5 z instalatorem, phpMyAdmin 5.2.3, Redis 7.4.12 bez hasła, Nginx Proxy Manager (panel i strona domyślna), port TLS 443 |
+| `modern` | 6/6 | 7 s | 10 s (443) | 88 s | WordPress 7.1.5 z instalatorem, phpMyAdmin 5.2.3, Redis 7.4.12 bez hasła, Nginx Proxy Manager (panel i strona domyślna), port TLS 443 |
 | `vulnerable` | 15/15 (z całym zakresem FTP 21000–21010) | 3 s | 99 s (21000) | 99 s | FTP, WordPress 4.7.5 (przestarzały, z instalatorem), Adminer 6.3.0, DVWA 1.10 |
-| `modern-proxy` | 3/3 | 7 s | 92 s (8474) | 92 s | WordPress 7.1.5 za Traefikiem i Toxiproxy, Traefik 3.1.7 z `api.insecure`, API Toxiproxy 2.12.0 bez uwierzytelniania |
+| `modern-proxy` | 3/3 | 7 s | 93 s (8474) | 95 s | WordPress 7.1.5 za Traefikiem i Toxiproxy, Traefik 3.1.7 z `api.insecure`, API Toxiproxy 2.12.0 bez uwierzytelniania |
 
 Porty z listy top pojawiają się po 3–10 s. Porty spoza niej (na przykład 15432, 21000, 8474) pojawiają się, gdy kończy się przejście przez pełny zakres.
 
@@ -66,19 +66,21 @@ Scenariusze zmian, ze zdaniami, które Czujka zapisała w „Zmianach”:
 
 | Scenariusz | Rodzaj zmiany | Zdanie Czujki |
 | --- | --- | --- |
-| `./quickstart.sh change` | `service_gone` | „Usługa 172.18.0.1:8787 zniknęła (nginx 1.31.9)” |
-| `./quickstart.sh up` | `service_returned` | „Usługa 172.18.0.1:8787 wróciła po 18 s (nie było jej w 1 skanie) (nginx 1.31.9)” |
-| zamiana `custom-network` na `modern` | `service_gone`, `service_new` | „Usługa 172.18.0.1:3001 zniknęła (http)”, „Nowa usługa 172.18.0.1:8080 (Apache httpd 2.4.71)” |
-| `redis:7` na `redis:6` (kopia pliku compose) | `tech_version` | „Zmiana wersji Redis na 172.18.0.1:6379: 7.4.12 → 6.2.24” |
-| Toxiproxy: opóźnienie 500 ms | `response_slower` | „Usługa 172.18.0.1:8085 odpowiada wolniej: 487 ms (zwykle 15 ms)” |
-| Toxiproxy: `timeout` 1 s | wynik usługi | HTTP 502 po 1024 ms w ostatniej obserwacji 8085 |
+| `./quickstart.sh change` (profil z portami szablonu i profil domyślny) | `service_gone` | „Usługa 172.18.0.1:8787 zniknęła (nginx 1.31.9)” |
+| `./quickstart.sh up` | `service_returned` | „Usługa 172.18.0.1:8787 wróciła po 53 s (nginx 1.31.9)”; na profilu domyślnym „wróciła po 1 min” |
+| przebieg, którego lista portów nie zawiera 8787, zaraz po przebiegu, który go znalazł | brak zmiany | 8787 zostaje otwarty, w wynikach przebiegu z `carried=true` (nie skanowany w tym przebiegu) |
+| zamiana `custom-network` na `modern` | `service_gone`, `service_new` | „Usługa 172.18.0.1:3001 zniknęła (Golang net/http server)”, „Nowa usługa 172.18.0.1:8080 (Apache httpd 2.4.71)” |
+| `redis:7` na `redis:6` (kopia pliku compose) | `tech_version` | „Zmiana wersji Redis, 172.18.0.1:6379: 7.4.12 → 6.2.24” |
+| Toxiproxy: opóźnienie 500 ms | `response_slower` | „Usługa 172.18.0.1:8085 odpowiada wolniej: 555 ms (zwykle 16 ms)” |
+| Toxiproxy: `timeout` 1 s | wynik usługi | HTTP 502 po 1011 ms w ostatniej obserwacji 8085 |
 | Toxiproxy: `bandwidth` 100 KB/s, `slow_close` 1 s | brak zmiany | skan kończy się, port 8085 zostaje otwarty |
-| drugi host (nginx w osobnej sieci dockera w maszynie jury) zatrzymany, skan | `host_missing`, `service_unreachable` | „Host 172.31.250.10 nie odpowiada (niepotwierdzone): w poprzednim przebiegu odpowiadał i miał 1 otwartą usługę: 80/tcp http” |
-| ten sam host, bez kolejnego skanu | `host_gone`, `service_gone` po 105 s (sprawdzenie ponowne Czujki) | „Host 172.31.250.10 zgłoszony jako nieaktywny”, „Usługa 172.31.250.10:80 zniknęła (http): host zgłoszony jako nieaktywny” |
+| drugi host (nginx w osobnej sieci dockera w maszynie jury) zatrzymany, skan | `host_missing`, `service_unreachable` | „Host 172.31.250.10 nie odpowiada (niepotwierdzone), miał 1 otwartą usługę” |
+| ten sam host, bez kolejnego skanu | `host_gone`, `service_gone` po 110 s (sprawdzenie ponowne Czujki) | „Host 172.31.250.10 nieaktywny, …”, „Usługa 172.31.250.10:80 zniknęła (nginx 1.31.9), host nieaktywny” |
 
-Razem: 139 sprawdzeń PASS, 1 FAIL, 1 znana luka. Przebieg z listą portów szablonu (7–15 portów) trwa 18–44 s, pierwsza usługa po 2–14 s.
+Na każdym stosie dwa przebiegi bez zmiany w szablonie (profil domyślny, potem profil z portami szablonu) dają te same produkty, wersje i technologie na każdym porcie szablonu, a drugi przebieg nie ma żadnej zmiany technologii ani wersji.
+
+Razem: 159 sprawdzeń PASS, 0 FAIL, 1 znana luka. Przebieg z listą portów szablonu (4–15 portów) trwa 18–49 s, bo wykrywanie wersji kończy się w całości; pierwsza usługa po 2–14 s.
 
 ## Znane luki
 
-- Po zamianie stosu `custom-network` na `modern` Czujka nie zgłasza zniknięcia usługi na porcie 8787. Ten port jest poza listą top, więc skanuje go tylko przejście przez pełny zakres. Zniknięcie usług na portach z listy top (3001) i nową usługę (8080) Czujka zgłasza. To jedyny FAIL w zapisie; poprawka jest w toku.
 - vsftpd na porcie 21 nie podaje wersji na komputerze z procesorem arm64. Obraz jest tylko dla amd64, a pod emulacją odpowiada błędem emulatora zamiast banera. Port, nazwa `ftp` i reguła FTP działają. Na hoście amd64 tej luki nie ma.

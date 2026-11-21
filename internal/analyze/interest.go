@@ -91,29 +91,29 @@ type Weight struct {
 // MaxSignaturePoints each. Scope criticality 4 adds 5 points, 5 adds 10.
 var InterestWeights = []Weight{
 	{ReasonAdminPanel, 30, "Panel administracyjny dostępny z sieci"},
-	{ReasonLoginPlainHTTP, 25, "Strona logowania bez szyfrowania (HTTP)"},
+	{ReasonLoginPlainHTTP, 25, "Logowanie bez szyfrowania (HTTP)"},
 	{ReasonDatabase, 25, "Baza danych dostępna z sieci"},
 	{ReasonDebugPage, 25, "Strona diagnostyczna lub tryb debug"},
-	{ReasonRemotePlain, 25, "Zdalny dostęp bez szyfrowania (telnet, rlogin)"},
-	{ReasonStaging, 20, "Środowisko testowe lub staging"},
+	{ReasonRemotePlain, 25, "Zdalny dostęp bez szyfrowania"},
+	{ReasonStaging, 20, "Środowisko testowe"},
 	{ReasonIoT, 20, "Urządzenie IoT"},
-	{ReasonDevTool, 20, "Narzędzie deweloperskie (CI, repozytorium, monitoring)"},
-	{ReasonRemoteDesktop, 20, "Zdalny pulpit (RDP, VNC)"},
+	{ReasonDevTool, 20, "Narzędzie deweloperskie"},
+	{ReasonRemoteDesktop, 20, "Zdalny pulpit"},
 	{ReasonDirListing, 15, "Listing katalogu"},
 	{ReasonExpiredCert, 15, "Przeterminowany certyfikat TLS"},
-	{ReasonNewExposure, 15, "Nowa ekspozycja od ostatniego skanu"},
+	{ReasonNewExposure, 15, "Nowa ekspozycja"},
 	{ReasonLogin, 10, "Strona logowania"},
 	{ReasonSelfSigned, 10, "Samopodpisany certyfikat TLS"},
 	{ReasonRareTech, 10, "Rzadka technologia w tej sieci"},
 	{ReasonOutdated, 10, "Przestarzała wersja oprogramowania"},
-	{ReasonRemoteAccess, 5, "Usługa zdalnego dostępu (SSH)"},
+	{ReasonRemoteAccess, 5, "Usługa zdalnego dostępu"},
 	{ReasonDefaultPage, 5, "Strona domyślna serwera"},
 	{ReasonCertExpiring, 5, "Certyfikat TLS wkrótce wygaśnie"},
 	{ReasonHostMismatch, 5, "Certyfikat TLS nie pasuje do nazwy hosta"},
 	{ReasonMissingHeaders, 5, "Strona logowania bez nagłówków bezpieczeństwa"},
 	{ReasonSensitiveHeader, 5, "Nagłówek ujawnia szczegóły oprogramowania"},
 	{ReasonCookie, 5, "Ciasteczko sesyjne bez flag bezpieczeństwa"},
-	{ReasonCriticality, 5, "Zakres o podwyższonej krytyczności"},
+	{ReasonCriticality, 5, "Krytyczny zakres"},
 }
 
 var weightByCode = func() map[string]Weight {
@@ -210,7 +210,7 @@ func Interest(in InterestInput) (int, []model.InterestReason) {
 		case expired:
 			add(ReasonExpiredCert, "ważny do "+t.NotAfter.UTC().Format("2006-01-02"))
 		case !t.NotAfter.IsZero() && days <= CertExpiringDays:
-			add(ReasonCertExpiring, fmt.Sprintf("zostało %d dni", days))
+			add(ReasonCertExpiring, fmt.Sprintf("za %d %s", days, plural(days, "dzień", "dni", "dni")))
 		}
 		if t.SelfSigned {
 			add(ReasonSelfSigned, "")

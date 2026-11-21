@@ -267,6 +267,53 @@ func TestRedirectLoopStops(t *testing.T) {
 	}
 }
 
+// L3 of the security review: a same-origin redirect from / is followed only
+// when its target passes the safe-path check of the signatures.
+func TestSameOriginRedirectToAnUnsafePathNotFollowed(t *testing.T) {
+	for _, tc := range []struct {
+		target string
+		follow bool
+	}{
+		{"/api/resetPassword", false},
+		{"/cache/flushAll", false},
+		{"/logout?next=/", false},
+		{"/login?next=%2Fadmin%2F", true},
+		{"/app/", true},
+	} {
+		t.Run(tc.target, func(t *testing.T) {
+			rec := &recorder{}
+			srv := httptest.NewServer(rec.wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/":
+					w.Header().Set("Location", tc.target)
+					w.WriteHeader(http.StatusFound)
+				case "/favicon.ico":
+					http.NotFound(w, r)
+				default:
+					fmt.Fprint(w, "<title>target</title>")
+				}
+			})))
+			defer srv.Close()
+			fp, _, err := New().Fingerprint(context.Background(), reqFor(t, srv))
+			if err != nil || fp == nil {
+				t.Fatalf("fp=%v err=%v", fp, err)
+			}
+			followed := false
+			for _, p := range rec.paths() {
+				if p != "/" && p != "/favicon.ico" {
+					followed = true
+				}
+			}
+			if followed != tc.follow {
+				t.Fatalf("followed=%v want %v; requests %v, error %q", followed, tc.follow, rec.paths(), fp.Error)
+			}
+			if !tc.follow && !strings.Contains(fp.Error, "not followed") {
+				t.Errorf("the note must say why: %q", fp.Error)
+			}
+		})
+	}
+}
+
 func TestOffHostRedirectNotFollowed(t *testing.T) {
 	var otherHits int
 	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -41,13 +41,13 @@ export async function startThisComputer(): Promise<number> {
   const name = THIS_COMPUTER_SCOPE();
   const scopes = await get<Page<Scope>>('/scopes', { limit: 200 });
   let scope = scopes.items.find((s) => s.name === name);
-  if (!scope) scope = await post<Scope>('/scopes', { name, description: t('Maszyna, na której działa Czujka (localhost)', 'The machine Czujka runs on (localhost)'), owner: '', criticality: 3, tags: [] });
+  if (!scope) scope = await post<Scope>('/scopes', { name, description: t('Komputer, na którym działa Czujka', 'The computer Czujka runs on'), owner: '', criticality: 3, tags: [] });
   if (!scope.target_count) await post<TargetPreview>('/scopes/' + scope.id + '/targets', { text: THIS_COMPUTER });
   const profiles = await get<Page<ScanProfile>>('/profiles', { limit: 200 });
   let profile = profiles.items.find((p) => p.scope_ids.length === 1 && p.scope_ids[0] === scope!.id);
   if (!profile) {
     const base = defaultProfile(profiles.items);
-    if (!base) throw new ApiError(409, 'no_profile', t('Brak profilu domyślnego. Utwórz profil w „Profile skanów”.', 'There is no default profile. Create one in "Scan profiles".'));
+    if (!base) throw new ApiError(409, 'no_profile', t('Brak profilu domyślnego. Utwórz profil.', 'No default profile. Create a profile.'));
     const { id: _i, next_run_at: _n, last_run_id: _l, created_at: _c, updated_at: _u, ...rest } = base;
     void _i; void _n; void _l; void _c; void _u;
     profile = await post<ScanProfile>('/profiles', {

@@ -387,7 +387,7 @@ func TestProfilesSafetyAndValidation(t *testing.T) {
 	}
 	// A profile can only be stricter than the safety policy.
 	if resp, raw := admin.raw("PATCH", fmt.Sprintf("/api/v1/profiles/%d", p.ID), map[string]any{"rate": map[string]any{"max_pps": 50000, "max_parallel_chunks": 4, "max_parallel_hosts": 16}},
-		map[string]string{auth.CSRFHeader: admin.csrf}); resp.StatusCode != 422 || !strings.Contains(string(raw), "safety policy") {
+		map[string]string{auth.CSRFHeader: admin.csrf}); resp.StatusCode != 422 || !strings.Contains(string(raw), "polityki bezpieczeństwa") {
 		t.Errorf("profile above the policy cap: %d %s", resp.StatusCode, raw)
 	}
 	admin.want(422, "PATCH", fmt.Sprintf("/api/v1/profiles/%d", p.ID), map[string]any{"ports": "80; rm -rf /"}, nil)
