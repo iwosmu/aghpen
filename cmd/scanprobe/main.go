@@ -20,11 +20,14 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/iwosmu/aghpen/internal/httpfp"
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/scan"
+	"github.com/iwosmu/aghpen/internal/sig"
 	"github.com/iwosmu/aghpen/internal/targets"
 )
 
@@ -177,6 +180,7 @@ type summary struct {
 	Groups        []scan.GroupEvent `json:"groups"`
 	Chunks        map[string]int    `json:"chunks_by_status"`
 	HostsReported int               `json:"hosts_reported"`
+	HTTPSent      int64             `json:"http_requests_sent,omitempty"` // counted by the collector, one per request
 	Iface         string            `json:"iface,omitempty"`
 	IfaceTxTotal  int64             `json:"iface_tx_packets,omitempty"`
 	IfaceTxPeak   int64             `json:"iface_tx_peak_pps,omitempty"`
@@ -201,6 +205,7 @@ func main() {
 		fixed       = flag.Bool("fixed-chunks", false, "turn the adaptive sizing off")
 		noSV        = flag.Bool("no-sv", false, "skip service and version detection")
 		intensity   = flag.Int("intensity", 5, "nmap --version-intensity (0..9)")
+		discMode    = flag.String("discovery", "balanced", "discovery mode: fast | balanced | thorough")
 		noARP       = flag.Bool("no-arp", false, "do not use ARP on local networks (use ICMP and TCP probes)")
 		skipDisc    = flag.Bool("skip-discovery", false, "treat every address as up (-Pn)")
 		hintsFlag   = flag.String("hints", "", "known hosts: ip[:port/port],ip ... (density-first order and retries)")
@@ -213,6 +218,11 @@ func main() {
 		iface       = flag.String("measure-iface", "", "measure transmitted packets on this interface (Linux), e.g. eth0")
 		estimate    = flag.Bool("estimate", false, "print the traffic estimate and exit")
 		emergency   = flag.Bool("emergency-stop", false, "set the policy emergency stop (the run must be refused)")
+		httpStage   = flag.Bool("http", false, "HTTP/TLS fingerprints and signatures: the real collector and the built-in signature library")
+		noSigPaths  = flag.Bool("no-sig-paths", false, "with -http: do not GET the extra safe paths that signatures ask for")
+		httpRPS     = flag.Float64("http-rps", 10, "with -http: HTTP requests per second, all hosts together")
+		hostRPS     = flag.Float64("per-host-rps", 5, "with -http: HTTP requests per second to one host")
+		maxPaths    = flag.Int("max-paths", 12, "with -http: extra signature paths per HTTP service")
 		verbose     = flag.Bool("v", false, "debug logs (nmap command lines)")
 		quiet       = flag.Bool("quiet", false, "no progress lines")
 	)
@@ -270,7 +280,7 @@ func main() {
 		Profile: model.ScanProfile{
 			Name:             "scanprobe",
 			Ports:            *ports,
-			Discovery:        model.DiscoveryOpts{ICMPEcho: true, ICMPTimestamp: true, TCPSynPorts: []int{22, 80, 443, 3389, 8080}, TCPAckPorts: []int{80, 443}, ARP: !*noARP, SkipDiscovery: *skipDisc},
+			Discovery:        model.DiscoveryOpts{ICMPEcho: true, ICMPTimestamp: true, TCPSynPorts: []int{22, 80, 443, 3389, 8080}, TCPAckPorts: []int{80, 443}, ARP: !*noARP, SkipDiscovery: *skipDisc, Mode: *discMode},
 			ServiceDetection: !*noSV,
 			VersionIntensity: *intensity,
 			Rate:             model.RateLimits{MaxPPS: *pps, MaxParallelChunks: *parallel},
@@ -280,20 +290,37 @@ func main() {
 		Policy: model.SafetyPolicy{AllowedPorts: *allowed, DeniedPorts: *denied, Exclusions: exclusions, EmergencyStop: *emergency},
 	}
 
+	deps := scan.Deps{Logger: log, NmapPath: *nmapPath, ForceNative: *native}
+	var httpSent atomic.Int64
+	if *httpStage {
+		sigs, err := sig.NewBuiltinEngine()
+		if err != nil {
+			fatal(fmt.Errorf("built-in signatures: %w", err))
+		}
+		collector := httpfp.New()
+		collector.Wait = scan.HTTPWait // every request waits for the per-host and the global limit
+		collector.OnRequest = func(string, string) { httpSent.Add(1) }
+		deps.Fingerprinter, deps.Signatures = collector, sigs
+		plan.Profile.HTTP = model.HTTPOpts{Enabled: true, MaxRedirects: 5, SignaturePaths: !*noSigPaths, Favicon: true, TimeoutMs: 8000}
+		plan.Profile.Rate.HTTPRPS = *httpRPS
+		plan.Policy.MaxHTTPRPS, plan.Policy.MaxPerHostRPS, plan.Policy.MaxPathsPerHost = *httpRPS, *hostRPS, *maxPaths
+		plan.Policy.UserAgent = httpfp.DefaultUserAgent
+		total, enabled := sigs.Count()
+		fmt.Fprintf(os.Stderr, "http stage: real collector, %d signatures (%d enabled), %.0f requests/s in total, %.0f per host, %d extra paths per service\n", total, enabled, *httpRPS, *hostRPS, *maxPaths)
+	}
+
 	var groupMu sync.Mutex
 	var groups []scan.GroupEvent
-	engine := scan.New(scan.Deps{
-		Logger: log, NmapPath: *nmapPath, ForceNative: *native,
-		OnGroup: func(ev scan.GroupEvent) {
-			groupMu.Lock()
-			groups = append(groups, ev)
-			groupMu.Unlock()
-		},
-	})
+	deps.OnGroup = func(ev scan.GroupEvent) {
+		groupMu.Lock()
+		groups = append(groups, ev)
+		groupMu.Unlock()
+	}
+	engine := scan.New(deps)
 
 	est := engine.Estimate(plan)
-	fmt.Fprintf(os.Stderr, "estimate: %d addresses, %d chunks, about %d packets, about %ds at %d pps\n",
-		est.Addresses, est.Chunks, est.EstPackets, est.EstDurationSec, est.EffectivePPS)
+	fmt.Fprintf(os.Stderr, "estimate: %d addresses, %d chunks, about %d packets, about %ds at %d pps, discovery mode %s\n",
+		est.Addresses, est.Chunks, est.EstPackets, est.EstDurationSec, est.EffectivePPS, est.DiscoveryMode)
 	if *estimate {
 		_ = json.NewEncoder(os.Stdout).Encode(est)
 		return
@@ -336,7 +363,7 @@ func main() {
 	sum := summary{
 		Status: string(out.Status), PauseReason: out.PauseReason, Prober: engine.Prober().Name(), Privileged: engine.Prober().Privileged(),
 		Sessions: sessions, WallMs: wall.Milliseconds(), Stats: out.Stats, LimitPPS: scan.EffectiveLimits(plan.Profile, plan.Policy).PPS,
-		Groups: groups, Chunks: sink.byStatus(), HostsReported: sink.hosts,
+		Groups: groups, Chunks: sink.byStatus(), HostsReported: sink.hosts, HTTPSent: httpSent.Load(),
 	}
 	if out.Err != nil {
 		sum.Error = out.Err.Error()

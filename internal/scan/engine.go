@@ -100,6 +100,8 @@ type run struct {
 	prober  probe.Prober
 	ports   *probe.PortSet
 	disc    model.DiscoveryOpts
+	mode    string          // discovery mode: fast, balanced or thorough
+	local   []targets.Range // directly connected IPv4 networks
 	lim     Limits
 	sizer   *sizer
 	budget  *Budget
@@ -178,8 +180,9 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 	r := &run{
 		e: e, log: log, plan: plan, sink: sink, sinkCtx: context.WithoutCancel(ctx),
 		prober: e.Prober(), ports: ports, disc: disc, lim: lim,
+		mode: discoveryMode(plan.Profile.Discovery.Mode), local: localNets(),
 		budget:    NewBudget(lim.PPS),
-		httpLim:   probe.NewLimiter(lim.HTTPRPS, int(math.Ceil(lim.HTTPRPS))),
+		httpLim:   probe.NewLimiter(lim.HTTPRPS, 1), // no burst: the cap holds in every second
 		hostSem:   make(chan struct{}, lim.ParallelHosts),
 		hostnames: exp.Hostnames,
 		hints:     map[string]model.HostHint{},
@@ -251,33 +254,20 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 		"addresses", total, "excluded", exp.Excluded, "chunks", len(units), "unit_size", unitSize,
 		"resumed", resumed, "prober", r.prober.Name(), "privileged", r.prober.Privileged(),
 		"ports", ports.Count(), "pps", lim.PPS, "parallel_chunks", lim.ParallelChunks,
-		"http_rps", lim.HTTPRPS, "hints", len(r.hints), "first_group", r.sizer.Next())
+		"http_rps", lim.HTTPRPS, "hints", len(r.hints), "first_group", r.sizer.Next(), "discovery", r.mode)
 	return r.execute(ctx)
 }
 
 // packetsPerAddress estimates the discovery packets for one dead address.
 func (r *run) packetsPerAddress() float64 {
-	return discoveryProbes(r.disc, r.prober.Privileged()) * 2 // one retry
+	return deadCost(r.disc, r.prober.Privileged(), r.mode, liveBlockGuess)
 }
 
 func discoveryProbes(d model.DiscoveryOpts, privileged bool) float64 {
 	if d.SkipDiscovery {
 		return 0
 	}
-	n := len(d.TCPSynPorts)
-	if privileged {
-		n += len(d.TCPAckPorts)
-		if d.ICMPEcho {
-			n++
-		}
-		if d.ICMPTimestamp {
-			n++
-		}
-	}
-	if n == 0 {
-		n = 1
-	}
-	return float64(n)
+	return float64(max(1, probeCount(d, privileged)))
 }
 
 func (r *run) execute(ctx context.Context) model.RunOutcome {
@@ -401,6 +391,7 @@ type groupStats struct {
 	services int
 	http     int
 	packets  int64
+	hosts    []model.HostResult // reported to the sink when the group is final
 }
 
 func (r *run) runGroup(ctx context.Context, g *group, want int) {
@@ -413,6 +404,7 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 	for _, u := range g.units {
 		t := start
 		u.c.Status, u.c.StartedAt, u.c.FinishedAt, u.c.Error, u.hostUp = model.ChunkRunning, &t, nil, "", 0
+		u.c.Group = g.units[0].c.Seq
 		r.emitChunk(u)
 	}
 	gs := &groupStats{}
@@ -455,6 +447,16 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 			s.ChunksDone += len(g.units)
 		})
 	}
+	if status != model.ChunkDeferred {
+		// hosts first, then the chunk state: a chunk marked done has its results stored
+		for _, h := range gs.hosts {
+			if err := r.sink.OnHost(r.sinkCtx, h); err != nil {
+				r.log.Warn("sink OnHost failed", "ip", h.IP, "error", err.Error())
+				r.stats.update(func(s *model.RunStats) { s.Errors++ })
+			}
+		}
+	}
+	gs.hosts = nil
 	for _, u := range g.units {
 		u.c.Status, u.c.Error, u.c.PPS, u.c.HostsUp = status, errText, pps, u.hostUp
 		// the group ran as one process: each chunk gets its share of the time
@@ -535,7 +537,7 @@ func (r *run) finish(parent, work context.Context) model.RunOutcome {
 func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 	lim := EffectiveLimits(plan.Profile, plan.Policy)
 	chunking := normalizeChunking(plan.Profile.Chunking)
-	est := model.ScanEstimate{EffectivePPS: lim.PPS, FitsWindow: true}
+	est := model.ScanEstimate{EffectivePPS: lim.PPS, FitsWindow: true, DiscoveryMode: discoveryMode(plan.Profile.Discovery.Mode)}
 
 	if len(plan.Chunks) > 0 {
 		for _, c := range plan.Chunks {
@@ -585,7 +587,19 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 		packets = float64(est.Addresses) * nPorts * 2 // every address gets a port scan, silent ports are retried
 		live = float64(est.Addresses) * est.ExpectedLiveRate
 	} else {
-		packets = dead*probes*2 + live*probes // a dead address gets one retry
+		// Share of /24 blocks that get the second pass in balanced mode: the
+		// blocks the inventory knows hosts in, or a guess for a new scope.
+		liveBlocks := liveBlockGuess
+		if len(plan.Hints) > 0 {
+			seen := map[string]bool{}
+			for _, h := range plan.Hints {
+				if p, err := targets.ParseValue(h.IP); err == nil && !p.V6.IsValid() {
+					seen[fmt.Sprint(p.Range.Lo>>8)] = true
+				}
+			}
+			liveBlocks = math.Min(1, float64(len(seen))*256/float64(est.Addresses))
+		}
+		packets = dead*deadCost(disc, e.Prober().Privileged(), est.DiscoveryMode, liveBlocks) + live*probes
 		packets += live * nPorts * 1.05
 	}
 	if plan.Profile.ServiceDetection {
