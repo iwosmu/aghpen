@@ -409,11 +409,13 @@ func serviceLane(host []hostObs, obs []svcObs) ([]Interval, []VersionMark) {
 		switch {
 		case seen:
 			next = "open"
-			v := versionText(o)
-			if haveVer && v != lastVer {
-				marks = append(marks, VersionMark{At: o.At, RunID: o.RunID, Before: lastVer, After: v})
+			// an empty version is a run without version detection, not a change
+			if v := versionText(o); v != "" {
+				if haveVer && v != lastVer {
+					marks = append(marks, VersionMark{At: o.At, RunID: o.RunID, Before: lastVer, After: v})
+				}
+				lastVer, haveVer = v, true
 			}
-			lastVer, haveVer = v, true
 		case h.Up:
 			next = "" // the host answered without the service: gone
 		case state != "":
@@ -456,6 +458,14 @@ func fieldHistories(obs []fieldObs) (changed []FieldHistory, unchanged map[strin
 		var vals []FieldValue
 		for _, o := range obs {
 			v := o.Values[f]
+			// An empty value is a field the run did not measure (no version
+			// detection, no HTTP stage): the last known value stays.
+			if v == "" && f != "name" {
+				if n := len(vals); n > 0 {
+					vals[n-1].To, vals[n-1].ToRun = o.At, o.RunID
+				}
+				continue
+			}
 			if n := len(vals); n > 0 && vals[n-1].Value == v {
 				vals[n-1].To, vals[n-1].ToRun = o.At, o.RunID
 				vals[n-1].Observations++
