@@ -1,185 +1,177 @@
 # Zgodność z treścią zadania
 
-Macierz śledzenia wymagań z `docs/PROBLEM_DEFINITION.md`. Dokument mówi, co działa w scalonym kodzie, a co jeszcze nie.
+Skrót dla jury. Każde wymaganie z `docs/PROBLEM_DEFINITION.md`, każdy z 12 punktów weryfikacji i każde kryterium oceny: co robi Czujka, gdzie to zobaczyć i jaki jest dowód.
 
 | | |
 | --- | --- |
-| Stan na | 2026-11-21, gałąź `iwosmu/agh-orchestrated-kickoff`, commit `6886182` |
-| Metoda | czytanie kodu, `go test ./...`, testy integracyjne na PostgreSQL z `pg_tde`, uruchomienie `docker compose` i wywołania `curl`, jeden przebieg `scanprobe` na `127.0.0.1` |
-| Nie jest źródłem | raporty autorów modułów i inne dokumenty; każde twierdzenie sprawdzono w kodzie albo w działającym programie |
+| Stan na | 2026-11-21, gałąź `iwosmu/agh-orchestrated-kickoff`, kod z commitu `f7d69c9` |
+| Metoda | czytanie kodu i tras API (`internal/api/server.go`, `internal/wire/wire.go`, `cmd/czujka/reprobe.go`), nazwy testów w kodzie, zapis testu e2e `e2e/full/transcript.txt` (52 z 52), raport interfejsu na laboratorium `web/REPORT-LAB.md` i zrzuty `web/screenshots/lab/` |
+| Nie jest źródłem | poprzednia wersja tego pliku; każdy status sprawdzono od nowa |
+| Publiczna instancja | `https://czujka.dev` z laboratorium 70 hostów; konto do odczytu dla jury: dane logowania w zgłoszeniu |
+
+Numery zrzutów (`40`, `47` …) to pliki w `web/screenshots/lab/`. „Krok N” to krok w `e2e/full/transcript.txt`.
 
 ## Statusy
 
-| Status | Znaczenie |
-| --- | --- |
-| **gotowe** | Kod jest scalony. Działanie sprawdzone testem albo wywołaniem na działającym programie. |
-| **w integracji** | Biblioteka jest scalona i ma testy. Binarka `czujka` jeszcze jej nie wywołuje: odpowiednia trasa API odpowiada `501 not_wired` albo nie istnieje. |
-| **brak** | W scalonym kodzie nie ma nic. |
+| Status | Znaczenie | Wierszy |
+| --- | --- | --- |
+| **udowodnione** | Działa w produkcie. Dowód z działającego produktu: zapis testu e2e, raport z laboratorium, zrzut na prawdziwych danych albo test integracyjny przez REST API na PostgreSQL z `pg_tde`. | 69 |
+| **gotowe** | Działa w produkcie i ma testy, ale brak zapisu przebiegu na prawdziwych danych albo dowód jest do powtórzenia. | 17 |
+| **częściowe** | Działa tylko część wymagania albo brakuje pomiaru, o który pyta wymaganie. | 10 |
+| **brak** | Nie ma tego w kodzie. | 0 |
 
-## Najważniejszy fakt
+Razem 96 wierszy.
 
-Wszystkie moduły skanowania i analizy istnieją jako przetestowane biblioteki. Funkcja `wire` w `cmd/czujka/wire.go` zwraca jednak pustą strukturę. Dlatego w binarce produktu **nie działa jeszcze**: start skanu, estymata, harmonogram, import wyników, eksport nmap XML, porównanie przebiegów, analiza po przebiegu, walidacja i dodawanie sygnatur, retro-hunt, DefectDojo. Sprawdzone na działającym stosie:
+## Najsłabsze miejsca
 
-```text
-POST /api/v1/runs                     -> 501 {"code":"not_wired","message":"the scan engine is not wired"}
-POST /api/v1/profiles/1/estimate      -> 501 not_wired
-POST /api/v1/import/results           -> 501 not_wired
-POST /api/v1/signatures/validate      -> 501 not_wired
-POST /api/v1/settings/defectdojo/test -> 501 not_wired
-GET  /api/v1/signatures?limit=1       -> 200 {"items":[],"total":0}
-GET  /healthz                         -> {"engine":false,"tde":true,...}
-```
-
-Test `TestNotWiredRoutesAnswer501` (`internal/api`) pilnuje, że niepodłączony moduł odpowiada 501, a nie udaje wyniku.
-
-W binarce produktu działa dziś: logowanie, role i użytkownicy, zakresy i cele (formularz i plik), profile skanów, polityka bezpieczeństwa i awaryjne zatrzymanie (flaga), edycja hostów, usług i obserwacji, eksport CSV/JSON, dziennik audytu, szyfrowanie, interfejs WWW (serwowany z obrazu).
+1. **Trafność wykrycia (punkty 7.1–7.4, kryterium 30%).** Czujka znajduje hosty, usługi i technologie na /16 laboratorium, ale nie ma jeszcze liczb precyzji i czułości względem prawdy wzorcowej 70 hostów. Pomiar narzędziem `e2e/score` trafi do `docs/WYNIKI.md` (w toku).
+2. **Liczby pakietów.** Średnie tempo (234 i 127 pps), „0 pakietów” po stopie awaryjnym i przy retro-huncie w `e2e/full/transcript.txt` są niepotwierdzone: przechwytywanie `tcpdump -Q out` nie widzi pakietów, które nmap wysyła przez surowe gniazdo. Ważne zostaje: wywołanie stopu trwało 0,06 s, a po 1 s nie działał żaden proces nmap; retro-hunt z konstrukcji czyta tylko zapisane dane.
+3. **DefectDojo z ekranu produktu.** Pliki eksportu i ponowny import są udowodnione, a wysyłkę przez API sprawdzono na żywym DefectDojo 3.5.202 narzędziem `dojoprobe` na tych samych pakietach. Wysyłki z ekranu produktu do żywej instancji nie ma w żadnym zapisie.
 
 ## 1. Wymagania z rozdziału 2 zadania
 
-| Nr | Wymaganie | Co robi Czujka | Gdzie | Dowód | Status |
+| Nr | Wymaganie | Co robi Czujka | Gdzie to zobaczyć | Dowód | Status |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Wczytanie listy adresów IP, zakresów CIDR lub domen | Tekst (jeden cel na wiersz albo lista po przecinku) i plik CSV/JSON. Rozpoznaje IPv4, IPv6 (pojedynczy adres), CIDR, zakres `a-b` i `a.b.c.d-N`, domenę. Podgląd przed zapisem: poprawne, błędne z numerem wiersza i powodem, duplikaty, liczba adresów, adresy wyłączone polityką. | `internal/api/targets_parse.go`, `handlers_targets.go`; `POST /scopes/{id}/targets`, `/targets/preview`, `/scopes/{id}/targets/import`; strona „Cele” | `TestParseTarget`, `TestParseTextAndFile`, `TestExcludedAndBlocks`; curl: 6 wartości → 4 poprawne, 3 błędy, 1037 adresów; plik JSON → 4097 adresów | **gotowe** |
-| 1 | – domena jako cel skanu | Silnik rozwiązuje domenę na adresy IPv4 (rekordy A) i przekazuje nazwę do kolektora HTTP. Rozwiązuje też domeny z listy wyłączeń. | `internal/targets/expand.go` | `TestExpandResolvesAndExcludes` | **w integracji** |
-| 2 | Bezpieczny skan discovery | Silnik: wykrycie hostów → skan portów → wykrycie usług → HTTP/TLS → sygnatury. Nie wysyła skryptów NSE, loginów ani danych aplikacji. Szczegóły: `docs/BEZPIECZENSTWO.md`. | `internal/scan`, `internal/probe`; `POST /runs` | `TestNmapArgs`, `TestRunDiscoversHostsRetriesAndReports`; `scanprobe -targets 127.0.0.1 -ports 18480,22` → 1 host, 1 usługa `http`; w produkcie `POST /runs` → 501 | **w integracji** |
-| 2a | Wielowątkowy skan narzędziami jak nmap, które integrują się z DefectDojo | Pula pracowników, równoległe procesy nmap z jednym wspólnym budżetem pakietów. Bez nmap: własny prober TCP w Go. Wynik przebiegu można wyeksportować jako nmap XML dla DefectDojo („Nmap Scan”). | `internal/scan/engine.go`, `limits.go`, `internal/probe/nmap.go`, `native.go`; `internal/interchange` | `TestParallelismAndBudget`, `TestBudgetSplit`, `TestNativeProber`; nmap 7.97 w obrazie produktu (sprawdzone); eksport XML w produkcie → 501 | **w integracji** |
-| 2b | Sprawdzenie czasu trwania skanu | Estymata przed startem (adresy, pakiety, czas, czy mieści się w oknie). W trakcie: czas aktywny, ETA, średnie tempo, czas każdej części. | `scan.Engine.Estimate`, `internal/scan/stats.go`; `POST /profiles/{id}/estimate`, `GET /runs/{id}`, `/runs/{id}/chunks` | `TestEstimate`, `TestStatsKeeper`; w produkcie estymata → 501 | **w integracji** |
-| 2c | Podział adresów na optymalne podgrupy | Bloki /24 łączone w części; bloki ze znanymi hostami idą pierwsze. Rozmiar grupy roboczej dopasowuje się do zmierzonego tempa: `następny = clamp(EWMA(rozmiar × cel / pomiar), min, max)`. | `internal/scan/planner.go`; pola `chunking` profilu | `TestSizerFollowsMeasuredSpeed`, `TestBuildUnitsDensityFirst`, `TestAdaptiveGroupsGrowWithSpeed` | **w integracji** |
-| 3 | Wykrycie aktywnych hostów | Z surowymi gniazdami: ICMP echo, ICMP timestamp, TCP SYN, TCP ACK, ARP. Bez nich: połączenie TCP. Host blokujący ICMP jest wykrywany sondą TCP. | `internal/probe/nmap.go` (`DiscoverArgs`), `native.go` | `TestParseXMLDiscovery`, `TestNormalizeDiscovery`; przebieg na 127.0.0.1 | **w integracji** |
-| 4 | Identyfikacja podstawowych usług | `nmap -sV` tylko na otwartych portach: usługa, produkt, wersja, CPE, pewność. Tylko TCP. | `internal/probe/nmap.go` (`ServiceArgs`), `nmapxml.go` | `TestParseXMLService`, `TestIdentifyBanner`; 127.0.0.1:18480 → `http`, „Golang net/http server” | **w integracji** |
-| 4 | – usługi UDP (DNS, SNMP, NTP) | Brak skanu UDP. | – | `grep -i udp internal/probe internal/scan` nie zwraca nic | **brak** |
-| 5 | Informacje o usługach HTTP/HTTPS | Kolektor wysyła `GET /` na adres IP z nagłówkiem `Host` i SNI. | `internal/httpfp`; `cmd/fpprobe` | niżej | **w integracji** |
-| 5a | – tytuł strony | `title` | `httpfp/html.go` | `TestBasicFingerprint` | **w integracji** |
-| 5b | – kod odpowiedzi HTTP | `status` | `httpfp/collector.go` | `TestBasicFingerprint` | **w integracji** |
-| 5c | – nagłówki | do 100 nagłówków, `server`, `powered_by` | `httpfp/fetch.go` (`cleanHeaders`) | `TestBasicFingerprint` | **w integracji** |
-| 5d | – ciasteczka | nazwa, domena, ścieżka, flagi `Secure`/`HttpOnly`/`SameSite`, długość i skrót wartości | `httpfp/fetch.go` (`cookiesOf`) | `TestRedirectChainAndCookies` | **w integracji** |
-| 5e | – certyfikat TLS | wersja, szyfr, CN, SAN, wystawca, daty, SHA-256, samopodpisany, wygasły, niezgodność nazwy | `httpfp/tls.go` | `TestTLSSelfSigned`, `TestTLSExpiredCertificate` | **w integracji** |
-| 5f | – przekierowania | każdy krok zapisany; kolektor idzie dalej tylko w obrębie tego samego hosta i portu | `httpfp/collector.go` (`root`) | `TestRedirectChainAndCookies`, `TestOffHostRedirectNotFollowed`, `TestRedirectLoopStops` | **w integracji** |
-| 6 | Proste wykrywanie technologii: CMS, framework, serwer aplikacyjny, IoT | 386 sygnatur wbudowanych. Kategorie: `cms` 66, `framework` 27, `app-server` 19, `web-server` 23, `iot` 40 i inne. Pewność liczona jako noisy-OR. | `internal/sig`, `signatures/*.yaml` | `TestBuiltinLibraryIsValid`, `TestBuiltinDetections`, `TestConfidenceIsNoisyOR`; w produkcie `GET /signatures` → 0 pozycji | **w integracji** |
-| 7 | Rozpoznanie: środowisko testowe lub staging, panel administracyjny | Klasy usług `staging` i `admin-panel` (oraz `login`, `dev-tool`, `database` …). Pliki `environment.yaml` (24 sygnatury) i `panels.yaml` (87). | `internal/sig/classify.go` | `TestClassifier`, `TestCategoryGivesClasses` | **w integracji** |
-| 8 | Porównanie wyników między przebiegami | Różnica dowolnych dwóch przebiegów: hosty, usługi, technologie, tytuł, status, certyfikat, nagłówki, ciasteczka, treść, przekierowania, klasy. | `internal/analyze/diff.go`; `GET /diff?from=&to=`; strona „Porównanie” | testy `internal/analyze`; w produkcie `GET /diff` → 501 | **w integracji** |
-| 9 | Oznaczenie nowych, znikających i zmienionych usług | Zmiany `service_new`, `service_gone`, `service_changed` (i 15 innych rodzajów) z wagą i flagą „oczekiwana”. Lista zmian z potwierdzaniem. | `internal/analyze/diff.go`; tabela `changes`; `GET /changes`, `POST /changes/ack` | `TestChangesSignaturesTags` (zapis i odczyt); nic jeszcze nie wywołuje analizy po przebiegu (`runner.Options.Analyzer` jest `nil`) | **w integracji** |
-| 10 | Własne sygnatury detekcyjne | Własny język YAML: 14 typów reguł, walidator trybu bezpiecznego, retro-hunt na zapisanych obserwacjach bez wysyłania pakietów. Edytor w UI. | `internal/sig/dsl.go`, `safety.go`, `retro.go`; `POST /signatures`, `/signatures/validate`, `/signatures/retrohunt` | `TestValidatorRejectsUnsafeSignatures`, `TestBriefExampleIsValid`, `TestRetroHunt`, `TestHotReloadEnableDisable`; w produkcie trasy → 501 | **w integracji** |
-| 11 | Formularz do wprowadzania danych | Formularz celów (tekst) z podglądem. Formularz ręcznej obserwacji (`POST /findings`). | strony „Cele”, „Obserwacje”; `handlers_targets.go`, `handlers_inventory.go` (`createFinding`) | curl jak w wierszu 1 | **gotowe** (cele, obserwacje) |
-| 11a | – dane z formularza przetwarzane tak samo | Cele z formularza i z pliku idą tą samą ścieżką (`preview` → `saveTargets`) i do tego samego planu skanu. Wyniki z importu wchodzą przez `ResultSink.OnHost`, tak jak wyniki silnika. | `handlers_targets.go`, `runner.Import` | `TestImport` (`internal/runner`) | **gotowe** (cele); **w integracji** (wyniki) |
-| 11b | – wprowadzanie ręczne oraz plik CSV i/lub JSON | Cele: ręcznie, CSV, JSON, z próbą na sucho (`dry_run`). Wyniki skanu: plik nmap XML, JSON, CSV. | `/scopes/{id}/targets/import`, `/import/results` | curl: CSV na sucho → 2 poprawne, 1 błąd; JSON → 201; import wyników → 501 | **gotowe** (cele); **w integracji** (wyniki) |
-| 11c | – ręczne dodanie hosta lub usługi do wyników | Nie ma formularza ani trasy. Wynik można dodać tylko plikiem. | – | brak `POST /hosts` i `POST /services` w `internal/api/server.go` | **brak** |
-| 12 | RBAC z tworzeniem i obsługą różnych ról | 22 uprawnienia. Administrator tworzy własne role z listy uprawnień. Nikt nie nada uprawnienia, którego sam nie ma. Role wbudowane są tylko do odczytu. Ostatniego administratora nie da się usunąć. | `internal/auth`; `/roles`, `/users`, `/permissions`; strona „Administracja” | `TestRBACMatrixCSRFAndAudit`, `TestRBACRules`; curl: `POST /roles` → 201 (rola „Audytor”) | **gotowe** |
-| 13 | Cztery konkretne role | `admin` = Administracja; `editor` = Dodawanie, usuwanie, modyfikacja; `analyst` = Modyfikacja i odczyt; `viewer` = Odczyt. Tabela uprawnień: `docs/BEZPIECZENSTWO.md`. | `internal/auth/roles.go` | `TestBuiltinRolesMatchTheArchitecture`; curl jako `viewer`: `POST` celu → 403, eksport → 403, `GET /users` → 403 | **gotowe** |
-| 14 | Edycja wprowadzonych wartości niezależnie od stanu skanu, zachowana przy kolejnych skanach | Edycja pola obserwowanego przez skaner zapisuje nadpisanie: wartość analityka, wartość skanera, kto i kiedy. Kolejny skan aktualizuje tylko wartość skanera. `null` cofa nadpisanie. Pola analityka (notatka, tagi, etykieta, właściciel, krytyczność, status obserwacji) nie są nigdy zapisywane przez skan. Edycja działa w osobnej transakcji, także podczas przebiegu. | `internal/store/inventory.go` (`applyPatch`), `ingest.go` (`czujka_observed`); `PATCH /hosts/{id}`, `/services/{id}`, `/findings/{id}`, `/targets/{id}`, `/profiles/{id}` | `TestEditsSurviveScans`, `TestInventoryEditsCookiesAndExport` (na PostgreSQL z `pg_tde`) | **gotowe** |
-| 14 | – zakres pól do edycji | Host: nazwy, system, etykieta, właściciel, krytyczność, tagi, notatka. Usługa: nazwa, produkt, wersja, klasy, tagi, notatka. Obserwacja: tytuł, opis, waga, status, tagi, przypisanie, notatka. Nie da się edytować: stanu portu, tytułu strony, listy technologii, rekordu przebiegu. | `hostPatch`, `servicePatch` w `internal/store` | kod | **gotowe** (z ograniczeniem) |
-| 15 | Czytelny interfejs dla każdej roli i główny dashboard | 18 stron, polski i angielski, widok zależny od uprawnień. Dashboard: liczby główne, najważniejsze obserwacje, ostatnie zmiany, niestabilne hosty, wygasające certyfikaty. | `web/`; `GET /dashboard` | Obraz serwuje UI (`GET /` → 200 HTML). `GET /dashboard` → 200. Zrzuty w `web/screenshots/` powstały na **danych przykładowych** (`VITE_FIXTURES=1`), nie na prawdziwym serwerze. | **w integracji** |
-| 16 | Baza z szyfrowaniem w spoczynku dla pól wrażliwych | Warstwa 1: PostgreSQL 17 z `pg_tde`, wszystkie 21 tabel w `tde_heap`, szyfrowany WAL. Warstwa 2: AES-256-GCM dla 6 kolumn (klucz API DefectDojo, wartości ciasteczek, fragmenty treści, dowody, notatki). | `deploy/db`, `internal/crypto`, `internal/store/rotate.go` | `TestMigrateIsIdempotentAndTablesAreEncrypted`, `TestIngestInventoryAndFieldEncryption`, `TestKeyRotation`; `/healthz`: `tables 21, encrypted 21, wal_encrypted true`; w zrzucie `pg_dump` klucz API jest szyfrogramem | **gotowe** |
-| 16 | – wyjątek | Surowy nagłówek `Set-Cookie` jest zapisywany razem z innymi nagłówkami. Chroni go tylko warstwa 1 i widzi go każdy z prawem odczytu wyników. | `httpfp/fetch.go` (`cleanHeaders`), `store/inventory.go` (`splitSecrets`) | kod: `splitSecrets` nie obejmuje nagłówków | **brak** (luka) |
+| 1 | Wczytanie listy adresów IP, zakresów CIDR lub domen | Tekst (jeden cel w wierszu) i plik CSV/JSON. IPv4, CIDR, zakres `a-b`, domena, pojedynczy IPv6. Podgląd przed zapisem: poprawne, błędne z numerem wiersza, duplikaty, liczba adresów, adresy wyłączone polityką. | ekran „Cele”; kreator, krok 2 | `TestParseTarget`, `TestParseTextAndFile`; kreator na laboratorium: 4 poprawne, 1 błędny wiersz, 1024 adresy (`web/screenshots/lab/21-wizard-2-network-preview.png`); e2e: zakres /22 → 1022 adresy (`e2e/full/transcript.txt` krok 5) | **udowodnione** |
+| 1a | – domena jako cel | Silnik rozwiązuje domenę na adresy IPv4 (rekordy A) i przekazuje nazwę do kolektora HTTP (nagłówek `Host`, SNI). | ekran „Cele”; plik `lab/ground-truth/targets-domains.txt` (73 nazwy) | `TestExpandResolvesAndExcludes` (`internal/targets`); brak zapisu przebiegu z domenami | **gotowe** |
+| 1b | – IPv6 | Pojedynczy adres IPv6 tak. Zakres CIDR IPv6 jest odrzucany z komunikatem „zakresy CIDR IPv6 nie są obsługiwane”. | ekran „Cele” (błąd przy `2001:db8::/64`) | `internal/targets/parse.go` | **częściowe** |
+| 2 | Bezpieczny skan discovery | Wykrycie hostów → porty → usługi (`nmap -sV`) → HTTP/TLS → sygnatury. Bez skryptów NSE, logowania i danych aplikacji. Szczegóły: `docs/BEZPIECZENSTWO.md`. | „Przebiegi skanów” → przebieg | e2e: dwa pełne przebiegi przez REST API (`e2e/full/transcript.txt` kroki 6 i 11); /16 laboratorium: 65 535 adresów (`web/screenshots/lab/47-run-completed-pl-dark-1440.png`) | **udowodnione** |
+| 2a | – wielowątkowo, narzędziami jak nmap, które integrują się z DefectDojo | Równoległe procesy nmap z jednym wspólnym budżetem pakietów. Bez nmap: własny prober TCP. Eksport przebiegu jako nmap XML („Nmap Scan” w DefectDojo). | `/healthz` → `probe.mode: nmap-raw`; „Import / eksport” | `TestParallelismAndBudget`, `TestBudgetSplit`; e2e: XML przebiegu 2 importuje się z powrotem: 10 hostów, 9 usług (krok 13) | **udowodnione** |
+| 2b | – sprawdzenie czasu trwania skanu | Estymata przed startem (adresy, pakiety, czas, czy mieści się w oknie). W trakcie: czas aktywny, ETA, tempo, czas każdej podgrupy. | okno „Uruchom skan”, kreator krok 5, strona przebiegu | e2e: estymata 1022 adresy, 122 s (krok 5); /16: czas 7 min 24 s na stronie przebiegu (zrzut `47`). Słabość: estymata zakłada 5 % aktywnych adresów, a wczesne ETA bywa dalekie (`web/REPORT-LAB.md` §7) | **udowodnione** |
+| 2c | – podział adresów na optymalne podgrupy | Bloki /24 łączone w grupy robocze; rozmiar grupy idzie za zmierzonym tempem (EWMA, cel 30 s); bloki ze znanymi hostami idą pierwsze. | strona przebiegu: tabela „Podgrupy adresów”, mapa | `TestSizerFollowsMeasuredSpeed`, `TestBuildUnitsDensityFirst`; /16: 256 bloków w 108 grupach, 78 łączonych (zrzut `47`) | **udowodnione** |
+| 3 | Wykrycie aktywnych hostów | Z surowymi gniazdami: ICMP echo i timestamp, TCP SYN/ACK, ARP. Bez nich: połączenie TCP. Host bez ICMP jest wykrywany sondą TCP albo ARP. | „Hosty” | e2e: 9 z 9 hostów, także host odrzucający ICMP (krok 7); /16: 66 aktywnych hostów (zrzut `47`). Precyzja i czułość: wiersz 7.1 | **udowodnione** |
+| 4 | Identyfikacja podstawowych usług | `nmap -sV` na otwartych portach: usługa, produkt, wersja, CPE. | „Usługi”, szczegóły usługi | e2e: nginx 1.24.0, OpenSSH 9.7, Redis 7.4.12, MariaDB 11.8.9, Grafana (krok 7) | **udowodnione** |
+| 4a | – usługi UDP | Profil może włączyć UDP, tylko dla niegroźnych zapytań: 53, 123, 137, 161, 500, 1900, 5353. | „Profile skanów” → sekcja UDP | `TestUDPPorts`, `TestUDPArgsAreSafe`, `TestSNMPProbe` (`internal/probe/udp_test.go`); brak zapisu przebiegu UDP na laboratorium | **gotowe** |
+| 5a | Informacje HTTP/HTTPS: tytuł strony | `title` z HTML | szczegóły usługi, sekcja HTTP | e2e: `title=WordPress › Installation`, `Grafana`, `Welcome to nginx!` (krok 7); zrzut `44` | **udowodnione** |
+| 5b | – kod odpowiedzi HTTP | `status` | szczegóły usługi | zrzut `44` (Status 200); e2e: zmiana kodu wykrywana jako zmiana (`internal/analyze`) | **udowodnione** |
+| 5c | – nagłówki | do 100 nagłówków, `Server`, `X-Powered-By` | szczegóły usługi, „Nagłówki odpowiedzi” | zrzut `44`; e2e: znaleziska `interesting-header` (krok 7) | **udowodnione** |
+| 5d | – ciasteczka | nazwa, domena, ścieżka, flagi `Secure`/`HttpOnly`/`SameSite`, długość i skrót wartości; wartość szyfrowana, w zapisanych nagłówkach zamaskowana (`MaskSetCookie`) | szczegóły usługi; test sygnatury | zrzut `51` (`infokiosk_sid`, `Secure=false; HttpOnly=true`); `TestRedirectChainAndCookies`; `internal/httpfp/fetch.go` | **udowodnione** |
+| 5e | – certyfikat TLS | wersja, szyfr, CN, SAN, wystawca, daty, SHA-256, samopodpisany, wygasły, niezgodność nazwy | szczegóły usługi, sekcja TLS | e2e: `self-signed-cert` i `cert-expiring` na 10.91.3.50:9443 (krok 7); `TestTLSSelfSigned`, `TestTLSExpiredCertificate` | **udowodnione** |
+| 5f | – przekierowania | każdy krok zapisany; kolektor idzie dalej tylko w obrębie tego samego hosta i portu | szczegóły usługi | `TestRedirectChainAndCookies`, `TestOffHostRedirectNotFollowed`, `TestRedirectLoopStops`; hosty `redir-chain`, `redir-ext` w laboratorium bez osobnego zapisu | **gotowe** |
+| 6 | Wykrywanie technologii: CMS, framework, serwer aplikacyjny, IoT | 386 sygnatur w YAML: panele 87, IoT 53, serwery 47, CMS 41, usługi 36, frameworki 35, systemy uczelniane 32, staging 24, nagłówki 20, ciasteczka 11. Pewność: noisy-OR dowodów. | „Usługi” → „Technologie i dowody”; „Sygnatury” | e2e: WordPress, Grafana, nginx z wersją, PHP, Apache (krok 7); zrzut `44`: WordPress 6.9.4, Apache 2.4.67, PHP 8.3.31; pulpit: MikroTik RouterOS (zrzut `40`) | **udowodnione** |
+| 7 | Rozpoznanie: staging, panel administracyjny | Klasy `staging`, `admin-panel` (oraz `login`, `dev-tool`, `database` …). | pulpit: liczniki „Panele administracyjne”, „Środowiska testowe” | e2e: `staging` na 10.91.3.50, `admin-panel` na WordPress (krok 7); pulpit /16: 9 paneli, 9 środowisk (zrzut `40`) | **udowodnione** |
+| 8 | Porównanie wyników między przebiegami | Różnica dowolnych dwóch przebiegów: hosty, usługi, technologie, tytuł, status, certyfikat, nagłówki, ciasteczka, treść, przekierowania. | „Zmiany” → „Porównaj dwa skany”; `GET /diff?from=&to=` | e2e: `GET /diff` przebiegów 1 i 2 → 8 zmian (krok 11) | **udowodnione** |
+| 9 | Oznaczenie nowych, znikających i zmienionych usług | 19 rodzajów zmian z wagą i flagą „oczekiwana”, potwierdzanie zmian. | „Zmiany”; zdanie na pulpicie | e2e: `host_new`, `service_new`, `service_changed`, `tech_version`, `title_changed`, `host_unstable` (krok 11); laboratorium `t0`→`t1`: zrzut `45` | **udowodnione** |
+| 10 | Własne sygnatury detekcyjne | Język YAML, 14 typów reguł, walidator trybu bezpiecznego, retro-hunt po zapisanych danych, edytor z walidacją na żywo, import pliku, sygnatura z przykładu. | „Sygnatury” → edytor; usługa → „Zaproponuj sygnaturę” | e2e: sygnatura przez API, retro-hunt 3 trafienia, dopasowanie w przebiegu 2, import pliku (kroki 9, 11, 14); zrzut `51` | **udowodnione** |
+| 11 | Formularz do wprowadzania danych | Formularz celów, formularz ręcznego hosta z usługami, formularz znaleziska. | „Cele”; „Hosty” → „Dodaj host ręcznie”; „Znaleziska” | `web/REPORT-LAB.md` §3: host 10.66.250.15 utworzony, przebieg „wpis ręczny”, 3 zmiany; zrzuty `60`, `61` | **udowodnione** |
+| 11a | – dane z formularza przetwarzane tak samo | Ręczny host i import wyników idą przez ten sam zapis i tę samą analizę co skan, jako osobny przebieg. | „Przebiegi skanów”: przebieg `manual-entry` albo `import` | `internal/wire/analysis.go`; e2e: import JSON/CSV/XML tworzy przebiegi 3–5 (krok 13) | **udowodnione** |
+| 11b | – ręcznie oraz plik CSV i/lub JSON | Cele: ręcznie, CSV, JSON, próba na sucho. Wyniki: nmap XML, JSON, CSV. Znaleziska: DefectDojo Generic Findings JSON/CSV i eksport Czujki. | „Import / eksport” | e2e: import trzech formatów (krok 13); ponowny import znalezisk: 180 zaktualizowanych, 0 duplikatów (`web/REPORT-LAB.md` §3, zrzut `63`) | **udowodnione** |
+| 12 | RBAC z tworzeniem i obsługą różnych ról | 22 uprawnienia; administrator tworzy własne role; nikt nie nada uprawnienia, którego sam nie ma; ostatniego administratora nie da się usunąć. | „Administracja” → role i użytkownicy | `TestRBACMatrixCSRFAndAudit` (REST API na PostgreSQL z `pg_tde`), `TestRBACRules`; `internal/model/types.go` (22 stałe `Perm…`) | **udowodnione** |
+| 13 | Cztery konkretne role | Administrator = Administracja; Edytor = Dodawanie, usuwanie, modyfikacja; Analityk = Modyfikacja i odczyt; Obserwator = Odczyt. | „Administracja”; drugie okno z kontem roli „Obserwator” | `internal/auth/roles.go`; `TestBuiltinRolesMatchTheArchitecture`; konto do odczytu dla jury na `https://czujka.dev` (dane logowania w zgłoszeniu) | **udowodnione** |
+| 14 | Edycja niezależna od stanu skanu, zachowana przy kolejnych skanach | Edycja pola skanera zapisuje nadpisanie z wartością skanera obok; pola analityka nigdy nie są nadpisywane; edycja działa także w trakcie przebiegu. Przebieg ma edytowalną notatkę i etykietę. | szczegóły hosta i usługi (ołówek przy polu), „Znaleziska” | e2e: notatka i tagi usługi oraz akceptacja znaleziska przetrwały drugi skan (krok 11); `TestEditsSurviveScans`; notatka przebiegu: `web/REPORT-LAB.md` §3 | **udowodnione** |
+| 15 | Czytelny interfejs dla każdej roli i główny dashboard | Pulpit zaczyna się zdaniem „co się zmieniło od ostatniego skanu”, potem liczby, trwający skan, listy. Polski i angielski, motyw ciemny i jasny, telefon i komputer; kontrolki niedostępne dla roli nie są rysowane. | „Pulpit” | zrzuty `40`–`47` na danych laboratorium /16 (`web/REPORT-LAB.md` §6) | **udowodnione** |
+| 16 | Szyfrowanie w spoczynku dla pól wrażliwych | Warstwa 1: PostgreSQL 17 z `pg_tde`, wszystkie tabele i WAL. Warstwa 2: AES-256-GCM dla klucza API DefectDojo, wartości ciasteczek, fragmentów treści, dowodów, notatek; rotacja klucza. | `/healthz` → `"tde":true` | e2e: `"tde":true` (krok 2); `TestMigrateIsIdempotentAndTablesAreEncrypted`, `TestIngestInventoryAndFieldEncryption`, `TestKeyRotation` | **udowodnione** |
+| 16a | – kopia zapasowa | Zrzut `pg_dump` jest jawny poza kolumnami warstwy 2; trzeba go szyfrować osobno. | `docs/WDROZENIE.md` §6 | `docs/BEZPIECZENSTWO.md` §3 | **częściowe** |
 
 ## 2. Akapit o module sygnatur
 
-Wymaganie: sygnatury służą do bezpiecznej detekcji cech, nie do eksploatacji.
-
-| Przykład z zadania | Reguła w Czujce | Dowód | Status |
-| --- | --- | --- | --- |
-| obecność konkretnego nagłówka | `header` (`exists`, `contains`, `regex`) | `TestEveryRuleType` | **w integracji** |
-| konkretna nazwa ciasteczka | `cookie` (nazwa, wzorzec nazwy, flagi); dowód nie zawiera wartości | `TestCookieEvidenceHidesTheValue` | **w integracji** |
-| hash favicony | `favicon` (`mmh3` w stylu Shodan, `sha256`) | `TestMurmur3Vectors`, `TestFaviconFallbackAndSoftNotFound` | **w integracji** |
-| charakterystyczny fragment HTML | `body`, `title`, `meta` | `TestEveryRuleType` | **w integracji** |
-| ścieżka `/login`, `/admin`, `/version` bez prób logowania | `path`: tylko `GET` bez treści i danych logowania; najwyżej 5 ścieżek na sygnaturę | `TestCheckPath`, `TestSafePath`, `TestMethodGuard` | **w integracji** |
-| wykrycie wersji w stopce | reguły `version` z grupą wyrażenia regularnego | `TestVersionExtraction`, `TestCleanVersion` | **w integracji** |
-| fingerprint popularnego CMS-a | `signatures/cms.yaml` (41 sygnatur) | `TestBuiltinDetections` | **w integracji** |
-| ostrożność: brak eksploatacji | Walidator odrzuca: metodę inną niż GET/HEAD, treść żądania, nagłówki, dane logowania, ładunki, inny host, `..`, kodowanie procentowe, pliki ukryte, ścieżki zmieniające stan, kopie i klucze. | `TestValidatorRejectsUnsafeSignatures`, `TestRetroHuntRejectsUnsafeSignature` | **w integracji** |
+| Punkt | Co robi Czujka | Gdzie to zobaczyć | Dowód | Status |
+| --- | --- | --- | --- | --- |
+| obecność konkretnego nagłówka | reguła `header` (`exists`, `contains`, `regex`) | „Sygnatury” → edytor | sygnatura `lab-infokiosk`: `X-InfoKiosk-Node` (zrzut `51`); `TestEveryRuleType` | **udowodnione** |
+| konkretna nazwa ciasteczka | reguła `cookie` (nazwa, wzorzec, flagi); dowód bez wartości | test sygnatury | zrzut `51` (`infokiosk_sid`); `TestCookieEvidenceHidesTheValue` | **udowodnione** |
+| hash favicony | reguła `favicon` (`mmh3` jak w Shodan, `sha256`) | szczegóły usługi: „Favicon (mmh3)” | `TestMurmur3Vectors`, `TestFaviconFallbackAndSoftNotFound`; przykład z laboratorium w `docs/REGULY.md` §10 (InfoKiosk, `mmh3: 1990289189`) | **gotowe** |
+| charakterystyczny fragment HTML | reguły `body`, `title`, `meta` | edytor sygnatur | e2e: własna sygnatura po treści strony, 3 trafienia (krok 9) | **udowodnione** |
+| ścieżka `/login`, `/admin`, `/version` bez logowania | reguła `path`: tylko GET bez treści i danych logowania; najwyżej 5 ścieżek na sygnaturę, 8 na usługę z polityki | test sygnatury: „Dodatkowe żądania GET na usługę” | zrzut `51` (`/kiosk/status`); `TestCheckPath`, `TestSafePath`, `TestMethodGuard` | **udowodnione** |
+| wykrycie wersji w stopce | reguły `version` z grupą wyrażenia regularnego | „Technologie i dowody” | zrzut `44`: WordPress 6.9.4 z `meta generator`; `TestVersionExtraction` | **udowodnione** |
+| fingerprint popularnego CMS-a | `signatures/cms.yaml` (41 sygnatur) | „Usługi”, filtr technologii | e2e: WordPress (krok 7); zrzut `44` | **udowodnione** |
+| ostrożność: brak eksploatacji | Walidator odrzuca: metodę inną niż GET/HEAD, treść żądania, nagłówki, dane logowania, ładunki, inny host, `..`, kodowanie procentowe, ścieżki zmieniające stan. | import pliku sygnatur | e2e: sygnatura z `POST` i `body` odrzucona z numerem wiersza (krok 14); `TestValidatorRejectsUnsafeSignatures` | **udowodnione** |
 
 ## 3. Akapit o wielowątkowości, oknach i podgrupach
 
-| Zdanie z zadania | Co robi Czujka | Dowód | Status |
-| --- | --- | --- | --- |
-| Skan wielowątkowy z użyciem nmap | wiersz 2a | `TestParallelismAndBudget` | **w integracji** |
-| Narzędzia integrujące się z DefectDojo | nmap XML → „Nmap Scan”; obserwacje → „Generic Findings Import” | sprawdzone na DefectDojo 3.5.202 (`docs/INTEGRACJE.md` §4); w produkcie → 501 | **w integracji** |
-| Sprawdzanie czasu trwania skanu | wiersz 2b | `TestEstimate` | **w integracji** |
-| Podział na optymalne podgrupy zależnie od szybkości | wiersz 2c | `TestSizerFollowsMeasuredSpeed` | **w integracji** |
-| Ustawianie przedziałów czasowych uruchomienia | Profil ma okna (dni tygodnia, od–do, przez północ, strefa czasowa). Zapis i walidacja działają. | curl: `POST /profiles` z oknem pn–pt 22:00–06:00 → 201; `TestInWindowSimpleAndMidnight`, `TestWindowsAcrossDaylightSaving` | **gotowe** (konfiguracja) |
-| Ustawianie częstotliwości | Profil ma cron (5 pól) albo odstęp w minutach. Harmonogram istnieje jako biblioteka, ale nikt go nie uruchamia: `next_run_at` pozostaje `null`. | `TestCron`, `TestSchedulerTick`; curl: profil z cronem → `"next_run_at":null` | **gotowe** (konfiguracja); **w integracji** (uruchamianie) |
-| Po przekroczeniu okna skan zatrzymany i wznowiony w kolejnym oknie | Silnik nie zaczyna części, która nie zmieści się przed końcem okna. O końcu okna przerywa i odkłada resztę. Menedżer przebiegów zapisuje `paused / window_closed` i czas wznowienia. Wznowienie (`ResumeDue`) nie ma jeszcze wywołującego. | `TestWindowGuardDoesNotStartWhatCannotFit`, `TestWindowPauseThenResume` (`internal/scan`), `TestWindowClosedFailureAndNotWired` (`internal/runner`) | **w integracji** |
+| Punkt | Co robi Czujka | Gdzie to zobaczyć | Dowód | Status |
+| --- | --- | --- | --- | --- |
+| Skan wielowątkowy z użyciem nmap | wiersz 2a | strona przebiegu: kilka podgrup „skanowany” naraz | zrzut `03`; `TestParallelismAndBudget` | **udowodnione** |
+| Narzędzia integrujące się z DefectDojo | Eksport przebiegu jako nmap XML i znalezisk jako Generic Findings Import; wysyłka przez API z kluczem znaleziska (drugi eksport aktualizuje); synchronizacja statusu. | „Znaleziska” → „Eksport do DefectDojo”; „Integracje” | pliki: e2e krok 13, `web/REPORT-LAB.md` §3 (eksport 274,5 kB, ponowny import bez duplikatów); wysyłka przez API: sprawdzona na żywym DefectDojo 3.5.202 narzędziem `dojoprobe` na tych samych pakietach (`docs/INTEGRACJE.md` §4.11); wysyłka z ekranu produktu do żywej instancji bez zapisu | **częściowe** |
+| Sprawdzanie czasu trwania skanu | wiersz 2b | okno „Uruchom skan” | e2e krok 5 | **udowodnione** |
+| Podział na optymalne podgrupy zależnie od szybkości | wiersz 2c | tabela „Podgrupy adresów” | zrzut `47` | **udowodnione** |
+| Przedziały czasowe uruchomienia | Okna tygodniowe (dni, od–do, przez północ, strefa czasowa), siatka 7 × 24 do malowania. | „Profile skanów” → okna; kreator krok 4 | e2e krok 16; `TestInWindowSimpleAndMidnight`, `TestWindowsAcrossDaylightSaving` | **udowodnione** |
+| Częstotliwość | Cron (5 pól) albo odstęp w minutach; harmonogram uruchamia przebiegi sam. | „Przebiegi skanów”: wyzwalacz `schedule` | `web/REPORT-LAB.md` §1: przebiegi z crona `*/2 * * * *`; `TestSchedulerTick` | **udowodnione** |
+| Po przekroczeniu okna skan zatrzymany i wznowiony w kolejnym oknie | Silnik nie zaczyna podgrupy, która się nie zmieści; o końcu okna przerywa; harmonogram wznawia w następnym oknie; w przebiegu częściowym nie ma fałszywych „zniknięć”. | strona przebiegu: „wstrzymany · okno”, potem „wznowiony” | e2e krok 16: pauza 15:02:16, wznowienie 15:04:01, zakończony; zrzuty `32`, `33` | **udowodnione** |
 
 ## 4. Minimalny oczekiwany zakres
 
-| Punkt | Co robi Czujka | Dowód | Status |
-| --- | --- | --- | --- |
-| import listy hostów lub zakresów | wiersz 1 | curl | **gotowe** |
-| import wyników skanów w formie JSON lub CSV | Importer nmap XML, JSON (4 kształty), CSV z tabelą nazw kolumn; błędny wiersz nie przerywa importu. | testy `internal/interchange`; w produkcie → 501 | **w integracji** |
-| obsługa dużych zakresów, ponad 10 000 IP | Liczenie adresów bez rozwijania listy (/8 w czasie stałym). Plan w blokach /24. Zapis wsadowy po 250 hostów. | `TestCountLargeAndExclusions`; curl: /20 → 4096 adresów; `make bench` (10 000 hostów × 3 usługi) nie był uruchomiony w tym audycie | **w integracji** |
-| konfiguracja skanu: okno czasowe i częstotliwość | rozdz. 3 | curl | **gotowe** (konfiguracja) |
-| ograniczanie tempa zapytań | Limit = mniejsza z wartości profilu i polityki. Pakiety: jeden budżet dzielony między procesy nmap (`--min-rate` = `--max-rate`). HTTP: limit globalny i na host. | `TestEffectiveLimits`, `TestBudgetSplit`, `TestLimiterRate`, `TestProfilesSafetyAndValidation` | **w integracji** (egzekwowanie); **gotowe** (polityka) |
-| wykrywanie aktywnych hostów | wiersz 3 | – | **w integracji** |
-| podstawowa identyfikacja usług | wiersz 4 | – | **w integracji** |
-| zapis wyników do bazy lub pliku | PostgreSQL: hosty, usługi, obserwacje z historią, zmiany, obserwacje analityczne. | `TestIngestInventoryAndFieldEncryption`, `TestRunsChunksAndProfiles` | **gotowe** |
-| porównanie dwóch skanów | wiersz 8 | – | **w integracji** |
-| dashboard lub raport pokazujący najważniejsze zmiany | Dashboard: wiersz 15. Raport z przebiegu w HTML (A4) i Markdown: biblioteka bez trasy API. | `docs/samples/raport-przyklad.html`; testy `internal/report` | **w integracji** |
-| eksport wyników do JSON lub CSV | `GET /export/{hosts,services,findings,changes,signatures}.{json,csv}` i `/export/runs/{id}.{json,csv}`. Strumieniowo. Ochrona przed formułami w CSV. Każdy eksport trafia do audytu. | `TestInventoryEditsCookiesAndExport`, `TestMergePatchAndCSVSafe`; curl: `/export/hosts.csv` → 200 | **gotowe** |
-| rozgraniczenie funkcjonalności na role | wiersze 12–13 | – | **gotowe** |
-| edycja danych istniejących skanów, wyników i konfiguracji | Wyniki i konfiguracja: wiersz 14. Rekord przebiegu nie ma pól do edycji (tylko wstrzymaj, wznów, anuluj). | – | **gotowe** (wyniki, konfiguracja); **brak** (rekord przebiegu) |
-| ochrona danych z wykonanych skanów (szyfrowanie) | wiersz 16 | – | **gotowe** |
+| Punkt | Co robi Czujka | Gdzie to zobaczyć | Dowód | Status |
+| --- | --- | --- | --- | --- |
+| import listy hostów lub zakresów | wiersz 1 | „Cele” | wiersz 1 | **udowodnione** |
+| import wyników skanów JSON lub CSV | nmap XML, JSON (4 kształty), CSV z tabelą nazw kolumn; błędny wiersz nie przerywa importu | „Import / eksport” | e2e krok 13 | **udowodnione** |
+| obsługa dużych zakresów, ponad 10 000 IP | Liczenie adresów bez rozwijania listy, plan w blokach /24, zapis wsadowy. | strona przebiegu /16 | 65 535 adresów w jednym przebiegu (zrzut `47`); `TestCountLargeAndExclusions` | **udowodnione** |
+| konfiguracja skanu: okno i częstotliwość | rozdz. 3 | „Profile skanów” | e2e krok 16 | **udowodnione** |
+| ograniczanie tempa zapytań | Limit = mniejsza z wartości profilu i polityki. Jeden budżet pakietów dla wszystkich procesów nmap; HTTP: limit globalny i na host. | górny pasek: „limit 2 000 pps”; wskaźnik tempa | licznik Czujki: /16 średnio 1 091 pps przy limicie 2 000 (zrzut `47`); licznik interfejsu w laboratorium silnika: 498–504 pps przy limicie 500 (`e2e/engine/REPORT.md`); liczby pakietów z `e2e/full/transcript.txt` niepotwierdzone (przechwytywanie nie widzi surowego gniazda nmap), do powtórzenia | **gotowe** |
+| wykrywanie aktywnych hostów | wiersz 3 | „Hosty” | wiersz 3 | **udowodnione** |
+| podstawowa identyfikacja usług | wiersz 4 | „Usługi” | wiersz 4 | **udowodnione** |
+| zapis wyników do bazy lub pliku | PostgreSQL: hosty, usługi, obserwacje z historią, zmiany, znaleziska; pliki eksportu | „Hosty”, „Import / eksport” | `TestIngestInventoryAndFieldEncryption`; e2e kroki 7 i 13 | **udowodnione** |
+| porównanie dwóch skanów | wiersz 8 | „Porównaj dwa skany” | e2e krok 11 | **udowodnione** |
+| dashboard lub raport z najważniejszymi zmianami | Pulpit (wiersz 15) i raport przebiegu HTML (A4) i Markdown | „Pulpit”; przebieg → „Raport” | e2e krok 12 (`report.html` 200, `report.md` 200); zrzut `55` | **udowodnione** |
+| eksport wyników do JSON lub CSV | `/export/{hosts,services,findings,changes,signatures}.{json,csv}`, `/export/runs/{id}.{json,csv,xml}`; ochrona przed formułami w CSV; każdy eksport w audycie | przyciski „CSV” / „JSON” nad każdą listą | e2e krok 13 | **udowodnione** |
+| rozgraniczenie funkcjonalności na role | wiersze 12–13 | „Administracja” | wiersze 12–13 | **udowodnione** |
+| edycja danych skanów, wyników i konfiguracji | wiersz 14; profile, cele, polityka; notatka i etykieta przebiegu | szczegóły hosta, usługi, przebiegu | e2e krok 11; `web/REPORT-LAB.md` §3 | **udowodnione** |
+| ochrona danych (szyfrowanie) | wiersz 16 | `/healthz` | wiersz 16 | **udowodnione** |
 
 ## 5. Mile widziany dodatkowy zakres
 
-| Punkt | Co robi Czujka | Dowód | Status |
-| --- | --- | --- | --- |
-| harmonogram cyklicznych skanów | Cron i odstęp, okna, `Scheduler.Tick`. Brak adaptera `sched.Backend` w API. | `TestSchedulerTick`, `TestNextRunAndNextStart` | **w integracji** |
-| wykrywanie różnic zależnych od pory dnia | Histogram 168 kubełków (godzina tygodnia) na host, zapisywany przy każdym wyniku. Model Bayesa nadaje status `expected-offline`. | `TestHourBucket` (zapis); testy `internal/analyze`; `docs/ALGORYTMY.md` §2 | **gotowe** (zbieranie danych); **w integracji** (model) |
-| ocena „ciekawości” | Punkty 0–100 z listą powodów. | testy `internal/analyze`; `docs/ALGORYTMY.md` §5 | **w integracji** |
-| powtarzanie pomiarów dla hostów niestabilnych | Znany host, który nie odpowiada, dostaje dodatkowe próby z rosnącą przerwą; ostatnia to połączenie TCP na znane porty. | `TestRunDiscoversHostsRetriesAndReports` | **w integracji** |
-| moduł HTTP/HTTPS fingerprinting | wiersz 5 | – | **w integracji** |
-| proste wykrywanie CMS-ów lub technologii | wiersz 6 | – | **w integracji** |
-| grupowanie podobnych usług | Klucz grupy z ikony, szablonu tytułu, technologii, nazw nagłówków i skrótu treści. | testy `internal/analyze`; `GET /service-groups` | **w integracji** |
-| obsługa tagów | Tagi na celach, hostach, usługach, obserwacjach; filtr `tag`; `GET /tags`. | `TestChangesSignaturesTags` | **gotowe** |
-| eksport wybranych obserwacji do DefectDojo | Wybrane obserwacje jako findings z endpointami; drugi eksport nie tworzy duplikatów. | `docs/INTEGRACJE.md` §4 (żywa instancja 3.5.202); w produkcie → 501 | **w integracji** |
-| wizualizacja zmian w czasie | Trend na dashboardzie, mapa adresów (krzywa Hilberta), mapa cieplna tygodnia. | zrzuty na danych przykładowych | **w integracji** |
-| integracja z pasywnymi źródłami danych | Pliki (CSV, JSON, JSON Lines, strefa DNS), odwrotny DNS, crt.sh (domyślnie wyłączone). Bez trasy API i ekranu. | testy `internal/passive`; `docs/INTEGRACJE.md` §3 | **w integracji** |
+| Punkt | Co robi Czujka | Gdzie to zobaczyć | Dowód | Status |
+| --- | --- | --- | --- | --- |
+| harmonogram cyklicznych skanów | rozdz. 3 | „Profile skanów” | `web/REPORT-LAB.md` §1 | **udowodnione** |
+| wykrywanie różnic zależnych od pory dnia | Histogram 168 godzin tygodnia na host i model Bayesa: brak w porze, w której host zwykle milczy, dostaje status `expected-offline` i nie trafia do alarmów. | szczegóły hosta: „Dostępność w tygodniu”, `p_alive` | `TestStabilityScenarios` (`docs/ALGORYTMY.md` §2.6); e2e: `host_unstable` zamiast „zniknął” (krok 11); rytm na prawdziwym zegarze laboratorium czeka na `lab/story.sh` | **gotowe** |
+| ocena „ciekawości” | Punkty 0–100, zawsze z listą powodów. | „Usługi” → „Dlaczego ciekawa” | e2e: `interest=98 why=signature+40 staging+20 …` (krok 7); zrzut `44` | **udowodnione** |
+| powtarzanie pomiarów dla hostów niestabilnych | W przebiegu: dodatkowe próby znanego hosta. Po przebiegu: plan ponownych sprawdzeń jednego adresu po 10, 30, 90 min albo w godzinie, w której model spodziewa się odpowiedzi; budżet 200 adresów na godzinę; domyślnie wyłączony. | „Pulpit” i szczegóły hosta: „Plan ponownych sprawdzeń” | e2e: przebieg 2 `retried: 1` (krok 11); `internal/reprobe` (`reprobe_integration_test.go`); sprawdzenie „host_gone przez ponowne sprawdzenia” w `e2e/full/run.sh` krok 11b, zapis przebiegu w toku | **gotowe** |
+| moduł HTTP/HTTPS fingerprinting | wiersze 5a–5f | szczegóły usługi | wiersze 5a–5f | **udowodnione** |
+| proste wykrywanie CMS-ów lub technologii | wiersz 6 | „Usługi” | wiersz 6 | **udowodnione** |
+| grupowanie podobnych usług | Klucz grupy z ikony, szablonu tytułu, technologii, nazw nagłówków i skrótu treści. | `GET /service-groups`; „Usługi” | testy `internal/analyze` (`group.go`) | **gotowe** |
+| obsługa tagów | Tagi na celach, hostach, usługach, znaleziskach; filtr; `GET /tags`. | pole „Tagi” w szczegółach | e2e: tag `e2e` na usłudze przetrwał skan (krok 11) | **udowodnione** |
+| eksport wybranych obserwacji do DefectDojo | rozdz. 3, wiersz „Narzędzia integrujące się z DefectDojo” | „Znaleziska” → zaznacz → „Eksport do DefectDojo” | jak w rozdz. 3 | **częściowe** |
+| wizualizacja zmian w czasie | Mapa cieplna tygodnia, pasma życia hosta i usług, historia pól usługi, wehikuł czasu (suwak przebiegów), trend na pulpicie, mapa adresów. | szczegóły hosta i usługi; „Wehikuł czasu” | `internal/timeline` (`history_integration_test.go`); sprawdzenia wehikułu w `e2e/full/run.sh` krok 11b; zrzuty wehikułu na danych laboratorium w toku | **gotowe** |
+| integracja z pasywnymi źródłami danych | Pliki (CSV, JSON, JSON Lines, strefa DNS), odwrotny DNS, crt.sh (domyślnie wyłączone). | „Import / eksport” → źródła pasywne | e2e krok 15; zrzuty `52`–`54` | **udowodnione** |
+| (własne) reguły ekspozycji | Reguły w YAML: czego w sieci być nie może albo co musi być; sprawdzane po każdym skanie i imporcie, bez pakietów; 14 reguł startowych. | „Reguły ekspozycji”; znaleziska `policy-violation` | `internal/rules` (`rules_integration_test.go`); próba na sucho 55 ms na 2000 hostach (`docs/REGULY.md` §7); sprawdzenia w `e2e/full/run.sh` krok 11b | **gotowe** |
+| (własne) sygnatura z przykładu | Usługa → rzadkie i stałe cechy → walidator → retro-hunt. | usługa → „Zaproponuj sygnaturę” | `internal/sigsuggest` (`proof_integration_test.go`); przykład InfoKiosk w `docs/REGULY.md` §10 | **gotowe** |
 
 ## 6. Wymagania formalne i techniczne
 
-| Punkt | Stan | Status |
-| --- | --- | --- |
-| Repozytorium kodu źródłowego | to repozytorium | **gotowe** |
-| Dokumentacja techniczna | `docs/DOKUMENTACJA.md` (spis) | **gotowe** |
-| Prezentacja do 10 slajdów | W repozytorium nie ma pliku prezentacji. | **brak** |
-| Działające demo | Stos startuje jednym poleceniem (sprawdzone). Bez podłączonego silnika demo nie pokaże skanu. Nie ma scenariusza demo. | **w integracji** |
-| Technologie bezpłatne i open-source | Go, PostgreSQL (dystrybucja Percona z `pg_tde`), nmap, chi, pgx, React, Vite. Bez płatnych API. | **gotowe** |
-| Język o niskim zużyciu zasobów | Go; jedna statyczna binarka; obraz 72 MB; proces `czujka` w spoczynku 42 MiB RAM (pomiar `docker stats`) | **gotowe** |
+| Punkt | Stan | Gdzie | Status |
+| --- | --- | --- | --- |
+| Repozytorium kodu źródłowego | to repozytorium; `go build ./...` przechodzi | `README.md` | **udowodnione** |
+| Dokumentacja techniczna | spis w `docs/DOKUMENTACJA.md`; wdrożenie, bezpieczeństwo, algorytmy, sygnatury, reguły, integracje, API | `docs/` | **gotowe** |
+| Prezentacja do 10 slajdów | 10 slajdów, PDF i HTML. 5 miejsc czeka na pomiary i zrzuty (`DO UZUPEŁNIENIA`). | `docs/slides/czujka.pdf` | **częściowe** |
+| Działające demo, lokalnie lub w środowisku testowym | Stos startuje jednym poleceniem; laboratorium 70 hostów lokalnie; publiczna instancja `https://czujka.dev` z laboratorium i zaplanowanym skanem. Scenariusz i lista ujęć: `docs/DEMO.md`. Nagranie jeszcze nie powstało. | `docs/DEMO.md`; `https://czujka.dev` | **gotowe** |
+| Technologie bezpłatne i open-source | Go, PostgreSQL (Percona z `pg_tde`), nmap, chi, pgx, React, Vite. Bez płatnych API. | `go.mod`, `web/package.json` | **udowodnione** |
+| Język o niskim zużyciu zasobów | Go; obraz 107 MB (`docker images`, 2026-11-21); najwyżej 99,9 MiB pamięci kontenera w czasie skanów | `e2e/full/transcript.txt` krok 18 | **udowodnione** |
 
 ## 7. Dwanaście punktów weryfikowanych przez jury (rozdz. 6)
 
-| Nr | Punkt | Stan w scalonym kodzie | Status |
-| --- | --- | --- | --- |
-| 1 | Poprawność wykrycia aktywnych hostów | Silnik jako biblioteka. W scalonym kodzie nie ma pomiaru precyzji i czułości względem wyników referencyjnych. | **w integracji** |
-| 2 | Poprawność identyfikacji usług | `nmap -sV`, tylko TCP. Brak UDP. | **w integracji** |
-| 3 | Trafność fingerprintingu HTTP/HTTPS | Kolektor z 20 testami na lokalnych serwerach. | **w integracji** |
-| 4 | Wykrycie CMS-ów lub technologii | 386 sygnatur; część oparta na dokumentacji produktów, bez sprawdzenia na żywej instancji (`docs/SIGNATURES.md` §12). | **w integracji** |
-| 5 | Ciekawe nagłówki i ciasteczka | `headers.yaml` (20), `cookies.yaml` (11), flagi ciasteczek, zmiany `headers_changed` i `cookies_changed`. | **w integracji** |
-| 6 | Działanie customowych sygnatur | Język i walidator gotowe; trasy API → 501. Format przykładowych sygnatur organizatora nieznany. | **w integracji** |
-| 7 | Porównanie wyników między skanami | wiersz 8 | **w integracji** |
-| 8 | Hosty niestabilne lub zmieniające odpowiedź | Powtórki w silniku, model dostępności, flaga „oczekiwana” zmiana. | **w integracji** |
-| 9 | Bezpieczeństwo i ostrożność skanera | Polityka i awaryjne zatrzymanie w API: gotowe. Limity w silniku: biblioteka. | **gotowe** (polityka); **w integracji** (silnik) |
-| 10 | Czytelność dashboardu lub raportu | UI sprawdzone na danych przykładowych. Raport: przykład w `docs/samples/`. | **w integracji** |
-| 11 | Import oraz eksport danych | Import celów i eksport CSV/JSON: gotowe. Import wyników i eksport XML: 501. Import obserwacji z pliku: brak. | **gotowe** (częściowo) |
-| 12 | Rozgraniczenie funkcjonalności między role | wiersze 12–13 | **gotowe** |
+| Nr | Punkt | Stan | Gdzie to zobaczyć | Dowód | Status |
+| --- | --- | --- | --- | --- | --- |
+| 7.1 | Poprawność wykrycia aktywnych hostów | Wykrywa hosty także bez ICMP. Brak liczb precyzji i czułości względem prawdy wzorcowej 70 hostów. | „Hosty” | e2e 9 z 9 (krok 7); /16: 66 aktywnych (zrzut `47`); `docs/WYNIKI.md` w toku | **częściowe** |
+| 7.2 | Poprawność identyfikacji usług | `nmap -sV`, UDP z listy niegroźnych zapytań. Brak liczb trafności. | „Usługi” | e2e krok 7; `docs/WYNIKI.md` w toku | **częściowe** |
+| 7.3 | Trafność fingerprintingu HTTP/HTTPS | Tytuł, kod, nagłówki, ciasteczka, TLS, przekierowania. Brak liczb trafności. | szczegóły usługi | wiersze 5a–5f; `docs/WYNIKI.md` w toku | **częściowe** |
+| 7.4 | Wykrycie CMS-ów lub technologii | 386 sygnatur, wersje z dowodami. Brak liczb trafności. | „Technologie i dowody” | wiersz 6; `docs/WYNIKI.md` w toku | **częściowe** |
+| 7.5 | Ciekawe nagłówki i ciasteczka | `headers.yaml` (20), `cookies.yaml` (11), flagi ciasteczek, zmiany `headers_changed` i `cookies_changed`, reguły ekspozycji na nagłówki i ciasteczka. | „Znaleziska”, filtr `interesting-header` | e2e: znaleziska „HTTPS bez HSTS”, „Wersja oprogramowania w Server” (krok 7); zrzut `51` | **udowodnione** |
+| 7.6 | Działanie customowych sygnatur | wiersz 10 | „Sygnatury” | e2e kroki 9, 11, 14 | **udowodnione** |
+| 7.7 | Porównanie wyników między skanami | wiersze 8–9 | „Zmiany” | e2e krok 11 | **udowodnione** |
+| 7.8 | Hosty niestabilne lub zmieniające odpowiedź | Model 168 godzin, `host_unstable` zamiast fałszywego „zniknął”, plan ponownych sprawdzeń, `host_back`. Hosty `flapper`, `tod-office`, `tod-night` w laboratorium. | szczegóły hosta | e2e krok 11 (`host_unstable`); `TestStabilityScenarios`; `e2e/full/run.sh` krok 11b w toku; `go run ./e2e/watchunstable` | **gotowe** |
+| 7.9 | Bezpieczeństwo i ostrożność skanera | Tylko GET i HEAD, walidator sygnatur, limity polityki ponad profilem, okna, wykluczenia, dozwolone sieci, stop awaryjny, kontener bez roota. | górny pasek: limit, GET/HEAD, „Stop awaryjny” | e2e: wywołanie stopu 0,06 s, brak procesu nmap po 1 s, nowy przebieg odrzucony 409 (krok 17); sygnatura z POST odrzucona (krok 14); proces uid 10001 (krok 2). Liczby pakietów po stopie: do ponownego pomiaru | **udowodnione** |
+| 7.10 | Czytelność dashboardu lub raportu | Pulpit ze zdaniem na górze, raport przebiegu A4. | „Pulpit”, „Raport” | zrzuty `40`–`47`, `55`; e2e krok 12 | **udowodnione** |
+| 7.11 | Import oraz export danych | Cele, wyniki (XML, JSON, CSV), znaleziska, sygnatury; eksport każdej listy i przebiegu. | „Import / eksport” | e2e kroki 13–14; `web/REPORT-LAB.md` §3 | **udowodnione** |
+| 7.12 | Rozgraniczenie funkcjonalności między role | wiersze 12–13 | konto „Obserwator” | `TestRBACMatrixCSRFAndAudit` | **udowodnione** |
 
 ## 8. Kryteria oceny
 
-| Waga | Kryterium | Ocena stanu |
-| --- | --- | --- |
-| 30% | Skuteczność discovery i identyfikacji usług | Silnik działa jako biblioteka i narzędzie `scanprobe`. Produkt go nie wywołuje. Brak UDP. |
-| 20% | Jakość techniczna, dokumentacja, prezentacja, uruchomienie, import/eksport, DefectDojo | Start jednym poleceniem: sprawdzony. Dokumentacja: jest. Import wyników, XML i DefectDojo: biblioteki, 501 w produkcie. Prezentacja: brak. |
-| 15% | Zmiany w czasie, niestabilne hosty, raportowanie | Algorytmy z testami i pomiarami. Analiza po przebiegu niepodłączona. |
-| 15% | Bezpieczeństwo, kontrola intensywności, dashboard | Polityka, awaryjne zatrzymanie, tryb bezpieczny sygnatur: gotowe albo przetestowane. Dashboard niesprawdzony na prawdziwych danych. |
-| 10% | Fingerprinting, technologie, CMS, nagłówki, ciasteczka, sygnatury | Kolektor i 386 sygnatur jako biblioteka. W produkcie lista sygnatur jest pusta. |
-| 10% | Role i zabezpieczenie danych | Gotowe i sprawdzone. Jedna luka: surowy nagłówek `Set-Cookie`. |
+| Waga | Kryterium | Stan | Status |
+| --- | --- | --- | --- |
+| 30% | Skuteczność discovery i identyfikacji usług w dużej infrastrukturze | /16 (65 535 adresów) w 7 min 24 s przy limicie 2000 pps; 66 aktywnych hostów, 71 usług. Brak liczb precyzji i czułości (`docs/WYNIKI.md` w toku). | **częściowe** |
+| 15% | Zmiany w czasie, niestabilne hosty, raportowanie | Zmiany i porównanie udowodnione w e2e. Model rytmu, ponowne sprawdzenia, wehikuł czasu i reguły: gotowe z testami; zapis przebiegu e2e i zrzuty w toku. | **gotowe** |
+| 20% | Jakość techniczna, dokumentacja, prezentacja, uruchomienie, import/eksport, DefectDojo | Jedno polecenie; e2e 52 z 52; czujka.dev działa; import i eksport udowodnione; prezentacja z 5 miejscami do uzupełnienia; wysyłka do żywego DefectDojo z produktu bez zapisu. | **gotowe** |
+| 15% | Bezpieczeństwo, kontrola intensywności, przejrzystość dashboardu | Mechanizmy udowodnione (krok 14, 16, 17); pulpit na danych laboratorium. Liczby pakietów do ponownego pomiaru. | **gotowe** |
+| 10% | Fingerprinting, technologie, CMS, nagłówki, ciasteczka, sygnatury | 386 sygnatur, wersje z dowodami, własne sygnatury i sygnatura z przykładu. | **udowodnione** |
+| 10% | Role i zabezpieczenie danych | 4 role i własne role, 22 uprawnienia, `pg_tde` i AES-256-GCM, audyt. Kopia `pg_dump` wymaga osobnego szyfrowania. | **udowodnione** |
 
 ## 9. Jak powtórzyć sprawdzenie
 
 ```sh
-gofmt -l . ; go build ./... && go vet ./... && go test -count=1 ./...
+go build ./... && go vet ./... && go test -count=1 ./...
 make test-integration                    # testy bazy na PostgreSQL z pg_tde (docker)
+make e2e-full                            # cały produkt przez REST API, około 15 minut; zapis: e2e/full/transcript.txt
 docker compose -f deploy/docker-compose.yml up -d --build --wait
-curl -s http://127.0.0.1:8080/healthz    # pole "engine" mówi, czy silnik jest podłączony
-go run ./cmd/scanprobe -targets 127.0.0.1 -ports 8080 -pps 50
+curl -s http://127.0.0.1:8080/healthz    # "engine":true, "tde":true, "probe":{"mode":"nmap-raw"}
 ```
 
-Po podłączeniu modułów w `cmd/czujka/wire.go` statusy **w integracji** trzeba sprawdzić ponownie tymi samymi wywołaniami: trasa nie może odpowiadać 501.
+Laboratorium 70 hostów i stan startowy demo: `docs/DEMO.md` §3. Prawda wzorcowa: `lab/ground-truth/`, ocena: `go run ./e2e/score`.
