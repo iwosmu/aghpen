@@ -19,11 +19,13 @@ Instrukcja dla administratora. Polecenia z tego dokumentu zostały wykonane 2026
 
 ```sh
 git clone <adres repozytorium> czujka && cd czujka
-cp deploy/.env.example deploy/.env        # opcjonalnie: własne sekrety, patrz rozdz. 3
+make init                                 # deploy/.env: losowe hasło bazy, hasło administratora, klucz główny
 docker compose -f deploy/docker-compose.yml up -d --build --wait
 ```
 
-Skrót: `make up`. Pierwsze budowanie pobiera obrazy i zależności. Kolejne starty trwają kilkanaście sekund.
+Skrót: `make up`. `make init` drukuje raz hasło administratora i nie nadpisuje istniejącego `deploy/.env` (`FORCE=1` nadpisuje; stary klucz główny jest wtedy stracony). Zrób kopię `deploy/.env` poza maszyną.
+
+CZAS_OD_KLONU
 
 Stos startuje także bez `deploy/.env`. Wtedy:
 
@@ -46,6 +48,33 @@ curl -s http://127.0.0.1:8080/healthz
 | --- | --- | --- | --- |
 | `db` | `deploy/db`: PostgreSQL 17 (Percona) z `pg_tde` | sieć `internal`, bez portu na hoście | `czujka-pgdata` (dane), `czujka-tde-keys` (klucze `pg_tde`) |
 | `czujka` | `deploy/Dockerfile`: binarka Go, interfejs WWW, nmap 7.97, Alpine | sieci `internal` i `scan`; `127.0.0.1:8080` | `czujka-keys` (klucz główny) |
+
+### 2.1 Sprawdzenie instalacji: `czujka doctor`
+
+```sh
+docker compose -f deploy/docker-compose.yml exec czujka czujka doctor     # albo --json
+```
+
+Polecenie sprawdza: połączenie z bazą, `pg_tde` (zaszyfrowane tabele i WAL), klucz główny (czy pasuje do danych), nmap i jego wersję (co najmniej 7.80), gniazda surowe (SYN, ICMP, ARP), DNS, wolne miejsce na dysku, `pg_dump` i `pg_restore` oraz trasę do sieci włączonych zakresów (bez wysyłania pakietów). Przy każdym błędzie drukuje poprawkę po polsku. Kod wyjścia jest różny od zera, gdy któraś kontrola ma stan `fail`. Administrator widzi ten sam raport w API: `GET /api/v1/doctor`.
+
+### 2.2 Instalacja offline: `make bundle`
+
+`make bundle` tworzy `dist/czujka-bundle-<wersja>.tar.gz`: oba obrazy (`docker save`), pliki compose bez sekcji budowania, `.env.example`, `init.sh`, `install.sh` i instrukcję `CZYTAJ.txt`. Na maszynie docelowej wystarczy Docker z wtyczką compose, bez dostępu do rejestru obrazów:
+
+```sh
+tar -xzf czujka-bundle-<wersja>.tar.gz && cd czujka-bundle-<wersja>
+sh install.sh      # docker load, .env z losowymi sekretami, start stosu, czujka doctor
+```
+
+DOWOD_PACZKI
+
+### 2.3 Bez kontenerów: `make release`
+
+`make release` buduje statyczne binarki linux/amd64 i linux/arm64 z wbudowanym interfejsem (`dist/release/`). Każde archiwum zawiera jednostkę systemd, plik zmiennych i instrukcję instalacji: [`deploy/systemd/README.md`](../deploy/systemd/README.md).
+
+### 2.4 Ciągła integracja
+
+`.github/workflows/ci.yml`: gofmt, build, vet i testy jednostkowe Go; testy integracyjne na PostgreSQL 17 z `pg_tde` w kontenerze; typecheck, lint, testy i build interfejsu; budowa obrazu produktu.
 
 Kilka instalacji na jednej maszynie: dodaj `-p <nazwa>` i inny port, na przykład `CZUJKA_PORT=18480 docker compose -p czujka-test -f deploy/docker-compose.yml up -d --build --wait`. Nazwy kontenerów i wolumenów dostają wtedy przedrostek `czujka-test`.
 
@@ -135,7 +164,7 @@ docker compose -f deploy/docker-compose.yml exec -T czujka \
 # user analityk@example.org created with role analyst (id 3)
 ```
 
-Bez `--password` polecenie drukuje losowe hasło. Polecenia binarki: `serve`, `migrate`, `user create`, `rotate-key`, `genkey`, `healthcheck`, `version`.
+Bez `--password` polecenie drukuje losowe hasło. Polecenia binarki: `serve`, `migrate`, `user create`, `rotate-key`, `genkey`, `healthcheck`, `doctor`, `backup`, `restore`, `version`.
 
 ## 5. Dostęp z innych maszyn
 
@@ -145,7 +174,24 @@ Domyślnie interfejs słucha tylko na `127.0.0.1` i bez TLS. Dla dostępu z siec
 2. Ustaw `CZUJKA_TRUST_PROXY=true` i `CZUJKA_COOKIE_SECURE=true`.
 3. Nie ustawiaj `CZUJKA_BIND=0.0.0.0` bez TLS: hasła i ciasteczko sesji szłyby jawnie.
 
-### 5.1 Instancja publiczna: zabezpieczenia
+### 5.1 Skan sieci lokalnej a tablica sąsiadów jądra
+
+Skan adresów w tej samej podsieci co interfejs skanera tworzy wpis ARP dla każdego sondowanego adresu, także cichego. Limit tablicy sąsiadów (`net.ipv4.neigh.default.gc_thresh1/2/3`, domyślnie 128/512/1024) jest wspólny dla całego hosta, także dla kontenerów. Po przepełnieniu jądro loguje `neighbour: arp_cache: neighbor table overflow!` i usuwa wpisy samego hosta. Wtedy host przestaje m.in. rozwiązywać nazwy DNS, a skan gubi hosty.
+
+`czujka doctor` (kontrola `neighbour_table`) porównuje `gc_thresh3` z liczbą adresów w sieci lokalnej skanera w największym włączonym zakresie i drukuje gotowe wartości. Dla zakresu /16 skanowanego bezpośrednio, na hoście (nie w kontenerze):
+
+```sh
+cat <<'EOF' | sudo tee /etc/sysctl.d/90-czujka-neigh.conf
+net.ipv4.neigh.default.gc_thresh1 = 32768
+net.ipv4.neigh.default.gc_thresh2 = 131072
+net.ipv4.neigh.default.gc_thresh3 = 262144
+EOF
+sudo sysctl --system
+```
+
+`install.sh` z paczki offline proponuje zapisanie tego pliku, gdy limit jest mniejszy (`CZUJKA_WRITE_SYSCTL=t` bez pytania). Skan przez bramę (cele poza siecią lokalną) nie zapełnia tej tablicy.
+
+### 5.2 Instancja publiczna: zabezpieczenia
 
 - **Blokada operatora.** Ustaw `CZUJKA_ALLOWED_NETWORKS` na sieci, które wolno skanować, np. `10.91.0.0/16,127.0.0.1`. To twarda granica wdrożenia. Cel poza nią jest odrzucany przy wpisie do zakresu, w skanie doraźnym, w ponownym sondowaniu i przy planowaniu przebiegu. Nazwa domenowa przechodzi tylko wtedy, gdy każdy jej adres leży w blokadzie. Administrator może zawęzić `allowed_networks` w polityce bezpieczeństwa, ale nie może jej poszerzyć poza blokadę (odpowiedź 422). Polityka w `GET /settings/safety` pokazuje blokadę w polu `operator_networks`. Skradziona sesja administratora nie skieruje więc skanera w internet.
 - **Ograniczenie logowania.** Z jednego adresu klienta: 20 prób na minutę (`CZUJKA_LOGIN_RATE_PER_MIN`), potem 429. Na jedno konto: 5 nieudanych prób (`CZUJKA_LOGIN_MAX_FAILURES`) blokuje konto na 15 minut (`CZUJKA_LOGIN_LOCKOUT`), z każdego adresu. Za serwerem pośredniczącym adres klienta to ostatni wpis `X-Forwarded-For`, więc podrobiony nagłówek od klienta nie omija limitu. Uwaga: blokada konta działa też przeciw atakującemu, który zna adres e-mail. Na instancji publicznej nie używaj domyślnego `admin@czujka.local`.
@@ -155,37 +201,42 @@ Sprawdzenie na prawdziwym stosie: `./e2e/lock/run.sh` (19 kontroli: blokada oper
 
 ## 6. Kopia zapasowa i odtwarzanie
 
-Do odtworzenia potrzebne są **dwie rzeczy**: zrzut bazy i klucz główny. Bez klucza głównego pola szyfrowane (notatki, dowody, wartości ciasteczek, klucz API DefectDojo) są stracone.
+`czujka backup` zapisuje jedno zaszyfrowane archiwum z całą bazą. `czujka restore` odtwarza je do pustej bazy. Do odtworzenia potrzebne są **dwie rzeczy**: archiwum i klucz główny. Bez klucza głównego archiwum się nie otworzy.
 
 ### 6.1 Kopia
 
 ```sh
-# 1. zrzut logiczny bazy
-docker compose -f deploy/docker-compose.yml exec -T db \
-  pg_dump -h 127.0.0.1 -U czujka -d czujka --clean --if-exists > czujka-backup.sql
-
-# 2. klucz główny (gdy jest w pliku; gdy jest w deploy/.env, skopiuj wartość CZUJKA_MASTER_KEY)
-docker compose -f deploy/docker-compose.yml exec -T czujka cat /var/lib/czujka/master.key > czujka-master.key
-chmod 600 czujka-master.key
+docker compose -f deploy/docker-compose.yml exec czujka czujka backup
+# backup: /var/lib/czujka/backups/czujka-20261121-145951.czbk (0.1 MiB, 49ms), master key dcad22502f9f, ...
+docker compose -f deploy/docker-compose.yml cp czujka:/var/lib/czujka/backups/. ./kopie/
 ```
 
-**Zrzut jest jawny.** `pg_dump` czyta dane już odszyfrowane przez `pg_tde`. Sprawdzone: zrzut zawiera adresy e-mail użytkowników tekstem; kolumny warstwy 2 pozostają szyfrogramami (`czk1.…`). Zaszyfruj plik (na przykład `age` albo `gpg`) i trzymaj klucz główny osobno od zrzutu.
+Opcja `-o PLIK` wybiera plik (`-o -`: standardowe wyjście). Klucz główny trzymaj osobno od archiwum: w `deploy/.env` (`CZUJKA_MASTER_KEY`) albo w pliku `/var/lib/czujka/master.key`.
+
+Jak to działa:
+
+- W środku jest `pg_dump` w formacie custom, bez rozszerzenia `pg_tde` (baza docelowa ma własne). Tabele zachowują metodę dostępu `tde_heap`.
+- Archiwum jest szyfrowane AES-256-GCM w porcjach po 1 MiB. Klucz archiwum powstaje z klucza głównego (HKDF-SHA256, losowa sól dla każdego archiwum).
+- Każda porcja jest związana z nagłówkiem, swoją pozycją i znacznikiem ostatniej porcji. Archiwum ucięte, zmienione albo przedłużone nie otworzy się.
+- Archiwum nie zawiera jawnego tekstu. Sprawdzone: nazwa hosta, baner usługi i klucz API DefectDojo nie występują w pliku.
+- Po rotacji klucza (rozdz. 7) stary klucz w `CZUJKA_MASTER_KEY_OLD` lub `master.key.old` nadal otwiera starsze archiwa.
 
 ### 6.2 Odtworzenie
 
 ```sh
 docker compose -f deploy/docker-compose.yml stop czujka
-docker compose -f deploy/docker-compose.yml exec -T db \
-  psql -h 127.0.0.1 -U czujka -d czujka -v ON_ERROR_STOP=1 -q < czujka-backup.sql
+docker compose -f deploy/docker-compose.yml run --rm --no-deps -v "$PWD/kopie:/backup:ro" czujka restore -i /backup/<plik>.czbk --force
 docker compose -f deploy/docker-compose.yml start czujka
-curl -s http://127.0.0.1:8080/healthz
 ```
 
-Sprawdzone: po odtworzeniu `/healthz` pokazuje `"db":"ok"` i 21 zaszyfrowanych tabel, a zakresy i cele są na miejscu. Tabele wracają do `tde_heap`, bo zrzut zapisuje metodę dostępu.
+- Bez `--force` polecenie odmawia, gdy baza ma już tabele Czujki. `--force` usuwa je przed odtworzeniem (rozszerzenie `pg_tde` zostaje).
+- Archiwum z innym kluczem głównym jest odrzucane przed jakąkolwiek zmianą w bazie.
+- `pg_restore` działa w jednej transakcji: błąd zostawia bazę bez zmian.
+- Po odtworzeniu polecenie porównuje liczby wierszy z manifestem archiwum, sprawdza klucz główny na polach szyfrowanych i stan `pg_tde`.
 
-Na nowej maszynie: najpierw uruchom stos (powstanie pusta baza z `pg_tde`), ustaw `CZUJKA_MASTER_KEY` w `deploy/.env` na wartość z kopii, potem wykonaj kroki powyżej. Ten wariant nie był uruchomiony w tym sprawdzeniu.
+Na nowej maszynie: ustaw w `deploy/.env` ten sam `CZUJKA_MASTER_KEY`, uruchom stos (powstanie pusta baza z `pg_tde`), potem wykonaj kroki powyżej.
 
-Kopia wolumenów zamiast zrzutu wymaga wszystkich trzech wolumenów naraz (`czujka-pgdata`, `czujka-tde-keys`, `czujka-keys`) przy zatrzymanym stosie. Nie była sprawdzona.
+Sprawdzone na dwóch czystych stosach (`deploy/e2e/backup-restore.sh`, 11 kontroli): dane stosu A (zakres, host wpisany ręcznie, import nmap, obserwacje, klucz API DefectDojo) wracają w stosie B. Administrator stosu A loguje się w B. `pg_tde` szyfruje 23 z 23 tabel. `czujka doctor` w B pokazuje `ok` dla bazy, `pg_tde` i klucza. Odtworzenie z innym kluczem głównym jest odrzucone, a baza B zostaje pusta.
 
 ## 7. Rotacja klucza głównego
 
@@ -218,7 +269,7 @@ Rotacja opakowuje na nowo tylko klucze danych, więc jest szybka. Przerwaną rot
 ## 8. Aktualizacja
 
 ```sh
-# najpierw kopia z rozdz. 6
+docker compose -f deploy/docker-compose.yml exec czujka czujka backup   # kopia z rozdz. 6
 git pull
 docker compose -f deploy/docker-compose.yml up -d --build --wait
 curl -s http://127.0.0.1:8080/healthz
@@ -274,6 +325,7 @@ go run ./cmd/scanprobe -targets 127.0.0.1 -ports 8080 -pps 50
 | Odpowiedź `501 not_wired` | moduł nie jest podłączony w tej wersji binarki | `docs/ZGODNOSC.md`; `/healthz` pole `engine` |
 | Po zalogowaniu przez HTTP z innej maszyny sesja nie działa | `CZUJKA_COOKIE_SECURE=true` bez TLS | użyj TLS (rozdz. 5) |
 | Skan nie widzi hostów laboratorium | kontener nie jest w sieci laboratorium | rozdz. 9 |
+| Nie wiem, co jest nie tak z instalacją | | `czujka doctor` (rozdz. 2.1): każda kontrola z poprawką po polsku |
 
 Logi: `docker compose -f deploy/docker-compose.yml logs -f czujka` (JSON, jeden wpis na wiersz).
 
