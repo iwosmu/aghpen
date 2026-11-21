@@ -37,7 +37,7 @@ function RunServices({ run, live }: { run: ScanRun; live: boolean }) {
   const hosts = [...new Set(items.map((s) => s.host_id))];
   const anyTime = items.some((s) => s.response_ms !== undefined);
   return (
-    <Panel title={t('Usługi znalezione w tym przebiegu', 'Services found in this run')} count={q.data?.total} flush
+    <Panel title={t('Usługi znalezione w tym przebiegu', 'Services found in this run')} count={q.data ? q.data.total - carried : undefined} flush
       actions={hosts.length === 1 ? <Link to={'/hosts/' + hosts[0]} className="link">{t('Host', 'Host')} <span className="mono">{items[0].ip}</span></Link> : undefined}>
       {q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : !q.data ? <SkeletonRows rows={5} /> : items.length === 0 ? (
         <p className="p-3 text-sm text-ink-2" data-testid="run-services-empty">{live ? t('Czekam na pierwsze otwarte porty…', 'Waiting for the first open ports…') : t('Ten przebieg nie znalazł otwartej usługi.', 'This run found no open service.')}</p>
@@ -67,7 +67,7 @@ function RunServices({ run, live }: { run: ScanRun; live: boolean }) {
               ))}
             </tbody>
           </table>
-          {carried > 0 ? <p className="border-t border-rule px-3 py-2 text-xs text-ink-3" data-testid="run-services-carried">{carried} {plural(carried, ['usługa', 'usługi', 'usług'], ['service', 'services'])} {t('na końcu listy: ten przebieg nie sprawdzał ich portów, stan pochodzi z ostatniej obserwacji.', 'at the end of the list: this run did not check their ports; the state comes from the last observation.')}</p> : null}
+          {carried > 0 ? <p className="border-t border-rule px-3 py-2 text-xs text-ink-3" data-testid="run-services-carried">{t('Nie skanowane w tym przebiegu', 'Not scanned in this run')}: {carried} {t('(na końcu listy). Ten skan nie sprawdzał tych portów, więc stan pochodzi z ostatniej obserwacji.', '(at the end of the list). This scan did not check these ports, so the state comes from the last observation.')}</p> : null}
         </div>
       )}
     </Panel>

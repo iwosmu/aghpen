@@ -254,3 +254,12 @@ Received body of the run (shortened `text`):
 ```
 
 Limits seen: `finished_at` is `null` in the run message (backend, reported to the integrator). The changes of run #4 are a lab artefact: after a container restart Czujka rejoined `czui-lab` without a fixed IP and took .3, so .14 went missing and .3 "came back" with port 8080 (Czujka itself); `lab-cache` could not start on its taken IP. The webhook delivery and the signature do not depend on that.
+
+## 17. Services not scanned in a run (carried, backend 736ff9a)
+
+Dind jury machine with the backend of iwosmu/czujka-core 736ff9a, UI of this branch (vite against the dind API). Lab `czui-lab` 172.30.6.0/28: nginx on .2:80, `python -m http.server 47123` on .3 (a port only the full-range pass finds).
+
+- /28: run #1 (default profile, full range) found 5 services, 47123 included. Run #2 with ports `80` only: `/services?run_id=2` and `/timeline/at/services?run_id=2` give `carried: true` for 4 rows and no `carried` (or `false`) for :80. No change rows: nothing is reported gone.
+- One host 172.30.6.3 (the run page shows its service table only for runs of at most 4 addresses): run #3 full range, run #4 ports `80`: the only row, 47123/tcp, is `carried`.
+
+UI: the run table shows "nie skanowany w tym przebiegu" (EN "not scanned in this run") in place of the state, dims the row, puts it at the end, shows no response time, and the panel count leaves it out ("Usługi znalezione w tym przebiegu 0"). A line under the table says "Nie skanowane w tym przebiegu: 1 (na końcu listy)…". The time machine keeps the state then ("otwarta") with the same text under it and dims the row; :80 of the same run stays normal. Screenshots: `carried-run-pl`, `carried-run-en`, `carried-run-pl-390`, `carried-timemachine-pl/en/pl-390`.
