@@ -133,6 +133,10 @@ type Target struct {
 	Addresses int64      `json:"addresses"`
 	CreatedAt time.Time  `json:"created_at"`
 	CreatedBy *int64     `json:"created_by"`
+	// MapsTo is the address the target is scanned as, set only when it differs
+	// from Value: a loopback target (localhost, 127.x, ::1) scanned as the
+	// docker host when Czujka runs in a container. Computed, not stored.
+	MapsTo string `json:"maps_to,omitempty"`
 }
 
 // TargetPreview is the answer of POST /targets/preview and of an import dry run.
@@ -749,6 +753,11 @@ type Service struct {
 	LastChanged  *time.Time          `json:"last_changed"`
 	Overrides    map[string]Override `json:"overrides"`
 	Latest       *ServiceObservation `json:"latest,omitempty"` // only on GET /services/{id}
+	// ResponseMs is the HTTP response time of the latest observation in ms;
+	// nil for a service without an HTTP answer. ResponseSlow: that time is
+	// slow against the service's own baseline (analyze.ResponseSeries).
+	ResponseMs   *int `json:"response_ms"`
+	ResponseSlow bool `json:"response_slow"`
 }
 
 type InterestReason struct {
@@ -800,6 +809,16 @@ const (
 	ChangeContent        ChangeKind = "content_changed" // body differs strongly (simhash distance)
 	ChangeRedirect       ChangeKind = "redirect_changed"
 	ChangeClass          ChangeKind = "class_changed" // for example became an admin panel
+	// ChangeServiceReturned: a service reported gone (or missing from the
+	// previous run) is open again. Before holds {state, last_open_run_id,
+	// last_open_at, away_seconds, runs_away}; After is "open".
+	ChangeServiceReturned ChangeKind = "service_returned"
+	// ChangeResponseSlower: the HTTP response time is clearly above the
+	// service's own baseline, or HTTP stopped answering while the port is
+	// open. Before {baseline_ms, ms}; After {ms} or {ms: null, error: "no_answer"}.
+	ChangeResponseSlower ChangeKind = "response_slower"
+	// ChangeResponseRecovered: a slow service answers in normal time again.
+	ChangeResponseRecovered ChangeKind = "response_recovered"
 )
 
 type Severity string
@@ -840,6 +859,9 @@ type RunDiffSummary struct {
 	ServicesNew     int    `json:"services_new"`
 	ServicesGone    int    `json:"services_gone"`
 	ServicesChanged int    `json:"services_changed"`
+	// ServicesReturned counts service_returned; ResponsesSlower counts response_slower.
+	ServicesReturned int `json:"services_returned"`
+	ResponsesSlower  int `json:"responses_slower"`
 	// HostsMissing counts host_missing changes. ServicesUnreachable counts
 	// the open services of silent hosts that are not reported inactive yet:
 	// they are unknown in this run, not gone.

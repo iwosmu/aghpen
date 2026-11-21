@@ -39,6 +39,7 @@ import (
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/runner"
 	"github.com/iwosmu/aghpen/internal/store"
+	"github.com/iwosmu/aghpen/internal/targets"
 )
 
 var version = "dev"
@@ -223,6 +224,8 @@ func serve() error {
 	} else if seeded {
 		log.Info("first start: stored the default safety policy and the default scan profile")
 	}
+
+	startHostGateway(ctx, cfg.HostGateway, log)
 
 	bus := runner.NewBus()
 	w := wire2(cfg, st, log)
@@ -495,4 +498,38 @@ func writeKeyFile(path, key string) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+// startHostGateway sets the address loopback targets are scanned as
+// (targets.SetHostGateway). In a container the docker host's DNS name may
+// answer a little after the start: it is retried for a minute.
+func startHostGateway(ctx context.Context, setting string, log *slog.Logger) {
+	in := targets.InContainer()
+	try := func() bool {
+		gw, err := targets.ResolveHostGateway(ctx, setting, in, nil)
+		if err != nil {
+			log.Warn("host gateway not resolved: localhost targets scan this container", "setting", setting, "err", err)
+			return false
+		}
+		targets.SetHostGateway(gw)
+		if gw.IsValid() {
+			log.Info("loopback targets (localhost, 127.x, ::1) are scanned as the docker host", "host_gateway", gw.String())
+		}
+		return true
+	}
+	if try() {
+		return
+	}
+	go func() {
+		for i := 0; i < 12; i++ {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+			}
+			if try() {
+				return
+			}
+		}
+	}()
 }

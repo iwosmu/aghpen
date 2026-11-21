@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"net/netip"
 	"os"
 	"strconv"
@@ -38,6 +39,16 @@ type Config struct {
 	// addresses). The operator lock: a hard upper bound on what can be
 	// scanned that no user can widen. Empty: no lock.
 	AllowedNetworks []string
+	// HostGateway: CZUJKA_HOST_GATEWAY. The address the loopback targets
+	// (localhost, 127.x, ::1) are scanned as when Czujka runs in a container.
+	// Empty: the IPv4 address of host.docker.internal (in a container only);
+	// "off": loopback stays loopback; a literal IPv4 address overrides.
+	HostGateway string
+	// PublishedPort: CZUJKA_PUBLISHED_PORT, the port the docker host publishes
+	// the UI on (CZUJKA_PORT of the compose file). The service on that port of
+	// the docker host is Czujka itself and gets the tag "czujka". 0: the port
+	// of CZUJKA_LISTEN.
+	PublishedPort int
 }
 
 // Load reads the configuration from the process environment.
@@ -57,6 +68,7 @@ func FromEnv(get func(string) string) (Config, error) {
 		Timezone:      str(get, "CZUJKA_TZ", "Europe/Warsaw"),
 		CookieSecure:  strings.ToLower(str(get, "CZUJKA_COOKIE_SECURE", "auto")),
 		LogFormat:     strings.ToLower(str(get, "CZUJKA_LOG_FORMAT", "json")),
+		HostGateway:   strings.TrimSpace(get("CZUJKA_HOST_GATEWAY")),
 	}
 	for _, k := range strings.Split(get("CZUJKA_MASTER_KEY_OLD"), ",") {
 		if k = strings.TrimSpace(k); k != "" {
@@ -81,6 +93,14 @@ func FromEnv(get func(string) string) (Config, error) {
 	}
 	if c.SchedInterval, err = dur(get, "CZUJKA_SCHED_INTERVAL", 20*time.Second); err != nil {
 		return c, err
+	}
+	if c.PublishedPort, err = num(get, "CZUJKA_PUBLISHED_PORT", 0); err != nil {
+		return c, err
+	}
+	if c.PublishedPort == 0 {
+		if _, p, err := net.SplitHostPort(c.Listen); err == nil {
+			c.PublishedPort, _ = strconv.Atoi(p)
+		}
 	}
 	for _, n := range strings.Split(get("CZUJKA_ALLOWED_NETWORKS"), ",") {
 		if n = strings.TrimSpace(n); n == "" {

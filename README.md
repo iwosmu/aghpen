@@ -34,6 +34,25 @@ Ostatnie polecenie pokazuje login (`admin@czujka.local`) i losowe hasło pierwsz
 
 Skanuj tylko sieci, do których masz uprawnienia.
 
+## Test na szablonie organizatorów
+
+Szablon `lab/jury` to jedna maszyna z usługami w Dockerze na portach hosta. Czujka działa w kontenerze, więc cel `localhost` (także `127.0.0.1` i `::1`) skanuje hosta dockera (`host.docker.internal`), a nie własny kontener. Podgląd celu pokazuje adres, pod którym cel jest skanowany. Szablon zajmuje port 8080, dlatego Czujka dostaje port 9180.
+
+```sh
+git clone <adres repozytorium> czujka && cd czujka
+CZUJKA_PORT=9180 docker compose -f deploy/docker-compose.yml up -d --build --wait
+CZUJKA_PORT=9180 docker compose -f deploy/docker-compose.yml logs czujka | grep -A3 "first administrator"
+cd lab/jury && ./quickstart.sh up
+```
+
+1. Otwórz `http://127.0.0.1:9180` i zaloguj się danymi z logu.
+2. W kreatorze wpisz cel `localhost`. W profilu skanowania (ekran „Profile”) ustaw porty szablonu: `21,80,81,443,2223,3001,5673,6379,8080,8081,8085,8086,8088,8089,8090,8474,8787,8888,15432,15673,21000-21010` (dla samego quickstartu wystarczy `2223,3001,5673,8787,15673`). Na komputerze z innymi programami nie skanuj `localhost` pełnym zakresem portów: sondy wykrywania wersji trafiają wtedy także w lokalne usługi tych programów.
+3. Uruchom skan. Wykonaj `./quickstart.sh change`, skanuj drugi raz: „Usługa …:8787 zniknęła”. Wykonaj `./quickstart.sh up`, skanuj trzeci raz: „Usługa …:8787 wróciła” z czasem nieobecności i liczbą skanów bez niej.
+
+Czas odpowiedzi: Czujka zapisuje czas odpowiedzi HTTP każdej usługi i porównuje go z jej własną bazą (mediana ostatnich 5 pomiarów). Odpowiedź co najmniej 2 razy wolniejsza i dłuższa o co najmniej 300 ms to zmiana „Wolniejsza odpowiedź”. Powrót do normy to „Odpowiedź w normie”. Na stosie `modern-proxy` skanuj raz bez opóźnienia i raz z `ENABLE_LATENCY=true` w `.env`. Port otwarty, na którym HTTP nie odpowiada w czasie, to „HTTP nie odpowiedział”, a nie zniknięcie usługi.
+
+Usługa Czujki na porcie 9180 hosta dockera ma tag `czujka` i nie daje znalezisk. Na Linuksie można też uruchomić Czujkę w sieci hosta (`deploy/docker-compose.host-network.yml`, [`docs/WDROZENIE.md`](docs/WDROZENIE.md) §2.5).
+
 ## Teza: skaner, który rozumie czas
 
 | Funkcja | Co daje | Szczegóły |

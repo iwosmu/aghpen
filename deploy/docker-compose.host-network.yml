@@ -1,0 +1,35 @@
+# Linux only: Czujka in the network namespace of the host (network_mode: host).
+#
+# Czujka then reaches 127.0.0.1 of the machine and every docker bridge network
+# on it directly (for example the frontend and backend networks of the
+# organisers' template), with no port publishing and no address mapping.
+# localhost stays localhost (CZUJKA_HOST_GATEWAY=off). The UI listens on
+# CZUJKA_BIND:CZUJKA_PORT of the host itself. The database keeps its own
+# network and is reachable from the host on 127.0.0.1:CZUJKA_DB_HOST_PORT only.
+#
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.host-network.yml up -d --wait
+#
+# Docker Desktop (macOS, Windows) has no real host network: use the default
+# file there; it scans localhost as the docker host (host.docker.internal).
+# Needs Docker Compose 2.24 or newer (!reset).
+services:
+  db:
+    networks: [internal, dbhost]
+    ports:
+      - "127.0.0.1:${CZUJKA_DB_HOST_PORT:-55432}:5432"
+
+  czujka:
+    network_mode: host
+    networks: !reset []
+    ports: !reset []
+    extra_hosts: !reset []
+    environment:
+      CZUJKA_DB_URL: postgres://czujka:${CZUJKA_DB_PASSWORD:-czujka-internal-network-only}@127.0.0.1:${CZUJKA_DB_HOST_PORT:-55432}/czujka?sslmode=disable
+      CZUJKA_LISTEN: ${CZUJKA_BIND:-127.0.0.1}:${CZUJKA_PORT:-8080}
+      CZUJKA_HOST_GATEWAY: "off"
+      CZUJKA_PUBLISHED_PORT: ${CZUJKA_PORT:-8080}
+
+networks:
+  # A plain bridge for the published database port: the internal network has
+  # no published ports by design.
+  dbhost: {}

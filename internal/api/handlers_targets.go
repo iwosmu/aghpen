@@ -9,6 +9,7 @@ import (
 
 	"github.com/iwosmu/aghpen/internal/model"
 	"github.com/iwosmu/aghpen/internal/runner"
+	"github.com/iwosmu/aghpen/internal/targets"
 )
 
 func (s *Server) listScopes(w http.ResponseWriter, r *http.Request) {
@@ -127,6 +128,9 @@ func (s *Server) listTargets(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	for i := range page.Items {
+		page.Items[i].MapsTo = targets.MapsTo(page.Items[i].Value)
+	}
 	writeJSON(w, http.StatusOK, page)
 }
 
@@ -225,6 +229,9 @@ func (s *Server) saveTargets(r *http.Request, scopeID int64, p model.TargetPrevi
 	saved, dup, err := s.st.AddTargets(r.Context(), scopeID, p.Valid, userID(r))
 	if err != nil {
 		return p, err
+	}
+	for i := range saved {
+		saved[i].MapsTo = targets.MapsTo(saved[i].Value)
 	}
 	p.Valid = saved
 	p.Duplicates += dup
@@ -403,6 +410,7 @@ func (s *Server) updateTarget(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	t.MapsTo = targets.MapsTo(t.Value)
 	writeJSON(w, http.StatusOK, t)
 }
 
