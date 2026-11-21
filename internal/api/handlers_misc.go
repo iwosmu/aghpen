@@ -393,6 +393,27 @@ func (s *Server) getDojo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, d)
 }
 
+var errDojoKeyHost = invalid("api_key: the stored API key is used only with the stored DefectDojo address; send the API key for the new address")
+
+// sameOrigin reports whether two URLs have the same scheme, host and port.
+func sameOrigin(a, b string) bool {
+	ua, err1 := url.Parse(strings.TrimSpace(a))
+	ub, err2 := url.Parse(strings.TrimSpace(b))
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	port := func(u *url.URL) string {
+		if p := u.Port(); p != "" {
+			return p
+		}
+		if strings.EqualFold(u.Scheme, "http") {
+			return "80"
+		}
+		return "443"
+	}
+	return strings.EqualFold(ua.Scheme, ub.Scheme) && strings.EqualFold(ua.Hostname(), ub.Hostname()) && port(ua) == port(ub)
+}
+
 func checkDojo(d *model.DefectDojoSettings) error {
 	d.URL = strings.TrimRight(strings.TrimSpace(d.URL), "/")
 	if d.URL != "" {
@@ -422,11 +443,17 @@ func (s *Server) putDojo(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	prevURL, keySet := in.URL, in.APIKeySet
 	if !decode(w, r, &in) {
 		return
 	}
 	if err := checkDojo(&in); err != nil {
 		s.fail(w, r, err)
+		return
+	}
+	if keySet && in.APIKey == "" && prevURL != "" && !sameOrigin(prevURL, in.URL) {
+		// The stored key would go to the new host at the next export (security review L1).
+		s.fail(w, r, errDojoKeyHost)
 		return
 	}
 	if in.ScopeMappings == nil {
@@ -462,12 +489,19 @@ func (s *Server) testDojo(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if in.APIKey == "" {
-		in.APIKey = stored.APIKey // test the stored key when the form sends none
-	}
 	if err := checkDojo(&in); err != nil {
 		s.fail(w, r, err)
 		return
+	}
+	if in.APIKey == "" {
+		// Test the stored key when the form sends none, but only against the
+		// stored host: the key must not go to an address from the request
+		// (security review L1).
+		if stored.URL != "" && !sameOrigin(stored.URL, in.URL) {
+			s.fail(w, r, errDojoKeyHost)
+			return
+		}
+		in.APIKey = stored.APIKey
 	}
 	auditSet(r, "integration.defectdojo.test", "integration", "defectdojo", map[string]any{"url": in.URL})
 	if s.d.Dojo == nil {
