@@ -224,6 +224,7 @@ services:
       LAB_URL: "http://10.66.1.10"
       LAB_TITLE: "Wydział Informatyki AGH (lab)"
       LAB_ADMIN_PASSWORD: "Lab-Admin-Pass-2026!"
+      WORDPRESS_CONFIG_EXTRA: "define('AUTOMATIC_UPDATER_DISABLED', true); define('WP_AUTO_UPDATE_CORE', false);"
     mem_limit: 256m
     depends_on:
       mariadb:
@@ -256,6 +257,7 @@ services:
       LAB_URL: "http://10.66.1.11"
       LAB_TITLE: "Blog Koła Naukowego"
       LAB_ADMIN_PASSWORD: "Lab-Admin-Pass-2026!"
+      WORDPRESS_CONFIG_EXTRA: "define('AUTOMATIC_UPDATER_DISABLED', true); define('WP_AUTO_UPDATE_CORE', false);"
     mem_limit: 256m
     depends_on:
       mariadb:
@@ -290,6 +292,7 @@ services:
       LAB_URL: "http://10.66.1.11"
       LAB_TITLE: "Blog Koła Naukowego"
       LAB_ADMIN_PASSWORD: "Lab-Admin-Pass-2026!"
+      WORDPRESS_CONFIG_EXTRA: "define('AUTOMATIC_UPDATER_DISABLED', true); define('WP_AUTO_UPDATE_CORE', false);"
     mem_limit: 256m
     depends_on:
       mariadb:

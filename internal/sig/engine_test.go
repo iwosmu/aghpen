@@ -489,3 +489,18 @@ func TestPathsForPrefersCustomSignatures(t *testing.T) {
 		t.Errorf("PathsFor = %v, want /wp-login.php before the custom path, both inside the budget", got)
 	}
 }
+
+func TestNmapProductNameJoinsKnownTechnology(t *testing.T) {
+	known := func(n string) bool { return n == "Grafana" || n == "Apache HTTP Server" }
+	for in, want := range map[string]string{
+		"Grafana http":           "Grafana",
+		"Grafana":                "Grafana",
+		"Apache HTTP Server":     "Apache HTTP Server",
+		"Jenkins httpd":          "Jenkins httpd", // no Jenkins signature hit: kept as nmap says
+		"Golang net/http server": "Golang net/http server",
+	} {
+		if got := nmapProductName(in, known); got != want {
+			t.Errorf("%q -> %q, want %q", in, got, want)
+		}
+	}
+}

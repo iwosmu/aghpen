@@ -47,6 +47,10 @@ func wordpress(name, ip, host, tag, db, title, desc string, in []string, svc tru
 			{"WORDPRESS_DB_HOST", "mariadb"}, {"WORDPRESS_DB_USER", "lab"}, {"WORDPRESS_DB_PASSWORD", labDBPass},
 			{"WORDPRESS_DB_NAME", db}, {"LAB_URL", "http://" + ip}, {"LAB_TITLE", title},
 			{"LAB_ADMIN_PASSWORD", labAdminPass},
+			// The lab network has a route out (docker bridge, not internal). Without
+			// this, WordPress 5.8.3 updated itself to the newest release one minute
+			// after the start (measured 2026-11-21: 7.1.5), and the ground truth was wrong.
+			{"WORDPRESS_CONFIG_EXTRA", "define('AUTOMATIC_UPDATER_DISABLED', true); define('WP_AUTO_UPDATE_CORE', false);"},
 		},
 		MemMB: 256, DependsOn: []string{"mariadb"},
 		Health:   Health{Test: "curl -fsS -m 3 -o /dev/null http://127.0.0.1/wp-login.php && test -f /tmp/lab-installed", StartPeriod: "120s"},

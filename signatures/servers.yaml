@@ -399,6 +399,7 @@
 
 - id: golang-http
   name: Go net/http
+  technology: Go
   category: web-server
   description: Serwer HTTP biblioteki standardowej Go (rozpoznawany po usłudze nmap).
   tags: [go]

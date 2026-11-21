@@ -54,6 +54,9 @@
       - {type: path, path: /administrator/, status: [200], regex: 'joomla|mod-login-username', weight: 0.9}
       - {type: path, path: /robots.txt, status: [200], contains_all: ['/administrator/', '/components/'], weight: 0.7}
       - {type: favicon, mmh3: [1627330242], weight: 0.9}
+      - {type: path, path: /administrator/manifests/files/joomla.xml, status: [200], contains: '<extension', weight: 0.9}
+  version:
+    - {type: path, path: /administrator/manifests/files/joomla.xml, regex: '<version>([0-9.]+)</version>'}
 
 - id: joomla-installer
   name: Joomla – niedokończona instalacja

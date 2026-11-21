@@ -8,7 +8,8 @@
   classes: [staging]
   match:
     rules:
-      - {type: hostname, regex: '(^|[.\-_])(dev|devel|develop|development|test|tst|testing|stage|staging|stg|uat|qa|preprod|pre-prod|sandbox|demo|beta|alpha|acc|canary|lab)[0-9]{0,2}([.\-_])', weight: 0.8}
+      - {type: hostname, regex: '(^|[.\-_])(dev|devel|develop|development|test|tst|testing|stage|staging|stg|uat|qa|preprod|pre-prod|sandbox|demo|beta|alpha|acc|canary)[0-9]{0,2}([.\-_])', weight: 0.8}
+      # "lab" is not here on purpose: at a university it names a laboratory (lab.agh.edu.pl, lab-212), not a test environment.
 
 - id: staging-certificate
   name: Certyfikat środowiska testowego

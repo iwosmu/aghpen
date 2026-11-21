@@ -312,20 +312,34 @@ func (s *Store) SeedDefaults(ctx context.Context) (created bool, err error) {
 	return created, err
 }
 
-// DefaultProfile is the scan profile of a new installation: a light, safe
-// discovery well under the caps of the default safety policy. It has no scope,
-// so it sends nothing until an operator assigns one.
+// DefaultPorts is the port set of the default profile: nmap's top 1000 plus
+// the infrastructure ports that top 1000 leaves out and that matter on an
+// attack surface: databases and caches, message brokers, container and
+// cluster APIs, monitoring and metrics. Chosen from measurements on the lab
+// (docs/WYNIKI.md): top 100 missed 69 of 155 open TCP ports, top 1000 43.
+const DefaultPorts = "top-1000," +
+	"1521,2379,2380,5984,6379,7474,8086,9042,9200,9300,11211,27017,28017," + // databases and caches
+	"1883,4369,5671,5672,8883,15672,15692,25672,61613,61616," + // message brokers
+	"2375,2376,4243,6443,9443,10250,10255," + // container and cluster APIs
+	"3000,5601,9090,9093,9100,9113,9187,9216," + // monitoring and metrics
+	"5985,5986,18080,50000" // remote management, CI agents
+
+// DefaultProfile is the scan profile of a new installation: the profile we
+// measured on the 70-host lab (docs/WYNIKI.md), under the caps of the default
+// safety policy. It has no scope, so it sends nothing until an operator
+// assigns one.
 func DefaultProfile() model.ScanProfile {
 	return model.ScanProfile{
 		Name:             "Domyślny (bezpieczne rozpoznanie)",
-		Description:      "Top 100 portów, wykrywanie usług, odcisk HTTP. Niskie limity ruchu. Przypisz zakres, aby uruchomić.",
+		Description:      "Top 1000 portów i porty infrastruktury, wybrane usługi UDP, wykrywanie usług, odcisk HTTP i TLS. Przypisz zakres, aby uruchomić.",
 		ScopeIDs:         []int64{},
-		Ports:            "top-100",
-		Discovery:        model.DiscoveryOpts{ICMPEcho: true, TCPSynPorts: []int{80, 443}, TCPAckPorts: []int{80}},
+		Ports:            DefaultPorts,
+		Discovery:        model.DiscoveryOpts{ICMPEcho: true, TCPSynPorts: []int{22, 80, 443, 3389, 8080}, TCPAckPorts: []int{80}, ARP: true, Mode: model.DiscoveryBalanced},
 		ServiceDetection: true,
 		VersionIntensity: 2,
 		HTTP:             model.HTTPOpts{Enabled: true, MaxBodyBytes: 262144, TimeoutMs: 5000, MaxRedirects: 3, SignaturePaths: true, Favicon: true},
-		Rate:             model.RateLimits{MaxPPS: 300, MaxParallelChunks: 2, MaxParallelHosts: 16, HTTPRPS: 10, PerHostConcurrency: 1},
+		UDP:              model.UDPOpts{Enabled: true},
+		Rate:             model.RateLimits{MaxPPS: 1000, MaxParallelChunks: 4, MaxParallelHosts: 16, HTTPRPS: 20, PerHostConcurrency: 1},
 		Chunking:         model.ChunkingOpts{Adaptive: true, InitialSize: 256, MinSize: 64, MaxSize: 4096, TargetSeconds: 60},
 		Retry:            model.RetryOpts{UnstableRetries: 2, BackoffMs: 500},
 		Schedule:         model.Schedule{Timezone: "Europe/Warsaw"},

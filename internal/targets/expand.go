@@ -3,6 +3,7 @@ package targets
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/netip"
 	"sort"
@@ -187,6 +188,27 @@ func Expand(ctx context.Context, ts []model.Target, exclusions []string, res Res
 		}()
 	}
 	wg.Wait()
+	// Second chance for lookups that failed for a passing reason (a timeout of
+	// a busy resolver: measured in the lab, 4 of 73 names timed out with 16
+	// lookups at once). Fewer at a time and a longer timeout.
+	sem = make(chan struct{}, 4)
+	for i, name := range names {
+		if !retryable(answers[i].err) {
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			c, cancel := context.WithTimeout(ctx, 2*timeout)
+			defer cancel()
+			if ips, err := res.LookupIP(c, "ip4", name); err == nil || !retryable(err) {
+				answers[i] = answer{ips, err}
+			}
+		}()
+	}
+	wg.Wait()
 
 	exRanges := append([]Range{}, ex.V4.Ranges()...)
 	for i := len(domains); i < len(names); i++ {
@@ -253,4 +275,17 @@ func contains(xs []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// retryable reports whether a failed lookup may succeed when asked again: a
+// timeout or a temporary resolver error, not "no such host".
+func retryable(err error) bool {
+	if err == nil {
+		return false
+	}
+	var de *net.DNSError
+	if errors.As(err, &de) {
+		return de.IsTimeout || de.IsTemporary
+	}
+	return errors.Is(err, context.DeadlineExceeded)
 }

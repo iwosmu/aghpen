@@ -633,6 +633,9 @@
               "version": "1.26.2"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "classes": [
             "admin-panel",
             "login"
@@ -2117,6 +2120,9 @@
               ]
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "classes": [
             "iot"
           ],
@@ -2161,7 +2167,8 @@
             }
           ],
           "tech_optional": [
-            "jQuery"
+            "jQuery",
+            "Go"
           ],
           "classes": [
             "iot"
@@ -2217,7 +2224,8 @@
             }
           ],
           "tech_optional": [
-            "jQuery"
+            "jQuery",
+            "Go"
           ],
           "classes": [
             "iot"
@@ -2272,6 +2280,9 @@
               ]
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "classes": [
             "iot"
           ],
@@ -2311,6 +2322,9 @@
                 "hp laserjet pro"
               ]
             }
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "classes": [
             "iot"
@@ -2366,6 +2380,9 @@
               ]
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "classes": [
             "iot"
           ],
@@ -2404,7 +2421,8 @@
           "name": "http",
           "tech_optional": [
             "nginx",
-            "Synology DSM"
+            "Synology DSM",
+            "Go"
           ],
           "class_optional": [
             "iot"
@@ -2438,7 +2456,8 @@
             }
           ],
           "tech_optional": [
-            "nginx"
+            "nginx",
+            "Go"
           ],
           "classes": [
             "iot",
@@ -2483,7 +2502,8 @@
             }
           ],
           "tech_optional": [
-            "nginx"
+            "nginx",
+            "Go"
           ],
           "classes": [
             "iot",
@@ -2540,6 +2560,9 @@
               "version": "1.26.2"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "class_optional": [
             "staging"
           ],
@@ -2562,6 +2585,9 @@
               "category": "web-server",
               "version": "1.26.2"
             }
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "classes": [
             "staging",
@@ -2649,7 +2675,8 @@
             }
           ],
           "tech_optional": [
-            "Symfony"
+            "Symfony",
+            "Go"
           ],
           "classes": [
             "api",
@@ -2728,7 +2755,8 @@
             }
           ],
           "tech_optional": [
-            "Debian"
+            "Debian",
+            "Go"
           ],
           "classes": [
             "staging"
@@ -2775,6 +2803,9 @@
               "category": "web-server"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 301,
             "location": "https://10.66.50.10/",
@@ -2792,6 +2823,9 @@
               "name": "nginx",
               "category": "web-server"
             }
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "classes": [
             "login"
@@ -2851,6 +2885,9 @@
               "category": "web-server"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Archiwum dokumentów",
@@ -2884,6 +2921,9 @@
               "name": "nginx",
               "category": "web-server"
             }
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -2927,6 +2967,9 @@
               "category": "web-server"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "System ankiet",
@@ -2969,6 +3012,9 @@
               "category": "web-server"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Intranet wydziału",
@@ -3010,6 +3056,9 @@
               "category": "web-server"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 301,
             "title": "Biuro Karier — strona główna",
@@ -3038,6 +3087,9 @@
               "name": "nginx",
               "category": "web-server"
             }
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 302,
@@ -3084,7 +3136,8 @@
           ],
           "tech_optional": [
             "Varnish",
-            "CentOS"
+            "CentOS",
+            "Go"
           ],
           "classes": [
             "login"
@@ -3170,6 +3223,10 @@
           ],
           "product": "nginx",
           "version": "1.26.2",
+          "tech_optional": [
+            "nginx",
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Konsola diagnostyczna",
@@ -3217,7 +3274,8 @@
           ],
           "tech_optional": [
             "Windows Server",
-            "ASP.NET MVC"
+            "ASP.NET MVC",
+            "Go"
           ],
           "classes": [
             "login"
@@ -3319,7 +3377,8 @@
           ],
           "tech_optional": [
             "Windows Server",
-            "ASP.NET MVC"
+            "ASP.NET MVC",
+            "Go"
           ],
           "classes": [
             "login"
@@ -3428,6 +3487,9 @@
               ]
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Informator — kiosk k-7f3a",
@@ -3486,6 +3548,9 @@
               "category": "web-server"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Serwer plików",
@@ -3522,6 +3587,9 @@
               "category": "web-server"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Monitoring UPS",
@@ -3539,6 +3607,9 @@
               "name": "nginx",
               "category": "web-server"
             }
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "classes": [
             "login"
@@ -3579,6 +3650,9 @@
               "category": "web-server"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "classes": [
             "login"
           ],
@@ -3617,6 +3691,9 @@
               "category": "web-server"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Archiwum (wolny serwer)",
@@ -3648,6 +3725,9 @@
               "category": "web-server"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Brama testowa",
@@ -3661,7 +3741,10 @@
           "name_alt": [
             "*"
           ],
-          "hard": "tarpit"
+          "hard": "tarpit",
+          "tech_optional": [
+            "Go"
+          ]
         }
       ]
     },
@@ -3684,6 +3767,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 81",
@@ -3696,6 +3782,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -3710,6 +3799,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 88",
@@ -3722,6 +3814,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -3736,6 +3831,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 2080",
@@ -3748,6 +3846,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -3762,6 +3863,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 4000",
@@ -3774,6 +3878,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -3788,6 +3895,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 4002",
@@ -3800,6 +3910,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -3814,6 +3927,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 4004",
@@ -3826,6 +3942,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -3840,6 +3959,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 4006",
@@ -3852,6 +3974,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -3866,6 +3991,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 4008",
@@ -3878,6 +4006,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -3892,6 +4023,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 4567",
@@ -3904,6 +4038,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -3918,6 +4055,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 7001",
@@ -3930,6 +4070,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -3944,6 +4087,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 7003",
@@ -3956,6 +4102,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -3970,6 +4119,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 7005",
@@ -3982,6 +4134,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -3996,6 +4151,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 7007",
@@ -4008,6 +4166,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4022,6 +4183,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 7009",
@@ -4034,6 +4198,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4048,6 +4215,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 7011",
@@ -4060,6 +4230,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4074,6 +4247,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 7013",
@@ -4086,6 +4262,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4100,6 +4279,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 7015",
@@ -4112,6 +4294,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4126,6 +4311,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 7017",
@@ -4138,6 +4326,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4152,6 +4343,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 7019",
@@ -4164,6 +4358,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4178,6 +4375,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 8001",
@@ -4190,6 +4390,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4204,6 +4407,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 8003",
@@ -4216,6 +4422,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4230,6 +4439,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 8005",
@@ -4242,6 +4454,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4256,6 +4471,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 8007",
@@ -4268,6 +4486,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4282,6 +4503,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 8009",
@@ -4294,6 +4518,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4308,6 +4535,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 8881",
@@ -4320,6 +4550,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4334,6 +4567,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 8883",
@@ -4346,6 +4582,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4360,6 +4599,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 8885",
@@ -4372,6 +4614,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4386,6 +4631,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 8887",
@@ -4398,6 +4646,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4412,6 +4663,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 8889",
@@ -4424,6 +4678,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4438,6 +4695,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 10000",
@@ -4450,6 +4710,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4464,6 +4727,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 20000",
@@ -4476,6 +4742,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4490,6 +4759,9 @@
           "name_alt": [
             "*"
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Instancja testowa 32768",
@@ -4502,6 +4774,9 @@
           "name": "http",
           "name_alt": [
             "*"
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4533,6 +4808,9 @@
               "name": "nginx",
               "category": "web-server"
             }
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4574,6 +4852,9 @@
               "category": "web-server"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Stacja pomiarowa",
@@ -4609,6 +4890,9 @@
               "name": "nginx",
               "category": "web-server"
             }
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4647,6 +4931,9 @@
               "category": "web-server"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Serwer kopii zapasowych",
@@ -4678,6 +4965,9 @@
               "category": "web-server"
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "http": {
             "status": 200,
             "title": "Host pod adresem .0",
@@ -4708,6 +4998,9 @@
               "name": "nginx",
               "category": "web-server"
             }
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4743,6 +5036,9 @@
                 "mikrotik router config httpd"
               ]
             }
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "classes": [
             "iot"
@@ -4788,7 +5084,8 @@
             }
           ],
           "tech_optional": [
-            "jQuery"
+            "jQuery",
+            "Go"
           ],
           "classes": [
             "iot"
@@ -4838,6 +5135,9 @@
                 "infokiosk"
               ]
             }
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "http": {
             "status": 200,
@@ -4901,6 +5201,9 @@
               ]
             }
           ],
+          "tech_optional": [
+            "Go"
+          ],
           "classes": [
             "iot"
           ],
@@ -4940,6 +5243,9 @@
                 "hp laserjet pro"
               ]
             }
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "classes": [
             "iot"
@@ -4994,6 +5300,9 @@
                 "hp laserjet pro"
               ]
             }
+          ],
+          "tech_optional": [
+            "Go"
           ],
           "classes": [
             "iot"

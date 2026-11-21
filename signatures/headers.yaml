@@ -205,3 +205,21 @@
     rules:
       - {type: url, regex: '^https://', weight: 0.4}
       - {type: redirect, regex: '^http://', weight: 0.8}
+
+- id: header-build-info
+  name: Nagłówek z wersją kompilacji (X-Build-Commit, X-Git-Commit, X-Revision)
+  category: header
+  description: Nagłówek odpowiedzi podaje commit albo numer kompilacji aplikacji. Ułatwia ustalenie dokładnej wersji kodu.
+  interest: 20
+  match:
+    rules:
+      - {type: header, name_regex: '^X-(Build|Build-Commit|Build-Id|Build-Number|Build-Version|Git-Commit|Git-Sha|Git-Revision|Commit|Commit-Sha|Revision|Source-Version)$', exists: true, weight: 0.9}
+
+- id: header-robots-noindex
+  name: X-Robots-Tag noindex (strona ukryta przed wyszukiwarkami)
+  category: header
+  description: Nagłówek X-Robots-Tag zakazuje indeksowania. Tak oznacza się często środowiska testowe i strony wewnętrzne wystawione do sieci.
+  interest: 10
+  match:
+    rules:
+      - {type: header, name: X-Robots-Tag, regex: '(?i)noindex|none', weight: 0.8}
