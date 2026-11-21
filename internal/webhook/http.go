@@ -131,7 +131,7 @@ func (n *Notifier) test(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	p := Payload{Event: EventTest, RunURL: strings.TrimRight(base, "/") + "/runs", Scope: "test", FinishedAt: &now,
 		Counts: map[string]int{}, Changes: []Item{}, Findings: []Item{},
-		Text: "*Czujka: test webhooka.* Po każdym przeanalizowanym przebiegu przyjdzie tu podsumowanie zmian. " + strings.TrimRight(base, "/") + "/runs"}
+		Text: "*Czujka: test webhooka.* " + strings.TrimRight(base, "/") + "/runs"}
 	body, _ := json.Marshal(p)
 	res := n.Client.Post(r.Context(), s.URL, s.Secret, EventTest, body)
 	detail := map[string]any{"test": true, "status": res.Status, "ms": res.Ms}

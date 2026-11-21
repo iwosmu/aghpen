@@ -336,8 +336,8 @@ const DefaultPorts = "top-1000," +
 // assigns one.
 func DefaultProfile() model.ScanProfile {
 	return model.ScanProfile{
-		Name:             "Domyślny (bezpieczne rozpoznanie)",
-		Description:      "Top 1000 portów i porty infrastruktury, wybrane usługi UDP, wykrywanie usług, odcisk HTTP i TLS. Przypisz zakres, aby uruchomić.",
+		Name:             "Domyślny",
+		Description:      "Top 1000 portów, wybrane usługi UDP, rozpoznawanie usług, HTTP i TLS.",
 		ScopeIDs:         []int64{},
 		Ports:            DefaultPorts,
 		Discovery:        model.DiscoveryOpts{ICMPEcho: true, TCPSynPorts: []int{22, 80, 443, 3389, 8080}, TCPAckPorts: []int{80}, ARP: true, Mode: model.DiscoveryBalanced},

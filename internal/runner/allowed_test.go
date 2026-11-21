@@ -87,7 +87,7 @@ func TestOperatorLockIsAnUpperBound(t *testing.T) {
 		t.Fatalf("lock with a wide policy: kept %v dropped %v %v", kept, dropped, err)
 	}
 	for _, d := range dropped {
-		if !strings.Contains(d.Reason, "CZUJKA_ALLOWED_NETWORKS") {
+		if !strings.Contains(d.Reason, "blokad") || strings.Contains(d.Reason, "CZUJKA_ALLOWED_NETWORKS") {
 			t.Errorf("%s: the reason must name the operator lock: %s", d.Value, d.Reason)
 		}
 	}

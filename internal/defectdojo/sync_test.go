@@ -161,7 +161,7 @@ func TestSyncLifecycleClosesAndReopens(t *testing.T) {
 	if p := s.patches[2]; p["is_mitigated"] != false || p["active"] != true {
 		t.Errorf("reopen patch %v", p)
 	}
-	if len(s.notes[1]) != 1 || !strings.Contains(s.notes[1][0], "nie jest już widoczna") || !strings.Contains(s.notes[2][0], "znów widoczna") {
+	if len(s.notes[1]) != 1 || !strings.Contains(s.notes[1][0], "znalezisko a zniknęło") || !strings.Contains(s.notes[2][0], "znalezisko b wróciło") {
 		t.Errorf("notes %v", s.notes)
 	}
 	if _, touched := s.patches[3]; touched {
@@ -190,7 +190,7 @@ func TestAttachEvidenceAndRunXML(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{"findings/5:Czujka: dowody admin-panel/10.0.0.1/tcp-80/x:czujka-evidence-admin-panel_10.0.0.1_tcp-80_x.txt",
-		"tests/19:Czujka: nmap XML przebiegu #42:czujka-run-42.xml"}
+		"tests/19:Czujka: nmap XML skanu #42:czujka-run-42.xml"}
 	if strings.Join(s.files, "|") != strings.Join(want, "|") {
 		t.Errorf("files %v", s.files)
 	}

@@ -124,7 +124,7 @@ func (m *Manager) outsideTargets(ctx context.Context, adhoc []model.Target) ([]m
 			}
 		}
 		out = append(out, model.InvalidLine{Line: i + 1, Value: t.Value,
-			Reason: "adres nie leży w całości w żadnym włączonym celu; przebieg ad hoc sprawdza tylko adresy z zakresów (cel dodaje użytkownik z uprawnieniem targets:create)"})
+			Reason: "Adres nie leży w żadnym włączonym celu."})
 	}
 	return out, nil
 }

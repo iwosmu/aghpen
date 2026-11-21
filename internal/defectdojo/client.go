@@ -454,7 +454,7 @@ func (c *Client) Ensure(ctx context.Context, t Target) (Location, error) {
 	if !ok {
 		var created named
 		body := map[string]any{"name": t.ProductName, "prod_type": loc.ProductTypeID,
-			"description": "Powierzchnia ataku obserwowana przez Czujkę: hosty, usługi i obserwacje z cyklicznych skanów discovery."}
+			"description": "Hosty, usługi i znaleziska z cyklicznych skanów Czujki."}
 		if err := c.sendJSON(ctx, http.MethodPost, "products/", body, &created); err != nil {
 			return loc, fmt.Errorf("nie można utworzyć produktu %q: %w", t.ProductName, err)
 		}
@@ -473,7 +473,7 @@ func (c *Client) Ensure(ctx context.Context, t Target) (Location, error) {
 		body := map[string]any{
 			"name": t.EngagementName, "product": loc.ProductID, "status": "In Progress", "engagement_type": "CI/CD",
 			"target_start": today.Format("2006-01-02"), "target_end": today.AddDate(1, 0, 0).Format("2006-01-02"),
-			"description": "Ciągłe obserwacje Czujki (bezpieczna detekcja, bez eksploatacji).", "deduplication_on_engagement": true,
+			"description": "Znaleziska Czujki.", "deduplication_on_engagement": true,
 		}
 		if err := c.sendJSON(ctx, http.MethodPost, "engagements/", body, &created); err != nil {
 			return loc, fmt.Errorf("nie można utworzyć engagementu %q: %w", t.EngagementName, err)
