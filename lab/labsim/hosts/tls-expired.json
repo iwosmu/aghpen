@@ -1,0 +1,87 @@
+{
+  "name": "tls-expired",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "ca",
+            "cn": "expired.lab.czujka.test",
+            "sans": [
+              "expired.lab.czujka.test",
+              "10.66.50.12"
+            ],
+            "not_before_days": -400,
+            "not_after_days": -35
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>System ankiet</title>\n</head>\n<body>\n<h1>System ankiet</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "ca",
+            "cn": "expired.lab.czujka.test",
+            "sans": [
+              "expired.lab.czujka.test",
+              "10.66.50.12"
+            ],
+            "not_before_days": -400,
+            "not_after_days": -35
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>System ankiet</title>\n</head>\n<body>\n<h1>System ankiet</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "ca",
+            "cn": "expired.lab.czujka.test",
+            "sans": [
+              "expired.lab.czujka.test",
+              "10.66.50.12"
+            ],
+            "not_before_days": -1,
+            "not_after_days": 89,
+            "gen": 1
+          },
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>System ankiet</title>\n</head>\n<body>\n<h1>System ankiet</h1>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

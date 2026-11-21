@@ -1,0 +1,5 @@
+ground-truth
+generated
+out
+**/*_test.go
+README.md

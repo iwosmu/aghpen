@@ -1,0 +1,62 @@
+{
+  "name": "tod-night",
+  "avail": {
+    "kind": "schedule",
+    "period_sec": 600,
+    "up_from_sec": 240,
+    "up_to_sec": 600
+  },
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Serwer kopii zapasowych</title>\n</head>\n<body>\n<h1>Kopie zapasowe</h1><p>Włączany na czas okna backupu.</p>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Serwer kopii zapasowych</title>\n</head>\n<body>\n<h1>Kopie zapasowe</h1><p>Włączany na czas okna backupu.</p>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Serwer kopii zapasowych</title>\n</head>\n<body>\n<h1>Kopie zapasowe</h1><p>Włączany na czas okna backupu.</p>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

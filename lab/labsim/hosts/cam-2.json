@@ -1,0 +1,89 @@
+{
+  "name": "cam-2",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "App-webs/",
+            "headers": [
+              {
+                "name": "X-Frame-Options",
+                "value": "SAMEORIGIN"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html><head><title></title>\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" />\n<script>\nwindow.location.href = \"/doc/page/login.asp?_\" + (new Date()).getTime();\n</script>\n</head><body></body></html>\n"
+              },
+              {
+                "path": "/doc/page/login.asp",
+                "body": "<!doctype html>\n<html><head><title>Login</title>\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n<link href=\"../css/login.css\" rel=\"stylesheet\" type=\"text/css\" />\n<script type=\"text/javascript\" src=\"../script/jquery-1.7.1.min.js\"></script>\n<script type=\"text/javascript\" src=\"../script/login.js\"></script>\n</head><body onload=\"initLogin()\">\n<div class=\"loginbar\"><input type=\"text\" id=\"loginUserName\" maxlength=\"32\" /><input type=\"password\" id=\"loginPassword\" maxlength=\"16\" /></div>\n<div class=\"footer\">&copy;Hikvision Digital Technology Co., Ltd. All Rights Reserved.</div>\n</body></html>\n"
+              }
+            ],
+            "favicon_seed": "hikvision"
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "App-webs/",
+            "headers": [
+              {
+                "name": "X-Frame-Options",
+                "value": "SAMEORIGIN"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html><head><title></title>\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" />\n<script>\nwindow.location.href = \"/doc/page/login.asp?_\" + (new Date()).getTime();\n</script>\n</head><body></body></html>\n"
+              },
+              {
+                "path": "/doc/page/login.asp",
+                "body": "<!doctype html>\n<html><head><title>Login</title>\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n<link href=\"../css/login.css\" rel=\"stylesheet\" type=\"text/css\" />\n<script type=\"text/javascript\" src=\"../script/jquery-1.7.1.min.js\"></script>\n<script type=\"text/javascript\" src=\"../script/login.js\"></script>\n</head><body onload=\"initLogin()\">\n<div class=\"loginbar\"><input type=\"text\" id=\"loginUserName\" maxlength=\"32\" /><input type=\"password\" id=\"loginPassword\" maxlength=\"16\" /></div>\n<div class=\"footer\">&copy;Hikvision Digital Technology Co., Ltd. All Rights Reserved.</div>\n</body></html>\n"
+              }
+            ],
+            "favicon_seed": "hikvision"
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "App-webs/",
+            "headers": [
+              {
+                "name": "X-Frame-Options",
+                "value": "SAMEORIGIN"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html><head><title></title>\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" />\n<script>\nwindow.location.href = \"/doc/page/login.asp?_\" + (new Date()).getTime();\n</script>\n</head><body></body></html>\n"
+              },
+              {
+                "path": "/doc/page/login.asp",
+                "body": "<!doctype html>\n<html><head><title>Login</title>\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n<link href=\"../css/login.css\" rel=\"stylesheet\" type=\"text/css\" />\n<script type=\"text/javascript\" src=\"../script/jquery-1.7.1.min.js\"></script>\n<script type=\"text/javascript\" src=\"../script/login.js\"></script>\n</head><body onload=\"initLogin()\">\n<div class=\"loginbar\"><input type=\"text\" id=\"loginUserName\" maxlength=\"32\" /><input type=\"password\" id=\"loginPassword\" maxlength=\"16\" /></div>\n<div class=\"footer\">&copy;Hikvision Digital Technology Co., Ltd. All Rights Reserved.</div>\n</body></html>\n"
+              }
+            ],
+            "favicon_seed": "hikvision"
+          }
+        }
+      ]
+    }
+  }
+}

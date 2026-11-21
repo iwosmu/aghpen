@@ -1,0 +1,9 @@
+{
+  "name": "status-uslug",
+  "version": "1.4.0",
+  "private": true,
+  "dependencies": {
+    "express": "^4.21.0",
+    "express-session": "^1.18.0"
+  }
+}

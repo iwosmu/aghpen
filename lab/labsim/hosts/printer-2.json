@@ -1,0 +1,176 @@
+{
+  "name": "printer-2",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "HP HTTP Server; HP LaserJet Pro M404dn - W1A53A; Serial Number: PHBLL1Z0XQ; Built: Thu Mar 31, 2022 11:55:49AM {TETONXXXXN002.2212A.00}",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>HP LaserJet Pro M404dn&nbsp;&nbsp;&nbsp;10.66.255.254</title>\n</head>\n<body>\n<div id=\"header\"><span class=\"product-name\">HP LaserJet Pro M404dn</span></div>\n<ul class=\"tabs\"><li><a href=\"/hp/device/DeviceStatus/Index\">Home</a></li><li><a href=\"/hp/device/SuppliesStatus\">Supplies</a></li><li><a href=\"/hp/device/NetworkSummary\">Networking</a></li></ul>\n<div id=\"footer\">&copy; Copyright 2019-2022 HP Development Company, L.P.</div>\n</body>\n</html>\n"
+              }
+            ],
+            "favicon_seed": "hp-laserjet"
+          }
+        },
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "HP LaserJet Pro M404dn",
+            "org": "HP Inc.",
+            "sans": [
+              "10.66.255.254"
+            ],
+            "not_before_days": -900,
+            "not_after_days": 2750,
+            "key": "rsa2048"
+          },
+          "site": {
+            "server": "HP HTTP Server; HP LaserJet Pro M404dn - W1A53A; Serial Number: PHBLL1Z0XQ; Built: Thu Mar 31, 2022 11:55:49AM {TETONXXXXN002.2212A.00}",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>HP LaserJet Pro M404dn&nbsp;&nbsp;&nbsp;10.66.255.254</title>\n</head>\n<body>\n<div id=\"header\"><span class=\"product-name\">HP LaserJet Pro M404dn</span></div>\n<ul class=\"tabs\"><li><a href=\"/hp/device/DeviceStatus/Index\">Home</a></li><li><a href=\"/hp/device/SuppliesStatus\">Supplies</a></li><li><a href=\"/hp/device/NetworkSummary\">Networking</a></li></ul>\n<div id=\"footer\">&copy; Copyright 2019-2022 HP Development Company, L.P.</div>\n</body>\n</html>\n"
+              }
+            ],
+            "favicon_seed": "hp-laserjet"
+          }
+        },
+        {
+          "port": 631,
+          "kind": "http",
+          "site": {
+            "server": "HP HTTP Server; HP LaserJet Pro M404dn - W1A53A; Serial Number: PHBLL1Z0XQ; Built: Thu Mar 31, 2022 11:55:49AM {TETONXXXXN002.2212A.00}",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>HP LaserJet Pro M404dn&nbsp;&nbsp;&nbsp;10.66.255.254</title>\n</head>\n<body>\n<div id=\"header\"><span class=\"product-name\">HP LaserJet Pro M404dn</span></div>\n<ul class=\"tabs\"><li><a href=\"/hp/device/DeviceStatus/Index\">Home</a></li><li><a href=\"/hp/device/SuppliesStatus\">Supplies</a></li><li><a href=\"/hp/device/NetworkSummary\">Networking</a></li></ul>\n<div id=\"footer\">&copy; Copyright 2019-2022 HP Development Company, L.P.</div>\n</body>\n</html>\n"
+              }
+            ],
+            "favicon_seed": "hp-laserjet"
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "HP HTTP Server; HP LaserJet Pro M404dn - W1A53A; Serial Number: PHBLL1Z0XQ; Built: Thu Mar 31, 2022 11:55:49AM {TETONXXXXN002.2212A.00}",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>HP LaserJet Pro M404dn&nbsp;&nbsp;&nbsp;10.66.255.254</title>\n</head>\n<body>\n<div id=\"header\"><span class=\"product-name\">HP LaserJet Pro M404dn</span></div>\n<ul class=\"tabs\"><li><a href=\"/hp/device/DeviceStatus/Index\">Home</a></li><li><a href=\"/hp/device/SuppliesStatus\">Supplies</a></li><li><a href=\"/hp/device/NetworkSummary\">Networking</a></li></ul>\n<div id=\"footer\">&copy; Copyright 2019-2022 HP Development Company, L.P.</div>\n</body>\n</html>\n"
+              }
+            ],
+            "favicon_seed": "hp-laserjet"
+          }
+        },
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "HP LaserJet Pro M404dn",
+            "org": "HP Inc.",
+            "sans": [
+              "10.66.255.254"
+            ],
+            "not_before_days": -900,
+            "not_after_days": 2750,
+            "key": "rsa2048"
+          },
+          "site": {
+            "server": "HP HTTP Server; HP LaserJet Pro M404dn - W1A53A; Serial Number: PHBLL1Z0XQ; Built: Thu Mar 31, 2022 11:55:49AM {TETONXXXXN002.2212A.00}",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>HP LaserJet Pro M404dn&nbsp;&nbsp;&nbsp;10.66.255.254</title>\n</head>\n<body>\n<div id=\"header\"><span class=\"product-name\">HP LaserJet Pro M404dn</span></div>\n<ul class=\"tabs\"><li><a href=\"/hp/device/DeviceStatus/Index\">Home</a></li><li><a href=\"/hp/device/SuppliesStatus\">Supplies</a></li><li><a href=\"/hp/device/NetworkSummary\">Networking</a></li></ul>\n<div id=\"footer\">&copy; Copyright 2019-2022 HP Development Company, L.P.</div>\n</body>\n</html>\n"
+              }
+            ],
+            "favicon_seed": "hp-laserjet"
+          }
+        },
+        {
+          "port": 631,
+          "kind": "http",
+          "site": {
+            "server": "HP HTTP Server; HP LaserJet Pro M404dn - W1A53A; Serial Number: PHBLL1Z0XQ; Built: Thu Mar 31, 2022 11:55:49AM {TETONXXXXN002.2212A.00}",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>HP LaserJet Pro M404dn&nbsp;&nbsp;&nbsp;10.66.255.254</title>\n</head>\n<body>\n<div id=\"header\"><span class=\"product-name\">HP LaserJet Pro M404dn</span></div>\n<ul class=\"tabs\"><li><a href=\"/hp/device/DeviceStatus/Index\">Home</a></li><li><a href=\"/hp/device/SuppliesStatus\">Supplies</a></li><li><a href=\"/hp/device/NetworkSummary\">Networking</a></li></ul>\n<div id=\"footer\">&copy; Copyright 2019-2022 HP Development Company, L.P.</div>\n</body>\n</html>\n"
+              }
+            ],
+            "favicon_seed": "hp-laserjet"
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "HP HTTP Server; HP LaserJet Pro M404dn - W1A53A; Serial Number: PHBLL1Z0XQ; Built: Thu Mar 31, 2022 11:55:49AM {TETONXXXXN002.2212A.00}",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>HP LaserJet Pro M404dn&nbsp;&nbsp;&nbsp;10.66.255.254</title>\n</head>\n<body>\n<div id=\"header\"><span class=\"product-name\">HP LaserJet Pro M404dn</span></div>\n<ul class=\"tabs\"><li><a href=\"/hp/device/DeviceStatus/Index\">Home</a></li><li><a href=\"/hp/device/SuppliesStatus\">Supplies</a></li><li><a href=\"/hp/device/NetworkSummary\">Networking</a></li></ul>\n<div id=\"footer\">&copy; Copyright 2019-2022 HP Development Company, L.P.</div>\n</body>\n</html>\n"
+              }
+            ],
+            "favicon_seed": "hp-laserjet"
+          }
+        },
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "selfsigned",
+            "cn": "HP LaserJet Pro M404dn",
+            "org": "HP Inc.",
+            "sans": [
+              "10.66.255.254"
+            ],
+            "not_before_days": -900,
+            "not_after_days": 2750,
+            "key": "rsa2048"
+          },
+          "site": {
+            "server": "HP HTTP Server; HP LaserJet Pro M404dn - W1A53A; Serial Number: PHBLL1Z0XQ; Built: Thu Mar 31, 2022 11:55:49AM {TETONXXXXN002.2212A.00}",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>HP LaserJet Pro M404dn&nbsp;&nbsp;&nbsp;10.66.255.254</title>\n</head>\n<body>\n<div id=\"header\"><span class=\"product-name\">HP LaserJet Pro M404dn</span></div>\n<ul class=\"tabs\"><li><a href=\"/hp/device/DeviceStatus/Index\">Home</a></li><li><a href=\"/hp/device/SuppliesStatus\">Supplies</a></li><li><a href=\"/hp/device/NetworkSummary\">Networking</a></li></ul>\n<div id=\"footer\">&copy; Copyright 2019-2022 HP Development Company, L.P.</div>\n</body>\n</html>\n"
+              }
+            ],
+            "favicon_seed": "hp-laserjet"
+          }
+        },
+        {
+          "port": 631,
+          "kind": "http",
+          "site": {
+            "server": "HP HTTP Server; HP LaserJet Pro M404dn - W1A53A; Serial Number: PHBLL1Z0XQ; Built: Thu Mar 31, 2022 11:55:49AM {TETONXXXXN002.2212A.00}",
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>HP LaserJet Pro M404dn&nbsp;&nbsp;&nbsp;10.66.255.254</title>\n</head>\n<body>\n<div id=\"header\"><span class=\"product-name\">HP LaserJet Pro M404dn</span></div>\n<ul class=\"tabs\"><li><a href=\"/hp/device/DeviceStatus/Index\">Home</a></li><li><a href=\"/hp/device/SuppliesStatus\">Supplies</a></li><li><a href=\"/hp/device/NetworkSummary\">Networking</a></li></ul>\n<div id=\"footer\">&copy; Copyright 2019-2022 HP Development Company, L.P.</div>\n</body>\n</html>\n"
+              }
+            ],
+            "favicon_seed": "hp-laserjet"
+          }
+        }
+      ]
+    }
+  }
+}

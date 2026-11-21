@@ -1,0 +1,203 @@
+{
+  "name": "staging-portal",
+  "states": {
+    "t0": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx/1.26.2",
+            "routes": [
+              {
+                "path": "/",
+                "status": 301,
+                "location": "https://10.66.40.10/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"https://10.66.40.10/\">https://10.66.40.10/</a>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "ca",
+            "cn": "staging.lab.czujka.test",
+            "org": "AGH Lab",
+            "sans": [
+              "staging.lab.czujka.test",
+              "10.66.40.10"
+            ],
+            "not_before_days": -20,
+            "not_after_days": 70
+          },
+          "site": {
+            "server": "nginx/1.26.2",
+            "headers": [
+              {
+                "name": "X-Environment",
+                "value": "staging"
+              },
+              {
+                "name": "X-Robots-Tag",
+                "value": "noindex, nofollow"
+              },
+              {
+                "name": "X-Build-Commit",
+                "value": "3f9c2ab"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "stg_session",
+                "value": "b7e2a9c04d1f",
+                "secure": true,
+                "http_only": true,
+                "same_site": "Lax"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>[STAGING] Wirtualny Dziekanat</title>\n</head>\n<body>\n<div class=\"env-banner\" style=\"background:#c00;color:#fff\">ŚRODOWISKO TESTOWE (STAGING) — dane nieprodukcyjne</div>\n<h1>Wirtualny Dziekanat</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t1": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx/1.26.2",
+            "routes": [
+              {
+                "path": "/",
+                "status": 301,
+                "location": "https://10.66.40.10/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"https://10.66.40.10/\">https://10.66.40.10/</a>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "ca",
+            "cn": "staging.lab.czujka.test",
+            "org": "AGH Lab",
+            "sans": [
+              "staging.lab.czujka.test",
+              "10.66.40.10"
+            ],
+            "not_before_days": -20,
+            "not_after_days": 70
+          },
+          "site": {
+            "server": "nginx/1.26.2",
+            "headers": [
+              {
+                "name": "X-Environment",
+                "value": "staging"
+              },
+              {
+                "name": "X-Robots-Tag",
+                "value": "noindex, nofollow"
+              },
+              {
+                "name": "X-Build-Commit",
+                "value": "3f9c2ab"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "stg_session",
+                "value": "b7e2a9c04d1f",
+                "secure": true,
+                "http_only": true,
+                "same_site": "Lax"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>[STAGING] Wirtualny Dziekanat 2.0 RC</title>\n</head>\n<body>\n<div class=\"env-banner\" style=\"background:#c00;color:#fff\">ŚRODOWISKO TESTOWE (STAGING) — dane nieprodukcyjne</div>\n<h1>Wirtualny Dziekanat</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "t2": {
+      "listeners": [
+        {
+          "port": 80,
+          "kind": "http",
+          "site": {
+            "server": "nginx/1.26.2",
+            "routes": [
+              {
+                "path": "/",
+                "status": 301,
+                "location": "https://10.66.40.10/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirect</title>\n</head>\n<body>\n<a href=\"https://10.66.40.10/\">https://10.66.40.10/</a>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        },
+        {
+          "port": 443,
+          "kind": "http",
+          "tls": {
+            "mode": "ca",
+            "cn": "staging.lab.czujka.test",
+            "org": "AGH Lab",
+            "sans": [
+              "staging.lab.czujka.test",
+              "10.66.40.10"
+            ],
+            "not_before_days": -20,
+            "not_after_days": 70
+          },
+          "site": {
+            "server": "nginx/1.26.2",
+            "headers": [
+              {
+                "name": "X-Environment",
+                "value": "staging"
+              },
+              {
+                "name": "X-Robots-Tag",
+                "value": "noindex, nofollow"
+              },
+              {
+                "name": "X-Build-Commit",
+                "value": "3f9c2ab"
+              }
+            ],
+            "cookies": [
+              {
+                "name": "stg_session",
+                "value": "b7e2a9c04d1f",
+                "secure": true,
+                "http_only": true,
+                "same_site": "Lax"
+              }
+            ],
+            "routes": [
+              {
+                "path": "/",
+                "body": "<!doctype html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<title>[STAGING] Wirtualny Dziekanat 2.0 RC</title>\n</head>\n<body>\n<div class=\"env-banner\" style=\"background:#c00;color:#fff\">ŚRODOWISKO TESTOWE (STAGING) — dane nieprodukcyjne</div>\n<h1>Wirtualny Dziekanat</h1>\n<form method=\"get\" action=\"/login\"><label>Login <input name=\"username\"></label> <label>Hasło <input type=\"password\" name=\"password\"></label> <button type=\"submit\">Zaloguj</button></form>\n</body>\n</html>\n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
