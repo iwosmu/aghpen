@@ -74,12 +74,12 @@ func TestBuiltinRolesMatchTheArchitecture(t *testing.T) {
 			t.Errorf("viewer holds %s", p)
 		}
 	}
-	if len(roles[model.RoleViewer]) != 4 || roles[model.RoleViewer][model.PermAuditRead] {
+	if len(roles[model.RoleViewer]) != 4 || roles[model.RoleViewer][model.PermAuditRead] || roles[model.RoleViewer][model.PermEmergencyStop] {
 		t.Errorf("viewer permissions: %v", roles[model.RoleViewer])
 	}
 	// analyst: read + update, run scans, export; no create or delete
 	a := roles[model.RoleAnalyst]
-	for _, p := range []model.Permission{model.PermTargetsUpdate, model.PermResultsUpdate, model.PermSignaturesUpdate, model.PermScansRun, model.PermExportRun} {
+	for _, p := range []model.Permission{model.PermTargetsUpdate, model.PermResultsUpdate, model.PermSignaturesUpdate, model.PermScansRun, model.PermExportRun, model.PermEmergencyStop} {
 		if !a[p] {
 			t.Errorf("analyst lacks %s", p)
 		}
@@ -91,7 +91,7 @@ func TestBuiltinRolesMatchTheArchitecture(t *testing.T) {
 	}
 	// editor: create and delete too, configure scans; no administration
 	e := roles[model.RoleEditor]
-	for _, p := range []model.Permission{model.PermTargetsCreate, model.PermTargetsDelete, model.PermResultsCreate, model.PermResultsDelete, model.PermSignaturesCreate, model.PermSignaturesDelete, model.PermScansConfigure} {
+	for _, p := range []model.Permission{model.PermTargetsCreate, model.PermTargetsDelete, model.PermResultsCreate, model.PermResultsDelete, model.PermSignaturesCreate, model.PermSignaturesDelete, model.PermScansConfigure, model.PermEmergencyStop} {
 		if !e[p] {
 			t.Errorf("editor lacks %s", p)
 		}
