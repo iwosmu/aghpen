@@ -17,7 +17,7 @@ Liczby pochodzą z [`docs/WYNIKI.md`](docs/WYNIKI.md) (jedno źródło). Pełna 
 | --- | --- | --- | --- | --- |
 | 30% | Discovery i identyfikacja usług w dużej sieci | przebieg /16 laboratorium; „Hosty”, „Usługi” | hosty 67 z 67, otwarte porty 154 ze 155, 0 fałszywych | [WYNIKI](docs/WYNIKI.md#wykrywanie-w-sieci-16), `e2e/lab-gate.sh` |
 | 20% | Uruchomienie, import/eksport, DefectDojo, dokumentacja | `docker compose up -d`; „Import / eksport”; „Znaleziska” → „Eksport do DefectDojo” | start 51–115 s; e2e 100 ze 100 kontroli | [WYNIKI](docs/WYNIKI.md#uruchomienie), `e2e/full/transcript.txt`, `web/REPORT-LAB.md` §11 |
-| 15% | Zmiany w czasie, niestabilne hosty, raport | szablon: `./quickstart.sh change` i drugi skan → „Usługa zniknęła”; `up` → „Usługa wróciła”; zatrzymany host → „nie odpowiada (niepotwierdzone)”, po około minucie „nieaktywny” | skany szablonu 18 s, 12 s, 17 s | [WYNIKI](docs/WYNIKI.md#szablon-organizatorów-jedna-maszyna), [ALGORYTMY](docs/ALGORYTMY.md) §3.4 |
+| 15% | Zmiany w czasie, niestabilne hosty, raport | szablon: `./quickstart.sh change` i drugi skan → „Usługa zniknęła”; `up` → „Usługa wróciła”; zatrzymany host → „nie odpowiada (niepotwierdzone)”, po około minucie „nieaktywny” | skan szablonu 49 s (`nmap -sV` na tych samych portach: 51 s) | [WYNIKI](docs/WYNIKI.md#szablon-organizatorów-jedna-maszyna), [ALGORYTMY](docs/ALGORYTMY.md) §3.4 |
 | 15% | Bezpieczeństwo, tempo skanu, czytelny pulpit | górny pasek: limit, GET/HEAD, „Stop awaryjny”; „Pulpit” | żadnej sekundy ponad limit + 10% na /16; stop w 0,09 s | [WYNIKI](docs/WYNIKI.md#tempo-i-bezpieczeństwo-skanowania), [BEZPIECZENSTWO](docs/BEZPIECZENSTWO.md) |
 | 10% | Fingerprinting, technologie, nagłówki, ciasteczka, sygnatury | usługa → „Technologie i dowody”; „Sygnatury” | technologie: precyzja 0,990, czułość 0,981; tytuły 122 ze 122 | [WYNIKI](docs/WYNIKI.md#wykrywanie-w-sieci-16), [SIGNATURES](docs/SIGNATURES.md) |
 | 10% | Role i ochrona danych | „Administracja”; `/healthz` → `"tde":true` | 4 role i własne, 22 uprawnienia; `pg_tde` i AES-256-GCM | `TestRBACMatrixCSRFAndAudit`, [BEZPIECZENSTWO](docs/BEZPIECZENSTWO.md) §2 |
@@ -30,7 +30,7 @@ Zmierzone na czystej maszynie (`docker:dind`, 0 obrazów; zapis: [`deploy/e2e/fr
 | `docker compose up -d` do zdrowego API (pobranie obrazów i budowa) | 51–115 s, zależnie od łącza (trzy pomiary: 79 s z Docker Hub, 115 s i 51 s przez mirror.gcr.io) |
 | zamiast tego paczka offline (`make bundle`, 354 MiB): rozpakowanie i `sh install.sh` | 26–29 s, bez sieci |
 | logowanie, „Ten komputer”, „Uruchom skan” (przeglądarka sterowana skryptem) | 9 s |
-| skan szablonu organizatorów („Ten komputer”, profil domyślny, czysty Ubuntu 24.04) | 18 s ([`docs/WYNIKI.md`](docs/WYNIKI.md)) |
+| skan szablonu organizatorów (sześć portów z `quickstart.sh`, czysty Ubuntu 24.04) | 49 s; `nmap -Pn -sV` na tych samych portach: 51 s ([`docs/WYNIKI.md`](docs/WYNIKI.md#szablon-organizatorów-jedna-maszyna)) |
 
 Nie trzeba `.env`: hasło bazy i klucz główny powstają przy pierwszym starcie w wolumenach, a losowe hasło administratora pojawia się raz w logu. Własne wartości: `make init` zapisuje `deploy/.env`, który `docker compose up -d` też czyta.
 
