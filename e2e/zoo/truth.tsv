@@ -6,34 +6,34 @@
 # substring that must be raised. ok: further technologies or classes that are right but not required (regexes).
 # ready: http<path>, https<path> or tcp: what run.sh waits for before the scan.
 01-cms	2368	tcp	cms	ghost:6.78.0-alpine	http	^Ghost$	6.78	Node\.js|Express				http/
-01-cms	33080	tcp	cms	mediawiki:1.46.2	http	^MediaWiki$	1.46.2	PHP,Apache	install-page			http/
-01-cms	80	tcp	cms	nextcloud:35.0.3-apache	http	^Nextcloud$	35.0.3	PHP,Apache	install-page			http/
-01-cms	41080	tcp	cms	matomo:5.14.3-apache	http	^Matomo$		PHP,Apache	install-page			http/
+01-cms	33080	tcp	cms	mediawiki:1.46.2	http	^MediaWiki$	1.46.2	PHP,Apache	install-page		class:admin-panel	http/
+01-cms	80	tcp	cms	nextcloud:35.0.3-apache	http	^Nextcloud$	35.0.3	PHP,Apache	install-page		class:admin-panel	http/
+01-cms	41080	tcp	cms	matomo:5.14.3-apache	http	^Matomo$	5.14.3	PHP,Apache	install-page		class:admin-panel	http/
 01-cms	27080	tcp	cms	roundcube/roundcubemail:1.7.6-apache	http	^Roundcube	1.7.6	PHP,Apache	login			http/
-01-cms	8082	tcp	cms	joomla:3.10.12-php8.0-apache	http	^Joomla	3.10	PHP,Apache	install-page			http/
-01-cms	19080	tcp	cms	drupal:7.103-apache	http	^Drupal$	7	PHP,Apache	install-page			http/
-01-cms	8083	tcp	cms	joomla:6.2.0-php8.4-apache	http	^Joomla	6	PHP,Apache	install-page			http/
+01-cms	8082	tcp	cms	joomla:3.10.12-php8.0-apache	http	^Joomla	3.10	PHP,Apache	install-page		class:admin-panel	http/
+01-cms	19080	tcp	cms	drupal:7.103-apache	http	^Drupal$	7	PHP,Apache	install-page		class:admin-panel	http/
+01-cms	8083	tcp	cms	joomla:6.2.0-php8.4-apache	http	^Joomla	6	PHP,Apache	install-page		class:admin-panel	http/
 02-observability	3000	tcp	monitoring	grafana/grafana:11.6.16	http	^Grafana$	11.6.16		login			http/
-02-observability	9200	tcp	database	elasticsearch:8.19.25	http	^Elasticsearch$	8.19.25		database			http/
-02-observability	45601	tcp	monitoring	kibana:8.19.25	http	^Kibana$	8.19.25					http/api/status
-02-observability	9093	tcp	monitoring	prom/alertmanager:v0.35.0	http	^Alertmanager$	0.35.0					http/
-02-observability	39100	tcp	monitoring	prom/node-exporter:v1.13.1	http	[Nn]ode.?[Ee]xporter|Prometheus exporter	1.13.1					http/
-02-observability	9091	tcp	monitoring	prom/pushgateway:v1.11.5	http	Pushgateway	1.11.5					http/
-02-observability	29999	tcp	monitoring	netdata/netdata:v2.13.0	http	^Netdata$	2.13					http/
-02-observability	3001	tcp	monitoring	louislam/uptime-kuma:2.5.12	http	^Uptime Kuma$						http/
-02-observability	30080	tcp	monitoring	jasonrivers/nagios:4.5.12	http	^Nagios	4.5.12	Apache	login			http/
-03-devtools	8080	tcp	panel	keycloak/keycloak:26.8.2	http	^Keycloak$	26.8.2		admin-panel			http/
-03-devtools	8200	tcp	panel	hashicorp/vault:2.2.2	http	Vault	2.2.2					http/v1/sys/health
-03-devtools	18500	tcp	panel	hashicorp/consul:2.1.0	http	^Consul$	2.1.0		unauth-control-api			http/v1/status/leader
-03-devtools	5000	tcp	panel	registry:3.1.2	http	Docker Registry	3.1.2		unauth-control-api			http/v2/
-03-devtools	38025	tcp	panel	axllent/mailpit:v1.34.0	http	^Mailpit$	1.34.0		dev-tool			http/
-03-devtools	1025	tcp	panel	axllent/mailpit:v1.34.0	smtp	Mailpit						tcp
-03-devtools	47080	tcp	panel	swaggerapi/swagger-ui:v5.35.1	http	^Swagger UI$			api			http/
-03-devtools	14080	tcp	panel	codercom/code-server:4.146.0	http	^code-server$	4.146.0		login			http/
-03-devtools	8888	tcp	panel	quay.io/jupyter/base-notebook:notebook-7.6.5	http	^Jupyter	7.6.5		login			http/
-03-devtools	1880	tcp	panel	nodered/node-red:5.0.10	http	^Node-RED$	5.0.10		dev-tool			http/
-03-devtools	3300	tcp	panel	gogs/gogs:0.14.4	http	^Gogs$	0.14.4		install-page			http/
-03-devtools	8081	tcp	panel	rediscommander/redis-commander:latest	http	^Redis Commander$			admin-panel			http/
+02-observability	9200	tcp	database	elasticsearch:8.19.25	http	^Elasticsearch$	8.19.25		database		class:api	http/
+02-observability	45601	tcp	monitoring	kibana:8.19.25	http	^Kibana$	8.19.25				class:dev-tool	http/api/status
+02-observability	9093	tcp	monitoring	prom/alertmanager:v0.35.0	http	^Alertmanager$	0.35.0				class:dev-tool	http/
+02-observability	39100	tcp	monitoring	prom/node-exporter:v1.13.1	http	[Nn]ode.?[Ee]xporter|Prometheus exporter	1.13.1				class:dev-tool,Eksporter Prometheus	http/
+02-observability	9091	tcp	monitoring	prom/pushgateway:v1.11.5	http	Pushgateway	1.11.5				class:dev-tool,Eksporter Prometheus|Prometheus exporter	http/
+02-observability	29999	tcp	monitoring	netdata/netdata:v2.13.0	http	^Netdata$	2.13				class:dev-tool	http/
+02-observability	3001	tcp	monitoring	louislam/uptime-kuma:2.5.12	http	^Uptime Kuma$			install-page		class:dev-tool	http/
+02-observability	30080	tcp	monitoring	jasonrivers/nagios:4.5.12	http	^Nagios		Apache	login		class:admin-panel	http/
+03-devtools	8080	tcp	panel	keycloak/keycloak:26.8.2	http	^Keycloak$			admin-panel		class:login	http/
+03-devtools	8200	tcp	panel	hashicorp/vault:2.2.2	http	Vault	2.2.2				class:login	http/v1/sys/health
+03-devtools	18500	tcp	panel	hashicorp/consul:2.1.0	http	Consul	2.1.0		unauth-control-api		class:dev-tool	http/v1/status/leader
+03-devtools	5000	tcp	panel	registry:3.1.2	http	Docker Registry			unauth-control-api		class:dev-tool,class:api	http/v2/
+03-devtools	38025	tcp	panel	axllent/mailpit:v1.34.0	http	^Mailpit$	1.34.0		dev-tool		class:staging	http/
+03-devtools	1025	tcp	panel	axllent/mailpit:v1.34.0	smtp	Mailpit					class:dev-tool,class:staging	tcp
+03-devtools	47080	tcp	panel	swaggerapi/swagger-ui:v5.35.1	http	^Swagger UI$			api		class:dev-tool	http/
+03-devtools	14080	tcp	panel	codercom/code-server:4.146.0	http	^code-server$			login		class:dev-tool	http/
+03-devtools	8888	tcp	panel	quay.io/jupyter/base-notebook:notebook-7.6.5	http	^Jupyter	2.21.1		login		class:dev-tool,Tornado	http/
+03-devtools	1880	tcp	panel	nodered/node-red:5.0.10	http	^Node-RED$			dev-tool		class:dev-tool,class:admin-panel	http/
+03-devtools	3300	tcp	panel	gogs/gogs:0.14.4	http	^Gogs$			install-page		class:dev-tool,class:admin-panel	http/
+03-devtools	8081	tcp	panel	rediscommander/redis-commander:latest	http	^Redis Commander$			admin-panel		class:database	http/
 03-devtools	28081	tcp	panel	mongo-express:1.0.2-20-alpine3.19	http	^Mongo Express$			login			http/
 04-java	8080	tcp	appserver	tomcat:10.1.62-jre21-temurin	http	Tomcat	10.1.62		default-page			http/
 04-java	18081	tcp	appserver	jetty:12.1.15-jdk21	http	^Jetty$	12.1.15					http/
@@ -80,4 +80,4 @@
 08-proxies	3128	tcp	proxy	ubuntu/squid:6.6-24.04_beta	http-proxy|http	^Squid$	6.6					tcp
 08-proxies	36081	tcp	proxy	varnish:9.1.0 -> httpd:2.4.71-alpine	http	^Varnish$	9.1	Apache	default-page			http/
 09-heavy	48081	tcp	panel	sonatype/nexus3:3.98.3	http	^Nexus	3.98.3					http/
-09-heavy	9000	tcp	panel	sonarqube:26.11.0.134175-community	http	^SonarQube$	26.11		login			http/api/system/status
+10-sonarqube	9000	tcp	panel	sonarqube:26.11.0.134175-community	http	^SonarQube$	26.11		login			http/api/system/status

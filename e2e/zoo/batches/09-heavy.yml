@@ -1,10 +1,6 @@
-# Zoo batch 09: heavy JVM services (alone, for memory).
+# Zoo batch 09: Nexus alone (heavy JVM; one heavy service at a time on a shared machine).
 services:
   nexus:
     image: sonatype/nexus3:3.98.3
     environment: {INSTALL4J_ADD_VM_PARAMS: "-Xms512m -Xmx1g -XX:MaxDirectMemorySize=1g"}
     ports: ["48081:8081"]
-  sonarqube:
-    image: sonarqube:26.11.0.134175-community
-    environment: {SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"}
-    ports: ["9000:9000"]

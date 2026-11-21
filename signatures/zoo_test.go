@@ -85,3 +85,69 @@ func TestZooCMSInstallers(t *testing.T) {
 	d7 := httpSvc(19080, "Apache httpd", "2.4.62", zooPage(t, 200, "drupal-7-install.html", "Select an installation profile | Drupal", b+":19080/install.php"))
 	check(t, eng, d7, want{"drupal-installer", "Drupal", "", model.ClassInstallPage})
 }
+
+func TestZooDevTools(t *testing.T) {
+	eng, err := sig.NewBuiltinEngine()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := "http://localhost"
+
+	// keycloak/keycloak:26.8.2 start-dev: nmap names port 8080 "rtsp"; the HTTP answer vetoes the RTSP (IoT) finding.
+	kc := &model.ServiceResult{Port: 8080, Proto: "tcp", State: "open", Name: "rtsp",
+		HTTP: zooPage(t, 200, "keycloak-26.8-admin-console.html", "Keycloak Administration Console", b+":8080/admin/master/console/")}
+	check(t, eng, kc, want{"keycloak-admin-console", "Keycloak", "", model.ClassAdminPanel})
+	noMatch(t, eng, kc, "rtsp")
+	noClass(t, eng, kc, model.ClassIoT)
+	// A real RTSP service (no HTTP answer) still matches.
+	cam := &model.ServiceResult{Port: 554, Proto: "tcp", State: "open", Name: "rtsp", Banner: "RTSP/1.0 200 OK"}
+	check(t, eng, cam, want{"rtsp", "", "", model.ClassIoT})
+
+	// hashicorp/consul:2.1.0 agent -dev: version from the UI's URL-encoded environment; /v1/agent/members without a token.
+	cs := httpSvc(18500, "Golang net/http server", "", zooPage(t, 200, "consul-2.1-ui.html", "Consul by HashiCorp", b+":18500/ui/"))
+	check(t, eng, cs, want{"consul", "HashiCorp Consul", "2.1.0", model.ClassDevTool})
+	noMatch(t, eng, cs, "consul-api-open")
+	cs.HTTP.Paths = []model.PathProbe{{Path: "/v1/agent/members", Status: 200,
+		Headers: map[string][]string{"X-Consul-Default-Acl-Policy": {"allow"}}, Excerpt: zooFixture(t, "consul-2.1-agent-members.json")}}
+	check(t, eng, cs, want{"consul-api-open", "HashiCorp Consul", "2.1.0", model.ClassUnauthControlAPI})
+
+	// axllent/mailpit:v1.34.0: web UI (version in the stylesheet URL) and the SMTP banner nmap read on 1025.
+	mp := httpSvc(38025, "Golang net/http server", "", zooPage(t, 200, "mailpit-1.34.html", "Mailpit", b+":38025/"))
+	check(t, eng, mp, want{"mailpit", "Mailpit", "1.34.0", model.ClassDevTool})
+	noMatch(t, eng, mp, "mailhog")
+	smtp := &model.ServiceResult{Port: 1025, Proto: "tcp", State: "open", Name: "smtp", Banner: "220 a6086590296c Mailpit ESMTP Service ready"}
+	check(t, eng, smtp, want{"mailpit-smtp", "Mailpit", "", model.ClassDevTool})
+
+	// gogs/gogs:0.14.4 first run.
+	gg := httpSvc(3300, "Golang net/http server", "", zooPage(t, 200, "gogs-0.14-install.html", "Installation - Gogs", b+":3300/install"))
+	gg.HTTP.Cookies = []model.Cookie{{Name: "i_like_gogs"}, {Name: "_csrf"}, {Name: "lang"}}
+	check(t, eng, gg, want{"gogs-installer", "Gogs", "", model.ClassInstallPage})
+	noClass(t, eng, gg, model.ClassLogin)
+
+	// registry:3.1.2: /v2/ answers 200 without a token.
+	rg := httpSvc(5000, "Docker Registry", "", &model.HTTPFingerprint{Scheme: "http", Status: 200, URL: b + ":5000/", FinalURL: b + ":5000/"})
+	rg.HTTP.Paths = []model.PathProbe{{Path: "/v2/", Status: 200, Headers: map[string][]string{"Docker-Distribution-Api-Version": {"registry/2.0"}}, Excerpt: "{}"}}
+	check(t, eng, rg, want{"docker-registry-open", "Docker Registry", "", model.ClassUnauthControlAPI})
+
+	// louislam/uptime-kuma:2.5.12 before its first setup redirects to /setup-database.
+	uk := httpSvc(3001, "Node.js Express framework", "", &model.HTTPFingerprint{Scheme: "http", Status: 200, Title: "Uptime Kuma", URL: b + ":3001/", FinalURL: b + ":3001/setup-database"})
+	check(t, eng, uk, want{"uptime-kuma-setup", "Uptime Kuma", "", model.ClassInstallPage})
+}
+
+func TestZooMonitoring(t *testing.T) {
+	eng, err := sig.NewBuiltinEngine()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := "http://localhost"
+
+	// prom/alertmanager:v0.35.0: the version from alertmanager_build_info on /metrics (first 16 KiB, as collected).
+	am := httpSvc(9093, "Golang net/http server", "", &model.HTTPFingerprint{Scheme: "http", Status: 200, Title: "Alertmanager", URL: b + ":9093/", FinalURL: b + ":9093/"})
+	am.HTTP.Paths = []model.PathProbe{{Path: "/metrics", Status: 200, Excerpt: zooFixture(t, "alertmanager-0.35-metrics.txt")}}
+	check(t, eng, am, want{"alertmanager", "Alertmanager", "0.35.0", model.ClassDevTool})
+
+	// prom/pushgateway:v1.11.5: its own product, not a generic exporter; version from /api/v1/status.
+	pg := httpSvc(9091, "Golang net/http server", "", &model.HTTPFingerprint{Scheme: "http", Status: 200, Title: "Prometheus Pushgateway", URL: b + ":9091/", FinalURL: b + ":9091/"})
+	pg.HTTP.Paths = []model.PathProbe{{Path: "/api/v1/status", Status: 200, Excerpt: zooFixture(t, "pushgateway-1.11-status.json")}}
+	check(t, eng, pg, want{"pushgateway", "Prometheus Pushgateway", "1.11.5", model.ClassDevTool})
+}

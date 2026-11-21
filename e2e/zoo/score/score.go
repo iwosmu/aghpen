@@ -56,6 +56,11 @@ func list(s string) []string {
 	return out
 }
 
+// Platform: runtimes, web servers and front-end libraries that a page or header shows on many products. Reported
+// next to a product they are not counted as false positives; RESULTS.md lists the ones checked by hand.
+var Platform = []string{"^Go$", "^Node\\.js$", "^Express$", "^Apache HTTP Server$", "^PHP$", "^Java$", "^jQuery$", "^Bootstrap$",
+	"^Vue\\.js$", "^React$", "^Angular", "^nginx$", "^OpenResty$", "^Python$", "^Jetty$", "^Font Awesome$"}
+
 func re(expr string) *regexp.Regexp { return regexp.MustCompile("(?i)" + expr) }
 
 // Result is the score of one tool on one truth row. Version, Techs, Classes and Finding are nil when the row does not
@@ -145,7 +150,12 @@ func Score(row Row, svc *model.ServiceResult, findings []model.Finding) Result {
 	}
 	allowed := append([]string{row.Product}, row.Techs...)
 	allowed = append(allowed, row.OK...)
+	allowed = append(allowed, Platform...)
 	for _, t := range svc.Technologies {
+		// nmap's own product shown as a technology is nmap's statement, scored as such, not a signature's.
+		if svc.Product != "" && strings.EqualFold(t.Name, svc.Product) {
+			continue
+		}
 		if !anyRe(allowed, t.Name) {
 			r.Wrong = append(r.Wrong, t.Name)
 		}
