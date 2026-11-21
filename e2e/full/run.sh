@@ -150,6 +150,23 @@ for tool in docker curl jq awk go; do command -v $tool >/dev/null || { echo "mis
 MAXPPS=800; HTTPRPS=20; ALLTOL=10
 PPSBINS="$TMP/ppsbins"; go build -o "$PPSBINS" ./e2e/ppsbins || { echo "cannot build e2e/ppsbins"; exit 2; }
 echo "docker $(docker version --format '{{.Server.Version}}'); scope: $NET $P.0.0/22 (created by this script)"
+# The neighbour table of the docker host (the Docker VM on macOS) is one table
+# for all network namespaces; gc_thresh3 bounds all of them together. When
+# other containers fill it, ARP answers are lost and a run finds hosts without
+# ports or no host at all: such a run says nothing about the product, so stop
+# here. NEIGH_NEED is the free room this scan needs (2 x the /22).
+neigh() { # prints "entries gc_thresh3 table_fulls" of the docker host
+  docker run --rm --net=host alpine sh -c 'awk "NR==2 {print \$1, \$13}" /proc/net/stat/arp_cache | { read e f; echo $((0x$e)) $(cat /proc/sys/net/ipv4/neigh/default/gc_thresh3) $((0x$f)); }' 2>/dev/null
+}
+NEIGH_NEED=2048
+read -r NE NT NF0 <<< "$(neigh)"
+echo "neighbour table of the docker host: $NE entries, gc_thresh3 $NT, table_fulls so far $NF0"
+if [ -z "$NT" ] || [ $((NT - NE)) -lt $NEIGH_NEED ]; then
+  echo "INVALID ENVIRONMENT: the neighbour table of the docker host has $((NT - NE)) free entries, this scan needs $NEIGH_NEED."
+  echo "Other containers fill it (ARP answers would be lost). Raise the limits of the docker host and rerun:"
+  echo "  docker run --rm --privileged --net=host alpine sysctl -w net.ipv4.neigh.default.gc_thresh1=16384 net.ipv4.neigh.default.gc_thresh2=65536 net.ipv4.neigh.default.gc_thresh3=131072"
+  exit 3
+fi
 
 step "1. Target network with real services"
 e2e/full/lab.sh up
@@ -505,6 +522,10 @@ for r in "$RUN1:$D1" "$RUN2:$D2"; do
   [ -f "$TMP/rate.$id.json" ] && jq -r --arg id "$id" --arg eng "$(api GET /runs/$id | jq .stats.packets_sent)" '"  run \($id) on the wire: nmap raw packets \([.total.arp, .total.raw_syn, .total.icmp, .total.udp_probe] | map(. // 0) | add) (engine counter \($eng)); max \(.raw_max_per_s)/s, p99 \(.raw_p99_per_s)/s, avg \(.raw_avg_per_s)/s"' "$TMP/rate.$id.json"
 done
 echo "  memory of the Czujka container during the scans: max $(mem_max) MiB over $(wc -l < $TMP/mem.txt | tr -d ' ') samples"
+
+read -r NE2 NT2 NF1 <<< "$(neigh)"
+echo "  neighbour table of the docker host after the run: $NE2 entries, gc_thresh3 $NT2"
+check "the docker host's neighbour table never overflowed during the run (else the run is invalid)" "$((NF1 - NF0))" "0"
 
 step "Result"
 echo "PASS: $PASSES  FAIL: $FAILS"
