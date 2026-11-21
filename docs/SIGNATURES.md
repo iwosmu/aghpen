@@ -250,20 +250,20 @@ W produkcie retro-hunt czyta obserwacje strumieniowo z bazy (`sigwire.RetroHunt`
 
 ## 9. Biblioteka wbudowana
 
-386 sygnatur w 10 plikach. Test `TestBuiltinLibraryIsValid` ładuje każdy plik i nie przepuszcza żadnego błędu ani ostrzeżenia walidatora.
+391 sygnatur w 10 plikach. Test `TestBuiltinLibraryIsValid` ładuje każdy plik i nie przepuszcza żadnego błędu ani ostrzeżenia walidatora.
 
 | Plik | Sygnatury | Zawartość |
 | --- | --- | --- |
 | `cms.yaml` | 41 | WordPress, Joomla, Drupal, TYPO3, Moodle, MediaWiki, DokuWiki, Ghost, Nextcloud, ownCloud, Roundcube, Zimbra, OWA, Confluence, Jira, instalatory |
-| `frameworks.yaml` | 35 | Laravel, Symfony, Django, Rails, Spring Boot, ASP.NET, Express, Next.js, React, Vue, Angular, jQuery, Bootstrap |
+| `frameworks.yaml` | 36 | Laravel, Symfony, Django, Rails, Spring Boot, ASP.NET, Express, Next.js, React, Vue, Angular, jQuery, Bootstrap |
 | `servers.yaml` | 47 | nginx, Apache, IIS, Caddy, Tomcat, Jetty, WildFly, WebLogic, HAProxy, Traefik, Varnish, Cloudflare, strony domyślne |
 | `panels.yaml` | 87 | phpMyAdmin, Adminer, Grafana, Kibana, Jenkins, GitLab, Gitea, Portainer, Keycloak, RabbitMQ, Prometheus, Swagger UI, Docker Registry, cPanel, Webmin, Proxmox |
 | `iot.yaml` | 53 | kamery (Hikvision, Dahua, Axis), routery (MikroTik, Ubiquiti, TP-Link), drukarki, NAS (Synology, QNAP), UPS, BMC (iLO, iDRAC, Redfish), zapory |
 | `university.yaml` | 32 | USOSweb, USOS API, APD, CAS, Shibboleth, DSpace, OJS, EPrints, dLibra, Omega-PSIR, Koha, EZproxy, BigBlueButton, JupyterHub, Jupyter, RStudio |
 | `environment.yaml` | 24 | znaczniki staging/dev/test, Django DEBUG, Laravel Ignition, profiler Symfony, phpinfo, Actuator, debugger Werkzeug, ślady stosu, pprof, lista plików |
-| `headers.yaml` | 20 | wersje w nagłówkach, nagłówki debugowania, wyciek serwera zaplecza i adresów prywatnych, błędy CORS, logowanie po HTTP, brak CSP/HSTS na stronie logowania |
-| `cookies.yaml` | 11 | sesja bez `Secure`/`HttpOnly`, JWT w ciasteczku, BIG-IP, Shiro `rememberMe`, ciasteczka load balancerów i WAF |
-| `services.yaml` | 36 | usługi inne niż HTTP: OpenSSH, Dropbear, Telnet, FTP, SMTP, bazy danych, RDP, VNC, SMB, LDAP, MQTT, protokoły przemysłowe, JDWP |
+| `headers.yaml` | 22 | wersje w nagłówkach, nagłówki debugowania, wyciek serwera zaplecza i adresów prywatnych, błędy CORS, logowanie po HTTP, brak CSP/HSTS na stronie logowania |
+| `cookies.yaml` | 12 | sesja bez `Secure`/`HttpOnly`, JWT w ciasteczku, BIG-IP, Shiro `rememberMe`, ciasteczka load balancerów i WAF |
+| `services.yaml` | 37 | usługi inne niż HTTP: OpenSSH, Dropbear, Telnet, FTP, SMTP, bazy danych, RDP, VNC, SMB, LDAP, MQTT, protokoły przemysłowe, JDWP |
 
 Skróty ikon (`mmh3`) w bibliotece pochodzą wyłącznie z prawdziwych instancji uruchomionych w laboratorium (tabela w rozdziale 11). Biblioteka nie zawiera skrótów spisanych z pamięci ani z internetu.
 

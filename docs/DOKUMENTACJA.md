@@ -46,7 +46,7 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 
 **[REGULY.md](REGULY.md): reguły ekspozycji.** „Powierzchnia ataku jako kod”: pola reguły, warunki, asercje, walidator, próba na sucho, cykl życia naruszeń, pakiet startowy 14 reguł. Rozdział 10: sygnatura z przykładu.
 
-**[INTEGRACJE.md](INTEGRACJE.md): integracje.** Import wyników (nmap XML, JSON, CSV) z tabelą nazw kolumn, eksport, sprawdzenie w obie strony. Pasywne źródła danych: pliki, odwrotny DNS, crt.sh. DefectDojo: ustawienia, mapowanie pól, eksport bez duplikatów. Lokalne laboratorium DefectDojo i narzędzie `dojoprobe`.
+**[INTEGRACJE.md](INTEGRACJE.md): integracje.** Import wyników (nmap XML, JSON, CSV) z tabelą nazw kolumn, eksport, sprawdzenie w obie strony. Pasywne źródła danych: pliki, odwrotny DNS, crt.sh. DefectDojo: ustawienia, mapowanie pól, eksport bez duplikatów. Lokalne laboratorium DefectDojo i narzędzie `dojoprobe`. Webhook alertów po każdym przebiegu opisuje `docs/API.md` („Alert webhook”).
 
 **[ARCHITECTURE.md](ARCHITECTURE.md): architektura i kontrakt (po angielsku).** Kryteria oceny przełożone na decyzje projektowe, schemat komponentów, przepływ danych jednego przebiegu, lista pakietów, opis algorytmów, ochrona danych, role, konwencje. Dokument powstał przed kodem jako kontrakt dla zespołu; tam, gdzie różni się od kodu, obowiązuje kod i `ZGODNOSC.md`.
 
@@ -81,6 +81,5 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 
 ## Czego brakuje w dokumentacji
 
-- `docs/WYNIKI.md`: pomiary trafności, tempa i czasu uruchomienia.
 - Instrukcja użytkownika interfejsu ekran po ekranie.
 - Polska wersja `ARCHITECTURE.md` i `API.md`.
