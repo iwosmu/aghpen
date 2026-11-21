@@ -164,7 +164,7 @@ Routes of `internal/timeline`. `Page<T>` lists take `limit` (default 50, max 100
 
 Model-driven confirmation probes (`internal/reprobe`). When a host goes `host_missing`, Czujka probes only that address and its known ports again after 10, 30 and 90 minutes (configurable), so a host that really went away becomes `host_gone` without a full scan, and a host that was only briefly silent returns to `up`. Hosts that answer irregularly get a probe in an hour when the availability model expects them up.
 
-**Off by default.** A fresh installation stores `enabled: false`: traffic that the scanner starts on its own needs the consent of an administrator. The first-run wizard offers it (checked by default); `PUT /settings/reprobe {"enabled": true}` turns it on.
+**On by default.** A fresh installation stores `enabled: true`. Re-probing sends the profile's own safe probes to single addresses that a scan already found, within the hourly budget, the scan windows, the safety policy and the emergency stop. `PUT /settings/reprobe {"enabled": false}` turns it off.
 
 | Method and path | Permission | Body → answer |
 | --- | --- | --- |
@@ -211,7 +211,7 @@ Settings     {enabled: false (fresh installation), budget_per_hour: 200, backoff
 ### Re-probing rules (`reprobe.Build`, a pure function)
 
 - Candidates: hosts with status `unstable` or `expected-offline` whose latest observation is a miss. `down` hosts wait for the next full scan.
-- **Confirm**: a host that went `host_missing` (status `unstable`, answered before) gets probes at `first miss + backoff_minutes[k]`, k = reprobes already recorded since the first miss. An overdue step is due now. A miss streak older than the last step plus 12 hours is not confirmed any more.
+- **Confirm**: a host that went `host_missing` (status `unstable`, answered before) gets probes at `first miss + backoff_minutes[k]`, k = reprobes already recorded since the first miss. An overdue step is due now. A miss streak older than the last step plus 12 hours is not confirmed any more. A host with fewer than 8 observations (no rhythm learned yet) uses the steps 1, 3 and 10 minutes instead (`reprobe.YoungBackoffMinutes`), so a host seen in one scan and silent in the next is confirmed inactive about a minute later.
 - **Likely up**: other candidates (and confirm hosts after the last step) are probed 5 minutes into the next hour whose model up-rate (`analyze.UpRates`) is at least `likely_up_rate`, where the host really answered on the same type of day (weekday or weekend, hour ±1), after its latest observation or reprobe. It needs at least 8 observations (`analyze.MinObsForExpected`).
 - **Safety**: never when `enabled` is false or the emergency stop is set; never an address in the policy exclusions (IP, CIDR, range); the time moves to the next open window of the host's profile (`sched.NextAllowed`), and a likely-up hour without an open window is skipped; at most `budget_per_hour` addresses per hour, counting the reprobes of the last hour (`reprobe_log`); later probes move to the next hour with a note. The engine applies the safety policy again (ports, rates, exclusions).
 - The executor (`reprobe.Executor`) runs every minute, starts the due probes as one targeted run per profile with trigger `reprobe`, records them in `reprobe_log`, and starts nothing while a reprobe run is still queued, running or analysing.

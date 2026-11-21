@@ -309,3 +309,36 @@ func TestExecutorStartsDueProbesPerProfile(t *testing.T) {
 		t.Fatalf("failed start: recorded %d errors %v", len(fb.recorded), rep.Errors)
 	}
 }
+
+// The jury's two-scan test: a host seen in one scan (one observation) that
+// is silent in the second gets its first confirmation 1 minute after the
+// miss, then 3 and 10 minutes, instead of 10, 30 and 90. A host with a learned rhythm keeps the stored steps.
+func TestYoungHostConfirmsWithinMinutes(t *testing.T) {
+	miss := at(17, 10, 0)
+	young := missingServer("10.0.0.5", miss, 0)
+	young.Buckets = [168]model.AvailBucket{}
+	young.Buckets[analyze.BucketIndex(miss.Add(-5*time.Minute), waw)].Up = 1
+	young.Buckets[analyze.BucketIndex(miss, waw)].Down = 1
+	old := missingServer("10.0.0.6", miss, 0)
+	p := Build(Input{Now: miss.Add(30 * time.Second), Settings: DefaultSettings(), Candidates: []Candidate{young, old}, Loc: waw})
+	if len(p.Probes) != 2 {
+		t.Fatalf("probes %+v skipped %+v", p.Probes, p.Skipped)
+	}
+	byIP := map[string]Probe{}
+	for _, pr := range p.Probes {
+		byIP[pr.IP] = pr
+	}
+	y, o := byIP["10.0.0.5"], byIP["10.0.0.6"]
+	if y.Kind != KindConfirm || !y.NotBefore.Equal(miss.Add(time.Minute)) || y.Steps != 3 || !strings.Contains(y.Reason, "rytm nie jest jeszcze znany") {
+		t.Errorf("young host: %+v", y)
+	}
+	if !o.NotBefore.Equal(miss.Add(10 * time.Minute)) {
+		t.Errorf("host with a rhythm: first confirmation at %v, want +10 min", o.NotBefore)
+	}
+	// The second young step comes 3 minutes after the miss.
+	young.Attempts = 1
+	p = Build(Input{Now: miss.Add(90 * time.Second), Settings: DefaultSettings(), Candidates: []Candidate{young}, Loc: waw})
+	if len(p.Probes) != 1 || !p.Probes[0].NotBefore.Equal(miss.Add(3*time.Minute)) || p.Probes[0].Step != 2 {
+		t.Errorf("second step: %+v", p.Probes)
+	}
+}
