@@ -42,6 +42,7 @@ type Summary struct {
 	} `json:"groups"`
 	Chunks        map[string]int    `json:"chunks_by_status"`
 	HostsReported int               `json:"hosts_reported"`
+	HTTPSent      int64             `json:"http_requests_sent"`
 	Iface         string            `json:"iface"`
 	IfaceTxTotal  int64             `json:"iface_tx_packets"`
 	IfaceTxPeak   int64             `json:"iface_tx_peak_pps"`
@@ -149,6 +150,115 @@ func CheckLab(out Output, names bool) (fails []string) {
 	return fails
 }
 
+// WantApp is one expected application of the fingerprint lab (lab.sh apps).
+type WantApp struct {
+	IP      string
+	Port    int
+	Tech    string // technology name the signature engine must report
+	Version string // prefix of its version; empty: any
+	Class   string // service class that must be present; empty: any
+	TLSSelf bool   // the certificate must be reported as self-signed
+}
+
+// Apps is the ground truth of the application lab.
+var Apps = []WantApp{
+	{"10.76.0.10", 3306, "MariaDB", "11.", "database", false},
+	{"10.76.0.11", 80, "WordPress", "6.", "login", false},
+	{"10.76.0.11", 80, "PHP", "8.", "", false},
+	{"10.76.0.20", 3000, "Grafana", "11.3.0", "login", false},
+	{"10.76.0.21", 3000, "Gitea", "1.22", "dev-tool", false},
+	{"10.76.0.21", 22, "OpenSSH", "", "remote-access", false},
+	{"10.76.0.30", 80, "phpMyAdmin", "5.", "admin-panel", false},
+	{"10.76.0.40", 8080, "Apache Tomcat", "10.1", "", false},
+	{"10.76.0.50", 8443, "Python", "", "", true},
+	{"10.76.0.60", 8181, "nginx", "1.", "default-page", false},
+}
+
+// CheckApps compares technologies, versions and classes with the ground truth.
+func CheckApps(out Output) (fails []string) {
+	type key struct {
+		ip   string
+		port int
+	}
+	svc := map[key]model.ServiceResult{}
+	seen := map[string]bool{}
+	for _, h := range out.Hosts {
+		if seen[h.IP] {
+			fails = append(fails, fmt.Sprintf("%s is reported more than once", h.IP))
+		}
+		seen[h.IP] = true
+		for _, s := range h.Services {
+			svc[key{h.IP, s.Port}] = s
+		}
+	}
+	for _, w := range Apps {
+		s, ok := svc[key{w.IP, w.Port}]
+		if !ok {
+			fails = append(fails, fmt.Sprintf("%s:%d was not found", w.IP, w.Port))
+			continue
+		}
+		found := false
+		for _, t := range s.Technologies {
+			if t.Name == w.Tech && strings.HasPrefix(t.Version, w.Version) {
+				found = true
+			}
+		}
+		if !found {
+			fails = append(fails, fmt.Sprintf("%s:%d: technology %s %s* not reported, got %v", w.IP, w.Port, w.Tech, w.Version, techs(s)))
+		}
+		if w.Class != "" && !contains(s.Classes, w.Class) {
+			fails = append(fails, fmt.Sprintf("%s:%d: class %s not reported, got %v", w.IP, w.Port, w.Class, s.Classes))
+		}
+		if w.TLSSelf && (s.TLS == nil || !s.TLS.SelfSigned || s.Tunnel != "ssl") {
+			fails = append(fails, fmt.Sprintf("%s:%d: self-signed TLS not reported", w.IP, w.Port))
+		}
+	}
+	if s := out.Summary; s != nil && s.HTTPSent != s.Stats.HTTPRequests {
+		fails = append(fails, fmt.Sprintf("the run counted %d HTTP requests, the collector sent %d", s.Stats.HTTPRequests, s.HTTPSent))
+	}
+	return fails
+}
+
+func techs(s model.ServiceResult) []string {
+	var out []string
+	for _, t := range s.Technologies {
+		out = append(out, strings.TrimSpace(t.Name+" "+t.Version))
+	}
+	return out
+}
+
+func contains(xs []string, x string) bool {
+	for _, v := range xs {
+		if v == x {
+			return true
+		}
+	}
+	return false
+}
+
+func printApps(w io.Writer, out Output) {
+	fmt.Fprintf(w, "%-11s %-5s %-34s %-52s %s\n", "IP", "PORT", "HTTP / TLS", "TECHNOLOGIES (signature engine)", "CLASSES")
+	for _, h := range out.Hosts {
+		for _, s := range h.Services {
+			web := "-"
+			if s.HTTP != nil {
+				title := s.HTTP.Title
+				if len(title) > 22 {
+					title = title[:22]
+				}
+				web = fmt.Sprintf("%d %q", s.HTTP.Status, title)
+			}
+			if s.TLS != nil {
+				web += fmt.Sprintf(" tls self-signed=%v", s.TLS.SelfSigned)
+			}
+			fmt.Fprintf(w, "%-11s %-5d %-34s %-52s %s\n", h.IP, s.Port, web, strings.Join(techs(s), ", "), strings.Join(s.Classes, ", "))
+		}
+	}
+	if s := out.Summary; s != nil {
+		fmt.Fprintf(w, "http requests: %d counted by the run, %d sent by the collector, %d HTTP services\n", s.Stats.HTTPRequests, s.HTTPSent, s.Stats.HTTPServices)
+	}
+}
+
 // CheckRate checks the intensity limit: no nmap group ran above its
 // --max-rate share and the run average stays under the limit.
 func CheckRate(s *Summary) (fails []string) {
@@ -234,7 +344,7 @@ func printTable(w io.Writer, out Output) {
 
 func main() {
 	in := flag.String("in", "", "file with scanprobe stdout")
-	expect := flag.String("expect", "lab", "lab | lab-ports | none")
+	expect := flag.String("expect", "lab", "lab | lab-ports | apps | none")
 	status := flag.String("status", "completed", "expected final status")
 	sessions := flag.Int("sessions", 0, "expected number of sessions (2 = paused and resumed); 0 = any")
 	flag.Parse()
@@ -256,6 +366,9 @@ func main() {
 		fails = append(fails, CheckLab(out, true)...)
 	case "lab-ports":
 		fails = append(fails, CheckLab(out, false)...)
+	case "apps":
+		printApps(os.Stdout, out)
+		fails = append(fails, CheckApps(out)...)
 	}
 	fails = append(fails, CheckRate(out.Summary)...)
 	if s := out.Summary; s != nil {

@@ -27,6 +27,58 @@ func NewLimiter(perSecond float64, burst int) *Limiter {
 // Wait takes one token.
 func (l *Limiter) Wait(ctx context.Context) error { return l.WaitN(ctx, 1) }
 
+// WaitAll blocks until every limiter has a token at the same moment, then
+// takes one from each. Nothing is reserved ahead: a token is taken when the
+// caller may send, so each limiter sees the real send times and its rate
+// holds even when another limiter of the set is the slower one.
+// Callers must pass the limiters in the same order everywhere.
+func WaitAll(ctx context.Context, ls ...*Limiter) error {
+	var act []*Limiter
+	for _, l := range ls {
+		if l != nil && l.rate > 0 {
+			act = append(act, l)
+		}
+	}
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		for _, l := range act {
+			l.mu.Lock()
+		}
+		now := time.Now()
+		var wait time.Duration
+		for _, l := range act {
+			l.tokens += now.Sub(l.last).Seconds() * l.rate
+			if l.tokens > l.burst {
+				l.tokens = l.burst
+			}
+			l.last = now
+			if l.tokens < 1 {
+				wait = max(wait, time.Duration((1-l.tokens)/l.rate*float64(time.Second))+time.Microsecond)
+			}
+		}
+		if wait == 0 {
+			for _, l := range act {
+				l.tokens--
+			}
+		}
+		for i := len(act) - 1; i >= 0; i-- {
+			act[i].mu.Unlock()
+		}
+		if wait == 0 {
+			return nil
+		}
+		t := time.NewTimer(wait)
+		select {
+		case <-t.C:
+		case <-ctx.Done():
+			t.Stop()
+			return ctx.Err()
+		}
+	}
+}
+
 // WaitN takes n tokens. It reserves them at once and then sleeps for the
 // debt, so the long-run rate holds even when n is larger than the burst.
 func (l *Limiter) WaitN(ctx context.Context, n int) error {

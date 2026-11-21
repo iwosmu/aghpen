@@ -12,11 +12,12 @@ cd "$(dirname "$0")"
 NET=czeng-net
 SCANNET=czeng-scan
 WIDENET=czeng-wide
+APPNET=czeng-apps
 IMG=czeng-lab:latest
 
 down() {
   docker ps -aq --filter "name=^czeng-" | xargs -r docker rm -f >/dev/null 2>&1 || true
-  docker network rm "$NET" "$SCANNET" "$WIDENET" >/dev/null 2>&1 || true
+  docker network rm "$NET" "$SCANNET" "$WIDENET" "$APPNET" >/dev/null 2>&1 || true
 }
 
 up() {
@@ -47,8 +48,50 @@ up() {
   docker ps --filter "name=^czeng-" --format '{{.Names}}\t{{.Status}}' | sort
 }
 
+# apps starts real applications in their own network, 10.76.0.0/24, for the
+# fingerprint scenario. The lab is throwaway: passwords are random and exist
+# only inside these containers.
+apps() {
+  docker ps -aq --filter "name=^czeng-app-" | xargs -r docker rm -f >/dev/null 2>&1 || true
+  docker network rm "$APPNET" >/dev/null 2>&1 || true
+  docker build -q -t "$IMG" lab >/dev/null
+  docker network create --subnet 10.76.0.0/24 --gateway 10.76.0.1 "$APPNET" >/dev/null
+  local pw; pw=$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')
+  app() { local name=$1 ip=$2; shift 2
+    docker run -d --name "czeng-app-$name" --hostname "$name" --network "$APPNET" --ip "$ip" "$@" >/dev/null; }
+  app db         10.76.0.10 -e MARIADB_ROOT_PASSWORD="$pw" -e MARIADB_DATABASE=wp -e MARIADB_USER=wp -e MARIADB_PASSWORD="$pw" mariadb:11
+  app wordpress  10.76.0.11 -e WORDPRESS_DB_HOST=10.76.0.10 -e WORDPRESS_DB_USER=wp -e WORDPRESS_DB_PASSWORD="$pw" -e WORDPRESS_DB_NAME=wp wordpress:6-apache
+  app grafana    10.76.0.20 grafana/grafana:11.3.0
+  app gitea      10.76.0.21 -e GITEA__security__INSTALL_LOCK=true gitea/gitea:1.22
+  app phpmyadmin 10.76.0.30 -e PMA_HOST=10.76.0.10 phpmyadmin:5
+  app tomcat     10.76.0.40 tomcat:10.1-jdk17
+  app https      10.76.0.50 -e ROLE=https -e PORT=8443 "$IMG"
+  app nginx-odd  10.76.0.60 nginx:alpine sh -c "sed -i 's/listen  *80;/listen 8181;/' /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"
+  echo "waiting for the applications..."
+  wait_http() { # container url
+    for _ in $(seq 1 90); do docker exec "$1" sh -c "curl -s -o /dev/null -m 3 '$2' || wget -q -T 3 -O /dev/null '$2'" 2>/dev/null && return 0; sleep 2; done
+    echo "$1 did not answer on $2" >&2; return 1; }
+  # install WordPress, so the site shows its real front page (lab set-up, not
+  # part of any scan); repeat until the database is ready and the page answers 200
+  local code=000
+  for _ in $(seq 1 60); do
+    docker exec czeng-app-wordpress curl -s -o /dev/null -m 60 -H 'Host: 10.76.0.11' 'http://localhost/wp-admin/install.php?step=2' \
+      --data-urlencode 'weblog_title=Czujka lab' --data-urlencode 'user_name=labadmin' --data-urlencode "admin_password=$pw" \
+      --data-urlencode "admin_password2=$pw" --data-urlencode 'pw_weak=1' --data-urlencode 'admin_email=lab@example.com' --data-urlencode 'blog_public=0' || true
+    code=$(docker exec czeng-app-wordpress curl -s -o /dev/null -m 20 -w '%{http_code}' -H 'Host: 10.76.0.11' http://localhost/ || true)
+    [ "$code" = 200 ] && break
+    sleep 2
+  done
+  [ "$code" = 200 ] || { echo "WordPress was not installed (front page answers $code)" >&2; return 1; }
+  wait_http czeng-app-grafana http://localhost:3000/login
+  wait_http czeng-app-gitea http://localhost:3000/
+  wait_http czeng-app-tomcat http://localhost:8080/ || true
+  docker ps --filter "name=^czeng-app-" --format '{{.Names}}\t{{.Status}}' | sort
+}
+
 case "${1:-}" in
   up) up ;;
+  apps) apps ;;
   down) down ;;
-  *) echo "usage: $0 up|down" >&2; exit 2 ;;
+  *) echo "usage: $0 up|apps|down" >&2; exit 2 ;;
 esac

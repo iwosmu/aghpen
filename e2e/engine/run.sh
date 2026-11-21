@@ -111,6 +111,19 @@ check G-unprivileged -expect none
 scan I-adaptive routed -targets 10.79.0.0/20 -exclude 10.79.0.1,10.79.15.254 -ports "$PORTS" -pps 2000 -measure-iface eth0 -quiet
 check I-adaptive -expect none
 
+# J. Real applications, real fingerprints: one engine run with the HTTP/TLS
+#    collector and the built-in signature library. The check compares
+#    technologies, versions and classes with what the lab really runs.
+./lab.sh apps || exit 1
+echo
+echo "== J-apps: scanprobe -targets 10.76.0.0/24 -ports top-100,3000,8181,8443 -pps 500 -http -http-rps 20 -per-host-rps 8 -max-paths 12"
+docker run --rm --name czeng-scanner --network czeng-apps --ip 10.76.0.2 -v "$BIN:/work:ro" --entrypoint /work/scanprobe "$IMG" \
+  -targets 10.76.0.0/24 -exclude 10.76.0.1,10.76.0.2 -ports top-100,3000,8181,8443 -pps 500 \
+  -http -http-rps 20 -per-host-rps 8 -max-paths 12 -measure-iface eth0 -quiet >"$OUT/J-apps.jsonl" 2>"$OUT/J-apps.log"
+echo "exit code $?"
+grep -E 'http stage|COMPLETED|FAILED' "$OUT/J-apps.log" | cut -c1-300
+check J-apps -expect apps
+
 # H. Emergency stop: the engine refuses to start and sends nothing.
 scan H-emergency l2 -targets 10.77.0.0/22 -ports "$PORTS" -emergency-stop -measure-iface eth0 -quiet
 check H-emergency -expect none -status failed

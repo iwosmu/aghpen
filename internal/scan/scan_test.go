@@ -617,7 +617,9 @@ func TestHTTPAndSignatureStage(t *testing.T) {
 			}
 		}
 	}
-	if out.Stats.HTTPServices != 2 || out.Stats.HTTPRequests != 6 {
+	// 3 calls pay one request each (also the port that is not HTTP), the two
+	// HTTP answers carry two extra paths each
+	if out.Stats.HTTPServices != 2 || out.Stats.HTTPRequests != 7 {
 		t.Errorf("http stats = %+v", out.Stats)
 	}
 

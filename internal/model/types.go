@@ -343,6 +343,10 @@ type Chunk struct {
 	HostsUp    int         `json:"hosts_up"`
 	PPS        float64     `json:"pps"`
 	Error      string      `json:"error"`
+	// Group is the work group of the chunk: the seq of the first chunk that one
+	// scanner process took together with this one. Chunks with the same Group
+	// were scanned as one adaptive group; 0 means the chunk has not started.
+	Group int `json:"group"`
 }
 
 // ---------- Engine output (one record per probed host) ----------

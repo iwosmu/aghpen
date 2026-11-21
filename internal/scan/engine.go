@@ -179,7 +179,7 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 		e: e, log: log, plan: plan, sink: sink, sinkCtx: context.WithoutCancel(ctx),
 		prober: e.Prober(), ports: ports, disc: disc, lim: lim,
 		budget:    NewBudget(lim.PPS),
-		httpLim:   probe.NewLimiter(lim.HTTPRPS, int(math.Ceil(lim.HTTPRPS))),
+		httpLim:   probe.NewLimiter(lim.HTTPRPS, 1), // no burst: the cap holds in every second
 		hostSem:   make(chan struct{}, lim.ParallelHosts),
 		hostnames: exp.Hostnames,
 		hints:     map[string]model.HostHint{},
@@ -401,6 +401,7 @@ type groupStats struct {
 	services int
 	http     int
 	packets  int64
+	hosts    []model.HostResult // reported to the sink when the group is final
 }
 
 func (r *run) runGroup(ctx context.Context, g *group, want int) {
@@ -413,6 +414,7 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 	for _, u := range g.units {
 		t := start
 		u.c.Status, u.c.StartedAt, u.c.FinishedAt, u.c.Error, u.hostUp = model.ChunkRunning, &t, nil, "", 0
+		u.c.Group = g.units[0].c.Seq
 		r.emitChunk(u)
 	}
 	gs := &groupStats{}
@@ -455,6 +457,16 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 			s.ChunksDone += len(g.units)
 		})
 	}
+	if status != model.ChunkDeferred {
+		// hosts first, then the chunk state: a chunk marked done has its results stored
+		for _, h := range gs.hosts {
+			if err := r.sink.OnHost(r.sinkCtx, h); err != nil {
+				r.log.Warn("sink OnHost failed", "ip", h.IP, "error", err.Error())
+				r.stats.update(func(s *model.RunStats) { s.Errors++ })
+			}
+		}
+	}
+	gs.hosts = nil
 	for _, u := range g.units {
 		u.c.Status, u.c.Error, u.c.PPS, u.c.HostsUp = status, errText, pps, u.hostUp
 		// the group ran as one process: each chunk gets its share of the time
