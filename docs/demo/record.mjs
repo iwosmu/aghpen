@@ -15,23 +15,28 @@
 //                     block in the sidebar is blurred in every frame (CZ_REDACT_ACCOUNT=0 shows it)
 //   CZ_WIZARD_URL     a FRESH stack for the install-and-wizard shot (its first-run password in CZ_WIZARD_PASSWORD);
 //                     without it shot 1 shows the login on CZ_URL
-//   CZ_PROFILE        profile to start live in shot 2 (default "Laboratorium /16: pełny przegląd"); CZ_START_SCAN=0 shows the
-//                     latest completed run of that profile instead (for a read-only account)
-//   CZ_SCAN_SECONDS   real seconds of the live scan to record (default 64; shown at ×8, so 8 s in the film)
-//   CZ_SCAN_WARM_CHUNKS  the film cuts in once this many address groups are done and a host is up (default 8; the
-//                     discovery phase before it is cut out); CZ_SCAN_WARM_MAX caps that wait in seconds (default 900)
-//   CZ_SCAN_FINISH    1 (default) waits off-camera for the live run to finish and ends the shot on its counts; 0 ends on
-//                     the last finished run of the profile; CZ_SCAN_FINISH_MAX caps the wait in seconds (default 1800)
+//   CZ_PROFILE        profile of shot 2 (default "Laboratorium /16: pełny przegląd"). The film follows the newest RUNNING
+//                     run of it and never shows another run. Without one it starts one manual scan; CZ_START_SCAN=0 forbids
+//                     that, and the script then stops before the first shot when no run of the profile is running
+//   CZ_SCAN_SECONDS   real seconds of the live scan to record (default 72; shown at ×8, so 9 s in the film)
+//   CZ_SCAN_WARM_CHUNKS  only for a scan this script starts: it cuts in once this many address groups are done and a host
+//                     is up (default 1); CZ_SCAN_WARM_MAX caps that wait in seconds (default 900)
+//   CZ_SCAN_FINISH    1 (default) waits off camera for the run to finish and ends the shot on its final counts (live counts
+//                     when it does not finish within CZ_SCAN_FINISH_MAX, default 1800 s); 0 ends on the live counts at once
 //   CZ_HOST           unstable host for shot 4 (default 10.66.70.20)
 //   CZ_RULE           rule for shot 6 (default "Panel administracyjny poza siecią zarządzania")
 //   CZ_SERVICE        service for the signature from an example, "ip:port" (default 10.66.1.10:80)
-//   CZ_STOP           1 (default) records the emergency stop and releases it afterwards; 0 only points at the button
-//                     (for a public instance: no stop is pressed)
+//   CZ_STOP           1 (default) presses the real emergency stop while the run of shot 2 is running, holds the stopped
+//                     state 3 s, then releases it and resumes the paused runs in a finally block, and at the end checks
+//                     over the API that the stop is off and the run is running or completed ("stop released: verified",
+//                     else exit code 3). Needs CZ_SCAN_FINISH=0 (the run must still be running). 0 only points at the button
 //   CZ_WIZARD_EMAIL   login of the fresh wizard stack (default admin@czujka.local)
+// Shot 3 compares the pair of consecutive runs of CZ_PROFILE (last 40) with the most unexpected changes, preferring a pair
+// with rows in all three columns. Each shot lasts at least words / 1.7 s + 2 s of its voice-over paragraph.
 // Writes on CZ_URL (each is logged as "write: ..."): the sign-in session; at most one manual scan in shot 2 (none when a
-// run of CZ_PROFILE is already running: the film follows that run, and none with CZ_START_SCAN=0); POST
-// /signatures/suggest in shot 6 (computes a proposal, saves nothing); with CZ_STOP=1 the emergency stop, its release,
-// resuming the runs it paused and cancelling the scan this script started. Nothing is deleted or disabled.
+// run of CZ_PROFILE is already running, and none with CZ_START_SCAN=0); POST /signatures/suggest in shot 6 (computes a
+// proposal, saves nothing); with CZ_STOP=1 the emergency stop, its release, resuming the runs it paused (cancelling only a
+// scan this script started). Nothing is deleted or disabled.
 //   CZ_HEADED=1       show the browser while recording
 //   CZ_ONLY           comma list of shot ids to record (testing), e.g. CZ_ONLY=time,rules
 //   CZ_OUT            folder for the film, the captions and lektor.txt (default docs/demo)
@@ -51,12 +56,12 @@ const WIZARD_EMAIL = env.CZ_WIZARD_EMAIL || "admin@czujka.local";
 const REDACT = env.CZ_REDACT_ACCOUNT !== "0";
 const wrote = (what) => console.log("write: " + what);
 const PROFILE = env.CZ_PROFILE || "Laboratorium /16: pełny przegląd";
-const SCAN_WARM_CHUNKS = Number(env.CZ_SCAN_WARM_CHUNKS || 8);
+const SCAN_WARM_CHUNKS = Number(env.CZ_SCAN_WARM_CHUNKS || 1);
 const SCAN_WARM_MAX = Number(env.CZ_SCAN_WARM_MAX || 900);
 const SCAN_FINISH = env.CZ_SCAN_FINISH !== "0";
 const SCAN_FINISH_MAX = Number(env.CZ_SCAN_FINISH_MAX || 1800);
 const START_SCAN = env.CZ_START_SCAN !== "0";
-const SCAN_SECONDS = Number(env.CZ_SCAN_SECONDS || 64);
+const SCAN_SECONDS = Number(env.CZ_SCAN_SECONDS || 72);
 const HOST = env.CZ_HOST || "10.66.70.20";
 const RULE = env.CZ_RULE || "Panel administracyjny poza siecią zarządzania";
 const SERVICE = env.CZ_SERVICE || "10.66.1.10:80";
@@ -90,7 +95,7 @@ const SHOTS = [
   { id: "stop", caption: "Stop awaryjny",
     vo: "Stop awaryjny zatrzymuje wszystkie skany w ułamku sekundy." },
   { id: "end", caption: "",
-    vo: "Czujka. Działa na czujka.dev." },
+    vo: "Czujka. Działa na czujka.dev.", minS: 5.8 }, // the voice spells the domain out: 3.8 s measured
 ];
 const marks = {}; // id -> {start, end, fast: [[t0, t1]]}
 let cur = null;
@@ -102,10 +107,12 @@ function filmSoFar(m, t) {
   for (const [a, b] of m.fast) d -= ((b || t) - a) * (1 - 1 / FAST);
   return d;
 }
-// Each shot holds its last frame until its voice-over paragraph fits: words / 2.3 per second plus 1.5 s of margin.
-const WPS = 2.3, VO_MARGIN = 1.5;
-const voNeed = (id) => { const s = SHOTS.find((x) => x.id === id); return s ? s.vo.split(/\s+/).filter(Boolean).length / WPS + VO_MARGIN : 0; };
-async function end() { const short = voNeed(cur.id) - filmSoFar(cur, now()); if (short > 0) await sleep(short * 1000); cur.end = now(); cur = null; }
+// Each shot holds its last frame until its voice-over paragraph fits the measured Polish voice: words / 1.7 per second
+// plus 1.5 s of margin plus 0.5 s of lead-in; a shot may set a longer floor (minS) from a measured take.
+const WPS = 1.7, VO_MARGIN = 1.5, VO_LEAD = 0.5;
+const voSpeak = (s) => s.vo.split(/\s+/).filter(Boolean).length / WPS;
+const voNeed = (id) => { const s = SHOTS.find((x) => x.id === id); return s ? Math.max(voSpeak(s) + VO_MARGIN + VO_LEAD, s.minS || 0) : 0; };
+async function end() { const short = voNeed(cur.id) - filmSoFar(cur, now()); if (short > 0) await sleep(short * 1000); await assertRedacted(); cur.end = now(); cur = null; }
 function fastOn() { cur.fast.push([now(), 0]); }
 function fastOff() { cur.fast[cur.fast.length - 1][1] = now(); }
 // A cut inside a shot: the frames between skipOn and skipOff are left out of the film (a hard cut, no ×8 mark).
@@ -129,9 +136,16 @@ const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, 
 await ctx.addInitScript((redact) => {
   try { localStorage.setItem("czujka.lang", "pl"); } catch {}
   // The signed-in account (name, e-mail) is blurred: the film must not carry the account of the recording instance.
-  if (redact) { const st = document.createElement("style"); st.textContent = "[data-testid=whoami]{filter:blur(9px)!important}"; (document.head || document.documentElement).appendChild(st); }
+  // A style added before the document exists is lost when the page parses, so it is (re)added whenever it is missing.
+  const ensureRedact = () => {
+    if (!redact || document.getElementById("__cz_redact") || !(document.head || document.body)) return;
+    const st = document.createElement("style"); st.id = "__cz_redact";
+    st.textContent = "[data-testid=whoami]{filter:blur(9px)!important}";
+    (document.head || document.body).appendChild(st);
+  };
   // A visible cursor: an overlay that follows the real mouse events, with a ring on every click.
   const install = () => {
+    ensureRedact();
     if (document.getElementById("__cz_cursor")) return;
     const c = document.createElement("div");
     c.id = "__cz_cursor";
@@ -227,9 +241,11 @@ async function login(url, email, password, visible) {
   const e = page.getByLabel(/e-mail|email/i).first();
   const p = page.getByLabel(/^Hasło$/).first();
   await e.waitFor();
-  if (visible) { await type(e, email, 35); await type(p, password, 30); await sleep(400); await click(page.getByRole("button", { name: "Zaloguj się" })); }
+  if (visible) { await type(e, email, 22); await type(p, password, 18); await sleep(250); await click(page.getByRole("button", { name: "Zaloguj się" })); }
   else { await e.fill(email); await p.fill(password); await page.getByRole("button", { name: "Zaloguj się" }).click(); }
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+  await page.waitForLoadState("networkidle").catch(() => {});
+  await assertRedacted();
 }
 // The live-scan view: the address map when the run has one (the UI hides it for runs over a few addresses), else the
 // progress tab. Chosen before the shot so no frame shows an empty tab.
@@ -241,8 +257,27 @@ async function runView(id) {
   await present("/runs/" + id + "?tab=progress");
   return page.locator("main h1").first();
 }
-async function present(path) { await page.goto(URL0 + path + (path.includes("?") ? "&" : "?") + "present=1"); await page.waitForLoadState("networkidle").catch(() => {}); await sleep(600); }
+async function present(path) { await page.goto(URL0 + path + (path.includes("?") ? "&" : "?") + "present=1"); await page.waitForLoadState("networkidle").catch(() => {}); await sleep(600); await assertRedacted(); }
+// The account block must be blurred in every frame: checked after each page load and at the end of each shot.
+async function assertRedacted() {
+  if (!REDACT) return;
+  const f = () => page.evaluate(() => { const w = document.querySelector("[data-testid=whoami]"); return w ? getComputedStyle(w).filter : "absent"; }).catch(() => "absent");
+  let v = await f();
+  if (v !== "absent" && !/blur/.test(v)) { await page.addStyleTag({ content: "[data-testid=whoami]{filter:blur(9px)!important}" }); v = await f(); }
+  if (v !== "absent" && !/blur/.test(v)) throw new Error("the account block is not blurred (filter: " + v + "): stopping before it is filmed");
+}
 const settle = (ms = 1200) => sleep(ms);
+
+// ---------- before the first shot: the profile, its running run, and what the options allow ----------
+await login(URL0, EMAIL, PASSWORD, false);
+const profiles = (await api("/profiles?limit=100")).items || [];
+const prof = profiles.find((p) => p.name === PROFILE);
+if (!prof) throw new Error("no profile named " + PROFILE);
+const findRunning = async () => ((await api("/runs?limit=20&status=running&profile_id=" + prof.id)).items || []).filter((r) => !r.ad_hoc).sort((a, b) => b.id - a.id)[0] || null;
+if (want("scan") && !START_SCAN && !(await findRunning())) throw new Error("no run of \"" + PROFILE + "\" is running and CZ_START_SCAN=0: start the recording while its scheduled run is running");
+if (want("stop") && STOP && SCAN_FINISH && !START_SCAN) throw new Error("CZ_STOP=1 needs the run still running at the stop shot: set CZ_SCAN_FINISH=0 (shot 2 then ends on the live counts)");
+const safety0 = await api("/settings/safety");
+if (safety0 && safety0.emergency_stop) throw new Error("the emergency stop is already on at " + URL0 + ": release it first");
 
 // ---------- 1. install and wizard ----------
 if (!want("install")) {} else if (env.CZ_WIZARD_URL) {
@@ -252,22 +287,22 @@ if (!want("install")) {} else if (env.CZ_WIZARD_URL) {
   // Start the shot on a rendered page, not on the blank frame before the login background paints.
   await page.waitForLoadState("networkidle").catch(() => {}); await sleep(1500);
   begin("install");
-  await settle(900);
+  await settle(300);
   await login(W, WIZARD_EMAIL, env.CZ_WIZARD_PASSWORD, true); // the throwaway stack; its password field shows dots
-  await page.goto(W + "/setup?present=1"); await settle(1200);
+  await page.goto(W + "/setup?present=1"); await settle(500);
   const pw1 = page.getByTestId("setup-pw");
   await pw1.waitFor({ timeout: 15000 }).catch(() => {});
   if (await pw1.isVisible().catch(() => false)) {
-    await type(pw1, "Kampus-AGH-2026!", 30);
-    await type(page.getByTestId("setup-pw2"), "Kampus-AGH-2026!", 30);
+    await type(pw1, "Kampus-AGH-2026!", 14);
+    await type(page.getByTestId("setup-pw2"), "Kampus-AGH-2026!", 14);
     await click(page.getByRole("button", { name: "Zapisz hasło i dalej" }));
-    await settle(900);
+    await settle(600);
   }
-  await type(page.getByTestId("setup-net-name"), "Kampus AGH", 45);
-  await type(page.getByTestId("setup-ranges"), "10.66.0.0/16", 45);
-  await settle(1000);
+  await type(page.getByTestId("setup-net-name"), "Kampus AGH", 25);
+  await type(page.getByTestId("setup-ranges"), "10.66.0.0/16", 25);
+  await settle(400);
   await click(page.getByRole("button", { name: "Zapisz zakres i dalej" }));
-  await settle(1300);
+  await settle(800);
   await end();
 } else {
   // No wizard stack: sign in off camera (the real credentials are never typed on screen), then show the dashboard.
@@ -280,48 +315,46 @@ if (!want("install")) {} else if (env.CZ_WIZARD_URL) {
 
 // ---------- the main stack ----------
 await login(URL0, EMAIL, PASSWORD, false);
-
-const profiles = (await api("/profiles?limit=100")).items || [];
-const prof = profiles.find((p) => p.name === PROFILE);
-if (!prof) throw new Error("no profile named " + PROFILE);
 const done = ((await api("/runs?limit=50&status=completed&profile_id=" + prof.id)).items || []).filter((r) => !r.ad_hoc);
 
 // ---------- 2. live /16 scan ----------
-let liveRun = null, liveDone = false, stopExtra = null, liveOwn = false, stopPressed = false;
-const TIME_STEPS_BACK = Number(env.CZ_TIME_STEPS || 4);
-// A run of the profile that is already running (a scheduled one) is filmed as it is: no second scan is started.
-const running = START_SCAN && want("scan") ? ((await api("/runs?limit=20&status=running&profile_id=" + prof.id)).items || []).filter((r) => !r.ad_hoc)[0] : null;
-if (!want("scan")) {} else if (START_SCAN) {
+let liveRun = null, liveDone = false, stopExtra = null, liveOwn = false, stopPressed = false, stopTarget = null, released = false;
+// Releases the emergency stop and resumes every run it paused (cancels only a scan this script started).
+async function releaseStop() {
+  if (released) return;
+  await api("/emergency-stop/release", "POST"); wrote("POST /emergency-stop/release");
+  const paused = ((await api("/runs?status=paused&limit=100")).items || []).filter((r) => r.pause_reason === "emergency_stop");
+  for (const r of paused) { const op = (liveOwn && r.id === liveRun) || r.id === stopExtra ? "/cancel" : "/resume"; await api("/runs/" + r.id + op, "POST"); wrote("POST /runs/" + r.id + op); }
+  released = true;
+}
+const TIME_STEPS_BACK = Number(env.CZ_TIME_STEPS || 3);
+// The film follows the newest RUNNING run of the profile (a scheduled one): no second scan is started. Without one it
+// starts one manual scan (CZ_START_SCAN=0 forbids that; the pre-check above already stopped the script then).
+if (want("scan")) {
+  const running = await findRunning();
   if (running) {
     liveRun = running.id;
     console.log("scan: following the running run " + liveRun + " (no scan started)");
-    await runView(liveRun);
-    begin("scan");
-    await settle(600);
   } else {
-  await present("/runs");
+    if (!START_SCAN) throw new Error("no run of \"" + PROFILE + "\" is running and CZ_START_SCAN=0");
+    await present("/runs");
+    await click(page.getByRole("button", { name: "Uruchom skan" }).first());
+    await settle(500);
+    await page.getByRole("dialog").locator("select").first().selectOption({ label: PROFILE });
+    await page.getByRole("dialog").getByRole("button", { name: "Uruchom", exact: true }).click();
+    await page.waitForURL(/\/runs\/\d+/);
+    liveRun = Number(page.url().match(/\/runs\/(\d+)/)[1]);
+    liveOwn = true;
+    wrote("POST /runs (one manual scan of " + PROFILE + ", run " + liveRun + ")");
+    // A run that has just started shows 0 % and no hosts during discovery: wait off camera for the first groups.
+    await waitRun(liveRun, (st) => (st.stats?.chunks_done || 0) >= SCAN_WARM_CHUNKS && (st.stats?.hosts_up || 0) > 0, SCAN_WARM_MAX);
+  }
+  // The address map of the running run (tab "Mapa"; a run over a few addresses has none, then the progress tab).
+  const map = await runView(liveRun);
   begin("scan");
   await settle(600);
-  await click(page.getByRole("button", { name: "Uruchom skan" }).first());
-  await settle(700);
-  const sel = page.getByRole("dialog").locator("select").first();
-  await point(sel); await sel.selectOption({ label: PROFILE }); await settle(1200);
-  await click(page.getByRole("dialog").getByRole("button", { name: "Uruchom", exact: true }));
-  await page.waitForURL(/\/runs\/\d+/);
-  liveRun = Number(page.url().match(/\/runs\/(\d+)/)[1]);
-  liveOwn = true;
-  wrote("POST /runs (one manual scan of " + PROFILE + ", run " + liveRun + ")");
-  await settle(1800);
-  }
-  // Discovery (one ARP sweep on-link, then the host sweep) shows 0 % and no hosts for minutes: cut it out and come back
-  // when the first address groups have finished and hosts are on the map.
-  skipOn();
-  await waitRun(liveRun, (st) => (st.stats?.chunks_done || 0) >= SCAN_WARM_CHUNKS && (st.stats?.hosts_up || 0) > 0, SCAN_WARM_MAX);
-  // The run page has tabs; the address-space map is in tab "Mapa" (a running run opens on "Przebieg").
-  const map = await runView(liveRun); await settle(800);
-  skipOff();
   await point(map, 900);
-  await settle(1200);
+  await settle(800);
   fastOn();
   const t0 = now();
   while (now() - t0 < SCAN_SECONDS) {
@@ -330,34 +363,45 @@ if (!want("scan")) {} else if (START_SCAN) {
     if (st && ["completed", "failed", "cancelled"].includes(st.status)) break;
   }
   fastOff();
-  // End on a finished run with its counts: wait (cut) for this run to finish, else show the last finished run.
+  // End on the counts of the same run (tab "Przebieg": rate gauge and counts): final when CZ_SCAN_FINISH=1 and it
+  // finishes in time, live otherwise. Never another run.
   skipOn();
-  const fin = SCAN_FINISH ? await waitRun(liveRun, () => false, SCAN_FINISH_MAX) : null;
-  // End on the counts: tab "Przebieg" holds the stats (a finished run opens on "Usługi").
-  if (fin && fin.status === "completed") { await present("/runs/" + liveRun + "?tab=progress"); liveDone = true; }
-  else if (done[0]) await present("/runs/" + done[0].id + "?tab=progress");
-  await page.waitForLoadState("networkidle").catch(() => {});
-  await page.evaluate(() => window.scrollTo(0, 0)); await settle(1200);
+  const fin = SCAN_FINISH ? await waitRun(liveRun, () => false, SCAN_FINISH_MAX) : await api("/runs/" + liveRun);
+  liveDone = !!fin && ["completed", "failed", "cancelled"].includes(fin.status);
+  console.log("scan: shot ends on the " + (liveDone ? "final" : "live") + " counts of run " + liveRun + " (" + (fin && fin.status) + ")");
+  await present("/runs/" + liveRun + "?tab=progress");
+  await page.evaluate(() => window.scrollTo(0, 0)); await settle(600);
   skipOff();
-  await settle(2500);
+  await settle(3000);
   await end();
-} else {
-  const last = done[0];
-  await present("/runs/" + last.id + "?tab=map");
-  begin("scan"); await settle(6000); await end();
 }
 
 // ---------- 3. changes between the two last completed scans ----------
 if (want("changes")) {
-  const [to, from] = done;
+  // The pair of consecutive full runs of the profile (last 40) with the most unexpected changes, preferring a pair with
+  // rows in all three columns (new, gone, changed).
+  const recent = ((await api("/runs?limit=40&status=completed&profile_id=" + prof.id)).items || []).filter((r) => !r.ad_hoc);
+  const ids = new Set(recent.map((r) => r.id));
+  const NEW = ["host_new", "service_new"], GONE = ["host_gone", "service_gone", "host_missing", "service_unreachable"];
+  let to = null, from = null, best = -1;
+  for (const r of recent) {
+    const bk = (r.summary && r.summary.by_kind) || {}, prev = r.summary && r.summary.prev_run_id;
+    if (!prev || !ids.has(prev)) continue;
+    let n = 0, a = 0, g = 0, c = 0;
+    for (const [k, v] of Object.entries(bk)) { if (k === "expected") continue; n += v; if (NEW.includes(k)) a += v; else if (GONE.includes(k)) g += v; else c += v; }
+    const sc = (a && g && c ? 1e6 : 0) + n;
+    if (n > 0 && sc > best) { best = sc; to = r; from = recent.find((x) => x.id === prev); }
+  }
+  if (!to) { [to, from] = done; console.log("changes: no pair with unexpected changes in the last 40 runs; showing the last two"); }
+  else console.log("changes: runs " + from.id + " -> " + to.id + " (" + (best % 1e6) + " unexpected changes" + (best >= 1e6 ? ", all three columns" : "") + ")");
   await present(to && from ? "/changes/compare?from=" + from.id + "&to=" + to.id : "/changes");
   begin("changes");
-  await settle(2500);
+  await settle(1800);
   const gone = page.getByText(/Zniknęły|Nowe|Zmienione/).first();
   if (await gone.count()) await point(gone, 900);
-  await settle(1500);
-  await smoothScroll(380, 1400);
-  await settle(3500);
+  await settle(1000);
+  await smoothScroll(380, 1100);
+  await settle(2500);
   await end();
 }
 
@@ -368,15 +412,14 @@ if (want("unstable")) {
   // The heatmap and the re-probe plan are in the host page tab "Dostępność".
   await present("/hosts/" + h.id + "?tab=availability");
   begin("unstable");
-  await settle(2200);
+  await settle(1000);
   const heat = page.getByText("Dostępność w tygodniu").first();
   await scrollIntoMiddle(heat, 1100);
   await point(heat, 900);
-  const cells = page.locator("rect, [data-hour]").first();
-  await settle(3500);
+  await settle(2200);
   const plan = page.getByText("Plan ponownych sprawdzeń").first();
   if (await plan.count()) { await scrollIntoMiddle(plan, 1100); await point(plan, 900); }
-  await settle(4500);
+  await settle(2500);
   await end();
 }
 
@@ -394,16 +437,16 @@ if (want("time")) {
   console.log("time machine: biggest change between runs", pts[bi - 1]?.run_id, "and", pts[bi]?.run_id, "(score " + best + ")");
   await present(after ? "/time?run=" + after.run_id : "/time");
   begin("time");
-  await settle(2200);
+  await settle(1100);
   // Point at the scrubber (the step hint text was removed from the UI); the arrow keys below step through the runs.
   const strip = page.getByTestId("tm-scrubber").first();
   if (await strip.count()) { await point(strip, 900); await strip.focus().catch(() => {}); }
   await settle(800);
   // Step back across the change, then forward over it again, slow enough to read the numbers and the map.
-  for (let i = 0; i < TIME_STEPS_BACK; i++) { await page.keyboard.press("ArrowLeft"); await settle(1500); }
+  for (let i = 0; i < TIME_STEPS_BACK; i++) { await page.keyboard.press("ArrowLeft"); await settle(1300); }
   await settle(800);
-  for (let i = 0; i < 2; i++) { await page.keyboard.press("ArrowRight"); await settle(1700); }
-  await settle(2500);
+  for (let i = 0; i < 2; i++) { await page.keyboard.press("ArrowRight"); await settle(1600); }
+  await settle(1800);
   await end();
 }
 
@@ -411,24 +454,24 @@ if (want("time")) {
 if (want("rules")) {
   await present("/rules");
   begin("rules");
-  await settle(1500);
+  await settle(700);
   await click(page.getByTestId("rule-list").getByText(RULE).first(), 900);
-  await settle(1500);
+  await settle(1100);
   const dry = page.getByTestId("rule-dryrun");
   if (await dry.count()) await point(dry, 900);
-  await settle(2200);
+  await settle(1400);
   const [ip, port] = SERVICE.split(":");
   const svcs = await api("/services?q=" + encodeURIComponent(ip) + "&limit=50");
   const s = (svcs.items || []).find((x) => (x.ip === ip || x.host_ip === ip) && String(x.port) === port) || (svcs.items || [])[0];
   await present("/services/" + s.id);
-  await settle(1200);
+  await settle(900);
   await click(page.getByRole("button", { name: "Zaproponuj sygnaturę" }), 900);
   wrote("POST /signatures/suggest (a proposal; nothing is saved)");
   await page.getByTestId("suggest-result").waitFor({ timeout: 30000 }).catch(() => {});
   await settle(1200);
   const res = page.getByTestId("suggest-result");
   if (await res.count()) await point(res.locator("svg, p, div").first(), 900);
-  await settle(3800);
+  await settle(2500);
   await end();
 }
 
@@ -442,33 +485,40 @@ if (want("stop") && !STOP) {
   await settle(3200);
   await end();
 } else if (STOP && want("stop")) {
-  // The stop needs a running scan to show its effect: reuse the live run, or start the profile (cancelled afterwards).
+  // The real stop, pressed while the live run (the scheduled one) is running; released and resumed right after the shot
+  // in a finally block, so a crash cannot leave it on.
   let stopRun = liveRun && !liveDone ? liveRun : null;
+  if (stopRun) { const st = await api("/runs/" + stopRun); if (!st || st.status !== "running") stopRun = null; }
+  if (!stopRun) { const r = await findRunning(); if (r) stopRun = r.id; }
   if (!stopRun) {
+    if (!START_SCAN) throw new Error("CZ_STOP=1: no run of \"" + PROFILE + "\" is running at the stop shot and CZ_START_SCAN=0");
     const r = await api("/runs", "POST", { profile_id: prof.id });
     stopRun = (r && r.id) || (r && r.details && r.details.run_id) || null;
-    if (stopRun) wrote("POST /runs (a scan for the emergency-stop shot, run " + stopRun + ", cancelled afterwards)");
-    if (stopRun && !liveRun) { liveRun = stopRun; liveOwn = true; } // our own scan: cancelled after the stop
-    if (stopRun && stopRun !== liveRun) stopExtra = stopRun;
-    if (stopRun) await waitRun(stopRun, (st) => st.status === "running" && (st.stats?.packets_sent || st.stats?.addresses_done || 0) > 0, 120);
+    if (!stopRun) throw new Error("CZ_STOP=1: could not start a run for the stop shot: " + JSON.stringify(r).slice(0, 200));
+    wrote("POST /runs (a scan for the emergency-stop shot, run " + stopRun + ", cancelled afterwards)");
+    if (!liveRun) { liveRun = stopRun; liveOwn = true; } else stopExtra = stopRun;
+    await waitRun(stopRun, (st) => st.status === "running" && (st.stats?.packets_sent || st.stats?.addresses_done || 0) > 0, 120);
   }
-  if (stopRun) await present("/runs/" + stopRun); else await present("/");
-  begin("stop");
-  await settle(1000);
-  await click(page.getByTestId("emergency-stop"), 900);
-  stopPressed = true;
-  wrote("POST /emergency-stop (released after the recording)");
-  await settle(900);
-  const confirm = page.getByRole("dialog").getByRole("button", { name: /Stop awaryjny|Zatrzymaj|Potwierdź/ }).last();
-  await click(confirm, 700);
-  // The state after the stop: the run paused by the emergency stop, the top strip in its stopped state, 0 pps.
-  await settle(2000);
-  const state = page.getByText(/wstrzymany|zatrzyman/i).first();
-  if (await state.count()) await point(state, 900);
-  await settle(1500);
-  await moveTo(1500, 60, 900);
-  await settle(1500);
-  await end();
+  stopTarget = stopRun;
+  await present("/runs/" + stopRun + "?tab=progress");
+  try {
+    begin("stop");
+    await settle(400);
+    await click(page.getByTestId("emergency-stop"), 800);
+    stopPressed = true;
+    wrote("POST /emergency-stop (released right after the shot)");
+    await settle(500);
+    const confirm = page.getByRole("dialog").getByRole("button", { name: /Stop awaryjny|Zatrzymaj|Potwierdź/ }).last();
+    if (await confirm.count()) await click(confirm, 600);
+    // The stopped state: the run paused by the emergency stop, the top strip red, 0 pps. Held 3.5 s.
+    const state = page.getByText(/wstrzymany|zatrzyman/i).first();
+    await state.waitFor({ timeout: 8000 }).catch(() => {});
+    if (await state.count()) await point(state, 600);
+    await settle(3200);
+    await end();
+  } finally {
+    if (stopPressed) await releaseStop();
+  }
 }
 
 // ---------- end card ----------
@@ -480,19 +530,22 @@ if (want("end")) {
   await page.setContent('<html><head>' + ENDFONTS + '</head><body style="margin:0;background:#0e131b;color:#e9e5da;font-family:IBM Plex Sans,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:28px"><div style="display:flex;align-items:center;gap:32px"><div style="width:120px;height:120px">' + logo.replace(/width="[^"]*"|height="[^"]*"/g, "").replace("<svg", '<svg width="120" height="120"') + '</div><div style="font-size:120px;font-weight:600;letter-spacing:-0.03em">Czujka</div></div><div style="font-family:IBM Plex Mono,monospace;font-size:56px;color:#6ea3f2">czujka.dev</div></body></html>');
   await page.evaluate(() => { const c = document.getElementById("__cz_cursor"); if (c) c.remove(); return document.fonts.ready; });
   await page.addStyleTag({ content: "#__cz_cursor{display:none!important}" });
-  begin("end"); await settle(5000); await end();
+  begin("end"); await settle(4000); await end();
 }
 
-// ---------- clean up what the recording changed (the emergency stop is released, the live scan cancelled) ----------
-if (stopPressed) {
-  await api("/emergency-stop/release", "POST"); wrote("POST /emergency-stop/release");
-  // Runs that the stop paused (scheduled ones too) would block their profile's schedule: resume them, cancel our own live scan.
-  const paused = ((await api("/runs?status=paused&limit=100")).items || []).filter((r) => r.pause_reason === "emergency_stop");
-  for (const r of paused) { const op = liveOwn && r.id === liveRun ? "/cancel" : "/resume"; await api("/runs/" + r.id + op, "POST"); wrote("POST /runs/" + r.id + op); }
-}
+// ---------- clean up what the recording changed, then verify the stop is off ----------
+if (stopPressed) await releaseStop();
 // Only a scan this script started is cancelled; a scheduled run it followed keeps running.
 if (liveOwn && liveRun && !liveDone) { await api("/runs/" + liveRun + "/cancel", "POST"); wrote("POST /runs/" + liveRun + "/cancel"); }
 if (stopExtra) { await api("/runs/" + stopExtra + "/cancel", "POST"); wrote("POST /runs/" + stopExtra + "/cancel"); }
+if (stopPressed) {
+  const saf = await api("/settings/safety");
+  const st = stopTarget && !(liveOwn && stopTarget === liveRun) && stopTarget !== stopExtra ? await waitRun(stopTarget, (x) => ["running", "completed"].includes(x.status), 60) : null;
+  const okStop = saf && saf.emergency_stop === false;
+  const okRun = !st || ["running", "completed"].includes(st.status);
+  if (!okStop || !okRun) { console.error("STOP NOT RELEASED: emergency_stop=" + (saf && saf.emergency_stop) + ", run " + stopTarget + " " + (st && st.status) + ". Release it now in the UI."); process.exitCode = 3; }
+  else console.log("stop released: verified (emergency_stop=false" + (st ? ", run " + stopTarget + " " + st.status : "") + ")");
+}
 await cdp.send("Page.stopScreencast");
 await sleep(300);
 
@@ -557,8 +610,9 @@ for (const s of SHOTS) {
   clips.push(clip);
   if (s.caption) srt.push(srt.length + 1 + "\n" + fmt(tl) + " --> " + fmt(tl + out) + "\n" + s.caption + "\n");
   const words = s.vo.split(/\s+/).filter(Boolean).length;
-  lektor.push("[" + mmss(tl) + "–" + mmss(tl + out) + "] " + s.id + " (" + out.toFixed(1) + " s; " + words + " słów ≈ " + (words / 2.3).toFixed(1) + " s przy 2,3 słowa/s; zapas " + (out - words / 2.3).toFixed(1) + " s)\n" + s.vo + "\n");
-  if (out - words / 2.3 < VO_MARGIN - 0.05) console.log("WARNING: shot " + s.id + " leaves only " + (out - words / 2.3).toFixed(1) + " s for its voice-over");
+  const speak = Math.max(words / WPS, (s.minS || 0) - VO_MARGIN - VO_LEAD);
+  lektor.push("[" + mmss(tl) + "–" + mmss(tl + out) + "] " + s.id + " (" + out.toFixed(1) + " s; " + words + " słów ≈ " + speak.toFixed(1) + " s przy 1,7 słowa/s; zapas " + (out - speak).toFixed(1) + " s)\n" + s.vo + "\n");
+  if (out - speak < VO_MARGIN + VO_LEAD - 0.05) console.log("WARNING: shot " + s.id + " leaves only " + (out - speak).toFixed(1) + " s for its voice-over (needs " + (VO_MARGIN + VO_LEAD) + " s of margin and lead-in)");
   console.log(s.id.padEnd(9), out.toFixed(1).padStart(5) + " s", fastFrom >= 0 ? "(×" + FAST + " from " + fastFrom.toFixed(1) + " s to " + fastTo.toFixed(1) + " s)" : "");
   tl += out;
 }
@@ -567,6 +621,6 @@ const mp4 = resolve(OUT, "czujka-demo.mp4");
 ff(["-f", "concat", "-safe", "0", "-i", join(WORK, "clips.txt"), "-c", "copy", "-movflags", "+faststart", mp4]);
 writeFileSync(resolve(OUT, "czujka-demo.pl.srt"), srt.join("\n"));
 const totalWords = SHOTS.reduce((n, s) => n + (marks[s.id] ? s.vo.split(/\s+/).filter(Boolean).length : 0), 0);
-writeFileSync(resolve(OUT, "lektor.txt"), "Lektor do filmu czujka-demo.mp4 (czas filmu " + mmss(tl) + ", " + totalWords + " słów ≈ " + (totalWords / 2.3).toFixed(0) + " s przy 2,3 słowa/s).\nNagraj głos na film; kody czasu to początek i koniec ujęcia. Wygenerowane przez record.mjs.\n\n" + lektor.join("\n"));
+writeFileSync(resolve(OUT, "lektor.txt"), "Lektor do filmu czujka-demo.mp4 (czas filmu " + mmss(tl) + ", " + totalWords + " słów ≈ " + (totalWords / WPS).toFixed(0) + " s przy 1,7 słowa/s; każdy akapit ma co najmniej 1,5 s zapasu i 0,5 s na wejście).\nNagraj głos na film; kody czasu to początek i koniec ujęcia. Wygenerowane przez record.mjs.\n\n" + lektor.join("\n"));
 console.log("film", mmss(tl), "(" + tl.toFixed(1) + " s),", frames.length, "frames ->", mp4);
 if (tl > 119) console.log("WARNING: the cut is " + tl.toFixed(1) + " s: over the 2:00 submission limit (shorten CZ_SCAN_SECONDS or record with CZ_STOP=0)");
