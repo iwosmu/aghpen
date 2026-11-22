@@ -6,26 +6,26 @@ Ten plik zawiera tylko liczby zmierzone na działającym produkcie. Każda ma ź
 
 Laboratorium `lab/` to 70 kontenerów w sieci `10.66.0.0/16` (65 536 adresów). Każdy kontener ma opis w `lab/ground-truth/t0.json`: adres, otwarte porty, usługa, wersja, technologie, klasy. Trzy hosty są celowo niestabilne i nie wchodzą do metryk.
 
-Polecenie `e2e/lab-gate.sh` uruchamia pełny skan /16 przez produkt (REST API, profil domyślny, limit 1000 pakietów na sekundę), nagrywa ruch programem `tcpdump` i porównuje wynik z opisem laboratorium. Potem skanuje to samo, niezmienione laboratorium drugi raz. Kontrola nie przechodzi, gdy skan przekroczy limit tempa, zgubi wyniki albo drugi skan zgłosi zmianę technologii lub wersji, której nie było. Żadna zmiana silnika nie trafia do głównej gałęzi bez jej zaliczenia.
+Polecenie `e2e/lab-gate.sh` uruchamia pełny skan /16 przez produkt (REST API, profil domyślny, limit 1000 pakietów na sekundę), nagrywa ruch programem `tcpdump` i porównuje wynik z opisem laboratorium. Potem skanuje to samo, niezmienione laboratorium drugi raz. Kontrola nie przechodzi, gdy skan przekroczy limit tempa, zgubi wyniki albo drugi skan zgłosi zmianę technologii lub wersji, której nie było. Kontrola sprawdza też limit pakietów w jądrze (rozdział „Tempo i bezpieczeństwo skanowania”) i to, czy przebieg ogólny drugiego przebiegu trwa najwyżej 1,15 raza dłużej niż pierwszego. Żadna zmiana silnika nie trafia do głównej gałęzi bez jej zaliczenia; wyjątek tej nocy opisuje rozdział „Drugi przebieg wolniejszy od pierwszego”.
 
 Zapis kontroli na tej wersji: [`e2e/results/gate/`](../e2e/results/gate/README.md).
 
 ## Wykrywanie w sieci /16
 
-Tryb ścisły: przypadki trudne też się liczą.
+Kontrola 3 (`e2e/lab-gate.sh`, wersja silnika `dab9d0e`, 22.11.2026, 03:04–04:20). Tryb ścisły: przypadki trudne też się liczą. Oba przebiegi dały te same liczby.
 
 | Kategoria | Znalezione | Fałszywe | Pominięte | Precyzja | Czułość |
 | --- | --- | --- | --- | --- | --- |
 | Hosty | 67 | 0 | 0 | 1,000 | 1,000 |
 | Otwarte porty | 154 | 0 | 1 | 1,000 | 0,994 |
 | Nazwy usług | 154 | 0 | 1 | 1,000 | 0,994 |
-| Technologie | 102 | 1 | 2 | 0,990 | 0,981 |
-| Klasy (panel, logowanie, środowisko testowe) | 51 | 1 | 1 | 0,981 | 0,981 |
+| Technologie | 103 | 0 | 1 | 1,000 | 0,990 |
+| Klasy (panel, logowanie, środowisko testowe) | 51 | 0 | 1 | 1,000 | 0,981 |
 
 | Kontrola | Poprawne |
 | --- | --- |
-| Wersje usług | 30 z 32 |
-| Wersje technologii | 55 z 56 |
+| Wersje usług (TCP i UDP) | 32 z 32 |
+| Wersje technologii | 55 z 57 |
 | Tytuły stron | 122 z 122 |
 | Nagłówki i ciasteczka warte uwagi | 68 z 68 |
 | Flagi ciasteczek | 24 z 24 |
@@ -35,39 +35,99 @@ Tryb ścisły: przypadki trudne też się liczą.
 
 Czego Czujka nie znalazła:
 
-- Port `10.66.70.11:18443` z jego usługą, technologią i klasą. Ten host odrzuca wszystko poza jednym wysokim portem spoza listy. Znajduje go dopiero skan pełnego zakresu portów. W sieci /16 taki skan każdego hosta trwałby około 86 minut, więc profil domyślny go tam nie robi. W małym zakresie Czujka skanuje pełny zakres sama (rozdział „Pełny zakres portów”).
-- Wersje `dnsmasq` na porcie 53/udp i NTP na 123/udp. Czujka nie wykrywa wersji po UDP.
-- Wersja technologii `dnsmasq` na 53/tcp: Czujka podaje „2.92rel2”, opis laboratorium „2.92”.
-- Jeden fałszywy wynik: port 8000 Portainera dostał technologię „Nagios NSCA” (zgadywanie nmapa dla nieznanego portu).
-- Jedna fałszywa klasa „środowisko testowe” na `10.66.60.10:80`.
+| Pominięcie | Przyczyna |
+| --- | --- |
+| `10.66.70.11:18443` (port, usługa „http”, technologia nginx, klasa „logowanie”) | Host odrzuca wszystko poza jednym wysokim portem spoza listy portów profilu. Znajduje go tylko skan pełnego zakresu. W /16 pełny zakres dostaje 16 hostów na przebieg (głębszy przebieg, rozdział „Pełny zakres portów”). Pierwsze idą hosty z otwartymi portami spoza 1000 najczęstszych, a ten host nie pokazuje żadnego. W pierwszym przebiegu nie trafia więc do szesnastki. Rotacja obejmie go w jednym z kolejnych przebiegów (70 aktywnych hostów, 16 na przebieg). |
+| Wersja `dnsmasq` na 53/tcp i 53/udp | Czujka podaje „2.92rel2” (tak odpowiada serwer), opis laboratorium „2.92”. |
+
+Od poprzedniej kontroli zniknęły dwa fałszywe wyniki i dwie pominięte wersje:
+
+| Było | Teraz | Zmiana |
+| --- | --- | --- |
+| port 8000 Portainera z technologią „Nagios NSCA” | brak fałszywej technologii | słabe dopasowania nmapa (reguła z mniej niż 2 bajtami banera) zostają tylko podpowiedzią nazwy |
+| fałszywa klasa „środowisko testowe” na `10.66.60.10:80` | brak | reguła nagłówka debugowania nie nadaje klasy |
+| wersje usług 30 z 32 (UDP bez wersji) | 32 z 32 | `nmap -sU -sV --version-intensity 0` na otwartych portach UDP z listy |
 
 Host, który pokazuje co najmniej 10 otwartych portów, dostaje dodatkowy skan portów 1-10000. Przed tą poprawką czułość portów wynosiła 0,794 (123 ze 155): 31 pominiętych portów leżało na jednym hoście z 64 otwartymi portami.
 
 ## Stabilność wyniku
 
-Drugi skan niezmienionego laboratorium zgłosił 0 zmian (`e2e/results/gate/changes-t0-2.json`). Ta kontrola znalazła trzy błędy, zanim trafiły do głównej gałęzi: usługa zmieniała nazwę z „http” na „ibm-db2”, a technologia „Go” pojawiała się i znikała na dwóch portach, zależnie od tego, jak długo port czekał w kolejce na wykrywanie wersji. Teraz wykrywanie wersji każdego portu trwa do końca, z jednym limitem 3 minut liczonym od startu.
+| Kontrola | Wynik |
+| --- | --- |
+| Zmiany zgłoszone w drugim przebiegu niezmienionego laboratorium | 0 (`e2e/results/gate/changes-t0-2.json`) |
+| Usługi w pierwszym i drugim przebiegu | 157 i 157 |
+| Wyniki trudnych i fałszywych przypadków | te same w obu przebiegach |
+
+Ta kontrola znalazła wcześniej trzy błędy, zanim trafiły do głównej gałęzi: usługa zmieniała nazwę z „http” na „ibm-db2”, a technologia „Go” pojawiała się i znikała na dwóch portach, zależnie od tego, jak długo port czekał w kolejce na wykrywanie wersji. Teraz wykrywanie wersji każdego portu trwa do końca, z jednym limitem 3 minut liczonym od startu.
 
 ## Tempo i bezpieczeństwo skanowania
 
-Pomiar na przewodzie, nie licznik programu. Limit 1000 pakietów na sekundę.
+Pomiar na przewodzie (`tcpdump` na interfejsie skanera), nie licznik programu. Limit polityki 1000 pakietów na sekundę. Limit w jądrze włączony (`CZUJKA_KERNEL_CAP=auto`). Kontrola używa domyślnych 16 hostów głębszego przebiegu; instancja publiczna skanuje co 30 minut z `CZUJKA_DEEP_PASS_HOSTS=4`.
 
-| Pomiar | Pierwszy skan | Drugi skan |
+| Pomiar | Pierwszy przebieg | Drugi przebieg |
 | --- | --- | --- |
-| Pakiety nmapa, najwyższa sekunda | 842 | 874 |
-| Wszystkie pakiety (także połączenia jądra przy wykrywaniu usług), najwyższa sekunda | 973 | 903 |
-| Wszystkie pakiety, percentyl 99 | 847 | 853 |
-| Sekundy powyżej limitu | 0 | 0 |
-| Czas pełnego skanu /16 | 762 s (12 min 42 s) | 1016 s (16 min 56 s) |
-| Wysłane pakiety | 230 914 | 231 371 |
+| Pakiety nmapa, najwyższa sekunda | 764 | 794 |
+| Wszystkie pakiety (także połączenia jądra przy wykrywaniu usług), najwyższa sekunda | 913 | 937 |
+| Wszystkie pakiety, percentyl 99 | 752 | 757 |
+| Sekundy powyżej limitu | 0 z 2138 | 0 z 2315 |
+| Przebieg ogólny /16 | 767 s (12 min 47 s) | 934 s (15 min 34 s) |
+| Głębszy przebieg (16 hostów, porty 1-65535) | 1368 s (22 min 48 s) | 1380 s (23 min) |
+| Cały przebieg | 2137 s | 2317 s |
+| Wysłane pakiety (interfejs skanera) | 1 260 327 | 1 270 096 |
 | Ostrzeżenia silnika | 0 | 0 |
+| Pamięć kontenera Czujki, najwyżej | 1228,8 MiB | – |
+| Baza po dwóch przebiegach | 22 MB | – |
 
-Drugi przebieg tego samego zakresu trwa dłużej przy tej samej liczbie pakietów. Planista łączy bloki znanych aktywnych hostów w większe grupy, a w dużej grupie etap HTTP hosta zaczyna się dopiero po wykrywaniu wersji całej grupy. Najdłuższy jest host z 64 usługami WWW: około 320 s przy limicie 2 żądań na sekundę na host. To znane ograniczenie planisty.
-
-Pamięć kontenera Czujki w czasie obu skanów: najwyżej 99,5 MiB. Baza po dwóch skanach /16: 18 MB.
+Pamięć: szczyt 1,2 GiB trwa około minuty, około 107 s po starcie pierwszego przebiegu. Przez resztę przebiegu kontener zajmuje 200–400 MiB. Przyczyny szczytu nie zbadaliśmy. Wcześniejsza liczba w tym dokumencie (99,5 MiB) była błędna: podsumowanie w `e2e/lab-run.sh` porównywało próbki jako tekst („99,5” wypadało wyżej niż „1078”). Wartość 1228,8 MiB policzyliśmy liczbowo z próbek `docker stats` co 2 s (poprawka skryptu: `54bd34c` w gałęzi `iwosmu/czujka-accuracy`). Kontrole 1 i 2 tej nocy, tak samo przeliczone: 997,1 MiB i 1138,7 MiB.
 
 Stop awaryjny (`e2e/full/transcript.txt`, sekcja 17): wywołanie trwało 0,09 s. Sekundę później nie działał żaden proces nmapa i nie wyszedł żaden pakiet IP.
 
-Wcześniejsze wersje miały dwa błędy, które znaleźliśmy pomiarem na przewodzie i naprawiliśmy. Pierwszy: skan przekraczał limit, bo nagranie ruchu nie widziało pakietów nmapa. Drugi: po naprawie limitu skan gubił usługi, bo nmap porzucał grupy hostów po 5 minutach. Dlatego kontrola sprawdza tempo i kompletność razem.
+### Limit pakietów w jądrze w kontroli
+
+Wiersz kontroli liczy w nagraniu sondy, które liczy jądro (SYN, UDP, ICMP echo), w stałych przedziałach (`e2e/kcap-window.sh`).
+
+| Pomiar | Granica | Pierwszy przebieg | Drugi przebieg |
+| --- | --- | --- | --- |
+| Limit aktywny | tak | tak | tak |
+| Najwięcej sond w przedziale 100 ms | `burst` + 1100 × 0,1 = 220 | 172 | 118 |
+| Najwięcej sond w sekundzie | `max_pps` 1000 | 764 | 758 |
+| Odrzucone przez jądro | każde przypisane do przedziału | 393 | 22 |
+
+Każde odrzucenie przypada na przedział tuż po przedziale prawie pustym, np. 03:18:11,1: 0, potem 172 sondy. Maszyna wirtualna stoi kilkadziesiąt milisekund, a nmap wysyła potem zaległość naraz. Jądro obcina nadmiar, a nmap wysyła te sondy ponownie w swoim tempie. Wszystkie takie przedziały leżą w głębszym przebiegu: jeden proces nmap z całym udziałem 1000 pakietów na sekundę ma tylko 10 % zapasu do limitu jądra. Wyniki wykrywania są takie same jak w kontroli bez limitu.
+
+| Wersja wiersza | Wynik | Dlaczego zmieniona |
+| --- | --- | --- |
+| „odrzucone = 0” | nie przeszła w kontroli 2, przebieg 1: 24 odrzucone po zamrożeniu maszyny wirtualnej na około 60 ms przy obciążeniu hosta 60 (przedział 41,9 s: 24 sondy, przedział 42,0 s: 108) | limit w jądrze ma właśnie obcinać taki wybuch; sam wybuch to nie błąd silnika |
+| „w każdym przedziale 100 ms najwyżej `burst` (110)” | błędna arytmetycznie: drugi przebieg miał 153 sondy w przedziale i 0 odrzuconych | kubełek o tempie r i pojemności b przepuszcza w stałym przedziale 100 ms do b + r × 0,1 |
+| obecna: aktywny, 100 ms ≤ 220, 1 s ≤ 1000, każde odrzucenie przypisane | przeszła w kontroli 2 i 3 | sprawdza gwarancję jądra i tempo silnika osobno |
+
+### Dwa przebiegi naraz
+
+Pomiar budżetu wspólnego dla wszystkich przebiegów (`e2e/results/h2/H2.txt`): przebieg /16 laboratorium i, 120 s później, drugi przebieg na `10.66.10.0/24` z własnym zakresem i kopią profilu. Limit w jądrze wyłączony, żeby zmierzyć sam silnik.
+
+| Pomiar | Wynik |
+| --- | --- |
+| Czas, gdy działały oba przebiegi | 696 s |
+| Wszystkie pakiety skanera, najwyższa sekunda | 756 |
+| Percentyl 99 / mediana | 531 / 197 |
+| Sekundy powyżej 1100 (limit + 10 %) | 0 |
+| Przebieg /16 przy wspólnym budżecie | 815 s |
+
+Przed tą zmianą każdy przebieg miał własny budżet `max_pps`, więc dwa przebiegi mogły wysłać razem do 2000 pakietów na sekundę.
+
+### Drugi przebieg wolniejszy od pierwszego: wiersz nie przeszedł
+
+| Wersja | Przebieg ogólny 1 | Przebieg ogólny 2 | Stosunek | Granica |
+| --- | --- | --- | --- | --- |
+| kontrola 2 (`acc25`) | 771 s | 1524 s | 1,98 | – |
+| kontrola 3 (`dab9d0e`, wydana) | 767 s | 934 s | **1,22** | 1,15 |
+| poprzednia wersja na instancji publicznej (bez głębszego przebiegu) | 853 s | 940 s (cały przebieg) | 1,10 | – |
+
+Kontrola 3 nie przeszła tego jednego wiersza. Granica zostaje 1,15.
+
+Przyczyna: przebieg z historią dobiera wielkość pierwszej grupy z prędkości poprzednich przebiegów profilu (`measured_pps`). W kontroli 2 ta prędkość zawierała głębszy przebieg (547 zamiast 271 pakietów na sekundę). Pierwsza grupa miała wtedy 4096 adresów i wszystkie 70 aktywnych hostów, z udziałem 120 pakietów na sekundę. Wersja wydana uczy się prędkości samego przebiegu ogólnego (`general_pps`), a grupa dobiera wolny budżet między etapami, gdy żadna grupa nie czeka. Pierwsza grupa ma teraz 2267 adresów, ale nadal 58 z 70 znanych hostów. Ich skan portów idzie z udziałem 210 pakietów na sekundę, zanim inne grupy skończą.
+
+Poprawka `04a6b1d` (grupa bierze najwyżej swoją część znanych aktywnych hostów) jest napisana i ma testy jednostkowe. Nie przeszła kontroli laboratorium, więc nie jest wydana.
 
 ## Pełny zakres portów
 
@@ -84,6 +144,47 @@ Pomiar na jednym hoście testowym z dziesięcioma usługami, limit 1000 pakietó
 Koniec skanu wyznacza najwolniejsze wykrywanie wersji w nmapie: instalator Gitei potrzebuje 42 s, port dystrybucji Erlanga 135 s. Sam nmap czeka tak samo. Usługi widać na liście od czwartej sekundy.
 
 Usługa na porcie, którego dany skan nie objął, zachowuje stan i dostaje znacznik „nie skanowana w tym przebiegu”. Czujka nie zgłasza jej jako znikniętej.
+
+### Rotacyjny głębszy przebieg (zakres ponad 256 adresów)
+
+| Pomiar | Wynik |
+| --- | --- |
+| Hosty na przebieg | 16 (`CZUJKA_DEEP_PASS_HOSTS`, domyślnie 16, `0` wyłącza, najwyżej 64; instancja publiczna: 4) |
+| Czas na host przy 1000 pakietów na sekundę | około 86 s (64 501 portów) |
+| Czas głębszego przebiegu w kontroli 3 | 1368 s i 1380 s |
+| Hosty czekające po przebiegu | 54 z 70 (każdy kolejny przebieg bierze inne) |
+| Znalezione usługi, kontrola 2, przebieg 1 | 31, wszystkie na hoście z 64 portami (`10.66.70.14`, np. 4001–4009, 7004–7019), wszystkie zgodne z opisem laboratorium |
+| Znalezione usługi, kontrola 3 | 0 nowych |
+
+W kontroli 3 głębszy przebieg nie dodał usług, bo te same 31 portów znajduje już szeroki przebieg gęstych hostów (porty 1-10000). Głębszy przebieg pomija teraz porty, które przebieg już zeskanował na hoście. Wcześniej skanował je drugi raz i liczył podwójnie (187 usług zamiast 156; baza scalała je po porcie, więc wynik i inwentarz były poprawne).
+
+Kolejność: najpierw hosty nigdy nie skanowane w pełni, potem hosty z większą liczbą otwartych portów TCP spoza 1000 najczęstszych, potem hosty skanowane w pełni najdawniej (`docs/ALGORYTMY.md`).
+
+## Sygnatury na obcych usługach (zoo)
+
+Test uogólnienia na usługach spoza laboratorium. Pełne tabele i metoda: [`e2e/zoo/RESULTS.md`](../e2e/zoo/RESULTS.md).
+
+Zbiór odłożony: 20 usług (23 porty), których Czujka nie widziała przy strojeniu, zeskanowane raz, na końcu. „Przed” to silnik i sygnatury sprzed pracy nad zoo na danych tego samego skanu.
+
+| Miara | Przed | Po | `nmap -sV` |
+| --- | --- | --- | --- |
+| Produkt | 6 z 23 | **13 z 23** | 4 z 23 |
+| Wersja | 1 z 3 | 1 z 3 | 1 z 3 |
+| Klasy | 4 z 14 | 4 z 14 | 0 z 14 |
+| Błędne etykiety | 9 | **11** | – |
+
+Błędnych etykiet przybyło dwie: samoopis nazwał OpenVSCode „Code” (prawda: „VS Code”), a sygnatura otwartego rejestru Dockera dodała klasę `unauth-control-api` na Docker Registry UI, który przekazuje `/v2/` do rejestru bez uwierzytelnienia. 9 z 11 błędnych etykiet dawał już silnik sprzed zmian. Siedem nowych produktów: FreshRSS, Kanboard, Directus, Graphite (import nuclei-templates) oraz Etherpad, File Browser, Gotify (samoopis strony).
+
+Zbiór strojenia: 76 portów w 10 partiach (na tych usługach stroiliśmy sygnatury).
+
+| Miara | Przed | Po | `nmap -sV` |
+| --- | --- | --- | --- |
+| Produkt | 53 z 76 | 62 z 76 | 17 z 76 |
+| Wersja | 26 z 48 | 34 z 48 | 8 z 48 |
+| Klasy | 26 z 54 | 42 z 54 | 0 z 54 |
+| Błędne etykiety | 11 | 2 (po usunięciu jednego importu: 1) | – |
+
+Laboratorium z importem i bez niego: precyzja technologii 0,990 w obu wariantach (dopasowanie zapisanego eksportu). Kontrola 3 z importem: precyzja technologii 1,000 (rozdział „Wykrywanie w sieci /16”).
 
 ## Skala: 2 000 i 10 000 żywych hostów
 

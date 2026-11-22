@@ -1,6 +1,6 @@
 {
-  "name": "lab-run: gate 214531",
-  "description": "Top 1000 portów i porty infrastruktury, wybrane usługi UDP, wykrywanie usług, odcisk HTTP i TLS. Przypisz zakres, aby uruchomić.",
+  "name": "lab-run: gate 030444",
+  "description": "Top 1000 portów, wybrane usługi UDP, rozpoznawanie usług, HTTP i TLS.",
   "scope_ids": [
     1
   ],
