@@ -173,7 +173,7 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 	u, err := s.d.Auth.CreateUser(r.Context(), principal(r), in.Email, in.Name, in.Password, in.RoleID)
 	if err != nil {
 		if errors.Is(err, store.ErrConflict) {
-			writeErr(w, http.StatusConflict, "conflict", "a user with this e-mail exists already")
+			writeErr(w, http.StatusConflict, "conflict", "Użytkownik z tym adresem e-mail już istnieje.")
 			return
 		}
 		s.fail(w, r, err)

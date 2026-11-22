@@ -316,7 +316,7 @@ func mapErr(err error) error {
 	if errors.As(err, &pg) {
 		switch pg.Code {
 		case "23505":
-			return fmt.Errorf("%w: %s", ErrConflict, pg.ConstraintName)
+			return fmt.Errorf("%w: %s", ErrConflict, uniqueText(pg.ConstraintName))
 		case "23503":
 			return fmt.Errorf("%w: referenced row is missing or still in use (%s)", ErrConflict, pg.ConstraintName)
 		case "22P02", "22003", "23514", "23502", "22007", "22008":
@@ -324,4 +324,22 @@ func mapErr(err error) error {
 		}
 	}
 	return err
+}
+
+// uniqueTexts are the sentences the UI shows when a unique rule rejects a
+// write: "conflict: scopes_name_key" told a person nothing.
+var uniqueTexts = map[string]string{
+	"scopes_name_key":            "Zakres o tej nazwie już istnieje.",
+	"users_email_key":            "Użytkownik z tym adresem e-mail już istnieje.",
+	"scan_profiles_name_key":     "Profil o tej nazwie już istnieje.",
+	"signatures_slug_key":        "Sygnatura o tym id już istnieje.",
+	"roles_slug_key":             "Rola o tej nazwie już istnieje.",
+	"targets_scope_id_value_key": "Ten cel jest już w zakresie.",
+}
+
+func uniqueText(constraint string) string {
+	if t, ok := uniqueTexts[constraint]; ok {
+		return t
+	}
+	return "Taki wpis już istnieje."
 }
