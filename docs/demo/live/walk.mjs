@@ -11,7 +11,7 @@ fs.mkdirSync(out, { recursive: true });
 const issues = [];
 const note = (o) => { issues.push(o); fs.appendFileSync(out + '/issues.jsonl', JSON.stringify(o) + '\n'); };
 // Skips controls that delete, stop or lock out: account switches too (a first run disabled four accounts with one click each).
-const SKIP = /konto aktywne|account active|usuń|delete|remove|stop awaryjny|emergency|wyloguj|log ?out|zwolnij stop|release|resetuj|reset|wyczyść|clear all|odbierz|revoke/i;
+const SKIP = /konto aktywne|konto włączone|account active|account enabled|usuń|delete|remove|stop awaryjny|emergency|wyloguj|log ?out|zwolnij stop|release|resetuj|reset|wyczyść|clear all|odbierz|revoke/i;
 const slug = (s) => s.replace(/^https?:\/\/[^/]+/, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'root';
 
 async function login(page, r) {

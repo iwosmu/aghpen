@@ -4,7 +4,7 @@ $ docs/demo/live/live.sh 7
   Files to import: docs/demo/live/samples/ (on this laptop)
 
   Next: Import -> results file, findings file; edit a finding; 'Uruchom skan' on 'Quickstart'
-$ import (same calls as the "Import / eksport" page): docs/demo/live/samples/wyniki-nmap.xml, docs/demo/live/samples/znaleziska-dojo-generic.json
+$ import (same calls as the "Import i eksport" page): docs/demo/live/samples/wyniki-nmap.xml, docs/demo/live/samples/znaleziska-dojo-generic.json
 == import results (nmap XML)
 {"run_id":2,"hosts":4,"services":12,"changes":null,"warnings":null}
 == import findings (DefectDojo Generic Findings)

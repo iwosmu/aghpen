@@ -347,8 +347,9 @@ if (want("time")) {
   await present(after ? "/time?run=" + after.run_id : "/time");
   begin("time");
   await settle(2200);
-  const strip = page.getByText(/krok o jeden przebieg/).first();
-  if (await strip.count()) await point(strip, 900);
+  // Point at the scrubber (the step hint text was removed from the UI); the arrow keys below step through the runs.
+  const strip = page.getByTestId("tm-scrubber").first();
+  if (await strip.count()) { await point(strip, 900); await strip.focus().catch(() => {}); }
   await settle(800);
   // Step back across the change, then forward over it again, slow enough to read the numbers and the map.
   for (let i = 0; i < TIME_STEPS_BACK; i++) { await page.keyboard.press("ArrowLeft"); await settle(1500); }
