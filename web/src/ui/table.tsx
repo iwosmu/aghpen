@@ -103,7 +103,7 @@ export function DataTable<T>(p: TableProps<T>) {
 
   if (narrow && p.mobile) {
     return (
-      <ul className={cx('transition-opacity', !p.inPanel && 'card mx-3 overflow-hidden rounded-[22px] py-1 sm:mx-6', p.dim && 'opacity-60')}>
+      <ul className={cx('transition-opacity', !p.inPanel && 'card mx-3 overflow-hidden rounded-[14px] py-1 sm:mx-6', p.dim && 'opacity-60')}>
         {groupRuns(rows, p.group).flatMap((g) => [
           ...(g.label ? [<li key={'g-' + g.key} className="px-4 pb-1.5 pt-4"><GroupHead label={g.label} count={g.rows.length} /></li>] : []),
           ...g.rows.map((row) => {
@@ -120,7 +120,7 @@ export function DataTable<T>(p: TableProps<T>) {
   }
 
   return (
-    <div className={cx('overflow-x-auto transition-opacity', !p.inPanel && 'card mx-3 rounded-[22px] sm:mx-6 lg:mx-8', p.dim && 'opacity-60')}>
+    <div className={cx('overflow-x-auto transition-opacity', !p.inPanel && 'card mx-3 rounded-[14px] sm:mx-6 lg:mx-8', p.dim && 'opacity-60')}>
       <table className="w-full min-w-max text-sm sm:min-w-0">
         {p.caption ? <caption className="sr-only">{p.caption}</caption> : null}
         <thead>

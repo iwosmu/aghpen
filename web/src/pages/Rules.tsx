@@ -75,7 +75,7 @@ function Editor({ rule, onSaved }: { rule: ExposureRule | null; onSaved: (r: Exp
       </Panel>
       {rule ? (
         <Panel title={t('Bieżące naruszenia', 'Current violations')} count={violations.data?.total} flush>
-          {violations.error ? <ErrorState error={violations.error} retry={() => violations.refetch()} /> : !violations.data ? <SkeletonRows rows={3} /> : violations.data.items.length === 0 ? <p className="px-3 py-3 text-sm text-ink-2 sm:px-4">{t('Brak naruszeń.', 'No violations.')}</p> : (
+          {violations.error ? <ErrorState error={violations.error} retry={() => violations.refetch()} /> : !violations.data ? <SkeletonRows rows={3} /> : violations.data.items.length === 0 ? <p className="px-3 py-3 text-sm text-ink-2 sm:px-4">{t('Brak naruszeń', 'No violations')}</p> : (
             <ul className="divide-y divide-rule">
               {violations.data.items.map((f) => (
                 <li key={f.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-1.5 text-sm sm:px-4">
@@ -123,7 +123,7 @@ export default function Rules() {
               </li>
             ))}
           </ul>
-          {items.length === 0 ? <p className="p-4 text-sm text-ink-2">{t('Brak reguł.', 'No rules yet.')}</p> : null}
+          {items.length === 0 ? <p className="p-4 text-sm text-ink-2">{t('Brak reguł', 'No rules yet')}</p> : null}
         </Panel>
         <Editor rule={sel === 'new' ? null : one.data ?? rule} onSaved={(r) => u.set({ rule: r ? r.id : null })} />
       </div>

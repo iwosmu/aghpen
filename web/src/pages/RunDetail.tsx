@@ -46,7 +46,7 @@ function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: nu
     <Panel title={t('Znalezione usługi', 'Services found')} count={q.data ? q.data.total - carried : undefined} flush
       actions={hosts.length === 1 ? <Link to={'/hosts/' + hosts[0]} className="link">{t('Host', 'Host')} <span className="mono">{items[0].ip}</span></Link> : undefined}>
       {q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : !q.data ? <SkeletonRows rows={5} /> : items.length === 0 ? (
-        <p className="p-3 text-sm text-ink-2" data-testid="run-services-empty">{live ? t('Oczekiwanie na otwarte porty…', 'Waiting for open ports…') : t('Brak otwartych usług.', 'No open services.')}</p>
+        <p className="p-3 text-sm text-ink-2" data-testid="run-services-empty">{live ? t('Oczekiwanie na otwarte porty…', 'Waiting for open ports…') : t('Brak otwartych usług', 'No open services')}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="run-services">
@@ -91,7 +91,7 @@ function NoStory({ run }: { run: ScanRun }) {
   const s = run.summary;
   if (!s) return null;
   const n = s.hosts_new + s.hosts_gone + s.hosts_back + s.services_new + s.services_gone + s.services_changed + (s.services_returned ?? 0) + (s.responses_slower ?? 0) + (s.hosts_missing ?? 0);
-  return n === 0 ? <p className="font-display text-[22px] leading-tight text-ink sm:text-[26px]" data-testid="run-story-none">{t('Bez zmian.', 'No changes.')}</p> : null;
+  return n === 0 ? <p className="font-display text-[22px] leading-tight text-ink sm:text-[26px]" data-testid="run-story-none">{t('Bez zmian', 'No changes')}</p> : null;
 }
 
 function Fact({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
@@ -196,7 +196,7 @@ export default function RunDetail() {
         back={{ to: '/runs', label: t('Skany', 'Scans') }}
         title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{t('Skan', 'Scan')} #{run.id}</span><span className="font-sans text-[15px] font-normal tracking-normal"><RunStatusMark status={run.status} pauseReason={run.pause_reason} /></span></span>}
         sub={<>{run.profile_id ? <Link to={'/profiles/' + run.profile_id} className="link">{run.profile_name}</Link> : run.profile_name} · {run.trigger === 'schedule' ? t('z harmonogramu', 'from the schedule') : run.trigger === 'import' ? t('import pliku', 'file import') : run.trigger === 'manual' ? t('uruchomiony ręcznie', 'started manually') : triggerLabel(run.trigger)} · {fmtDateTime(run.started_at)}
-          {isLive ? <span className="ml-2 inline-flex items-center gap-1 text-xs text-ink-3"><span className={cx('inline-block h-1.5 w-1.5 rounded-full', connected ? 'bg-st-new' : 'bg-st-changed')} />{connected ? t('na żywo', 'live') : t('łączenie…', 'connecting…')}</span> : null}</>}
+          {isLive ? <span className="ml-2 inline-flex items-center gap-1 text-xs text-ink-3"><span className={cx('lamp', connected ? 'bg-st-new' : 'bg-st-changed')} />{connected ? t('na żywo', 'live') : t('łączenie…', 'connecting…')}</span> : null}</>}
         readOnly={!canRun && (isLive || run.status === 'paused')}
         actions={canRun ? (
           <>
@@ -218,24 +218,24 @@ export default function RunDetail() {
       <div className="space-y-5 p-4 sm:p-6 lg:px-8">
         <RunNote run={run} canEdit={canRun} />
         {run.error ? (
-          <div role="alert" className="flex items-start gap-2 rounded-[16px] bg-st-gone-wash px-4 py-3 text-sm">
-            <Icon name="alert" className="mt-0.5 text-danger" /><span><span className="font-medium">{t('Skan zakończył się błędem.', 'The scan failed.')}</span> <span className="mono text-xs">{run.error}</span></span>
+          <div role="alert" className="flex items-start gap-2 rounded-[10px] bg-st-gone-wash px-4 py-3 text-sm">
+            <Icon name="alert" className="mt-0.5 text-danger" /><span><span className="font-medium">{t('Skan zakończył się błędem', 'The scan failed')}</span> <span className="mono text-xs">{run.error}</span></span>
           </div>
         ) : null}
         {run.status === 'paused' && run.pause_reason === 'emergency_stop' ? (
-          <div role="status" className="flex items-start gap-2 rounded-[16px] bg-st-gone-wash px-4 py-3 text-sm" data-testid="paused-emergency">
+          <div role="status" className="flex items-start gap-2 rounded-[10px] bg-st-gone-wash px-4 py-3 text-sm" data-testid="paused-emergency">
             <Icon name="stop" className="mt-0.5 text-danger" />
             <span>{t('Stop awaryjny wstrzymał ten skan. Po wyłączeniu stopu wznów skan ręcznie.', 'The emergency stop paused this scan. After the stop is off, resume the scan manually.')}</span>
           </div>
         ) : null}
         {run.status === 'paused' && run.pause_reason === 'manual' ? (
-          <div role="status" className="flex items-start gap-2 rounded-[16px] bg-raised px-4 py-3 text-sm">
+          <div role="status" className="flex items-start gap-2 rounded-[10px] bg-raised px-4 py-3 text-sm">
             <Glyph name="pause" tone="neutral" />
-            <span>{t('Skan wstrzymany ręcznie.', 'The scan is paused manually.')}</span>
+            <span>{t('Skan wstrzymany ręcznie', 'The scan is paused manually')}</span>
           </div>
         ) : null}
         {run.status === 'paused' && run.pause_reason === 'window_closed' ? (
-          <div className="flex items-start gap-2 rounded-[16px] bg-st-changed-wash px-4 py-3 text-sm">
+          <div className="flex items-start gap-2 rounded-[10px] bg-st-changed-wash px-4 py-3 text-sm">
             <Glyph name="pause" tone="changed" />
             <span>
               {t('Okno czasowe zamknęło się o ', 'The time window closed at ')}<span className="num">{fmtTime(run.window_end)}</span>{t('.', '.')}{' '}
@@ -252,10 +252,10 @@ export default function RunDetail() {
           </section>
         ) : null}
         {s.warnings && s.warnings.length > 0 ? (
-          <div role="alert" data-testid="run-warnings" className="flex items-start gap-2 rounded-[16px] bg-st-gone-wash px-4 py-3 text-sm">
+          <div role="alert" data-testid="run-warnings" className="flex items-start gap-2 rounded-[10px] bg-st-gone-wash px-4 py-3 text-sm">
             <Icon name="alert" className="mt-0.5 text-danger" />
             <span>
-              <span className="font-medium">{t('Wynik skanu jest niepełny.', 'The scan result is incomplete.')}</span>
+              <span className="font-medium">{t('Wynik skanu jest niepełny', 'The scan result is incomplete')}</span>
               {s.warnings.map((w) => <span key={w} className="block">{w}</span>)}
             </span>
           </div>
@@ -284,7 +284,7 @@ export default function RunDetail() {
 
           <Panel title={t('Podgrupy adresów', 'Address chunks')} count={sortedChunks.length} flush>
             {chunks.error ? <ErrorState error={chunks.error} retry={() => chunks.refetch()} /> : !chunks.data ? <SkeletonRows rows={8} /> : sortedChunks.length === 0 ? (
-              <p className="p-3 text-sm text-ink-2">{run.trigger === 'import' ? t('Import nie ma podgrup.', 'An import has no chunks.') : t('Plan podgrup pojawi się po starcie skanu.', 'The chunk plan appears when the scan starts.')}</p>
+              <p className="p-3 text-sm text-ink-2">{run.trigger === 'import' ? t('Import nie ma podgrup', 'An import has no chunks') : t('Plan podgrup pojawi się po starcie skanu', 'The chunk plan appears when the scan starts')}</p>
             ) : (
               <div className="max-h-[520px] overflow-auto">
                 <table className="w-full text-sm">
@@ -339,7 +339,7 @@ export default function RunDetail() {
             <PartialNote run={run} className="mt-2" />
             {run.status === 'running' && runningChunks > 0 ? (
               <p className="mt-2.5 flex items-center gap-2.5 text-sm text-ink" data-testid="run-phase">
-                <span className="bar-active inline-block h-1.5 w-5 flex-none rounded-full" aria-hidden="true" />
+                <span className="bar-active inline-block h-1.5 w-5 flex-none rounded-[2px]" aria-hidden="true" />
                 {small ? smallPhaseText(s) : phaseText(s, runningChunks, runningAddrs)}
               </p>
             ) : null}
@@ -439,7 +439,7 @@ function RunNote({ run, canEdit }: { run: ScanRun; canEdit: boolean }) {
 export function smallPhaseText(s: ScanRun['stats']): string {
   if (s.http_requests > 0) return t('Rozpoznawanie usług WWW: ' + s.services_open + ' ' + plural(s.services_open, ['otwarty port', 'otwarte porty', 'otwartych portów'], ['', '']) + ' do tej pory.', 'Identifying web services: ' + s.services_open + ' open ' + (s.services_open === 1 ? 'port' : 'ports') + ' so far.');
   if (s.services_open > 0) return t('Rozpoznawanie usług na ' + s.services_open + ' ' + plural(s.services_open, ['otwartym porcie', 'otwartych portach', 'otwartych portach'], ['', '']) + '.', 'Identifying the services on ' + s.services_open + ' open ' + (s.services_open === 1 ? 'port' : 'ports') + '.');
-  return t('Skanowanie portów.', 'Scanning ports.');
+  return t('Skanowanie portów', 'Scanning ports');
 }
 
 /** The phase of a running scan in words, from what the counters show so far. */

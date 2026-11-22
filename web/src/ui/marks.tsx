@@ -276,12 +276,12 @@ export function InterestBreakdown({ value, reasons }: { value: number; reasons: 
         <span className="num text-sm text-ink-3">/ 100</span>
       </div>
       {segs.length ? (
-        <div className="mt-3 flex h-[6px] w-full gap-px overflow-hidden rounded-full bg-sunk" aria-hidden="true">
+        <div className="mt-3 flex h-[6px] w-full gap-px overflow-hidden rounded-[2px] bg-sunk" aria-hidden="true">
           {segs.map((x) => <span key={x.i} className="h-full bg-accent" style={{ width: x.w + '%', opacity: shade(x.i) }} />)}
         </div>
       ) : null}
       {list.length === 0 ? (
-        <p className="mt-3 text-sm text-ink-2">{t('Brak czynników podnoszących ocenę.', 'No factor raises the score.')}</p>
+        <p className="mt-3 text-sm text-ink-2">{t('Brak czynników podnoszących ocenę', 'No factor raises the score')}</p>
       ) : (
         <ul className="mt-3">
           {list.map((r, i) => (

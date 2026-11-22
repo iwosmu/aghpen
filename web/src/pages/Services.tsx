@@ -19,7 +19,7 @@ import { productLine, shownProduct } from '../lib/shownProduct';
 const FILTERS = ['q', 'state', 'port', 'name', 'tech', 'class', 'tag', 'min_interest', 'tls', 'group_key', 'host_id', 'run_id'];
 
 /** how many technology chips fit the column: two short ones, else one */
-const svcTechFit = (s: Service) => { const xs = (s.technologies ?? []).map((x) => x.name + (x.version ? ' ' + x.version : '')); return xs.length > 1 && xs[0].length + xs[1].length <= 22 ? 2 : 1; };
+const svcTechFit = (s: Service) => { const xs = (s.technologies ?? []).map((x) => x.name + (x.version && (x.name + x.version).length <= 16 ? ' ' + x.version : '')); return xs.length > 1 && xs[0].length + xs[1].length <= 22 ? 2 : 1; };
 
 export default function Services() {
   const u = useUrlState();
@@ -53,7 +53,7 @@ export default function Services() {
       <span className="block max-w-[300px] truncate text-ink" title={s.title}>{s.title || <span className="text-ink-2"><ProductValue s={s} /></span>}
         {s.overrides && Object.keys(s.overrides).length ? <span className="ml-1.5 text-2xs text-st-changed" title={t('wartość poprawiona przez analityka', 'value corrected by an analyst')}>{t('poprawione', 'edited')}</span> : null}</span>
     ) },
-    { id: 'tech', header: t('Technologie', 'Technologies'), hide: 'md', cell: (s) => (s.technologies ?? []).length ? <span className="flex max-w-[230px] gap-1 overflow-hidden" title={(s.technologies ?? []).map((x) => x.name + (x.version ? ' ' + x.version : '')).join(', ')}>{(s.technologies ?? []).slice(0, svcTechFit(s)).map((x) => <span key={x.name} className="chip-fact max-w-[130px]"><span className="truncate">{x.name}{x.version ? ' ' + x.version : ''}</span></span>)}{(s.technologies ?? []).length > svcTechFit(s) ? <span className="chip-fact num">+{(s.technologies ?? []).length - svcTechFit(s)}</span> : null}</span> : <span className="text-ink-3">–</span> },
+    { id: 'tech', header: t('Technologie', 'Technologies'), hide: 'md', cell: (s) => (s.technologies ?? []).length ? <span className="flex max-w-[230px] gap-1 overflow-hidden" title={(s.technologies ?? []).map((x) => x.name + (x.version ? ' ' + x.version : '')).join(', ')}>{(s.technologies ?? []).slice(0, svcTechFit(s)).map((x) => <span key={x.name} className="chip-fact max-w-[170px]"><span className="truncate">{x.name}{x.version && (x.name + x.version).length <= 16 ? ' ' + x.version : ''}</span></span>)}{(s.technologies ?? []).length > svcTechFit(s) ? <span className="chip-fact num">+{(s.technologies ?? []).length - svcTechFit(s)}</span> : null}</span> : <span className="text-ink-3">–</span> },
     { id: 'class', header: t('Klasy', 'Classes'), hide: 'lg', cell: (s) => <span className="inline-flex whitespace-nowrap"><ClassChips classes={s.classes} max={1} /></span> },
     ...(anyTime ? [{ id: 'rt', header: t('Czas odpowiedzi', 'Response time'), align: 'right' as const, hide: '2xl' as const, cell: (s: Service) => <ResponseCell s={s} /> }] : []),
     { id: 'group', header: t('Podobne', 'Similar'), align: 'right', hide: '2xl', cell: (s) => s.group_size > 1 ? <Link to={'/services?group_key=' + encodeURIComponent(s.group_key)} className="num link" title={t('usługi o tej samej treści i technologiach', 'services with the same content and technologies')}>×{s.group_size}</Link> : <span className="text-ink-3">–</span> },

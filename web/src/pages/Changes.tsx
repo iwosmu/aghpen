@@ -95,7 +95,7 @@ export default function Changes() {
           const on = u.get('kind') === k;
           return (
             <button key={k} type="button" aria-pressed={on} onClick={() => u.set({ kind: on ? null : k })}
-              className={cx('inline-flex h-[30px] flex-none items-center gap-2 whitespace-nowrap rounded-full pl-3 text-xs font-medium transition-colors duration-150', on ? 'bg-primary pr-2 text-primary-ink' : 'bg-[var(--row-hover)] pr-3.5 text-ink-2 shadow-[inset_0_0_0_1px_var(--rule-strong)] hover:text-ink')}>
+              className={cx('inline-flex h-[28px] flex-none items-center gap-2 whitespace-nowrap rounded-[6px] pl-2.5 text-xs transition-colors duration-150 ease-[var(--ease)]', on ? 'bg-raised pr-2 text-ink shadow-[inset_0_0_0_1px_var(--rule-strong)]' : 'pr-3 text-ink-2 shadow-[inset_0_0_0_1px_var(--rule)] hover:bg-[var(--row-hover)] hover:text-ink')}>
               <Glyph name={i.glyph} tone={i.tone} size={12} />{i.label}{on ? <Icon name="x" size={12} className="ml-0.5" /> : null}
             </button>
           );
@@ -132,7 +132,7 @@ export default function Changes() {
         selected={canAck ? selected : undefined} onSelect={canAck ? setSelected : undefined}
         rowClass={(c) => cx(c.acked_at && 'opacity-70')}
         group={u.get('sort', '-at').endsWith('at') ? (c) => ({ key: String(c.run_id), label: <><Link to={'/runs/' + c.run_id} className="link">{t('Skan', 'Scan')} #{c.run_id}</Link><span className="text-ink-3"> · </span><span>{fmtRelative(c.at)}</span></> }) : undefined}
-        empty={<Empty icon="changes" title={active ? t('Żadna zmiana nie pasuje do filtrów', 'No changes match the filters') : t('Brak zmian', 'No changes yet')} hint={active ? undefined : t('Zmiany pojawią się po drugim skanie.', 'Changes appear after the second scan.')} action={active ? undefined : <NextSteps />} />}
+        empty={<Empty icon="changes" title={active ? t('Żadna zmiana nie pasuje do filtrów', 'No changes match the filters') : t('Brak zmian', 'No changes yet')} hint={active ? undefined : t('Zmiany pojawią się po drugim skanie', 'Changes appear after the second scan')} action={active ? undefined : <NextSteps />} />}
         mobile={(c) => (
           <div>
             <div className="flex items-center justify-between gap-2"><ChangeMark kind={c.kind} expected={c.expected} /><span className="num text-xs text-ink-3">#{c.run_id}</span></div>

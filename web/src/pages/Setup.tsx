@@ -26,7 +26,7 @@ function plans(): { id: Plan; label: string; text: string }[] {
     { id: 'nightly', label: t('Co noc', 'Every night'), text: t('Start o 22:00, okno 22:00–06:00.', 'Starts at 22:00, window 22:00–06:00.') },
     { id: 'offhours', label: t('Poza godzinami pracy', 'Outside office hours'), text: t('Dni robocze 18:00–07:00 i cały weekend, start o 18:30.', 'Weekdays 18:00–07:00 and the whole weekend, start at 18:30.') },
     { id: 'every4h', label: t('Co 4 godziny', 'Every 4 hours'), text: t('Bez okien czasowych. Więcej ruchu.', 'No time windows. More traffic.') },
-    { id: 'manual', label: t('Tylko ręcznie', 'Manual only'), text: t('Bez harmonogramu.', 'No schedule.') },
+    { id: 'manual', label: t('Tylko ręcznie', 'Manual only'), text: t('Bez harmonogramu', 'No schedule') },
   ];
 }
 

@@ -83,7 +83,7 @@ function HttpPanel({ h, tls }: { h: HTTPFingerprint; tls: boolean }) {
 
       <div>
         <h3 className="label mb-1.5">{t('Ciasteczka', 'Cookies')} <span className="num text-ink-3">{(h.cookies ?? []).length}</span></h3>
-        {(h.cookies ?? []).length === 0 ? <p className="text-sm text-ink-3">{t('Brak ciasteczek.', 'No cookies.')}</p> : (
+        {(h.cookies ?? []).length === 0 ? <p className="text-sm text-ink-3">{t('Brak ciasteczek', 'No cookies')}</p> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="border-b border-rule-strong text-left text-xs text-ink-3"><th className="h-[26px] pr-4 font-medium">{t('Nazwa', 'Name')}</th><th className="pr-4 font-medium">{t('Flagi', 'Flags')}</th><th className="pr-4 font-medium">{t('Ścieżka', 'Path')}</th><th className="font-medium">{t('Wartość', 'Value')}</th></tr></thead>
@@ -150,7 +150,7 @@ function TlsPanel({ c }: { c: TLSInfo }) {
 
 function TechList({ s, matches }: { s: Service; matches: SigMatch[] }) {
   const techs = s.technologies ?? [];
-  if (techs.length === 0 && matches.length === 0) return <p className="text-sm text-ink-2">{t('Brak rozpoznanych technologii.', 'No technologies recognised.')}</p>;
+  if (techs.length === 0 && matches.length === 0) return <p className="text-sm text-ink-2">{t('Brak rozpoznanych technologii', 'No technologies recognised')}</p>;
   const rest = matches.filter((m) => !techs.some((x) => x.name === m.name));
   const row = (name: string, category: string, version: string, confidence: number, ms: SigMatch[], sources: string[] | null, cpe: string) => (
     <li key={name} className="border-b border-rule py-2 last:border-b-0">
@@ -249,7 +249,7 @@ export default function ServiceDetail() {
             </dl>
           </Panel>
 
-          {r?.http ? <Panel title="HTTP"><HttpPanel h={r.http} tls={s.tls} /></Panel> : s.name === 'http' ? <Panel title="HTTP"><p className="text-sm text-ink-2">{t('Brak danych HTTP z ostatniego skanu.', 'No HTTP data from the last scan.')}</p></Panel> : null}
+          {r?.http ? <Panel title="HTTP"><HttpPanel h={r.http} tls={s.tls} /></Panel> : s.name === 'http' ? <Panel title="HTTP"><p className="text-sm text-ink-2">{t('Brak danych HTTP z ostatniego skanu', 'No HTTP data from the last scan')}</p></Panel> : null}
           {r?.tls ? <Panel title={t('Certyfikat TLS', 'TLS certificate')}><TlsPanel c={r.tls} /></Panel> : null}
 
           <ServiceHistoryPanel serviceId={s.id} />

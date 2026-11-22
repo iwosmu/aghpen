@@ -193,7 +193,7 @@ function AuditTab() {
         </FilterField>
       </FilterBar>
       <DataTable rows={q.data?.items} cols={cols} rowKey={(a) => a.id} loading={q.isPending} error={q.error} retry={() => q.refetch()} dim={q.isPlaceholderData}
-        empty={<p className="p-4 text-sm text-ink-2 sm:px-6">{t('Brak wpisów dla tych filtrów.', 'No entries for these filters.')}</p>}
+        empty={<p className="p-4 text-sm text-ink-2 sm:px-6">{t('Brak wpisów dla tych filtrów', 'No entries for these filters')}</p>}
         mobile={(a) => <div><div className="mono text-xs">{a.action}</div><div className="text-xs text-ink-3">{a.user_email} · {fmtDateTime(a.at)}</div></div>} />
       {q.data ? <Pager total={q.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}
     </div>
@@ -241,7 +241,7 @@ function SafetyTab() {
   return (
     <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <Panel title={t('Polityka bezpieczeństwa', 'Safety policy')} actions={canManage ? <Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!dirty} onClick={() => save.mutate(undefined)}>{t('Zapisz politykę', 'Save policy')}</Button> : undefined}>
-        {!canManage ? <div className="mb-3"><ReadOnlyNote text={t('Tylko do odczytu.', 'Read only.')} /></div> : null}
+        {!canManage ? <div className="mb-3"><ReadOnlyNote text={t('Tylko do odczytu', 'Read only')} /></div> : null}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {num('max_pps', t('Pakiety na sekundę', 'Packets per second'), 'pps')}
           {num('max_http_rps', t('Żądania HTTP na sekundę', 'HTTP requests per second'), 'rps')}
@@ -389,7 +389,7 @@ function DojoTab() {
               <input className="field mono" value={f.link_url ?? ''} onChange={(e) => setF({ ...f, link_url: e.target.value })} placeholder="http://127.0.0.1:18080" data-testid="dojo-link-url" />
             </Field>
           ) : null}
-          <Field label={t('Klucz API', 'API key')} hint={f.api_key_set ? t('Zapisany. Wpisz nowy, aby go zmienić.', 'Stored. Type a new one to replace it.') : t('Brak klucza.', 'No key set.')}>
+          <Field label={t('Klucz API', 'API key')} hint={f.api_key_set ? t('Zapisany. Wpisz nowy, aby go zmienić.', 'Stored. Type a new one to replace it.') : t('Brak klucza', 'No key set')}>
             <input className="field mono" type="password" autoComplete="off" value={key} onChange={(e) => { setKey(e.target.value); setTest(null); }} placeholder={f.api_key_set ? '••••••••••••••••' : ''} />
           </Field>
           <Field label={t('Typ produktu', 'Product type')}><input className="field" value={f.product_type_name} onChange={(e) => setF({ ...f, product_type_name: e.target.value })} /></Field>

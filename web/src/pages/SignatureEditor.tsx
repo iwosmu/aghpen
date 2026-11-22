@@ -175,7 +175,7 @@ export default function SignatureEditor() {
                     })}
                   </ul>
                 ) : null}
-                {(v.paths ?? []).length ? <p className="mt-2 text-xs text-ink-2">{t('Dodatkowe żądania GET na usługę:', 'Extra GET requests per service:')} {(v.paths ?? []).map((p) => <span key={p} className="mono mr-2 text-ink">{p}</span>)}</p> : <p className="mt-2 text-xs text-ink-3">{t('Bez dodatkowych ścieżek.', 'No extra paths.')}</p>}
+                {(v.paths ?? []).length ? <p className="mt-2 text-xs text-ink-2">{t('Dodatkowe żądania GET na usługę:', 'Extra GET requests per service:')} {(v.paths ?? []).map((p) => <span key={p} className="mono mr-2 text-ink">{p}</span>)}</p> : <p className="mt-2 text-xs text-ink-3">{t('Bez dodatkowych ścieżek', 'No extra paths')}</p>}
               </div>
             )}
           </Panel>
@@ -204,7 +204,7 @@ export default function SignatureEditor() {
                       </li>
                     ))}
                   </ul>
-                ) : <p className="mt-2 text-sm text-ink-2">{t('Żadna zapisana usługa nie pasuje.', 'No stored services match.')}</p>}
+                ) : <p className="mt-2 text-sm text-ink-2">{t('Żadna zapisana usługa nie pasuje', 'No stored services match')}</p>}
               </div>
             )}
           </Panel>
