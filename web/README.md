@@ -25,7 +25,7 @@ Binarka Go osadza `web/dist` przy budowaniu z tagiem `embedui` (`embed.go`). Bez
 - Dane opisują fikcyjną sieć uczelni (ok. 400 hostów, 700 usług). Stan wraca do początku po przeładowaniu strony.
 - Konta: `admin@cbi.example`, `editor@cbi.example`, `analyst@cbi.example`, `viewer@cbi.example`, hasło `czujka`.
 
-Zrzuty bezpośrednio w `screenshots/` pochodzą z tego trybu. Zrzuty w `screenshots/real/` pochodzą z prawdziwego serwera i prawdziwych danych (import nmap, skan `127.0.0.1`, DefectDojo).
+Zrzuty bezpośrednio w `screenshots/` pochodzą z tego trybu. Zrzuty w `screenshots/real/` pochodzą z prawdziwego serwera i prawdziwych danych (import nmap, skan `127.0.0.1`, DefectDojo). Te zrzuty pokazują interfejs sprzed uproszczenia i leżą na gałęzi `archive/screenshots`.
 
 ## Praca z prawdziwym backendem
 

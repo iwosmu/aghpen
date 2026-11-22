@@ -26,7 +26,7 @@ Zmierzone na czystej maszynie (`docker:dind`, 0 obrazów; zapis: [`deploy/e2e/fr
 
 | Krok | Czas |
 | --- | --- |
-| `git clone` | 1–2 s |
+| `git clone --depth 1` | 10 s (45 MB na dysku; pomiar 22.11 na łączu domowym) |
 | `docker compose up -d` do zdrowego API (pobranie obrazów i budowa) | 51–115 s, zależnie od łącza (trzy pomiary: 79 s z Docker Hub, 115 s i 51 s przez mirror.gcr.io) |
 | zamiast tego paczka offline (`make bundle`, 354 MiB): rozpakowanie i `sh install.sh` | 26–29 s, bez sieci |
 | logowanie, „Ten komputer”, „Uruchom skan” (przeglądarka sterowana skryptem) | 9 s |

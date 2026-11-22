@@ -114,7 +114,7 @@ Format: route, what it returns, what the contract says.
 
 ## 7. Screenshots
 
-`web/screenshots/real/`, 81 files, all from the real server, 1440x900 unless the name starts with `m-` (390x844). I looked at the main pages: dashboard (empty, with data, light, English, mobile), runs, live run, run detail, hosts, host detail (active and gone), services, service detail with HTTP fingerprint, changes, compare, findings, DefectDojo export, targets, profiles, transfer, admin tabs, emergency stop, role views, login states.
+`web/screenshots/real/`, 81 files, all from the real server, 1440x900 unless the name starts with `m-` (390x844). I looked at the main pages: dashboard (empty, with data, light, English, mobile), runs, live run, run detail, hosts, host detail (active and gone), services, service detail with HTTP fingerprint, changes, compare, findings, DefectDojo export, targets, profiles, transfer, admin tabs, emergency stop, role views, login states. (These files are on branch `archive/screenshots`; the main branch keeps only the screenshots a document cites by name.)
 
 Groups: `00*` login states, `01`-`15-empty*` fresh database, `08`-`17` configuration and admin, `20`-`31` real data, `4-role-*` per role, `m-*` mobile.
 
