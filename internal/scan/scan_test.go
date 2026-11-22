@@ -1581,7 +1581,7 @@ func TestDeepPassRotates(t *testing.T) {
 	if p == nil || p.State != model.PassDone || p.Hosts != 16 || p.HostsSkipped != 5 {
 		t.Fatalf("deep pass = %+v", p)
 	}
-	if !slices.ContainsFunc(out.Stats.Notes, func(n string) bool { return strings.Contains(n, "objęła 16 hostów; czeka jeszcze 5") }) {
+	if !slices.ContainsFunc(out.Stats.Notes, func(n string) bool { return strings.Contains(n, "hosty w tym przebiegu: 16, czekające: 5") }) {
 		t.Errorf("notes = %q", out.Stats.Notes)
 	}
 	// the deep result of a host comes after its general result
