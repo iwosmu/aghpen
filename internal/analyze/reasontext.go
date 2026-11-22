@@ -37,6 +37,14 @@ var reasonEN = map[string]string{
 	ReasonSignature:       "Signature",
 }
 
+// textDatabasePanel is the admin-panel reason of a web tool for databases
+// (Adminer, phpMyAdmin, pgAdmin): the code stays admin-panel, the text names
+// what the panel manages.
+const (
+	textDatabasePanel   = "Panel bazy danych dostępny z sieci"
+	textDatabasePanelEN = "Database admin panel reachable from the network"
+)
+
 // ReasonLabel is the label of a reason code in lang, without its detail.
 func ReasonLabel(code, lang string) string {
 	if lang == "en" {
@@ -64,6 +72,9 @@ func RenderReason(r model.InterestReason, lang string) string {
 	label, ok := reasonEN[r.Code]
 	if !ok {
 		return r.Text
+	}
+	if r.Code == ReasonAdminPanel && r.Text == textDatabasePanel {
+		return textDatabasePanelEN
 	}
 	if r.Code == ReasonCriticality {
 		if m := reCriticality.FindStringSubmatch(r.Text); m != nil {

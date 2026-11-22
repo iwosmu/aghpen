@@ -2,11 +2,8 @@ signature +38
   pl: Sygnatura: Adminer
   en: Signature: Adminer
 admin-panel +30
-  pl: Panel administracyjny dostępny z sieci
-  en: Admin panel reachable from the network
-database +25
-  pl: Baza danych dostępna z sieci: http
-  en: Database open to the network: http
+  pl: Panel bazy danych dostępny z sieci
+  en: Database admin panel reachable from the network
 rare-tech +10
   pl: Rzadka technologia w tej sieci: 1 z 87 usług
   en: Rare technology in this network: 1 of 87 services

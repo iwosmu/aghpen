@@ -162,7 +162,7 @@ func Interest(in InterestInput) (int, []model.InterestReason) {
 	if has(model.ClassAdminPanel) {
 		add(ReasonAdminPanel, "")
 		if webDatabase {
-			why[len(why)-1].Text = "Panel bazy danych dostępny z sieci"
+			why[len(why)-1].Text = textDatabasePanel
 		}
 	}
 	if has(model.ClassLogin) {
