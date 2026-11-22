@@ -168,4 +168,15 @@ const all = {};
 for (const r of roles) { all[r.role] = {}; for (const m of modes) { try { all[r.role][m.lang + '-' + m.width] = await walkRole(browser, r, m); } catch (e) { note({ role: r.role, mode: m.lang + '-' + m.width, kind: 'walker-error', text: String(e).slice(0, 300) }); } } }
 fs.writeFileSync(out + '/pages.json', JSON.stringify(all, null, 1));
 await browser.close();
-console.log('issues', issues.length);
+// Pass or fail: a page error, a 5xx, a visible control that answers 403, or a walker crash fails the walk.
+// Everything else (4xx from a form test, truncation, untranslated text, no-effect clicks) is listed for a human to judge.
+const HARD = (i) => i.kind === 'page-error' || /^http-5\d\d$/.test(i.kind) || i.kind === 'visible-control-403' || i.kind === 'walker-error';
+const hard = issues.filter(HARD);
+const byKind = {};
+for (const i of issues) byKind[i.kind] = (byKind[i.kind] || 0) + 1;
+const visits = Object.values(all).reduce((a, m) => a + Object.values(m).reduce((b, p) => b + (p ? p.length : 0), 0), 0);
+const summary = { roles: Object.keys(all), page_visits: visits, records: issues.length, by_kind: byKind, hard_failures: hard };
+fs.writeFileSync(out + '/summary.json', JSON.stringify(summary, null, 1));
+console.log('walk: ' + visits + ' page visits, ' + issues.length + ' records, ' + hard.length + ' hard failures (' + (hard.length ? 'FAIL' : 'PASS') + ')');
+for (const h of hard) console.log('  FAIL ' + h.role + ' ' + h.mode + ' ' + h.page + ' ' + h.kind + ' ' + (h.text || ''));
+process.exitCode = hard.length ? 1 : 0;

@@ -268,7 +268,8 @@ if (!want("scan")) {} else if (START_SCAN) {
   // when the first address groups have finished and hosts are on the map.
   skipOn();
   await waitRun(liveRun, (st) => (st.stats?.chunks_done || 0) >= SCAN_WARM_CHUNKS && (st.stats?.hosts_up || 0) > 0, SCAN_WARM_MAX);
-  await page.reload(); await settle(1500);
+  // The run page has tabs; the address-space map is in tab "Mapa" (a running run opens on "Przebieg").
+  await present("/runs/" + liveRun + "?tab=map"); await settle(1500);
   skipOff();
   const map = page.getByText("Mapa przestrzeni adresowej").first();
   await point(map, 900);
@@ -284,8 +285,9 @@ if (!want("scan")) {} else if (START_SCAN) {
   // End on a finished run with its counts: wait (cut) for this run to finish, else show the last finished run.
   skipOn();
   const fin = SCAN_FINISH ? await waitRun(liveRun, () => false, SCAN_FINISH_MAX) : null;
-  if (fin && fin.status === "completed") { await page.reload(); liveDone = true; }
-  else if (done[0]) await page.goto(URL0 + "/runs/" + done[0].id + "?present=1");
+  // End on the counts: tab "Przebieg" holds the stats (a finished run opens on "Usługi").
+  if (fin && fin.status === "completed") { await present("/runs/" + liveRun + "?tab=progress"); liveDone = true; }
+  else if (done[0]) await present("/runs/" + done[0].id + "?tab=progress");
   await page.waitForLoadState("networkidle").catch(() => {});
   await page.evaluate(() => window.scrollTo(0, 0)); await settle(1200);
   skipOff();
@@ -293,7 +295,7 @@ if (!want("scan")) {} else if (START_SCAN) {
   end();
 } else {
   const last = done[0];
-  await present("/runs/" + last.id);
+  await present("/runs/" + last.id + "?tab=map");
   begin("scan"); await settle(6000); end();
 }
 
@@ -315,7 +317,8 @@ if (want("changes")) {
 if (want("unstable")) {
   const hosts = await api("/hosts?q=" + encodeURIComponent(HOST) + "&limit=5");
   const h = (hosts.items || []).find((x) => x.ip === HOST) || (hosts.items || [])[0];
-  await present("/hosts/" + h.id);
+  // The heatmap and the re-probe plan are in the host page tab "Dostępność".
+  await present("/hosts/" + h.id + "?tab=availability");
   begin("unstable");
   await settle(2200);
   const heat = page.getByText("Dostępność w tygodniu").first();
