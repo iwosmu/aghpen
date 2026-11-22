@@ -68,12 +68,12 @@ function Scrubber({ runs, index, onIndex }: { runs: RunPoint[]; index: number; o
           const h = light ? 8 : 10 + Math.round(Math.sqrt(r.changes / maxChanges) * (H - 12));
           const sel = i === index;
           return (
-            <span key={r.run_id} title={'#' + r.run_id + ' · ' + fmtDateTime(r.at) + ' · ' + triggerLabel(r.trigger) + ' · ' + r.changes + ' ' + t('zmiana / zmiany / zmian (plural())', 'change / changes')}
-              className={cx('absolute bottom-1 -translate-x-1/2', sel ? 'bg-accent' : r.changes - r.changes_expected > 0 ? 'bg-ink-2' : 'bg-ink-3', light && !sel && 'opacity-60')}
+            <span key={r.run_id} title={'#' + r.run_id + ' · ' + fmtDateTime(r.at) + ' · ' + triggerLabel(r.trigger) + ' · ' + r.changes + ' ' + plural(r.changes, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes'])}
+              className={cx('absolute bottom-1 -translate-x-1/2', sel ? 'bg-ink' : r.changes - r.changes_expected > 0 ? 'bg-ink-2' : 'bg-ink-3', light && !sel && 'opacity-60')}
               style={{ left: pos(i) + '%', height: h, width: light ? 2 : sel ? 6 : 4 }} />
           );
         })}
-        {cur ? <span className="pointer-events-none absolute -bottom-0.5 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-b border-r border-accent bg-panel" style={{ left: pos(index) + '%' }} /> : null}
+        {cur ? <span className="pointer-events-none absolute -bottom-0.5 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-b border-r border-ink bg-panel" style={{ left: pos(index) + '%' }} /> : null}
       </div>
       <div className="mt-1 flex justify-between px-2 text-2xs text-ink-3">
         <span className="num">{runs[0] ? fmtDateTime(runs[0].at) : ''}</span>
@@ -89,7 +89,7 @@ function Count({ label, value, now, tone }: { label: string; value: number; now?
   return (
     <div className="flex min-w-0 flex-col-reverse">
       <dt className="mt-1.5 text-xs text-ink-3">{label}{d ? <span className="num ml-1.5 text-ink-2" title={t('zmiana do dziś', 'change to today')}>{d > 0 ? '+' : ''}{fmtInt(d)} {t('dziś', 'today')}</span> : null}</dt>
-      <dd className={cx('font-display text-[40px] leading-none tracking-[-0.01em] text-ink sm:text-[48px]', tone)}>{fmtInt(value)}</dd>
+      <dd className={cx('font-display text-[32px] leading-none text-ink sm:text-[38px]', tone)}>{fmtInt(value)}</dd>
     </div>
   );
 }
@@ -179,19 +179,21 @@ function SnapshotLists({ runId }: { runId: number }) {
   const cur = tab === 'hosts' ? hosts : tab === 'services' ? services : findings;
   return (
     <Panel flush>
+      <div className="px-4 pb-3 pt-4 sm:px-6 lg:px-8">
       <Tabs value={tab} onChange={(id) => u.set({ list: id })} tabs={[
         { id: 'hosts', label: t('Hosty', 'Hosts'), count: hosts.data?.total },
         { id: 'services', label: t('Usługi', 'Services'), count: services.data?.total },
         { id: 'findings', label: t('Znaleziska', 'Findings'), count: findings.data?.total },
       ]} />
+      </div>
       <FilterBar onClear={() => u.clear(['hstatus', 'sstate', 'fsev'])} active={[status, state, sev].filter(Boolean).length}>
         {tab === 'hosts' ? <FilterField label={t('Stan wtedy', 'Status then')} width={180}><Select value={status} onChange={(v) => u.set({ hstatus: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'up', label: t('aktywne', 'up') }, { value: 'not responding', label: t('nie odpowiada', 'not responding') }, { value: 'unstable', label: t('niestabilne', 'unstable') }, { value: 'expected-offline', label: t('poza godzinami', 'outside usual hours') }, { value: 'down', label: t('nieaktywne', 'down') }]} /></FilterField> : null}
         {tab === 'services' ? <FilterField label={t('Stan wtedy', 'Status then')} width={180}><Select value={state} onChange={(v) => u.set({ sstate: v })} options={[{ value: '', label: t('otwarte i nieznane', 'open and unknown') }, { value: 'open', label: t('otwarte', 'open') }, { value: 'unknown', label: t('nieznane', 'unknown') }, { value: 'gone', label: t('zniknęły', 'gone') }, { value: 'all', label: t('wszystkie', 'all') }]} /></FilterField> : null}
         {tab === 'findings' ? <FilterField label={t('Waga', 'Severity')} width={140}><Select value={sev} onChange={(v) => u.set({ fsev: v })} options={[{ value: '', label: t('dowolna', 'any') }, { value: 'high', label: t('wysoka', 'high') }, { value: 'medium', label: t('średnia', 'medium') }, { value: 'low', label: t('niska', 'low') }, { value: 'info', label: 'info' }]} /></FilterField> : null}
       </FilterBar>
-      {tab === 'hosts' ? <DataTable rows={hosts.data?.items} cols={hCols} rowKey={(h) => h.id} loading={hosts.isPending} error={hosts.error} retry={() => hosts.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak hostów dla tych filtrów.', 'No hosts for these filters.')}</p>} mobile={(h) => <div className="flex justify-between"><span className="mono">{h.ip}</span><HostStatusMark status={h.status} /></div>} /> : null}
-      {tab === 'services' ? <DataTable rows={services.data?.items} cols={sCols} rowKey={(s) => s.id} rowClass={(s) => (s.carried ? 'text-ink-3 [&_.link]:text-ink-2' : undefined)} loading={services.isPending} error={services.error} retry={() => services.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak usług dla tych filtrów.', 'No services for these filters.')}</p>} mobile={(s) => <div className={cx('flex justify-between gap-2', s.carried && 'text-ink-3')}><span className="mono">{s.ip}:{s.port}</span>{s.carried ? <NotScanned /> : <ServiceStateMark state={s.state} />}</div>} /> : null}
-      {tab === 'findings' ? <DataTable rows={findings.data?.items} cols={fCols} rowKey={(f) => f.id} loading={findings.isPending} error={findings.error} retry={() => findings.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak otwartych znalezisk.', 'No open findings.')}</p>} mobile={(f) => <div><Sev level={f.severity} compact /> {f.title}</div>} /> : null}
+      {tab === 'hosts' ? <DataTable inPanel rows={hosts.data?.items} cols={hCols} rowKey={(h) => h.id} group={(h) => { const n = h.ip.split('.').slice(0, 3).join('.') + '.0/24'; return { key: n, label: <span className="mono normal-case">{n}</span> }; }} loading={hosts.isPending} error={hosts.error} retry={() => hosts.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak hostów dla tych filtrów', 'No hosts for these filters')}</p>} mobile={(h) => <div className="flex justify-between"><span className="mono">{h.ip}</span><HostStatusMark status={h.status} /></div>} /> : null}
+      {tab === 'services' ? <DataTable inPanel rows={services.data?.items} cols={sCols} rowKey={(s) => s.id} group={(s) => { const n = s.ip.split('.').slice(0, 3).join('.') + '.0/24'; return { key: n, label: <span className="mono normal-case">{n}</span> }; }} rowClass={(s) => (s.carried ? 'text-ink-3 [&_.link]:text-ink-2' : undefined)} loading={services.isPending} error={services.error} retry={() => services.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak usług dla tych filtrów', 'No services for these filters')}</p>} mobile={(s) => <div className={cx('flex justify-between gap-2', s.carried && 'text-ink-3')}><span className="mono">{s.ip}:{s.port}</span>{s.carried ? <NotScanned /> : <ServiceStateMark state={s.state} />}</div>} /> : null}
+      {tab === 'findings' ? <DataTable inPanel rows={findings.data?.items} cols={fCols} rowKey={(f) => f.id} loading={findings.isPending} error={findings.error} retry={() => findings.refetch()} empty={<p className="p-4 text-sm text-ink-2">{t('Brak otwartych znalezisk', 'No open findings')}</p>} mobile={(f) => <div><Sev level={f.severity} compact /> {f.title}</div>} /> : null}
       {cur.data ? <Pager total={cur.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null }, { keepOffset: true })} /> : null}
     </Panel>
   );
@@ -227,12 +229,12 @@ export default function TimeMachine() {
   }, [cur, runs]);
 
   const header = <PageHeader title={t('Oś czasu', 'Timeline')} />;
-  if (tl.error) return <div>{header}<div className="p-4 sm:p-6">{routeMissing(tl.error) ? <Unavailable /> : <ErrorState error={tl.error} retry={() => tl.refetch()} />}</div></div>;
+  if (tl.error) return <div>{header}<div className="px-4 pb-6 sm:px-6 lg:px-8">{routeMissing(tl.error) ? <Unavailable /> : <ErrorState error={tl.error} retry={() => tl.refetch()} />}</div></div>;
   if (!tl.data) return <div>{header}<SkeletonRows rows={10} /></div>;
-  if (runs.length === 0) return <div>{header}<div className="p-4 sm:p-6"><Empty icon="history" title={t('Brak skanów', 'No scans yet')} /></div></div>;
+  if (runs.length === 0) return <div>{header}<div className="px-4 pb-6 sm:px-6 lg:px-8"><Empty icon="history" title={t('Brak skanów', 'No scans yet')} /></div></div>;
   if (runs.length === 1) {
     return (
-      <div>{header}<div className="p-4 sm:p-6" data-testid="tm-one-run">
+      <div>{header}<div className="px-4 pb-6 sm:px-6 lg:px-8" data-testid="tm-one-run">
         <Empty icon="history" title={t('Potrzeba co najmniej dwóch skanów', 'At least two scans are needed')}          action={<Link to={'/runs/' + runs[0].run_id} className="link text-sm">{t('Otwórz skan', 'Open scan')} #{runs[0].run_id}</Link>} />
       </div></div>
     );
@@ -252,12 +254,12 @@ export default function TimeMachine() {
   ) : null;
   const sentences = s ? ((s.diff_to_now?.sentences ?? []).length && run.run_id !== latest.run_id ? (
     <ul className="space-y-1 text-sm" data-testid="tm-sentences">{(s.diff_to_now.sentences ?? []).map((x, i) => <li key={i} className="flex gap-2"><span className="mt-2 h-1 w-1 flex-none bg-ink-3" />{x}</li>)}</ul>
-  ) : <p className="text-sm text-ink-2">{run.run_id === latest.run_id ? t('To najnowszy skan.', 'This is the latest scan.') : t('Brak zmian od tamtej chwili.', 'No changes since then.')}</p>) : null;
+  ) : <p className="text-sm text-ink-2">{run.run_id === latest.run_id ? t('To najnowszy skan', 'This is the latest scan') : t('Brak zmian od tamtej chwili', 'No changes since then')}</p>) : null;
   if (few) {
     return (
       <div>
         {header}
-        <div className="space-y-4 p-4 sm:p-6">
+        <div className="space-y-4 px-4 pb-6 sm:px-6 lg:px-8">
           <Panel title={<span>{t('Skan', 'Scan')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
             actions={<span className="num text-ink-3">{cur + 1} / {runs.length}</span>}>
             <Scrubber runs={runs} index={cur} onIndex={setIndex} />
@@ -276,7 +278,7 @@ export default function TimeMachine() {
   return (
     <div>
       {header}
-      <div className="space-y-4 p-4 sm:p-6">
+      <div className="space-y-4 px-4 pb-6 sm:px-6 lg:px-8">
         <Panel title={<span>{t('Skan', 'Scan')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
           actions={<span className="num text-ink-3">{cur + 1} / {runs.length}</span>}>
           <Scrubber runs={runs} index={cur} onIndex={setIndex} />
@@ -296,7 +298,7 @@ export default function TimeMachine() {
                 <p className="label mb-2">{t('Od tamtej chwili do dziś', 'From then to today')}</p>
                 {(s.diff_to_now?.sentences ?? []).length ? (
                   <ul className="space-y-2 text-base text-ink" data-testid="tm-sentences">{(s.diff_to_now.sentences ?? []).map((x, i) => <li key={i} className="flex gap-2.5"><span className="mt-[11px] h-1 w-1 flex-none bg-ink-3" />{x}</li>)}</ul>
-                ) : <p className="text-base text-ink-2">{run.run_id === latest.run_id ? t('To najnowszy skan.', 'This is the latest scan.') : t('Brak zmian od tamtej chwili.', 'No changes since then.')}</p>}
+                ) : <p className="text-base text-ink-2">{run.run_id === latest.run_id ? t('To najnowszy skan', 'This is the latest scan') : t('Brak zmian od tamtej chwili', 'No changes since then')}</p>}
               </div>
             </div>
           )}
@@ -310,7 +312,7 @@ export default function TimeMachine() {
 
 // ---------- host swim lanes and service field history ----------
 
-const laneColor: Record<string, string> = { up: 'var(--st-new)', open: 'var(--accent)', missing: 'var(--st-changed)', unknown: 'var(--ink-3)', down: 'var(--st-gone)' };
+const laneColor: Record<string, string> = { up: 'var(--st-new)', open: 'var(--seq-3)', missing: 'var(--st-changed)', unknown: 'var(--ink-3)', down: 'var(--st-gone)' };
 
 function Lane({ intervals, t0, t1, height = 10 }: { intervals: LifeInterval[]; t0: number; t1: number; height?: number }) {
   const span = Math.max(1, t1 - t0);

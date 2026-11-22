@@ -139,7 +139,7 @@ export function WindowPicker({ value, onChange, disabled }: { value: Window[]; o
                   onPointerDown={(e) => { (e.target as HTMLElement).releasePointerCapture?.(e.pointerId); start(i); }}
                   onPointerEnter={() => over(i)}
                   onKeyDown={(e) => onKey(e, row, hr)}
-                  className={cx('block h-[22px] w-full min-w-0 focus-visible:z-10', on ? 'bg-accent' : 'bg-raised hover:bg-rule', !disabled && 'cursor-crosshair')}
+                  className={cx('block h-[22px] w-full min-w-0 focus-visible:z-10', on ? 'bg-[var(--seq-4)]' : 'bg-raised hover:bg-rule', !disabled && 'cursor-crosshair')}
                   style={on ? undefined : { boxShadow: 'inset 0 0 0 1px var(--rule)' }}
                 />
               );

@@ -7,13 +7,13 @@ import { get } from '../api/client';
 import { useAction, useItem, usePage } from '../api/hooks';
 import { post } from '../api/client';
 import type { Host, ManualEntryResult, NameCount, Page, Scope } from '../api/types';
-import { t, plural } from '../i18n';
-import { cx, fmtDateTime, fmtDec, fmtInt, fmtRelative } from '../lib/format';
+import { t } from '../i18n';
+import { cx, fmtInt } from '../lib/format';
 import { useUrlState, useWidth } from '../lib/hooks';
-import { Button, Dialog, Empty, ErrorState, Field, InlineError, PageHeader, Select, SkeletonRows, Spinner, Tags } from '../ui/kit';
+import { Button, Dialog, Empty, ErrorState, Field, InlineError, PageHeader, Select, SkeletonRows, Spinner } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 import { FilterBar, FilterField, SearchField } from '../ui/table';
-import { HOST_STATUSES, HostStatusMark, InterestScore, hostStatusInfo } from '../ui/marks';
+import { HOST_STATUSES, InterestScore, hostStatusInfo, toneColor } from '../ui/marks';
 import { ExportButtons, useDraft } from '../ui/edit';
 import { useCan } from '../session';
 
@@ -25,7 +25,14 @@ function noPortsText(status: string): string {
 const LIVE_STATUSES = 'up,unstable,expected-offline,unknown';
 const FILTERS = ['q', 'status', 'scope_id', 'tag', 'tech', 'port', 'min_interest', 'cidr'];
 
-interface VCol { id: string; header: string; width: string; min: number; sort?: string; align?: 'right'; cell: (h: Host) => ReactNode }
+interface VCol { id: string; header: ReactNode; width: string; min: number; sort?: string; align?: 'right'; cell: (h: Host) => ReactNode }
+
+
+/** The host's state as a lamp; the word is in its title and for screen readers. */
+function HostLamp({ status }: { status: string }) {
+  const i = hostStatusInfo(status);
+  return <span className="lamp flex-none" style={{ background: i.tone === 'neutral' ? 'var(--ink-2)' : toneColor(i.tone) }} title={i.label} role="img" aria-label={i.label} />;
+}
 
 export default function Hosts() {
   const u = useUrlState();
@@ -61,7 +68,7 @@ export default function Hosts() {
   const [wrapRef, width] = useWidth<HTMLDivElement>();
   const scrollRef = useRef<HTMLDivElement>(null);
   const narrow = width > 0 && width < 640;
-  const rowH = narrow ? 58 : 30;
+  const rowH = 46;
   // TanStack Virtual keeps its own mutable state; the component is not memoised by the compiler.
   const virt = useVirtualizer({ count: rows.length, getScrollElement: () => scrollRef.current, estimateSize: () => rowH, overscan: 14 });
   const items = virt.getVirtualItems();
@@ -73,23 +80,22 @@ export default function Hosts() {
   useEffect(() => { virt.measure(); }, [rowH]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allCols: VCol[] = [
-    { id: 'status', header: t('Stan', 'Status'), width: '168px', min: 0, cell: (h) => <HostStatusMark status={h.status} /> },
+    { id: 'status', header: <span className="sr-only">{t('Stan', 'Status')}</span>, width: '12px', min: 0, cell: (h) => <HostLamp status={h.status} /> },
     { id: 'ip', header: 'IP', width: '124px', min: 0, sort: 'ip', cell: (h) => <span className="mono">{h.ip}</span> },
     { id: 'name', header: t('Nazwa / etykieta', 'Name / label'), width: 'minmax(160px, 1.4fr)', min: 0, cell: (h) => (
       <span className="block truncate">
         {h.label ? <span className="text-ink">{h.label}</span> : null}
         {h.label && h.hostnames?.length ? <span className="text-ink-3"> · </span> : null}
-        <span className={cx('mono', h.label ? 'text-ink-3' : 'text-ink-2')}>{h.hostnames?.[0] ?? (h.label ? '' : '–')}</span>
+        <span className={h.label ? 'text-ink-3' : 'text-ink'}>{h.hostnames?.[0] ?? (h.label ? '' : '–')}</span>
       </span>
     ) },
-    { id: 'ports', header: t('Otwarte porty', 'Open ports'), width: 'minmax(120px, 1fr)', min: 900, sort: 'service_count', cell: (h) => (h.open_ports ?? []).length ? <span className="mono block truncate text-ink-2">{(h.open_ports ?? []).join(' ')}</span> : <span className="block truncate text-xs text-ink-3" title={noPortsText(h.status)}>{h.status === 'down' ? noPortsText(h.status) : t('brak otwartych portów', 'no open port')}</span> },
-    { id: 'tech', header: t('Technologie', 'Technologies'), width: 'minmax(140px, 1.2fr)', min: 1080, cell: (h) => <span className="block truncate text-ink-2">{(h.technologies ?? []).join(', ') || ((h.open_ports ?? []).length ? '–' : '')}</span> },
-    { id: 'tags', header: t('Tagi', 'Tags'), width: '150px', min: 1320, cell: (h) => <Tags tags={h.tags} max={2} /> },
-    { id: 'palive', header: t('Obecność', 'Presence'), width: '62px', min: 760, sort: 'p_alive', align: 'right', cell: (h) => <span className="num text-ink-2">{fmtDec(h.p_alive)}</span> },
-    { id: 'seen', header: t('Ostatnia obserwacja', 'Last seen'), width: '128px', min: 700, sort: 'last_seen', cell: (h) => <span className="num text-ink-2" title={fmtDateTime(h.last_seen)}>{fmtRelative(h.last_seen)}</span> },
+    { id: 'ports', header: t('Porty', 'Ports'), width: 'minmax(120px, 0.8fr)', min: 700, sort: 'service_count', cell: (h) => (h.open_ports ?? []).length ? <span className="flex gap-1 overflow-hidden">{(h.open_ports ?? []).slice(0, 2).map((p) => <span key={p} className="chip-fact mono">{p}</span>)}{(h.open_ports ?? []).length > 2 ? <span className="chip-fact num flex-none" title={(h.open_ports ?? []).join(', ')}>+{(h.open_ports ?? []).length - 2}</span> : null}</span> : <span className="block truncate text-xs text-ink-3" title={noPortsText(h.status)}>{h.status === 'down' ? noPortsText(h.status) : t('brak otwartych portów', 'no open port')}</span> },
+    { id: 'tech', header: t('Technologie', 'Technologies'), width: 'minmax(140px, 1.2fr)', min: 900, cell: (h) => (h.technologies ?? []).length ? <span className="flex gap-1 overflow-hidden" title={(h.technologies ?? []).join(', ')}>{(h.technologies ?? []).slice(0, 2).map((x) => <span key={x} className="chip-fact min-w-0 max-w-[150px] shrink"><span className="truncate">{x}</span></span>)}{(h.technologies ?? []).length > 2 ? <span className="chip-fact num flex-none">+{(h.technologies ?? []).length - 2}</span> : null}</span> : <span className="text-ink-3">{(h.open_ports ?? []).length ? '–' : ''}</span> },
     { id: 'interest', header: t('Ciekawość', 'Interest'), width: '86px', min: 0, sort: 'interest', align: 'right', cell: (h) => <InterestScore value={h.interest} /> },
   ];
-  const cols = allCols.filter((c) => width === 0 || width >= c.min);
+  // a column of dashes says nothing: hide the name column when no loaded host has a name or a label
+  const anyName = rows.length === 0 || rows.some((h) => h.label || (h.hostnames ?? []).length);
+  const cols = allCols.filter((c) => (width === 0 || width >= c.min) && (c.id !== 'name' || anyName));
   const grid = cols.map((c) => c.width).join(' ');
   const sort = u.get('sort', '-interest');
   const active = FILTERS.filter((k) => u.get(k)).length;
@@ -101,16 +107,12 @@ export default function Hosts() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         title={t('Hosty', 'Hosts')}
-        sub={inf.data ? <><span className="num text-ink">{fmtInt(total)}</span> {plural(total, ['host', 'hosty', 'hostów'], ['host', 'hosts'])}{active ? t(' po filtrach', ' after filters') : u.get('status') ? '' : t(', bez nieaktywnych', ', down hosts hidden')}</> : t('Wczytywanie…', 'Loading…')}
+        sub={inf.data ? <span className="num">{fmtInt(total)}</span> : null}
         readOnly={!canEdit}
         actions={<>{canCreate ? <Button icon="plus" onClick={() => setManual(true)} data-testid="host-manual">{t('Dodaj host', 'Add host')}</Button> : null}<ExportButtons kind="hosts" query={query} /></>}
       />
       {manual ? <ManualHostDialog onClose={() => setManual(false)} /> : null}
-      <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
-        <SearchField value={q} onChange={setQ} placeholder={t('IP, nazwa, etykieta', 'IP, name, label')} width={200} />
-        <FilterField label={t('Stan', 'Status')} width={150}>
-          <Select value={u.get('status', 'live')} onChange={(v) => u.set({ status: v === 'live' ? null : v })} options={[{ value: 'live', label: t('bez nieaktywnych', 'hide down') }, { value: 'all', label: t('wszystkie', 'all') }, ...HOST_STATUSES.map((s) => ({ value: s, label: hostStatusInfo(s).label }))]} />
-        </FilterField>
+      <FilterBar onClear={() => u.clear(FILTERS)} active={active} moreActive={['scope_id', 'tag', 'tech', 'port', 'cidr', 'min_interest'].filter((k) => u.get(k)).length} more={<>
         <FilterField label={t('Zakres', 'Scope')} width={160}>
           <Select value={u.get('scope_id')} onChange={(v) => u.set({ scope_id: v })} options={[{ value: '', label: t('wszystkie', 'all') }, ...(scopes.data?.items ?? []).map((s) => ({ value: String(s.id), label: s.name }))]} />
         </FilterField>
@@ -123,9 +125,14 @@ export default function Hosts() {
         <FilterField label={t('Ciekawość od', 'Interest from')} width={96}>
           <Select value={u.get('min_interest')} onChange={(v) => u.set({ min_interest: v })} options={[{ value: '', label: '0' }, { value: '25', label: '25' }, { value: '50', label: '50' }, { value: '75', label: '75' }]} />
         </FilterField>
+      </>}>
+        <SearchField value={q} onChange={setQ} placeholder={t('IP, nazwa, etykieta', 'IP, name, label')} width={200} />
+        <FilterField label={t('Stan', 'Status')} width={176}>
+          <Select value={u.get('status', 'live')} onChange={(v) => u.set({ status: v === 'live' ? null : v })} options={[{ value: 'live', label: t('bez nieaktywnych', 'hide down') }, { value: 'all', label: t('wszystkie', 'all') }, ...HOST_STATUSES.map((s) => ({ value: s, label: hostStatusInfo(s).label }))]} />
+        </FilterField>
       </FilterBar>
 
-      <div ref={wrapRef} className="flex min-h-0 flex-1 flex-col">
+      <div ref={wrapRef} className="card mx-3 mb-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[14px] sm:mx-6 lg:mx-8">
         {inf.error ? <ErrorState error={inf.error} retry={() => inf.refetch()} /> : inf.isPending ? <SkeletonRows rows={14} /> : rows.length === 0 ? (
           active ? <Empty icon="hosts" title={t('Żaden host nie pasuje do filtrów', 'No hosts match the filters')} action={<Button icon="x" onClick={() => u.clear(FILTERS)}>{t('Wyczyść filtry', 'Clear filters')}</Button>} />
             : hidden > 0 ? <Empty icon="hosts" title={t('Filtr „bez nieaktywnych” ukrywa wszystkie hosty', 'The "hide down" filter hides every host')} action={<Button onClick={() => u.set({ status: 'all' })} data-testid="hosts-show-all">{t('Pokaż wszystkie', 'Show all')} ({fmtInt(hidden)})</Button>} />
@@ -133,7 +140,7 @@ export default function Hosts() {
         ) : (
           <>
             {!narrow ? (
-              <div className="grid h-[30px] flex-none items-center gap-x-3 border-b border-rule-strong bg-panel px-4 text-xs font-medium text-ink-3 sm:px-6" style={{ gridTemplateColumns: grid }} role="row">
+              <div className="grid h-[44px] flex-none items-center gap-x-3 border-b border-rule px-5 text-2xs font-medium text-ink-2 sm:px-6" style={{ gridTemplateColumns: grid }} role="row">
                 {cols.map((c) => {
                   const dir = sort === c.sort ? 'asc' : sort === '-' + c.sort ? 'desc' : null;
                   return c.sort ? (
@@ -146,7 +153,7 @@ export default function Hosts() {
                 })}
               </div>
             ) : null}
-            <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto" style={{ height: 'max(320px, calc(100dvh - 300px))' }} role="table" aria-rowcount={total} aria-label={t('Hosty', 'Hosts')} data-testid="hosts-scroll">
+            <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto" style={{ height: 'max(320px, calc(100dvh - 330px))' }} role="table" aria-rowcount={total} aria-label={t('Hosty', 'Hosts')} data-testid="hosts-scroll">
               <div style={{ height: virt.getTotalSize(), position: 'relative' }}>
                 {items.map((vi) => {
                   const h = rows[vi.index];
@@ -154,21 +161,23 @@ export default function Hosts() {
                     <Link
                       key={h.id} to={'/hosts/' + h.id} role="row" aria-rowindex={vi.index + 1}
                       onKeyDown={(e) => { if (e.key === 'Enter') navigate('/hosts/' + h.id); }}
-                      className={cx('absolute left-0 right-0 border-b border-rule px-4 text-sm outline-offset-[-2px] hover:bg-raised sm:px-6', narrow ? 'flex flex-col justify-center' : 'grid items-center gap-x-3', (h.status === 'down' || h.status === 'expected-offline') && 'text-ink-2')}
+                      className={cx('absolute left-0 right-0 border-b border-rule px-5 text-sm outline-offset-[-2px] hover:bg-[var(--row-hover)] sm:px-6', narrow ? 'flex flex-col justify-center' : 'grid items-center gap-x-3', (h.status === 'down' || h.status === 'expected-offline') && 'text-ink-2')}
                       style={{ top: vi.start, height: rowH, gridTemplateColumns: narrow ? undefined : grid }}
                     >
                       {narrow ? (
-                        <>
-                          <span className="flex items-center justify-between gap-2"><span className="mono text-sm text-ink">{h.ip}</span><InterestScore value={h.interest} /></span>
-                          <span className="flex items-center justify-between gap-2 text-xs"><span className="truncate text-ink-2">{h.label || h.hostnames?.[0] || (h.open_ports ?? []).join(' ') || noPortsText(h.status)}</span><span className="flex-none"><HostStatusMark status={h.status} /></span></span>
-                        </>
+                        <span className="flex items-center gap-3">
+                          <HostLamp status={h.status} />
+                          <span className="mono flex-none text-sm text-ink">{h.ip}</span>
+                          <span className="min-w-0 flex-1 truncate text-xs text-ink-2">{h.label || h.hostnames?.[0] || (h.open_ports ?? []).join(' ')}</span>
+                          <InterestScore value={h.interest} />
+                        </span>
                       ) : cols.map((c) => <span key={c.id} role="cell" className={cx('min-w-0 whitespace-nowrap', c.align === 'right' && 'flex justify-end')}>{c.cell(h)}</span>)}
                     </Link>
                   );
                 })}
               </div>
             </div>
-            <div className="flex h-[30px] flex-none items-center justify-between gap-3 border-t border-rule px-4 text-xs text-ink-3 sm:px-6">
+            <div className="flex h-[40px] flex-none items-center justify-between gap-3 border-t border-rule px-5 text-xs text-ink-2 sm:px-6">
               <span>{t('Wczytano', 'Loaded')} <span className="num text-ink-2">{fmtInt(rows.length)}</span> {t('z', 'of')} <span className="num text-ink-2">{fmtInt(total)}</span></span>
               {isFetchingNextPage ? <span className="inline-flex items-center gap-1.5"><Spinner /></span> : null}
             </div>

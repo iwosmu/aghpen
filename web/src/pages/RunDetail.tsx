@@ -7,12 +7,14 @@ import { serviceName, isSelf } from '../lib/serviceName';
 import { ServiceStateMark } from '../ui/marks';
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtTime } from '../lib/format';
-import { useLiveRun } from '../lib/hooks';
-import { Button, Dialog, ErrorState, Field, InlineError, PageHeader, Panel, SkeletonRows } from '../ui/kit';
+import { MenuButton } from '../ui/edit';
+import { Button, Dialog, ErrorState, Field, InlineError, PageHeader, Panel, SkeletonRows, Tabs } from '../ui/kit';
 import { triggerLabel } from './Runs';
 import { Icon } from '../ui/Icon';
 import { ChunkStatusMark, Glyph, RunStatusMark } from '../ui/marks';
 import { AddressMap } from '../viz/AddressMap';
+import { NetworkField, networkFields } from '../viz/Night';
+import { useLiveRun, useUrlState, useWidth } from '../lib/hooks';
 import { PacketCount, ProgressBar, RateGauge } from '../viz/charts';
 import { useCan } from '../session';
 import { RunStory } from '../ui/RunStory';
@@ -45,13 +47,12 @@ function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: nu
     <Panel title={t('Znalezione usługi', 'Services found')} count={q.data ? q.data.total - carried : undefined} flush
       actions={hosts.length === 1 ? <Link to={'/hosts/' + hosts[0]} className="link">{t('Host', 'Host')} <span className="mono">{items[0].ip}</span></Link> : undefined}>
       {q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : !q.data ? <SkeletonRows rows={5} /> : items.length === 0 ? (
-        <p className="p-3 text-sm text-ink-2" data-testid="run-services-empty">{live ? t('Oczekiwanie na otwarte porty…', 'Waiting for open ports…') : t('Brak otwartych usług.', 'No open services.')}</p>
+        <p className="p-3 text-sm text-ink-2" data-testid="run-services-empty">{live ? t('Oczekiwanie na otwarte porty…', 'Waiting for open ports…') : t('Brak otwartych usług', 'No open services')}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="run-services">
             <thead><tr className="border-b border-rule-strong text-left text-xs text-ink-3">
-              {hosts.length > 1 ? <th className="h-[30px] px-3 font-medium">IP</th> : null}
-              <th className="h-[30px] px-3 font-medium">{t('Port', 'Port')}</th>
+              <th className="h-[30px] px-3 font-medium">{hosts.length > 1 ? t('Adres', 'Address') : t('Port', 'Port')}</th>
               <th className="px-3 font-medium">{live ? t('Stan', 'Status') : t('Stan dziś', 'Status today')}</th>
               <th className="px-3 font-medium">{t('Usługa', 'Service')}</th>
               <th className="px-3 font-medium">{t('Produkt', 'Product')}</th>
@@ -61,8 +62,7 @@ function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: nu
             <tbody>
               {items.map((s) => (
                 <tr key={s.id} className={cx('border-b border-rule last:border-b-0', s.carried && 'text-ink-3 [&_.link]:text-ink-2')} data-carried={s.carried ? 'true' : undefined} title={s.carried ? notScannedHint() : undefined} style={fresh.has(s.id) && !s.carried ? { animation: 'rise-in 240ms var(--ease-out-expo)' } : undefined}>
-                  {hosts.length > 1 ? <td className="mono h-[30px] whitespace-nowrap px-3">{s.ip}</td> : null}
-                  <td className="h-[30px] whitespace-nowrap px-3"><Link to={'/services/' + s.id} className="mono link">{s.port}/{s.proto}</Link></td>
+                  <td className="h-[30px] whitespace-nowrap px-3"><Link to={'/services/' + s.id} className="mono link">{hosts.length > 1 ? s.ip + ':' + s.port : s.port + '/' + s.proto}</Link></td>
                   <td className="whitespace-nowrap px-3">{s.carried ? <NotScanned /> : <ServiceStateMark state={live ? 'open' : s.state} />}</td>
                   <td className="whitespace-nowrap px-3">{serviceName(s)}{isSelf(s) ? <SelfTag /> : null}</td>
                   <td className={cx('whitespace-nowrap px-3', !s.carried && 'text-ink-2')}><ProductValue s={s} /></td>
@@ -90,7 +90,7 @@ function NoStory({ run }: { run: ScanRun }) {
   const s = run.summary;
   if (!s) return null;
   const n = s.hosts_new + s.hosts_gone + s.hosts_back + s.services_new + s.services_gone + s.services_changed + (s.services_returned ?? 0) + (s.responses_slower ?? 0) + (s.hosts_missing ?? 0);
-  return n === 0 ? <p className="font-display text-[28px] leading-tight text-ink sm:text-[32px]" data-testid="run-story-none">{t('Bez zmian.', 'No changes.')}</p> : null;
+  return n === 0 ? <p className="font-display text-[22px] leading-tight text-ink sm:text-[26px]" data-testid="run-story-none">{t('Bez zmian', 'No changes')}</p> : null;
 }
 
 function Fact({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
@@ -103,12 +103,7 @@ function Fact({ label, children, wide }: { label: string; children: React.ReactN
 }
 
 function ReportButtons({ onOpen }: { onOpen: (print: boolean) => void }) {
-  return (
-    <>
-      <Button icon="external" onClick={() => onOpen(false)} data-testid="run-report">{t('Raport', 'Report')}</Button>
-      <Button icon="print" onClick={() => onOpen(true)}>{t('Drukuj', 'Print')}</Button>
-    </>
-  );
+  return <MenuButton label={t('Raport', 'Report')} icon="external" testId="run-report-menu" items={[{ label: t('Otwórz', 'Open'), onSelect: () => onOpen(false), testId: 'run-report' }, { label: t('Drukuj', 'Print'), onSelect: () => onOpen(true) }]} />;
 }
 
 function specLabel(c: Chunk): string {
@@ -116,7 +111,25 @@ function specLabel(c: Chunk): string {
   return c.spec[0] + ' +' + (c.spec.length - 1);
 }
 
+/** A run over one /24: every address of the block is a cell, lit where this run found open services. */
+function RunAddressField({ runId, cidr, live, fallback }: { runId: number; cidr: string; live: boolean; fallback: React.ReactNode }) {
+  const q = useItem<Page<Service>>('/services', { run_id: runId, limit: 1000 }, live ? { refetchInterval: 3000 } : undefined);
+  const field = useMemo(() => {
+    const ips = [...new Set((q.data?.items ?? []).map((s) => s.ip))];
+    return networkFields(ips.map((ip) => ({ ip, status: 'up' as const })), [], live ? [cidr] : [])[0];
+  }, [q.data, cidr, live]);
+  const [ref, w] = useWidth<HTMLDivElement>();
+  if (q.data && !field) return <>{fallback}</>;
+  return (
+    <div ref={ref} className="flex flex-col gap-3 py-2">
+      <p className="mono text-[13px] text-ink-2">{cidr}</p>
+      {field && w ? <NetworkField field={field} width={w} /> : <div className="skeleton h-[160px] rounded-[10px]" />}
+    </div>
+  );
+}
+
 export default function RunDetail() {
+  const u = useUrlState();
   const id = Number(useParams().id);
   const navigate = useNavigate();
   const canRun = useCan('scans:run');
@@ -156,6 +169,8 @@ export default function RunDetail() {
   const s = run.stats;
   const pct = s.addresses_total ? s.addresses_done / s.addresses_total : 0;
   const isLive = run.status === 'running' || run.status === 'analyzing';
+  const defaultTab = isLive || run.status === 'paused' || run.status === 'queued' ? 'progress' : 'services';
+  const tab = u.get('tab', defaultTab);
   const policyCap = safety.data?.max_pps ?? 0;
   const cap = Math.min(profile.data?.rate.max_pps ?? policyCap, policyCap || Infinity) || policyCap;
   const maxSize = Math.max(1, ...(chunks.data ?? []).map((c) => c.size));
@@ -176,9 +191,9 @@ export default function RunDetail() {
     <div>
       <PageHeader
         back={{ to: '/runs', label: t('Skany', 'Scans') }}
-        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{t('Skan', 'Scan')} #{run.id}</span><span className="font-sans text-base font-normal"><RunStatusMark status={run.status} pauseReason={run.pause_reason} /></span></span>}
+        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{t('Skan', 'Scan')} #{run.id}</span><span className="font-sans text-[15px] font-normal tracking-normal"><RunStatusMark status={run.status} pauseReason={run.pause_reason} /></span></span>}
         sub={<>{run.profile_id ? <Link to={'/profiles/' + run.profile_id} className="link">{run.profile_name}</Link> : run.profile_name} · {run.trigger === 'schedule' ? t('z harmonogramu', 'from the schedule') : run.trigger === 'import' ? t('import pliku', 'file import') : run.trigger === 'manual' ? t('uruchomiony ręcznie', 'started manually') : triggerLabel(run.trigger)} · {fmtDateTime(run.started_at)}
-          {isLive ? <span className="ml-2 inline-flex items-center gap-1 text-xs text-ink-3"><span className={cx('inline-block h-1.5 w-1.5 rounded-full', connected ? 'bg-st-new' : 'bg-st-changed')} />{connected ? t('na żywo', 'live') : t('łączenie…', 'connecting…')}</span> : null}</>}
+          {isLive ? <span className="ml-2 inline-flex items-center gap-1 text-xs text-ink-3"><span className={cx('lamp', connected ? 'bg-st-new' : 'bg-st-changed')} />{connected ? t('na żywo', 'live') : t('łączenie…', 'connecting…')}</span> : null}</>}
         readOnly={!canRun && (isLive || run.status === 'paused')}
         actions={canRun ? (
           <>
@@ -197,27 +212,27 @@ export default function RunDetail() {
         )}
       />
 
-      <div className="space-y-5 p-4 sm:p-6 lg:px-8">
+      <div className="space-y-5 px-4 pb-6 sm:px-6 lg:px-8">
         <RunNote run={run} canEdit={canRun} />
         {run.error ? (
-          <div role="alert" className="flex items-start gap-2 border border-danger/60 bg-st-gone-wash px-3 py-2 text-sm">
-            <Icon name="alert" className="mt-0.5 text-danger" /><span><span className="font-medium">{t('Skan zakończył się błędem.', 'The scan failed.')}</span> <span className="mono text-xs">{run.error}</span></span>
+          <div role="alert" className="flex items-start gap-2 rounded-[10px] bg-st-gone-wash px-4 py-3 text-sm">
+            <Icon name="alert" className="mt-0.5 text-danger" /><span><span className="font-medium">{t('Skan zakończył się błędem', 'The scan failed')}</span> <span className="mono text-xs">{run.error}</span></span>
           </div>
         ) : null}
         {run.status === 'paused' && run.pause_reason === 'emergency_stop' ? (
-          <div role="status" className="flex items-start gap-2 border border-danger/60 bg-st-gone-wash px-3 py-2 text-sm" data-testid="paused-emergency">
+          <div role="status" className="flex items-start gap-2 rounded-[10px] bg-st-gone-wash px-4 py-3 text-sm" data-testid="paused-emergency">
             <Icon name="stop" className="mt-0.5 text-danger" />
             <span>{t('Stop awaryjny wstrzymał ten skan. Po wyłączeniu stopu wznów skan ręcznie.', 'The emergency stop paused this scan. After the stop is off, resume the scan manually.')}</span>
           </div>
         ) : null}
         {run.status === 'paused' && run.pause_reason === 'manual' ? (
-          <div role="status" className="flex items-start gap-2 border border-rule-strong bg-raised px-3 py-2 text-sm">
+          <div role="status" className="flex items-start gap-2 rounded-[10px] bg-raised px-4 py-3 text-sm">
             <Glyph name="pause" tone="neutral" />
-            <span>{t('Skan wstrzymany ręcznie.', 'The scan is paused manually.')}</span>
+            <span>{t('Skan wstrzymany ręcznie', 'The scan is paused manually')}</span>
           </div>
         ) : null}
         {run.status === 'paused' && run.pause_reason === 'window_closed' ? (
-          <div className="flex items-start gap-2 border border-rule-strong bg-st-changed-wash px-3 py-2 text-sm">
+          <div className="flex items-start gap-2 rounded-[10px] bg-st-changed-wash px-4 py-3 text-sm">
             <Glyph name="pause" tone="changed" />
             <span>
               {t('Okno czasowe zamknęło się o ', 'The time window closed at ')}<span className="num">{fmtTime(run.window_end)}</span>{t('.', '.')}{' '}
@@ -228,16 +243,16 @@ export default function RunDetail() {
 
         {run.status === 'completed' && run.summary?.prev_run_id ? (
           <section className="py-1" data-testid="run-story-panel">
-            <h2 className="mb-2 text-xs text-ink-3">{t('Względem skanu', 'Compared with scan')} <Link to={'/runs/' + run.summary.prev_run_id} className="num link">#{run.summary.prev_run_id}</Link> · <Link to={'/changes/compare?from=' + run.summary.prev_run_id + '&to=' + run.id} className="link">{t('porównanie', 'comparison')}</Link></h2>
-            <RunStory runId={run.id} className="space-y-1.5 [&_li]:text-lg" />
+            <h2 className="caps mb-3">{t('Względem skanu', 'Compared with scan')} <Link to={'/runs/' + run.summary.prev_run_id} className="num link">#{run.summary.prev_run_id}</Link> · <Link to={'/changes/compare?from=' + run.summary.prev_run_id + '&to=' + run.id} className="link">{t('porównanie', 'comparison')}</Link></h2>
+            <RunStory runId={run.id} className="space-y-2 [&_.mono]:text-[0.86em] [&_li]:text-[19px] [&_li]:leading-[28px] sm:[&_li]:text-[21px]" />
             <NoStory run={run} />
           </section>
         ) : null}
         {s.warnings && s.warnings.length > 0 ? (
-          <div role="alert" data-testid="run-warnings" className="flex items-start gap-2 border border-danger/60 bg-st-gone-wash px-3 py-2 text-sm">
+          <div role="alert" data-testid="run-warnings" className="flex items-start gap-2 rounded-[10px] bg-st-gone-wash px-4 py-3 text-sm">
             <Icon name="alert" className="mt-0.5 text-danger" />
             <span>
-              <span className="font-medium">{t('Wynik skanu jest niepełny.', 'The scan result is incomplete.')}</span>
+              <span className="font-medium">{t('Wynik skanu jest niepełny', 'The scan result is incomplete')}</span>
               {s.warnings.map((w) => <span key={w} className="block">{w}</span>)}
             </span>
           </div>
@@ -248,64 +263,52 @@ export default function RunDetail() {
           </div>
         ) : null}
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="card p-4 sm:p-5">
-            <div className="flex items-baseline justify-between gap-3">
-              {small && isLive ? (
-                <span><span className="font-display text-[44px] leading-none">{fmtInt(s.services_open)}</span> <span className="text-sm text-ink-2">{plural(s.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['open service', 'open services'])} {t('do tej pory', 'so far')}</span></span>
-              ) : (
-                <span><span className="font-display text-[44px] leading-none">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów', 'of addresses')}</span></span>
-              )}
-              <span className="num text-sm text-ink-2">{fmtInt(s.addresses_done)} / {fmtInt(s.addresses_total)}</span>
-            </div>
-            <div className="mt-2"><ProgressBar value={s.addresses_done} max={s.addresses_total} active={isLive ? runningAddrs : 0} label={t('Postęp skanu', 'Scan progress')} /></div>
-            <RunPasses passes={s.passes} className="mt-1.5" />
-            <PartialNote run={run} className="mt-2" />
-            {run.status === 'running' && runningChunks > 0 ? (
-              <p className="mt-2.5 flex items-center gap-2.5 text-sm text-ink" data-testid="run-phase">
-                <span className="bar-active inline-block h-1.5 w-5 flex-none rounded-full" aria-hidden="true" />
-                {small ? smallPhaseText(s) : phaseText(s, runningChunks, runningAddrs)}
-              </p>
-            ) : null}
-            <dl className="mt-4 grid grid-cols-2 gap-y-3 border-t border-rule/70 pt-4 sm:grid-cols-4">
-              <Fact label={run.status === 'completed' ? t('Czas trwania', 'Duration') : t('Czas aktywny', 'Active time')}><span className="num">{fmtDuration(s.elapsed_sec)}</span></Fact>
-              <Fact label={t('Pozostało', 'Remaining')}><span className="num">{isLive || run.status === 'paused' ? (run.status === 'analyzing' ? t('analiza', 'analysing') : s.eta_sec > 0 ? fmtDuration(s.eta_sec) : '–') : '–'}</span></Fact>
-              <Fact label={t('Podgrupy', 'Chunks')}><span className="num">{s.chunks_done} / {s.chunks_total}</span></Fact>
-              <Fact label={t('Aktywne hosty', 'Hosts up')}><span className="num">{fmtInt(s.hosts_up)}</span></Fact>
-              <Fact label={t('Otwarte usługi', 'Open services')}><span className="num">{fmtInt(s.services_open)}</span> <span className="text-xs font-normal text-ink-3">({fmtInt(s.http_services)} WWW)</span></Fact>
-              <Fact label={t('Pakiety', 'Packets')}><PacketCount sent={s.packets_sent} estimated={s.packets_estimated} /></Fact>
-              <Fact label={t('Żądania HTTP', 'HTTP requests')}><span className="num">{fmtInt(s.http_requests)}</span></Fact>
-              <Fact label={t('Hosty sprawdzone ponownie', 'Hosts probed again')}><span className="num">{fmtInt(s.retried)}</span></Fact>
-            </dl>
-          </section>
-          <section className="card p-4 sm:p-5">
-            <h2 className="mb-3 text-sm font-semibold">{t('Tempo skanowania', 'Scan rate')}</h2>
-            {policyCap ? <RateGauge current={isLive ? s.current_pps : 0} cap={cap} policyCap={policyCap} basis={isLive ? s.current_pps_basis : undefined} /> : <div className="skeleton h-12" />}
-            <p className="mt-2 text-xs text-ink-2">{t('Średnio', 'Average')} <span className="num text-ink">{fmtInt(s.avg_pps)}</span> pps. {profile.data && profile.data.rate.max_pps > policyCap ? t('Polityka bezpieczeństwa ogranicza tempo do ' + fmtInt(policyCap) + ' pps.', 'The safety policy limits the rate to ' + fmtInt(policyCap) + ' pps.') : null}</p>
-          </section>
-        </div>
-
-        {small ? <RunServices run={run} live={isLive} /> : null}
-        {small ? null : <div className="grid gap-4 xl:grid-cols-2">
-          <Panel title={t('Mapa przestrzeni adresowej', 'Address-space map')} count={(map.data?.blocks.length ?? 0) + ' × /24'}>
-            {map.error ? <ErrorState error={map.error} retry={() => map.refetch()} /> : !map.data ? <div className="skeleton h-[260px]" /> : (
+        <Tabs value={tab} onChange={(v) => u.set({ tab: v === defaultTab ? null : v })} tabs={[
+          { id: 'services', label: t('Usługi', 'Services') },
+          ...(run.summary ? [{ id: 'changes', label: t('Zmiany', 'Changes') }] : []),
+          ...(small ? [] : [{ id: 'map', label: t('Mapa', 'Map') }, { id: 'chunks', label: t('Podgrupy', 'Chunks') }]),
+          { id: 'progress', label: t('Przebieg', 'Progress') },
+        ]} />
+        {tab === 'services' ? <RunServices run={run} live={isLive} cap={small ? undefined : RUN_SERVICES_CAP} /> : null}
+        {tab === 'changes' ? (run.summary ? (
+            <Panel title={t('Zmiany w tym skanie', 'Changes in this scan')} actions={<Link className="link" to={'/changes?run_id=' + run.id}>{t('Wszystkie', 'All')}</Link>}>
+              <dl className="grid grid-cols-2 gap-x-6 sm:grid-cols-3">
+                {([
+                  ['plus', 'new', t('nowe hosty', 'new hosts'), run.summary.hosts_new], ['plus', 'new', t('nowe usługi', 'new services'), run.summary.services_new], ['back', 'new', t('hosty wróciły', 'hosts back'), run.summary.hosts_back], ['returned', 'new', t('usługi wróciły', 'services back'), run.summary.services_returned ?? 0], ['slow', 'changed', t('usługi odpowiadają wolniej', 'services respond slower'), run.summary.responses_slower ?? 0],
+                  ['minus', 'gone', t('hosty nieaktywne', 'hosts down'), run.summary.hosts_gone], ['minus', 'gone', t('usługi zniknęły', 'services gone'), run.summary.services_gone], ['wave', 'unstable', t('hosty niestabilne', 'hosts unstable'), run.summary.hosts_unstable],
+                  ['delta', 'changed', t('zmienione usługi', 'changed services'), run.summary.services_changed], ['dot', 'accent', t('nowe znaleziska', 'new findings'), run.summary.findings_new],
+                  ['half', 'changed', t('hosty nie odpowiadają (niepotwierdzone)', 'hosts not responding (unconfirmed)'), run.summary.hosts_missing ?? 0], ['half', 'changed', t('usługi nie odpowiadają (niepotwierdzone)', 'services not responding (unconfirmed)'), run.summary.services_unreachable ?? 0],
+                ] as const).map(([g, tone, label, n]) => (
+                  <div key={label} className={cx('flex min-h-[40px] items-center justify-between gap-2 border-b border-rule py-1.5', !n && 'opacity-55')}>
+                    <dt className="flex items-center gap-1.5 text-sm text-ink-2"><Glyph name={g} tone={n ? tone : 'expected'} />{label}</dt>
+                    <dd className={cx('num text-sm font-medium', n ? 'text-ink' : 'text-ink-3')}>{n}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Panel>
+          ) : null) : null}
+        {tab === 'map' && !small ? <Panel title={t('Mapa przestrzeni adresowej', 'Address-space map')} count={(map.data?.blocks.length ?? 0) + ' × /24'}>
+            {map.error ? <ErrorState error={map.error} retry={() => map.refetch()} /> : !map.data ? <div className="skeleton h-[260px]" /> : map.data.blocks.length === 1 ? (
+              <RunAddressField runId={run.id} cidr={map.data.blocks[0].cidr} live={isLive} fallback={
+                <AddressMap blocks={map.data.blocks} highlight={highlight} onHover={setHoverCidr} onSelect={(b: MapBlock) => navigate('/hosts?cidr=' + encodeURIComponent(b.cidr))} />
+              } />
+            ) : (
               <AddressMap
                 blocks={map.data.blocks} highlight={highlight} onHover={setHoverCidr}
                 onSelect={(b: MapBlock) => navigate('/hosts?cidr=' + encodeURIComponent(b.cidr))}
                 describe={(b) => { const c = chunkOf.get(b.cidr); return c ? t('podgrupa', 'chunk') + ' #' + c.seq : null; }}
               />
             )}
-          </Panel>
-
-          <Panel title={t('Podgrupy adresów', 'Address chunks')} count={sortedChunks.length} flush>
+          </Panel> : null}
+        {tab === 'chunks' && !small ? <Panel title={t('Podgrupy adresów', 'Address chunks')} count={sortedChunks.length} flush>
             {chunks.error ? <ErrorState error={chunks.error} retry={() => chunks.refetch()} /> : !chunks.data ? <SkeletonRows rows={8} /> : sortedChunks.length === 0 ? (
-              <p className="p-3 text-sm text-ink-2">{run.trigger === 'import' ? t('Import nie ma podgrup.', 'An import has no chunks.') : t('Plan podgrup pojawi się po starcie skanu.', 'The chunk plan appears when the scan starts.')}</p>
+              <p className="p-3 text-sm text-ink-2">{run.trigger === 'import' ? t('Import nie ma podgrup', 'An import has no chunks') : t('Plan podgrup pojawi się po starcie skanu', 'The chunk plan appears when the scan starts')}</p>
             ) : (
               <div className="max-h-[520px] overflow-auto">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-10 bg-panel">
-                    <tr className="border-b border-rule-strong text-left text-xs text-ink-3">
-                      <th className="h-[30px] w-[36px] pl-3 pr-2 font-medium">#</th>
+                  <thead className="sticky top-0 z-10 bg-[var(--panel-solid)]">
+                    <tr className="border-b border-rule text-left text-2xs text-ink-2">
+                      <th className="h-[40px] w-[36px] pl-5 pr-2 font-medium">#</th>
                       <th className="px-2 font-medium">{t('Adresy', 'Addresses')}</th>
                       <th className="px-2 font-medium" title={t('Grupa robocza: podgrupy, które jeden proces skanera wziął razem', 'Work group: the chunks that one scanner process took together')}>{t('Grupa', 'Group')}</th>
                       <th className="px-2 font-medium">{t('Rozmiar', 'Size')}</th>
@@ -319,9 +322,9 @@ export default function RunDetail() {
                     {sortedChunks.map((c) => (
                       <tr
                         key={c.id} onPointerEnter={() => setHoverChunk(c.id)} onPointerLeave={() => setHoverChunk(null)} tabIndex={0} onFocus={() => setHoverChunk(c.id)} onBlur={() => setHoverChunk(null)}
-                        className={cx('border-b border-rule last:border-b-0 outline-offset-[-2px]', (hoverChunk === c.id || hoveredChunkId === c.id) ? 'bg-accent-wash' : hoverGroup && c.group === hoverGroup ? 'bg-accent-wash/50' : '')}
+                        className={cx('border-b border-rule last:border-b-0 outline-offset-[-2px]', (hoverChunk === c.id || hoveredChunkId === c.id) ? 'bg-raised' : hoverGroup && c.group === hoverGroup ? 'bg-accent-wash/50' : '')}
                       >
-                        <td className="num h-[30px] pl-3 pr-2 text-ink-2">{c.seq}</td>
+                        <td className="num h-[42px] pl-5 pr-2 text-ink-2">{c.seq}</td>
                         <td className="mono whitespace-nowrap px-2" title={c.spec.join(', ')}>{specLabel(c)}</td>
                         <td className="num whitespace-nowrap px-2 text-ink-2">{c.group ? <span className="inline-flex items-center gap-1">{(groupSizes.get(c.group) ?? 0) > 1 ? <span className="inline-block h-[14px] w-[3px] bg-accent" aria-hidden="true" /> : null}G{c.group}{(groupSizes.get(c.group) ?? 0) > 1 ? <span className="text-2xs text-ink-3">×{groupSizes.get(c.group)}</span> : null}</span> : '–'}</td>
                         <td className="px-2"><span className="flex items-center gap-2"><span className="num w-[38px] text-right">{fmtInt(c.size)}</span><span className="hidden h-[4px] bg-ink-3 sm:block" style={{ width: Math.max(3, (c.size / maxSize) * 28) }} /></span></td>
@@ -335,12 +338,45 @@ export default function RunDetail() {
                 </table>
               </div>
             )}
-          </Panel>
-        </div>}
-        {small ? null : <RunServices run={run} live={isLive} cap={RUN_SERVICES_CAP} />}
-
-        <div className="grid gap-4 xl:grid-cols-2">
-          {!small && (isLive || recent.length > 0) ? (
+          </Panel> : null}
+        {tab === 'progress' ? <>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="card p-5">
+            <div className="flex items-baseline justify-between gap-3">
+              {small && isLive ? (
+                <span><span className="font-display text-[36px] leading-none">{fmtInt(s.services_open)}</span> <span className="text-sm text-ink-2">{plural(s.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['open service', 'open services'])} {t('do tej pory', 'so far')}</span></span>
+              ) : (
+                <span><span className="font-display text-[36px] leading-none">{fmtPct(pct, pct > 0 && pct < 1 ? 1 : 0)}</span> <span className="text-sm text-ink-2">{t('adresów', 'of addresses')}</span></span>
+              )}
+              <span className="num text-sm text-ink-2">{fmtInt(s.addresses_done)} / {fmtInt(s.addresses_total)}</span>
+            </div>
+            <div className="mt-2"><ProgressBar value={s.addresses_done} max={s.addresses_total} active={isLive ? runningAddrs : 0} label={t('Postęp skanu', 'Scan progress')} /></div>
+            <RunPasses passes={s.passes} className="mt-1.5" />
+            <PartialNote run={run} className="mt-2" />
+            {run.status === 'running' && runningChunks > 0 ? (
+              <p className="mt-2.5 flex items-center gap-2.5 text-sm text-ink" data-testid="run-phase">
+                <span className="bar-active inline-block h-1.5 w-5 flex-none rounded-[2px]" aria-hidden="true" />
+                {small ? smallPhaseText(s) : phaseText(s, runningChunks, runningAddrs)}
+              </p>
+            ) : null}
+            <dl className="mt-5 grid grid-cols-2 gap-y-4 pt-1 sm:grid-cols-4">
+              <Fact label={run.status === 'completed' ? t('Czas trwania', 'Duration') : t('Czas aktywny', 'Active time')}><span className="num">{fmtDuration(s.elapsed_sec)}</span></Fact>
+              <Fact label={t('Pozostało', 'Remaining')}><span className="num">{isLive || run.status === 'paused' ? (run.status === 'analyzing' ? t('analiza', 'analysing') : s.eta_sec > 0 ? fmtDuration(s.eta_sec) : '–') : '–'}</span></Fact>
+              <Fact label={t('Podgrupy', 'Chunks')}><span className="num">{s.chunks_done} / {s.chunks_total}</span></Fact>
+              <Fact label={t('Aktywne hosty', 'Hosts up')}><span className="num">{fmtInt(s.hosts_up)}</span></Fact>
+              <Fact label={t('Otwarte usługi', 'Open services')}><span className="num">{fmtInt(s.services_open)}</span> <span className="text-xs font-normal text-ink-3">({fmtInt(s.http_services)} WWW)</span></Fact>
+              <Fact label={t('Pakiety', 'Packets')}><PacketCount sent={s.packets_sent} estimated={s.packets_estimated} /></Fact>
+              <Fact label={t('Żądania HTTP', 'HTTP requests')}><span className="num">{fmtInt(s.http_requests)}</span></Fact>
+              <Fact label={t('Hosty sprawdzone ponownie', 'Hosts probed again')}><span className="num">{fmtInt(s.retried)}</span></Fact>
+            </dl>
+          </section>
+          <section className="card p-5">
+            <h2 className="label mb-3">{t('Tempo skanowania', 'Scan rate')}</h2>
+            {policyCap ? <RateGauge current={isLive ? s.current_pps : 0} cap={cap} policyCap={policyCap} basis={isLive ? s.current_pps_basis : undefined} /> : <div className="skeleton h-12" />}
+            <p className="mt-2 text-xs text-ink-2">{t('Średnio', 'Average')} <span className="num text-ink">{fmtInt(s.avg_pps)}</span> pps. {profile.data && profile.data.rate.max_pps > policyCap ? t('Polityka bezpieczeństwa ogranicza tempo do ' + fmtInt(policyCap) + ' pps.', 'The safety policy limits the rate to ' + fmtInt(policyCap) + ' pps.') : null}</p>
+          </section>
+        </div>
+        {!small && (isLive || recent.length > 0) ? (
             <Panel title={t('Ostatnio wykryte hosty', 'Hosts just found')} flush>
               {recent.length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Oczekiwanie na odpowiedzi…', 'Waiting for responses…')}</p> : (
                 <ul>
@@ -355,24 +391,7 @@ export default function RunDetail() {
               )}
             </Panel>
           ) : null}
-          {run.summary ? (
-            <Panel title={t('Zmiany w tym skanie', 'Changes in this scan')} actions={<Link className="link" to={'/changes?run_id=' + run.id}>{t('Wszystkie', 'All')}</Link>}>
-              <dl className="grid grid-cols-2 gap-x-6 sm:grid-cols-3">
-                {([
-                  ['plus', 'new', t('nowe hosty', 'new hosts'), run.summary.hosts_new], ['plus', 'new', t('nowe usługi', 'new services'), run.summary.services_new], ['back', 'new', t('hosty wróciły', 'hosts back'), run.summary.hosts_back], ['returned', 'new', t('usługi wróciły', 'services back'), run.summary.services_returned ?? 0], ['slow', 'changed', t('usługi odpowiadają wolniej', 'services respond slower'), run.summary.responses_slower ?? 0],
-                  ['minus', 'gone', t('hosty nieaktywne', 'hosts down'), run.summary.hosts_gone], ['minus', 'gone', t('usługi zniknęły', 'services gone'), run.summary.services_gone], ['wave', 'unstable', t('hosty niestabilne', 'hosts unstable'), run.summary.hosts_unstable],
-                  ['delta', 'changed', t('zmienione usługi', 'changed services'), run.summary.services_changed], ['dot', 'accent', t('nowe znaleziska', 'new findings'), run.summary.findings_new],
-                  ['half', 'changed', t('hosty nie odpowiadają (niepotwierdzone)', 'hosts not responding (unconfirmed)'), run.summary.hosts_missing ?? 0], ['half', 'changed', t('usługi nie odpowiadają (niepotwierdzone)', 'services not responding (unconfirmed)'), run.summary.services_unreachable ?? 0],
-                ] as const).map(([g, tone, label, n]) => (
-                  <div key={label} className="flex items-center justify-between gap-2 border-b border-rule py-1.5">
-                    <dt className="flex items-center gap-1.5 text-sm text-ink-2"><Glyph name={g} tone={n ? tone : 'expected'} />{label}</dt>
-                    <dd className="num text-sm font-medium">{n}</dd>
-                  </div>
-                ))}
-              </dl>
-            </Panel>
-          ) : null}
-        </div>
+        </> : null}
       </div>
 
       <Dialog
@@ -416,7 +435,7 @@ function RunNote({ run, canEdit }: { run: ScanRun; canEdit: boolean }) {
 export function smallPhaseText(s: ScanRun['stats']): string {
   if (s.http_requests > 0) return t('Rozpoznawanie usług WWW: ' + s.services_open + ' ' + plural(s.services_open, ['otwarty port', 'otwarte porty', 'otwartych portów'], ['', '']) + ' do tej pory.', 'Identifying web services: ' + s.services_open + ' open ' + (s.services_open === 1 ? 'port' : 'ports') + ' so far.');
   if (s.services_open > 0) return t('Rozpoznawanie usług na ' + s.services_open + ' ' + plural(s.services_open, ['otwartym porcie', 'otwartych portach', 'otwartych portach'], ['', '']) + '.', 'Identifying the services on ' + s.services_open + ' open ' + (s.services_open === 1 ? 'port' : 'ports') + '.');
-  return t('Skanowanie portów.', 'Scanning ports.');
+  return t('Skanowanie portów', 'Scanning ports');
 }
 
 /** The phase of a running scan in words, from what the counters show so far. */

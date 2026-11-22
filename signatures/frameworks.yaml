@@ -13,6 +13,7 @@
 
 - id: php-builtin-server
   name: PHP – wbudowany serwer deweloperski
+  name_en: PHP – built-in development server
   category: web-server
   technology: PHP
   description: Serwer „php -S” jest narzędziem deweloperskim i nie powinien działać produkcyjnie.
@@ -107,6 +108,7 @@
 
 - id: django-admin
   name: Django – panel administracyjny
+  name_en: Django – admin panel
   category: framework
   technology: Django
   description: Panel administracyjny Django dostępny publicznie.
@@ -259,6 +261,7 @@
 
 - id: java-servlet
   name: Java (kontener serwletów)
+  name_en: Java (servlet container)
   category: language
   technology: Java
   description: Aplikacja Javy rozpoznana po ciasteczku JSESSIONID albo nagłówku Servlet.

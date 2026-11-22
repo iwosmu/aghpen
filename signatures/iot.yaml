@@ -46,6 +46,7 @@
 
 - id: ip-camera-generic
   name: Kamera IP / rejestrator
+  name_en: IP camera / recorder
   category: iot
   description: Interfejs WWW kamery IP albo rejestratora wideo (producent nieustalony).
   tags: [kamera]
@@ -183,6 +184,7 @@
 
 - id: hp-printer
   name: Drukarka HP
+  name_en: HP printer
   technology: HP Printer
   category: iot
   description: Drukarka albo urządzenie wielofunkcyjne HP z wbudowanym serwerem WWW.
@@ -197,6 +199,7 @@
 
 - id: brother-printer
   name: Drukarka Brother
+  name_en: Brother printer
   category: iot
   description: Drukarka albo urządzenie wielofunkcyjne Brother.
   tags: [drukarka]
@@ -208,6 +211,7 @@
 
 - id: canon-printer
   name: Drukarka Canon
+  name_en: Canon printer
   category: iot
   description: Drukarka albo urządzenie wielofunkcyjne Canon (Remote UI).
   tags: [drukarka]
@@ -219,6 +223,7 @@
 
 - id: kyocera-printer
   name: Drukarka Kyocera
+  name_en: Kyocera printer
   category: iot
   description: Drukarka albo urządzenie wielofunkcyjne Kyocera.
   tags: [drukarka]
@@ -230,6 +235,7 @@
 
 - id: xerox-printer
   name: Drukarka Xerox
+  name_en: Xerox printer
   category: iot
   description: Drukarka albo urządzenie wielofunkcyjne Xerox.
   tags: [drukarka]
@@ -241,6 +247,7 @@
 
 - id: epson-printer
   name: Drukarka Epson
+  name_en: Epson printer
   category: iot
   description: Drukarka Epson.
   tags: [drukarka]
@@ -252,6 +259,7 @@
 
 - id: lexmark-printer
   name: Drukarka Lexmark
+  name_en: Lexmark printer
   category: iot
   description: Drukarka Lexmark.
   tags: [drukarka]
@@ -263,6 +271,7 @@
 
 - id: printer-generic
   name: Drukarka sieciowa
+  name_en: Network printer
   category: iot
   description: Interfejs WWW drukarki (Ricoh, Konica Minolta, Samsung, Sharp, OKI).
   tags: [drukarka]
@@ -617,6 +626,7 @@
 
 - id: voip-phone
   name: Telefon / centrala VoIP
+  name_en: VoIP phone / PBX
   category: iot
   description: Interfejs WWW telefonu albo centrali VoIP (Grandstream, Yealink, Polycom, Cisco SPA, FreePBX, 3CX).
   tags: [voip]
@@ -657,6 +667,7 @@
 
 - id: ics-gateway
   name: Urządzenie przemysłowe (Schneider, Moxa, Lantronix, WAGO)
+  name_en: "Industrial device (Schneider, Moxa, Lantronix, WAGO)"
   category: iot
   description: Serwer WWW urządzenia przemysłowego albo konwertera portów szeregowych.
   tags: [ics]

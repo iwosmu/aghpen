@@ -4,7 +4,7 @@ import { cx, fmtMs } from '../lib/format';
 
 /** The tag the server puts on Czujka's own UI port on the scanned host. */
 export function SelfTag() {
-  return <span className="ml-2 whitespace-nowrap border border-accent/60 px-1 text-2xs text-accent" title={t('To interfejs tej Czujki.', 'The UI of this Czujka.')} data-testid="self-tag">{t('ta Czujka', 'this Czujka')}</span>;
+  return <span className="ml-2 whitespace-nowrap rounded-[4px] border border-rule-strong px-1 text-2xs text-ink-2" title={t('To interfejs tej Czujki.', 'The UI of this Czujka.')} data-testid="self-tag">{t('ta Czujka', 'this Czujka')}</span>;
 }
 
 /** The latest HTTP response time of a service; "wolniej" when the server marks it slow. */

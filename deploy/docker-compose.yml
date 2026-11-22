@@ -59,6 +59,11 @@ services:
     # Always build from this checkout (cached, a few seconds): an image left by an older checkout must not be reused.
     pull_policy: build
     restart: unless-stopped
+    # SIGINT is PostgreSQL's fast shutdown: it ends the sessions and writes a checkpoint. On the
+    # default SIGTERM it waits for every client to disconnect, the grace period ends and the
+    # database is killed, so every restart went through crash recovery.
+    stop_signal: SIGINT
+    stop_grace_period: 1m
     depends_on:
       secrets:
         condition: service_completed_successfully

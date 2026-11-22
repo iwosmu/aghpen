@@ -184,6 +184,7 @@
 
 - id: jenkins-open
   name: Jenkins bez logowania
+  name_en: Jenkins without login
   category: devops
   technology: Jenkins
   description: Panel Jenkinsa odpowiada kodem 200 bez logowania. Zadania i konfiguracja mogą być czytelne dla każdego.
@@ -235,6 +236,7 @@
 
 - id: gitea-installer
   name: Gitea – niedokończona instalacja
+  name_en: Gitea – unfinished installation
   category: devops
   technology: Gitea
   description: Strona instalatora Gitea jest dostępna. Kto ją wypełni, zostaje administratorem serwera.
@@ -289,6 +291,7 @@
 
 - id: portainer-uninitialized
   name: Portainer – brak konta administratora
+  name_en: Portainer – no admin account
   category: devops
   technology: Portainer
   description: Portainer czeka na utworzenie konta administratora albo zablokował się po upływie czasu na inicjalizację.
@@ -364,6 +367,7 @@
 
 - id: prometheus-exporter
   name: Eksporter Prometheus
+  name_en: Prometheus exporter
   category: devops
   description: Eksporter metryk (node_exporter i podobne). Metryki ujawniają szczegóły systemu.
   tags: [monitoring]
@@ -497,6 +501,7 @@
 
 - id: plesk-default-page
   name: Plesk – strona domyślna
+  name_en: Plesk – default page
   category: panel
   technology: Plesk
   description: Domena pokazuje stronę domyślną hostingu Plesk.
@@ -565,6 +570,7 @@
 
 - id: keycloak-admin-console
   name: Keycloak – konsola administracyjna
+  name_en: Keycloak – admin console
   category: security
   technology: Keycloak
   description: Konsola administracyjna Keycloak jest osiągalna z sieci.
@@ -655,6 +661,7 @@
 
 - id: docker-registry-open
   name: Docker Registry bez uwierzytelniania
+  name_en: Docker Registry without authentication
   category: devops
   technology: Docker Registry
   description: Rejestr obrazów odpowiada na /v2/ kodem 200 bez logowania. Każdy może pobrać obrazy.
@@ -757,6 +764,7 @@
 
 - id: openapi-spec
   name: Specyfikacja OpenAPI
+  name_en: OpenAPI specification
   category: devops
   technology: false
   description: Usługa udostępnia opis swojego API (OpenAPI/Swagger).
@@ -941,6 +949,7 @@
 
 - id: s3-compatible
   name: Magazyn obiektów S3
+  name_en: S3 object storage
   category: devops
   technology: false
   description: Usługa odpowiada jak magazyn obiektów zgodny z Amazon S3.
@@ -954,6 +963,7 @@
 
 - id: s3-bucket-listing
   name: Publiczna lista obiektów S3
+  name_en: Public S3 object list
   category: devops
   technology: false
   description: Magazyn obiektów pokazuje listę plików bez uwierzytelniania.

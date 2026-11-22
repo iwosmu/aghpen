@@ -53,17 +53,17 @@ export function ReprobePanel({ hostId, limit = 8 }: { hostId?: number; limit?: n
     <Panel title={title} actions={!hostId && canConfigure ? <button type="button" className="link text-xs" onClick={() => setEdit((v) => !v)}>{edit ? t('Zamknij ustawienia', 'Close settings') : t('Ustawienia', 'Settings')}</button> : undefined}>
       <div data-testid="reprobe-plan">
         {p.blocked && p.enabled ? <p className="mb-2 flex items-start gap-2 text-sm text-danger"><Icon name="stop" size={14} className="mt-0.5" />{p.blocked}</p> : null}
-        {!p.enabled ? <p className="text-sm text-ink-2">{t('Ponowne sprawdzenia są wyłączone.', 'Re-probing is off.')}</p> : !hostId ? (
+        {!p.enabled ? <p className="text-sm text-ink-2">{t('Ponowne sprawdzenia są wyłączone', 'Re-probing is off')}</p> : !hostId ? (
           <p className="mb-2 text-xs text-ink-3"><span className="num text-ink">{fmtInt(p.due_now)}</span> {t('do sprawdzenia teraz', 'due now')} · <span className="num text-ink">{fmtInt(p.used_last_hour)}</span> / <span className="num">{fmtInt(p.budget_per_hour)}</span> {t('adresów w ostatniej godzinie', 'addresses in the last hour')}</p>
         ) : null}
-        {p.enabled && probes.length === 0 && skipped.length === 0 ? <p className="text-sm text-ink-2">{hostId ? t('Ten host nie czeka na ponowne sprawdzenie.', 'This host is not waiting for a re-probe.') : t('Nic nie czeka na ponowne sprawdzenie.', 'Nothing is waiting for a re-probe.')}</p> : null}
+        {p.enabled && probes.length === 0 && skipped.length === 0 ? <p className="text-sm text-ink-2">{hostId ? t('Ten host nie czeka na ponowne sprawdzenie', 'This host is not waiting for a re-probe') : t('Nic nie czeka na ponowne sprawdzenie', 'Nothing is waiting for a re-probe')}</p> : null}
         {probes.length ? (
           <ul className="divide-y divide-rule">
             {probes.slice(0, limit).map((x, i) => (
               <li key={x.host_id + ':' + i} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 py-1.5 text-sm">
                 <span className="min-w-0">
                   {!hostId ? <Link to={'/hosts/' + x.host_id} className="mono link mr-2">{x.ip}</Link> : null}
-                  <span className={cx('mr-2 text-2xs uppercase tracking-wide', x.kind === 'confirm' ? 'text-st-changed' : 'text-accent')}>{x.kind === 'confirm' ? t('potwierdzenie', 'confirm') + ' ' + x.step + '/' + x.steps : t('spodziewana odpowiedź', 'response expected')}</span>
+                  <span className={cx('mr-2 text-2xs uppercase tracking-wide', x.kind === 'confirm' ? 'text-st-changed' : 'text-ink-2')}>{x.kind === 'confirm' ? t('potwierdzenie', 'confirm') + ' ' + x.step + '/' + x.steps : t('spodziewana odpowiedź', 'response expected')}</span>
                   <span className="text-ink-2">{x.reason}</span>
                   {ports(x.ports) ? <span className="mono ml-1.5 text-2xs text-ink-3">{ports(x.ports)}</span> : null}
                 </span>
@@ -82,5 +82,27 @@ export function ReprobePanel({ hostId, limit = 8 }: { hostId?: number; limit?: n
         {edit && !hostId ? <SettingsForm s={p.settings} onDone={() => setEdit(false)} /> : null}
       </div>
     </Panel>
+  );
+}
+
+/** One mono line for the scans page: what the re-probe planner will do; the settings open under it. */
+export function ReprobeLine() {
+  const q = useItem<ReprobePlan>('/reprobe/plan', undefined, { refetchInterval: 60_000 });
+  const settings = useItem<ReprobeSettings>('/settings/reprobe', undefined, { enabled: useCan('scans:configure') });
+  const [open, setOpen] = useState(false);
+  if (!q.data) return null;
+  const p = q.data;
+  const s = settings.data ?? p.settings;
+  return (
+    <div className="px-4 pb-4 sm:px-6 lg:px-8" data-testid="reprobe-line">
+      <p className="mono text-[12px] text-ink-3">
+        {p.enabled ? <>
+          {p.blocked ? <span className="text-danger">{p.blocked} · </span> : null}
+          {fmtInt(p.due_now)} {t('do sprawdzenia teraz', 'due now')} · {fmtInt(p.used_last_hour)} / {fmtInt(p.budget_per_hour)} {t('adresów w ostatniej godzinie', 'addresses in the last hour')}
+        </> : t('Ponowne sprawdzenia są wyłączone', 'Re-probing is off')}
+        {settings.data ? <> · <button type="button" className="hover:text-ink hover:underline" aria-expanded={open} onClick={() => setOpen((v) => !v)}>{t('Ustawienia', 'Settings')}</button></> : null}
+      </p>
+      {open && s ? <div className="max-w-[560px]"><SettingsForm s={s} onDone={() => setOpen(false)} /></div> : null}
+    </div>
   );
 }

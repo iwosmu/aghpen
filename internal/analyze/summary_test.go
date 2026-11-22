@@ -94,6 +94,10 @@ func allKindCases() []kindCase {
 			"Usługa 10.0.0.5:80 odpowiada wolniej: 900 ms (zwykle 40 ms)", "Service 10.0.0.5:80 responds slower: 900 ms (usually 40 ms)"},
 		{ch(model.ChangeResponseRecovered, 80, "http.response_ms", map[string]any{"baseline_ms": 40, "ms": 900}, map[string]any{"ms": 42}, false, nil),
 			"Usługa 10.0.0.5:80 znów szybka: 42 ms (zwykle 40 ms)", "Service 10.0.0.5:80 fast again: 42 ms (usually 40 ms)"},
+		{ch(model.ChangeResponseRecovered, 80, "http.response_ms", map[string]any{"baseline_ms": 0, "ms": 900}, map[string]any{"ms": 0}, false, nil),
+			"Usługa 10.0.0.5:80 znów szybka: poniżej 1 ms (zwykle poniżej 1 ms)", "Service 10.0.0.5:80 fast again: under 1 ms (usually under 1 ms)"},
+		{ch(model.ChangeResponseSlower, 80, "http.response_ms", map[string]any{"baseline_ms": 0, "ms": 0}, map[string]any{"ms": 0}, false, nil),
+			"Usługa 10.0.0.5:80 odpowiada wolniej: poniżej 1 ms (zwykle poniżej 1 ms)", "Service 10.0.0.5:80 responds slower: under 1 ms (usually under 1 ms)"},
 	}
 }
 

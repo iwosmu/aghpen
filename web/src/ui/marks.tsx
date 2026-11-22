@@ -9,14 +9,15 @@ export type Tone = 'new' | 'gone' | 'changed' | 'unstable' | 'expected' | 'neutr
 export type GlyphName = 'plus' | 'minus' | 'delta' | 'wave' | 'dashring' | 'dot' | 'ring' | 'check' | 'x' | 'pause' | 'run' | 'half' | 'back' | 'hatch' | 'returned' | 'slow';
 
 const TONE_VAR: Record<Tone, string> = {
-  new: 'var(--st-new)', gone: 'var(--st-gone)', changed: 'var(--st-changed)', unstable: 'var(--st-unstable)',
-  expected: 'var(--st-expected)', neutral: 'var(--ink-2)', accent: 'var(--accent)', danger: 'var(--danger)',
+  // one accent rule: icons take the secondary text colour; coral marks "gone / needs you", blue "scanning now"
+  new: 'var(--ink-2)', gone: 'var(--coral)', changed: 'var(--ink-2)', unstable: 'var(--ink-2)',
+  expected: 'var(--ink-3)', neutral: 'var(--ink-2)', accent: 'var(--accent)', danger: 'var(--danger)',
 };
 export function toneColor(tone: Tone): string { return TONE_VAR[tone]; }
 
 export function Glyph({ name, tone = 'neutral', size = 14, pulse }: { name: GlyphName; tone?: Tone; size?: number; pulse?: boolean }) {
   const c = TONE_VAR[tone];
-  const s = { stroke: c, strokeWidth: 2, fill: 'none', strokeLinecap: 'square' as const };
+  const s = { stroke: c, strokeWidth: 1.5, fill: 'none', strokeLinecap: 'square' as const };
   let body: ReactNode;
   switch (name) {
     case 'plus': body = <path d="M7 2.5v9M2.5 7h9" {...s} />; break;
@@ -24,7 +25,7 @@ export function Glyph({ name, tone = 'neutral', size = 14, pulse }: { name: Glyp
     case 'delta': body = <path d="M7 2.2 12.2 11.5H1.8Z" fill={c} />; break;
     case 'wave': body = <path d="M1 7c1.5-3.6 3-3.6 4.500 0s3 3.600 4.500 0 2-2.400 3-1.400" {...s} strokeWidth={1.8} />; break;
     case 'dashring': body = <circle cx="7" cy="7" r="4.6" {...s} strokeWidth={1.6} strokeDasharray="2.4 2.2" strokeLinecap="butt" />; break;
-    case 'dot': body = <circle cx="7" cy="7" r="3.6" fill={c} />; break;
+    case 'dot': body = <rect x="3.5" y="3.5" width="7" height="7" rx="2" fill={c} />; break;
     case 'ring': body = <circle cx="7" cy="7" r="4.2" {...s} strokeWidth={1.6} />; break;
     case 'half': body = <><circle cx="7" cy="7" r="4.2" {...s} strokeWidth={1.6} /><path d="M7 2.800a4.200 4.200 0 0 1 0 8.400Z" fill={c} /></>; break;
     case 'check': body = <path d="M2.500 7.500 5.500 10.500 11.500 3.500" {...s} />; break;
@@ -47,9 +48,9 @@ export function Glyph({ name, tone = 'neutral', size = 14, pulse }: { name: Glyp
 
 export function Mark({ glyph, tone, children, pulse, title, className }: { glyph: GlyphName; tone: Tone; children?: ReactNode; pulse?: boolean; title?: string; className?: string }) {
   return (
-    <span className={cx('inline-flex items-center gap-1.5 whitespace-nowrap', className)} title={title}>
+    <span className={cx('inline-flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap', className)} title={title}>
       <Glyph name={glyph} tone={tone} pulse={pulse} />
-      {children !== undefined ? <span>{children}</span> : null}
+      {children !== undefined ? <span className="min-w-0 truncate">{children}</span> : null}
     </span>
   );
 }
@@ -92,10 +93,10 @@ export const CHANGE_KINDS: ChangeKind[] = [
   'content_changed', 'redirect_changed', 'class_changed',
 ];
 
-export function ChangeMark({ kind, expected }: { kind: ChangeKind | string; expected?: boolean }) {
+export function ChangeMark({ kind, expected, plain }: { kind: ChangeKind | string; expected?: boolean; /** the row says 'expected' elsewhere */ plain?: boolean }) {
   const i = changeKindInfo(kind);
   if (expected) {
-    return <Mark glyph="dashring" tone="expected" title={t('Zmiana zgodna ze wzorcem dostępności hosta', 'The change fits the host availability pattern')}><span className="text-ink-3">{i.label} · {t('oczekiwana', 'expected')}</span></Mark>;
+    return <Mark glyph="dashring" tone="expected" title={t('Zmiana zgodna ze wzorcem dostępności hosta', 'The change fits the host availability pattern')}><span className="text-ink-3">{i.label}{plain ? null : <> · {t('oczekiwana', 'expected')}</>}</span></Mark>;
   }
   return <Mark glyph={i.glyph} tone={i.tone}>{i.label}</Mark>;
 }
@@ -178,7 +179,8 @@ export function severityLabel(s: Severity | string): string {
 }
 export function Sev({ level, compact }: { level: Severity | string; compact?: boolean }) {
   const n = SEV_LEVEL[level] ?? 1;
-  const color = n === 4 ? 'var(--st-gone)' : n === 3 ? 'var(--st-changed)' : n === 2 ? 'var(--accent)' : 'var(--ink-3)';
+  // one accent rule: only the top level is coral; the rest stay in ink tones
+  const color = n === 4 ? 'var(--coral)' : n >= 2 ? 'var(--ink-2)' : 'var(--ink-3)';
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap" title={t('Waga: ', 'Severity: ') + severityLabel(level)}>
       <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" style={{ flex: 'none' }}>
@@ -195,7 +197,7 @@ export function Sev({ level, compact }: { level: Severity | string; compact?: bo
 export const FINDING_STATUSES: FindingStatus[] = ['new', 'triaged', 'accepted', 'false_positive', 'resolved'];
 export function findingStatusInfo(s: FindingStatus | string): { tone: Tone; glyph: GlyphName; label: string } {
   switch (s) {
-    case 'new': return { tone: 'accent', glyph: 'dot', label: t('nowe', 'new') };
+    case 'new': return { tone: 'neutral', glyph: 'dot', label: t('nowe', 'new') };
     case 'triaged': return { tone: 'neutral', glyph: 'half', label: t('w analizie', 'in analysis') };
     case 'accepted': return { tone: 'neutral', glyph: 'check', label: t('zaakceptowane', 'accepted') };
     case 'false_positive': return { tone: 'expected', glyph: 'x', label: t('fałszywy alarm', 'false positive') };
@@ -227,7 +229,7 @@ export function ClassChips({ classes, max = 3 }: { classes: string[] | null | un
   return (
     <span className={max <= 1 ? 'inline-flex items-center gap-1 whitespace-nowrap' : 'inline-flex flex-wrap items-center gap-1'}>
       {classes.slice(0, max).map((c) => (
-        <span key={c} className="inline-flex h-[18px] items-center rounded-sm bg-accent-wash px-1.5 text-2xs text-ink">{classLabel(c)}</span>
+        <span key={c} className="inline-flex h-[20px] items-center whitespace-nowrap rounded-[4px] bg-raised px-1.5 text-[12px] text-ink-2">{classLabel(c)}</span>
       ))}
       {classes.length > max ? <span className="text-xs text-ink-3">+{classes.length - max}</span> : null}
     </span>
@@ -249,12 +251,12 @@ export const TECH_CATEGORIES = ['cms', 'framework', 'app-server', 'web-server', 
 
 // ---------- Scores: never a bare number ----------
 export function InterestScore({ value, reasons, showTip }: { value: number; reasons?: InterestReason[] | null; showTip?: (e: React.MouseEvent | React.FocusEvent, body: ReactNode) => void }) {
-  const tone = value >= 70 ? 'var(--st-gone)' : value >= 40 ? 'var(--st-changed)' : 'var(--ink-3)';
+  const tone = value >= 90 ? 'var(--ink-2)' : 'var(--ink-3)';
   const title = reasons && reasons.length ? reasons.map((r) => '+' + r.points + ' ' + r.text).join('\n') : undefined;
   return (
     <span className="inline-flex items-center gap-1.5" title={showTip ? undefined : title}>
       <span className="num w-[22px] text-right text-sm text-ink">{value}</span>
-      <span className="relative h-[4px] w-[34px] bg-rule" aria-hidden="true">
+      <span className="relative h-[3px] w-[28px] overflow-hidden rounded-[1px] bg-rule" aria-hidden="true">
         <span className="absolute inset-y-0 left-0" style={{ width: Math.min(100, value) + '%', background: tone }} />
       </span>
     </span>
@@ -270,21 +272,21 @@ export function InterestBreakdown({ value, reasons }: { value: number; reasons: 
   return (
     <div data-testid="interest-breakdown">
       <div className="flex items-baseline gap-2">
-        <span className="font-display text-[56px] leading-[0.9] tracking-[-0.01em] text-ink">{value}</span>
+        <span className="font-display text-[44px] leading-[0.95] text-ink">{value}</span>
         <span className="num text-sm text-ink-3">/ 100</span>
       </div>
       {segs.length ? (
-        <div className="mt-3 flex h-[6px] w-full gap-px overflow-hidden rounded-full bg-sunk" aria-hidden="true">
-          {segs.map((x) => <span key={x.i} className="h-full bg-accent" style={{ width: x.w + '%', opacity: shade(x.i) }} />)}
+        <div className="mt-3 flex h-[6px] w-full gap-px overflow-hidden rounded-[2px] bg-sunk" aria-hidden="true">
+          {segs.map((x) => <span key={x.i} className="h-full bg-ink-2" style={{ width: x.w + '%', opacity: shade(x.i) }} />)}
         </div>
       ) : null}
       {list.length === 0 ? (
-        <p className="mt-3 text-sm text-ink-2">{t('Brak czynników podnoszących ocenę.', 'No factor raises the score.')}</p>
+        <p className="mt-3 text-sm text-ink-2">{t('Brak czynników podnoszących ocenę', 'No factor raises the score')}</p>
       ) : (
         <ul className="mt-3">
           {list.map((r, i) => (
             <li key={i} className="grid grid-cols-[8px_36px_minmax(0,1fr)] items-baseline gap-x-2.5 border-b border-rule py-2 last:border-b-0">
-              <span className="h-[8px] w-[8px] rounded-[2px] bg-accent" style={{ opacity: shade(i) }} aria-hidden="true" />
+              <span className="h-[8px] w-[8px] rounded-[2px] bg-ink-2" style={{ opacity: shade(i) }} aria-hidden="true" />
               <span className="num text-right text-sm text-ink">+{r.points}</span>
               <span className="text-sm leading-snug text-ink">{r.text}</span>
             </li>
@@ -301,7 +303,7 @@ export function Confidence({ value, width = 34 }: { value: number; width?: numbe
     <span className="inline-flex items-center gap-1.5" title={t('Pewność identyfikacji: ', 'Identification confidence: ') + label}>
       <span className="num text-sm text-ink">{fmtPct(value)}</span>
       <span className="relative h-[4px] bg-rule" style={{ width }} aria-hidden="true">
-        <span className="absolute inset-y-0 left-0 bg-accent" style={{ width: Math.round(value * 100) + '%', opacity: 0.45 + value * 0.55 }} />
+        <span className="absolute inset-y-0 left-0 bg-ink-2" style={{ width: Math.round(value * 100) + '%', opacity: 0.45 + value * 0.55 }} />
       </span>
     </span>
   );

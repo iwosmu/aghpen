@@ -4,9 +4,9 @@ import { useAction, usePage } from '../api/hooks';
 import { ApiError, patch, upload } from '../api/client';
 import type { Signature, SignatureImportReport } from '../api/types';
 import { t } from '../i18n';
-import { fmtInt, fmtRelative } from '../lib/format';
+import { cx, fmtInt } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
-import { Button, Dialog, Empty, InlineError, LinkButton, PageHeader, Select, Tags, FileInput } from '../ui/kit';
+import { Button, Dialog, Empty, InlineError, LinkButton, PageHeader, Select, FileInput } from '../ui/kit';
 import { DataTable, FilterBar, FilterField, Pager, SearchField, type Col } from '../ui/table';
 import { Glyph, TECH_CATEGORIES, categoryLabel } from '../ui/marks';
 import { useDraft } from '../ui/edit';
@@ -18,8 +18,8 @@ export function Switch({ checked, onChange, label, disabled }: { checked: boolea
   return (
     <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled}
       onClick={(e) => { e.stopPropagation(); e.preventDefault(); onChange(!checked); }}
-      className={'relative inline-flex h-[20px] w-[36px] flex-none items-center rounded-full border transition-colors disabled:opacity-50 ' + (checked ? 'border-primary bg-primary' : 'border-rule-strong bg-sunk')}>
-      <span className={'block h-[14px] w-[14px] rounded-full transition-transform duration-150 ' + (checked ? 'translate-x-[18px] bg-primary-ink' : 'translate-x-[2px] bg-ink-3')} />
+      className={'relative inline-flex h-[20px] w-[36px] flex-none items-center rounded-full border transition-colors disabled:opacity-50 ' + (checked ? 'border-transparent bg-[var(--seq-2)]' : 'border-rule-strong bg-sunk')}>
+      <span className={'block h-[14px] w-[14px] rounded-full transition-transform duration-150 ease-[var(--ease)] ' + (checked ? 'translate-x-[18px] bg-ink' : 'translate-x-[2px] bg-ink-3')} />
     </button>
   );
 }
@@ -92,18 +92,10 @@ export default function Signatures() {
     { id: 'on', header: t('Włączona', 'Enabled'), width: 76, cell: (s) => canToggle
       ? <Switch checked={s.enabled} disabled={toggle.isPending} onChange={() => toggle.mutate(s)} label={(s.enabled ? t('Wyłącz sygnaturę ', 'Disable signature ') : t('Włącz sygnaturę ', 'Enable signature ')) + s.name} />
       : s.enabled ? <span className="inline-flex items-center gap-1.5 text-xs"><Glyph name="check" tone="new" size={12} />{t('tak', 'yes')}</span> : <span className="inline-flex items-center gap-1.5 text-xs text-ink-3"><Glyph name="ring" tone="expected" size={12} />{t('nie', 'no')}</span> },
-    { id: 'name', header: t('Sygnatura', 'Signature'), sort: 'name', wrap: true, cell: (s) => (
-      <div className="min-w-[200px] py-1">
-        <Link to={'/signatures/' + s.id} className="link font-medium">{s.name}</Link>
-        <div className="max-w-[460px] truncate text-xs text-ink-3" title={s.description}>{s.description}</div>
-      </div>
-    ) },
-    { id: 'slug', header: 'ID', hide: 'xl', cell: (s) => <span className="mono text-xs text-ink-2">{s.slug}</span> },
+    { id: 'name', header: t('Sygnatura', 'Signature'), sort: 'name', cell: (s) => <span className="flex max-w-[clamp(180px,calc(100vw-1000px),420px)] items-center gap-2" title={s.description}><Link to={'/signatures/' + s.id} className="link truncate">{s.name}</Link>{s.builtin ? null : <span className="chip-fact flex-none">{t('własna', 'custom')}</span>}</span> },
+    { id: 'slug', header: 'ID', hide: 'lg', cell: (s) => <span className="mono block max-w-[clamp(120px,14vw,240px)] truncate text-xs text-ink-2" title={s.slug}>{s.slug}</span> },
     { id: 'cat', header: t('Kategoria', 'Category'), sort: 'category', cell: (s) => <span className="text-ink-2">{categoryLabel(s.category)}</span> },
-    { id: 'tags', header: t('Tagi', 'Tags'), hide: '2xl', cell: (s) => <Tags tags={s.tags} max={3} /> },
-    { id: 'src', header: t('Źródło', 'Source'), hide: 'md', cell: (s) => s.builtin ? <span className="text-ink-3">{t('wbudowana', 'built-in')}</span> : <span>{t('własna', 'custom')} <span className="text-xs text-ink-3">{s.author.split('@')[0]}</span></span> },
     { id: 'matches', header: t('Dopasowania', 'Matches'), sort: 'match_count', align: 'right', cell: (s) => s.match_count ? <span className="num">{fmtInt(s.match_count)}</span> : <span className="num text-ink-3">0</span> },
-    { id: 'upd', header: t('Zmieniona', 'Updated'), hide: '2xl', cell: (s) => <span className="num text-ink-2">{fmtRelative(s.updated_at)}</span> },
   ];
   return (
     <div>
@@ -113,20 +105,22 @@ export default function Signatures() {
         actions={can('signatures:create') ? <><Button icon="upload" onClick={() => setImportOpen(true)} data-testid="sig-import">{t('Importuj', 'Import')}</Button><LinkButton to="/signatures/new" variant="primary" icon="plus">{t('Nowa sygnatura', 'New signature')}</LinkButton></> : null}
       />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
-      <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
-        <SearchField value={text} onChange={setText} placeholder={t('nazwa, identyfikator, opis', 'name, id, description')} width={240} />
-        <FilterField label={t('Kategoria', 'Category')} width={170}><Select value={u.get('category')} onChange={(v) => u.set({ category: v })} options={[{ value: '', label: t('wszystkie', 'all') }, ...TECH_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c) }))]} /></FilterField>
+      <FilterBar onClear={() => u.clear(FILTERS)} active={active} moreActive={['enabled', 'builtin'].filter((k) => u.get(k)).length} more={<>
         <FilterField label={t('Stan', 'Status')} width={130}><Select value={u.get('enabled')} onChange={(v) => u.set({ enabled: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'true', label: t('włączone', 'enabled') }, { value: 'false', label: t('wyłączone', 'disabled') }]} /></FilterField>
         <FilterField label={t('Źródło', 'Source')} width={130}><Select value={u.get('builtin')} onChange={(v) => u.set({ builtin: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'true', label: t('wbudowane', 'built-in') }, { value: 'false', label: t('własne', 'custom') }]} /></FilterField>
+      </>}>
+        <SearchField value={text} onChange={setText} placeholder={t('nazwa, identyfikator, opis', 'name, id, description')} width={240} />
+        <FilterField label={t('Kategoria', 'Category')} width={170}><Select value={u.get('category')} onChange={(v) => u.set({ category: v })} options={[{ value: '', label: t('wszystkie', 'all') }, ...TECH_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c) }))]} /></FilterField>
       </FilterBar>
       <DataTable
         rows={q.data?.items} cols={cols} rowKey={(s) => s.id} rowHref={(s) => '/signatures/' + s.id} loading={q.isPending} error={q.error} retry={() => q.refetch()} dim={q.isPlaceholderData}
         sort={u.get('sort', 'name')} onSort={(s) => u.set({ sort: s })} rowClass={(s) => (s.enabled ? undefined : 'text-ink-3')}
         empty={<Empty icon="signatures" title={active ? t('Żadna sygnatura nie pasuje do filtrów', 'No signatures match the filters') : t('Brak sygnatur', 'No signatures yet')} />}
         mobile={(s) => (
-          <div>
-            <div className="flex items-center justify-between gap-2"><span className="text-sm font-medium">{s.name}</span><span className="num text-xs text-ink-2">{s.match_count}</span></div>
-            <div className="mt-0.5 text-xs text-ink-3">{categoryLabel(s.category)} · {s.builtin ? t('wbudowana', 'built-in') : t('własna', 'custom')} · {s.enabled ? t('włączona', 'enabled') : t('wyłączona', 'disabled')}</div>
+          <div className="flex items-center gap-3">
+            <span className={cx('min-w-0 flex-1 truncate text-sm', !s.enabled && 'text-ink-3')}>{s.name}</span>
+            <span className="flex-none text-xs text-ink-3">{categoryLabel(s.category)}</span>
+            <span className="num w-[32px] flex-none text-right text-xs text-ink-2">{s.match_count}</span>
           </div>
         )}
       />

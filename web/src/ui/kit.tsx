@@ -10,10 +10,10 @@ import { ApiError, isUnavailable } from '../api/client';
 // ---------- Button ----------
 type BtnVariant = 'primary' | 'default' | 'ghost' | 'danger' | 'dangerSolid';
 const BTN: Record<BtnVariant, string> = {
-  primary: 'bg-primary text-primary-ink border-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-press font-semibold shadow-[0_1px_0_rgb(255_255_255/0.35)_inset]',
-  default: 'bg-raised text-ink border-rule-strong hover:border-ink-3 hover:bg-[color-mix(in_oklch,var(--raised),var(--ink)_6%)]',
-  ghost: 'bg-transparent text-ink-2 border-transparent hover:bg-raised hover:text-ink',
-  danger: 'bg-transparent text-danger border-danger/60 hover:bg-st-gone-wash',
+  primary: 'bg-primary text-primary-ink border-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-press',
+  default: 'bg-raised text-ink border-rule hover:bg-[color-mix(in_oklch,var(--raised),var(--ink)_6%)] shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]',
+  ghost: 'bg-transparent text-ink-2 border-transparent hover:bg-[var(--row-hover)] hover:text-ink',
+  danger: 'bg-raised text-danger border-rule hover:bg-st-gone-wash',
   dangerSolid: 'bg-danger-solid text-danger-ink border-danger-solid hover:brightness-110 font-semibold',
 };
 
@@ -26,9 +26,9 @@ export function Button({
       {...rest}
       disabled={rest.disabled || busy}
       className={cx(
-        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-sm border transition-colors duration-150',
-        'disabled:opacity-50 disabled:pointer-events-none active:translate-y-px',
-        size === 'sm' ? 'h-[28px] px-2.5 text-xs' : 'h-[34px] px-3.5 text-sm',
+        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] border font-medium transition-[background-color,color,transform] duration-150 ease-[var(--ease)]',
+        'disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]',
+        size === 'sm' ? 'h-[28px] rounded-[6px] px-2.5 text-xs' : 'h-[36px] px-4 text-sm',
         BTN[variant], className,
       )}
     >
@@ -43,8 +43,8 @@ export function LinkButton({ to, icon, children, variant = 'default', size = 'md
     <Link
       to={to}
       className={cx(
-        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-sm border transition-colors duration-150',
-        size === 'sm' ? 'h-[28px] px-2.5 text-xs' : 'h-[34px] px-3.5 text-sm', BTN[variant],
+        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] border font-medium transition-[background-color,color,transform] duration-150 ease-[var(--ease)] active:scale-[0.98]',
+        size === 'sm' ? 'h-[28px] rounded-[6px] px-2.5 text-xs' : 'h-[36px] px-4 text-sm', BTN[variant],
       )}
     >
       {icon ? <Icon name={icon} size={size === 'sm' ? 14 : 16} /> : null}
@@ -57,7 +57,7 @@ export function IconButton({ icon, label, className, ...rest }: { icon: string; 
   return (
     <button
       type="button" aria-label={label} title={label} {...rest}
-      className={cx('inline-flex h-[34px] w-[34px] items-center justify-center rounded-sm border border-transparent text-ink-2 hover:bg-raised hover:text-ink disabled:opacity-50', className)}
+      className={cx('inline-flex h-[32px] w-[32px] items-center justify-center rounded-[8px] border border-transparent text-ink-2 hover:bg-[var(--row-hover)] hover:text-ink disabled:opacity-50', className)}
     >
       <Icon name={icon} />
     </button>
@@ -71,15 +71,15 @@ export function Spinner() {
 // ---------- Layout pieces ----------
 export function PageHeader({ title, sub, actions, readOnly, back }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode; readOnly?: boolean; back?: { to: string; label: string } }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-rule/70 px-4 pb-4 pt-5 sm:px-6 lg:px-8">
+    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 pb-6 pt-6 sm:px-6 lg:px-8">
       <div className="min-w-0">
         {back ? (
-          <Link to={back.to} className="mb-1 inline-flex items-center gap-1 text-xs text-ink-3 hover:text-ink">
+          <Link to={back.to} className="mb-2 inline-flex h-[24px] items-center gap-1 rounded-[6px] pr-2.5 text-xs font-medium text-ink-2 hover:text-ink">
             <Icon name="chevronLeft" size={12} />{back.label}
           </Link>
         ) : null}
-        <h1 className="font-display text-[30px] font-normal leading-[1.05] tracking-[-0.005em] text-ink sm:text-[36px]">{title}</h1>
-        {sub ? <p className="mt-0.5 max-w-[80ch] text-sm text-ink-2">{sub}</p> : null}
+        <h1 className="font-display text-[28px] leading-[1.15] text-ink sm:text-[32px]">{title}</h1>
+        {sub ? <p className="mt-1.5 max-w-[80ch] text-sm text-ink-2">{sub}</p> : null}
         {readOnly ? <ReadOnlyNote /> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
@@ -100,15 +100,15 @@ export function Panel({ title, count, actions, children, className, flush }: { t
   return (
     <section className={cx('card min-w-0', className)}>
       {title ? (
-        <div className="flex min-h-[40px] items-center justify-between gap-3 border-b border-rule/70 px-4">
-          <h2 className="flex items-baseline gap-2 text-sm font-semibold text-ink">
+        <div className="flex min-h-[48px] items-center justify-between gap-3 px-5 pt-1">
+          <h2 className="caps flex items-baseline gap-2">
             {title}
             {count !== undefined ? <span className="num text-xs font-normal text-ink-3">{count}</span> : null}
           </h2>
-          {actions ? <div className="flex items-center gap-2 text-xs">{actions}</div> : null}
+          {actions ? <div className="flex items-center gap-2 text-xs text-ink-3 [&_.link]:text-ink-3 [&_.link]:no-underline [&_.link:hover]:text-ink [&_.link:hover]:underline">{actions}</div> : null}
         </div>
       ) : null}
-      <div className={flush ? '' : 'p-4'}>{children}</div>
+      <div className={flush ? 'pb-2' : title ? 'px-5 pb-5 pt-1' : 'p-5'}>{children}</div>
     </section>
   );
 }
@@ -116,7 +116,7 @@ export function Panel({ title, count, actions, children, className, flush }: { t
 export function Field({ label, hint, error, children, className }: { label: ReactNode; hint?: ReactNode; error?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <label className={cx('block min-w-0', className)}>
-      <span className="label mb-1 block">{label}</span>
+      <span className="label mb-1.5 block pl-1">{label}</span>
       {children}
       {error ? <span className="mt-1 block text-xs text-danger">{error}</span> : hint ? <span className="mt-1 block text-xs text-ink-3">{hint}</span> : null}
     </label>
@@ -137,8 +137,8 @@ export function Check({ label, checked, onChange, disabled, hint }: { label: Rea
 
 export function KV({ k, children, mono }: { k: ReactNode; children: ReactNode; mono?: boolean }) {
   return (
-    <div className="flex min-h-[30px] items-baseline gap-3 border-b border-rule py-1.5 last:border-b-0">
-      <dt className="w-[38%] max-w-[180px] flex-none text-xs text-ink-3">{k}</dt>
+    <div className="flex min-h-[36px] items-baseline gap-3 border-b border-rule py-2 last:border-b-0">
+      <dt className="w-[38%] max-w-[180px] flex-none text-xs text-ink-2">{k}</dt>
       <dd className={cx('min-w-0 flex-1 break-words text-sm text-ink', mono && 'mono')}>{children}</dd>
     </div>
   );
@@ -146,13 +146,13 @@ export function KV({ k, children, mono }: { k: ReactNode; children: ReactNode; m
 
 export function Tabs({ tabs, value, onChange }: { tabs: { id: string; label: ReactNode; count?: number }[]; value: string; onChange: (id: string) => void }) {
   return (
-    <div role="tablist" className="flex gap-0 overflow-x-auto border-b border-rule px-4 sm:px-6">
+    <div role="tablist" className="flex w-fit max-w-full gap-0.5 overflow-x-auto rounded-[8px] bg-sunk p-[2px] shadow-[inset_0_0_0_1px_var(--rule)]">
       {tabs.map((tab) => (
         <button
           key={tab.id} role="tab" type="button" aria-selected={value === tab.id} onClick={() => onChange(tab.id)}
           className={cx(
-            '-mb-px flex h-[40px] items-center gap-1.5 whitespace-nowrap border-b-2 px-3 text-sm',
-            value === tab.id ? 'border-primary font-medium text-ink' : 'border-transparent text-ink-2 hover:text-ink',
+            'flex h-[30px] items-center gap-1.5 whitespace-nowrap rounded-[6px] px-3 text-sm font-medium transition-colors duration-150',
+            value === tab.id ? 'bg-raised text-ink shadow-[inset_0_0_0_1px_var(--rule-strong)]' : 'text-ink-2 hover:bg-[var(--row-hover)] hover:text-ink',
           )}
         >
           {tab.label}
@@ -165,7 +165,7 @@ export function Tabs({ tabs, value, onChange }: { tabs: { id: string; label: Rea
 
 export function Chip({ children, onRemove, tone = 'plain', title }: { children: ReactNode; onRemove?: () => void; tone?: 'plain' | 'accent'; title?: string }) {
   return (
-    <span title={title} className={cx('inline-flex h-[22px] max-w-full items-center gap-1 rounded-sm border px-2 text-xs', tone === 'accent' ? 'border-accent/50 bg-accent-wash text-ink' : 'border-rule-strong text-ink-2')}>
+    <span title={title} className={cx('inline-flex h-[22px] max-w-full items-center gap-1 rounded-[4px] border px-1.5 text-xs', tone === 'accent' ? 'border-transparent bg-accent-wash text-ink' : 'border-transparent bg-[var(--row-hover)] text-ink-2 shadow-[inset_0_0_0_1px_var(--rule)]')}>
       <span className="truncate">{children}</span>
       {onRemove ? (
         <button type="button" onClick={onRemove} aria-label={t('Usuń', 'Remove')} className="-mr-0.5 text-ink-3 hover:text-ink"><Icon name="x" size={10} /></button>
@@ -228,7 +228,7 @@ export function ErrorState({ error, retry }: { error: unknown; retry?: () => voi
 export function Unavailable({ what, error }: { what?: ReactNode; error?: unknown }) {
   const msg = (error as Error | undefined)?.message;
   return (
-    <div role="status" data-testid="unavailable" className="flex items-start gap-2 border border-rule bg-sunk px-3 py-2.5 text-sm">
+    <div role="status" data-testid="unavailable" className="flex items-start gap-2 rounded-[10px] bg-sunk px-3.5 py-3 text-sm">
       <Icon name="info" className="mt-0.5 flex-none text-ink-3" size={14} />
       <div className="min-w-0">
         <p className="font-medium text-ink">{t('Funkcja niedostępna w tej instalacji', 'Not available in this installation')}</p>
@@ -243,7 +243,7 @@ export function SkeletonRows({ rows = 6 }: { rows?: number }) {
   return (
     <div className="px-3 py-2" aria-busy="true" aria-label={t('Wczytywanie', 'Loading')}>
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex h-[30px] items-center gap-3 border-b border-rule last:border-b-0">
+        <div key={i} className="flex h-[40px] items-center gap-3">
           <div className="skeleton h-2.5" style={{ width: 60 + ((i * 37) % 80) }} />
           <div className="skeleton h-2.5 flex-1" style={{ maxWidth: 180 + ((i * 53) % 220) }} />
           <div className="skeleton h-2.5 w-12" />
@@ -281,16 +281,16 @@ export function Dialog({ open, onClose, title, children, footer, width = 520 }: 
       ref={ref}
       onClose={onClose}
       onClick={(e) => { if (e.target === ref.current) onClose(); }}
-      className="m-auto max-h-[88dvh] w-[calc(100vw-24px)] overflow-visible border border-rule-strong bg-panel p-0 text-ink shadow-[var(--shadow)] backdrop:bg-black/55"
+      className="glass m-auto max-h-[88dvh] w-[calc(100vw-24px)] overflow-visible rounded-[14px] border-0 p-0 text-ink backdrop:bg-[rgb(0_0_0/0.5)]"
       style={{ maxWidth: width }}
     >
       <div className="flex max-h-[88dvh] flex-col">
-        <div className="flex h-[40px] flex-none items-center justify-between border-b border-rule px-4">
-          <h2 className="text-sm font-semibold">{title}</h2>
+        <div className="flex flex-none items-center justify-between px-6 pb-1 pt-5">
+          <h2 className="text-[19px] font-medium tracking-[-0.02em]">{title}</h2>
           <IconButton icon="x" label={t('Zamknij', 'Close')} onClick={onClose} className="-mr-2" />
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
-        {footer ? <div className="flex flex-none flex-wrap items-center justify-end gap-2 border-t border-rule px-4 py-3">{footer}</div> : null}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>
+        {footer ? <div className="flex flex-none flex-wrap items-center justify-end gap-2 px-6 pb-6 pt-2">{footer}</div> : null}
       </div>
     </dialog>,
     document.body,
@@ -321,7 +321,7 @@ export function Toaster() {
       {items.map((i) => (
         <div
           key={i.id}
-          className={cx('pointer-events-auto flex items-start gap-2 border bg-raised px-3 py-2 text-sm shadow-[var(--shadow)]', i.tone === 'error' ? 'border-danger/70' : 'border-rule-strong')}
+          className={cx('glass pointer-events-auto flex items-start gap-2.5 rounded-[10px] px-4 py-3 text-sm', i.tone === 'error' ? 'ring-1 ring-danger/60' : '')}
           style={{ animation: 'rise-in 200ms var(--ease-out-expo)' }}
         >
           <Icon name={i.tone === 'error' ? 'alert' : i.tone === 'info' ? 'info' : 'check'} className={i.tone === 'error' ? 'mt-0.5 text-danger' : i.tone === 'info' ? 'mt-0.5 text-ink-3' : 'mt-0.5 text-st-new'} size={14} />
@@ -345,7 +345,7 @@ export function useTip() {
     ? createPortal(
         <div
           role="tooltip"
-          className="pointer-events-none fixed z-[60] max-w-[280px] border border-rule-strong bg-raised px-2.5 py-1.5 text-xs text-ink shadow-[var(--shadow)]"
+          className="pointer-events-none fixed z-[60] max-w-[280px] rounded-[8px] bg-[var(--tip)] px-3 py-2 text-xs text-ink shadow-[var(--shadow),inset_0_0_0_1px_var(--rule-strong)]"
           style={{
             left: Math.max(8, Math.min(tip.x + 12, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 292)),
             top: Math.max(8, tip.y + 14),
@@ -365,10 +365,10 @@ export function Meter({ value, max, cap, tone = 'accent', height = 6, label }: {
   const color = tone === 'danger' ? 'var(--danger)' : tone === 'changed' ? 'var(--st-changed)' : 'var(--accent)';
   return (
     <div
-      className="relative w-full bg-[color-mix(in_oklch,var(--accent)_14%,var(--raised))]" style={{ height }}
+      className="relative w-full overflow-visible rounded-[2px] bg-[var(--row-hover)] shadow-[inset_0_0_0_1px_var(--rule)]" style={{ height }}
       role="meter" aria-valuemin={0} aria-valuemax={max} aria-valuenow={value} aria-label={label}
     >
-      <div className="h-full transition-[width] duration-500" style={{ width: pct * 100 + '%', background: color }} />
+      <div className="h-full rounded-[2px] transition-[width] duration-500 ease-[var(--ease)]" style={{ width: pct * 100 + '%', background: color }} />
       {cap !== undefined && max > 0 ? <div className="absolute -bottom-1 -top-1 w-px bg-ink" style={{ left: Math.min(100, (cap / max) * 100) + '%' }} /> : null}
     </div>
   );
@@ -414,7 +414,7 @@ export function TagInput({ value, onChange, placeholder }: { value: string[]; on
     setDraft('');
   };
   return (
-    <div className="flex min-h-[34px] flex-wrap items-center gap-1 rounded-sm border border-rule-strong bg-sunk px-1.5 py-1 focus-within:border-transparent focus-within:outline focus-within:outline-[1.5px] focus-within:outline-offset-1 focus-within:outline-focus">
+    <div className="flex min-h-[34px] flex-wrap items-center gap-1 rounded-[8px] border border-rule bg-raised px-2 py-1.5 focus-within:border-transparent focus-within:outline focus-within:outline-[1.5px] focus-within:outline-offset-1 focus-within:outline-focus">
       {value.map((x) => <Chip key={x} onRemove={() => onChange(value.filter((y) => y !== x))}>{x}</Chip>)}
       <input
         className="h-[20px] min-w-[90px] flex-1 bg-transparent text-sm outline-none placeholder:text-ink-3"
@@ -435,7 +435,7 @@ export function FileInput({ accept, file, onFile, inputRef, testId }: { accept?:
   return (
     <span className="field flex cursor-pointer items-center gap-3 overflow-hidden pl-0 pr-3 focus-within:border-transparent focus-within:outline focus-within:outline-[1.5px] focus-within:outline-offset-1 focus-within:outline-focus">
       <input ref={inputRef} type="file" accept={accept} data-testid={testId} className="sr-only" onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
-      <span className="flex h-full flex-none items-center border-r border-rule-strong bg-raised px-3 text-sm font-medium text-ink">{t('Wybierz plik', 'Choose a file')}</span>
+      <span className="flex h-full flex-none items-center border-r border-rule-strong bg-[var(--row-hover)] px-3.5 text-sm font-medium text-ink">{t('Wybierz plik', 'Choose a file')}</span>
       <span className={'min-w-0 truncate text-sm ' + (file ? 'mono text-ink' : 'text-ink-3')}>{file ? file.name : t('nie wybrano pliku', 'no file chosen')}</span>
     </span>
   );

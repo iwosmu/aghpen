@@ -115,7 +115,7 @@ export default function SignatureEditor() {
           {canWrite ? <Button variant="primary" icon="check" busy={save.isPending} disabled={!v?.ok || pending || !dirty} onClick={() => save.mutate(undefined)}>{t('Zapisz sygnaturę', 'Save signature')}</Button> : null}
         </>}
       />
-      <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+      <div className="grid gap-4 px-4 pb-6 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         <div className="min-w-0">
           <div className="flex items-center justify-between gap-3 border border-b-0 border-rule bg-panel px-3 py-1.5 text-xs text-ink-2">
             <span className="mono">{isNew ? t('nowa.yaml', 'new.yaml') : (sig?.slug ?? '') + '.yaml'}</span>
@@ -175,7 +175,7 @@ export default function SignatureEditor() {
                     })}
                   </ul>
                 ) : null}
-                {(v.paths ?? []).length ? <p className="mt-2 text-xs text-ink-2">{t('Dodatkowe żądania GET na usługę:', 'Extra GET requests per service:')} {(v.paths ?? []).map((p) => <span key={p} className="mono mr-2 text-ink">{p}</span>)}</p> : <p className="mt-2 text-xs text-ink-3">{t('Bez dodatkowych ścieżek.', 'No extra paths.')}</p>}
+                {(v.paths ?? []).length ? <p className="mt-2 text-xs text-ink-2">{t('Dodatkowe żądania GET na usługę:', 'Extra GET requests per service:')} {(v.paths ?? []).map((p) => <span key={p} className="mono mr-2 text-ink">{p}</span>)}</p> : <p className="mt-2 text-xs text-ink-3">{t('Bez dodatkowych ścieżek', 'No extra paths')}</p>}
               </div>
             )}
           </Panel>
@@ -204,7 +204,7 @@ export default function SignatureEditor() {
                       </li>
                     ))}
                   </ul>
-                ) : <p className="mt-2 text-sm text-ink-2">{t('Żadna zapisana usługa nie pasuje.', 'No stored services match.')}</p>}
+                ) : <p className="mt-2 text-sm text-ink-2">{t('Żadna zapisana usługa nie pasuje', 'No stored services match')}</p>}
               </div>
             )}
           </Panel>

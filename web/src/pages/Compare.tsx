@@ -17,7 +17,7 @@ function RunCard({ run, side }: { run: ScanRun; side: string }) {
       <div className="text-xs text-ink-3">{side}</div>
       <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2"><Link to={'/runs/' + run.id} className="num link text-base font-medium">#{run.id}</Link><span className="truncate text-sm text-ink-2">{run.profile_name}</span></div>
       <div className="num mt-0.5 text-xs text-ink-2">{fmtDateTime(run.finished_at ?? run.started_at)} · {fmtDuration(run.stats.elapsed_sec)}</div>
-      <div className="mt-1 text-xs text-ink-2"><span className="num text-ink">{fmtInt(run.stats.hosts_up)}</span> {t('host / hosty / hostów (plural())', 'host / hosts')} · <span className="num text-ink">{fmtInt(run.stats.services_open)}</span> {t('usługa / usługi / usług (plural())', 'service / services')}</div>
+      <div className="mt-1 text-xs text-ink-2"><span className="num text-ink">{fmtInt(run.stats.hosts_up)}</span> {plural(run.stats.hosts_up, ['host', 'hosty', 'hostów'], ['host', 'hosts'])} · <span className="num text-ink">{fmtInt(run.stats.services_open)}</span> {plural(run.stats.services_open, ['usługa', 'usługi', 'usług'], ['service', 'services'])}</div>
     </div>
   );
 }
@@ -32,7 +32,7 @@ function Column({ title, glyph, tone, items, showExpected }: { title: string; gl
         <Glyph name={glyph} tone={tone} />{title}<span className="num font-normal text-ink-2">{real.length}</span>
         {expected.length ? <span className="ml-auto inline-flex items-center gap-1 text-xs font-normal text-ink-3"><Glyph name="dashring" tone="expected" size={11} />{expected.length} {t('oczekiwane', 'expected')}</span> : null}
       </h2>
-      {list.length === 0 ? <p className="p-3 text-sm text-ink-3">{expected.length ? t('Tylko zmiany oczekiwane.', 'Expected changes only.') : t('Brak.', 'None.')}</p> : (
+      {list.length === 0 ? <p className="p-3 text-sm text-ink-3">{expected.length ? t('Tylko zmiany oczekiwane', 'Expected changes only') : t('Brak', 'None')}</p> : (
         <ul className="max-h-[560px] overflow-auto">
           {list.map((c, i) => (
             <li key={c.id || 'x' + i + '-' + c.ip + ':' + (c.port ?? '')} className="border-b border-rule px-3 py-2 last:border-b-0">
@@ -76,7 +76,7 @@ export default function Compare() {
   return (
     <div>
       <PageHeader back={{ to: '/changes', label: t('Zmiany', 'Changes') }} title={t('Porównanie skanów', 'Compare scans')} />
-      <div className="space-y-4 p-4 sm:p-6">
+      <div className="space-y-4 px-4 pb-6 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-end gap-3">
           <label className="block min-w-[240px] flex-1"><span className="label mb-1 block">{t('Starszy skan (przed)', 'Older scan (before)')}</span><Select value={from} onChange={(v) => u.set({ from: v })} options={opts} /></label>
           <button type="button" className="mb-0.5 inline-flex h-[30px] w-[30px] items-center justify-center border border-rule-strong hover:bg-raised" aria-label={t('Zamień skany', 'Swap the scans')} onClick={() => u.set({ from: to, to: from })}><Icon name="compare" /></button>
@@ -93,14 +93,14 @@ export default function Compare() {
               <RunCard run={d.from} side={t('Przed', 'Before')} />
               <div className="flex flex-none flex-col items-center px-1 text-xs text-ink-2">
                 <Icon name="arrowRight" className="hidden text-ink-3 sm:block" />
-                <span className="num">{fmtSigned(d.to.stats.hosts_up - d.from.stats.hosts_up)} {t('host / hosty / hostów (plural())', 'host / hosts')}</span>
-                <span className="num">{fmtSigned(d.to.stats.services_open - d.from.stats.services_open)} {t('usługa / usługi / usług (plural())', 'service / services')}</span>
+                <span className="num">{fmtSigned(d.to.stats.hosts_up - d.from.stats.hosts_up)} {plural(Math.abs(d.to.stats.hosts_up - d.from.stats.hosts_up), ['host', 'hosty', 'hostów'], ['host', 'hosts'])}</span>
+                <span className="num">{fmtSigned(d.to.stats.services_open - d.from.stats.services_open)} {plural(Math.abs(d.to.stats.services_open - d.from.stats.services_open), ['usługa', 'usługi', 'usług'], ['service', 'services'])}</span>
               </div>
               <RunCard run={d.to} side={t('Po', 'After')} />
             </div>
             <StoryList changes={all} className="space-y-1 border border-rule bg-panel px-3 py-2.5" testId="compare-story" />
             <div className="flex flex-col text-sm text-ink-2">
-              {all.length === 0 ? t('Brak zmian między tymi skanami.', 'No changes between these scans.') : (
+              {all.length === 0 ? t('Brak zmian między tymi skanami', 'No changes between these scans') : (
                 <span><span className="num text-ink">{all.filter((c) => !c.expected).length}</span> {plural(all.filter((c) => !c.expected).length, ['zmiana wymaga', 'zmiany wymagają', 'zmian wymaga'], ['change needs', 'changes need'])} {t('przeglądu', 'review')}, <span className="num text-ink">{all.filter((c) => c.expected).length}</span> {t('oczekiwanych', 'expected')}. {t('Nowych znalezisk:', 'New findings:')} <span className="num text-ink">{d.summary.findings_new}</span>.</span>
               )}
               {d.summary.hosts_missing ? (

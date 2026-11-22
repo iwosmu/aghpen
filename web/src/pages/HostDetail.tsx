@@ -4,7 +4,8 @@ import { patch } from '../api/client';
 import type { AvailabilityProfile, Change, Host, Scope, Service } from '../api/types';
 import { t, plural } from '../i18n';
 import { fmtDateTime, fmtDec, fmtRelative } from '../lib/format';
-import { ErrorState, KV, PageHeader, Panel, Select, SkeletonRows, TagInput, Tags, useTip } from '../ui/kit';
+import { ErrorState, KV, PageHeader, Panel, Select, SkeletonRows, Tabs, TagInput, Tags, useTip } from '../ui/kit';
+import { useUrlState } from '../lib/hooks';
 import { DataTable, type Col } from '../ui/table';
 import { ChangeMark, ClassChips, Crit, HostStatusMark, InterestScore, ServiceStateMark, Sev } from '../ui/marks';
 import { InlineText, OverrideNote } from '../ui/edit';
@@ -71,12 +72,12 @@ function ModelOutput({ h, a, compact }: { h: Host; a: AvailabilityProfile; compa
           </dd>
         </div>
       </dl>
-      {compact ? null : <p className="border-l border-rule-strong pl-3 text-sm text-ink">{a.pattern || t('Za mało obserwacji, aby opisać wzorzec.', 'Too few observations to describe a pattern.')}</p>}
+      {compact ? null : <p className="border-l border-rule-strong pl-3 text-sm text-ink">{a.pattern || t('Za mało obserwacji, aby opisać wzorzec', 'Too few observations to describe a pattern')}</p>}
       {h.status === 'expected-offline' || h.status === 'unstable' || h.status === 'down' ? (
         <p className="text-xs text-ink-2">
-          {h.status === 'expected-offline' ? t('O tej porze host zwykle nie odpowiada.', 'The host usually does not respond at this hour.')
-            : h.status === 'unstable' ? t('Host odpowiada nieregularnie.', 'The host responds irregularly.')
-            : t('Braków odpowiedzi z rzędu jest więcej niż próg.', 'More misses in a row than the threshold.')}
+          {h.status === 'expected-offline' ? t('O tej porze host zwykle nie odpowiada', 'The host usually does not respond at this hour')
+            : h.status === 'unstable' ? t('Host odpowiada nieregularnie', 'The host responds irregularly')
+            : t('Braków odpowiedzi z rzędu jest więcej niż próg', 'More misses in a row than the threshold')}
         </p>
       ) : null}
       {recent.length && !compact ? (
@@ -106,6 +107,8 @@ export default function HostDetail() {
   const avail = useItem<AvailabilityProfile>('/hosts/' + id + '/availability');
   const changes = usePage<Change>('/hosts/' + id + '/changes', { limit: 50 });
   const scopes = usePage<Scope>('/scopes', { limit: 200 });
+  const u = useUrlState();
+  const tab = u.get('tab', 'services');
   const save = useAction((body: Record<string, unknown>) => patch<Host>('/hosts/' + id, body), { invalidate: ['/hosts'], success: t('Zapisano', 'Saved') });
   if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
   if (!q.data) return <SkeletonRows rows={12} />;
@@ -118,7 +121,7 @@ export default function HostDetail() {
     { id: 'product', header: t('Produkt', 'Product'), hide: 'md', cell: (s) => <span className="text-ink-2"><ProductValue s={s} /></span> },
     { id: 'title', header: t('Tytuł / technologie', 'Title / technologies'), wrap: true, cell: (s) => <span className="block min-w-[160px] max-w-[420px] truncate text-ink-2">{s.title || (s.technologies ?? []).map((x) => x.name).join(', ') || '–'}</span> },
     { id: 'class', header: t('Klasy', 'Classes'), hide: '2xl', cell: (s) => <ClassChips classes={s.classes} max={2} /> },
-    ...((services.data ?? []).some((s) => s.response_ms !== undefined) ? [{ id: 'rt', header: t('Czas odpowiedzi', 'Response time'), align: 'right' as const, hide: 'md' as const, cell: (s: Service) => <ResponseCell s={s} /> }] : []),
+    ...((services.data ?? []).some((s) => s.response_ms !== undefined) ? [{ id: 'rt', header: t('Czas odpowiedzi', 'Response time'), align: 'right' as const, hide: '2xl' as const, cell: (s: Service) => <ResponseCell s={s} /> }] : []),
     { id: 'interest', header: t('Ciekawość', 'Interest'), align: 'right', cell: (s) => <InterestScore value={s.interest} reasons={s.interest_why} /> },
   ];
   return (
@@ -126,12 +129,12 @@ export default function HostDetail() {
       <PageHeader
         back={{ to: '/hosts', label: t('Hosty', 'Hosts') }}
         title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono text-[26px] font-medium tracking-[-0.01em] sm:text-[30px]">{h.ip}</span><span className="font-sans text-base font-normal"><HostStatusMark status={h.status} /></span></span>}
-        sub={<>{h.label ? <span className="text-ink">{h.label} · </span> : null}<span className="mono">{(h.hostnames ?? []).join(', ') || t('bez nazwy DNS', 'no DNS name')}</span></>}
+        sub={<>{h.label ? <span className="text-ink">{h.label} · </span> : null}<span className="mono">{(h.hostnames ?? []).join(', ')}</span></>}
         readOnly={!canEdit}
-        actions={<span className="flex items-center gap-2 text-sm text-ink-2">{t('Ciekawość', 'Interest')} <InterestScore value={h.interest} /></span>}
+        actions={<span className="text-sm" title={t('Ciekawość', 'Interest')}><InterestScore value={h.interest} /></span>}
       />
-      <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-        <div className="space-y-4">
+      <div className="grid gap-4 px-4 pb-6 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+        <div className="order-2 space-y-4 xl:order-none">
           <Panel title={t('Opis analityka', 'Analyst notes')}>
             <dl>
               <KV k={t('Etykieta', 'Label')}><InlineText label={t('Etykieta', 'Label')} value={h.label} canEdit={canEdit} busy={save.isPending} placeholder={t('brak etykiety', 'no label')} onSave={(v) => save.mutate({ label: v })} /></KV>
@@ -145,76 +148,89 @@ export default function HostDetail() {
               <KV k={t('Notatka', 'Note')}><InlineText label={t('Notatka', 'Note')} multiline value={h.note} canEdit={canEdit} busy={save.isPending} placeholder={t('brak notatki', 'no note')} onSave={(v) => save.mutate({ note: v })} /></KV>
             </dl>
           </Panel>
-          <Panel title={t('Dane ze skanów', 'Scan data')}>
-            <dl>
-              <KV k={t('System', 'OS')}>
-                <InlineText label={t('System', 'OS')} value={h.os_guess} canEdit={canEdit} placeholder={t('nie rozpoznano', 'not recognised')} onSave={(v) => save.mutate({ os_guess: v })} />
-                <OverrideNote o={h.overrides?.os_guess} canEdit={canEdit} onRevert={() => save.mutate({ os_guess: null })} />
-              </KV>
-              <KV k={t('Nazwy DNS', 'DNS names')} mono>
-                {(h.hostnames ?? []).join(', ') || '–'}
-                <OverrideNote o={h.overrides?.hostnames} canEdit={canEdit} onRevert={() => save.mutate({ hostnames: null })} />
-              </KV>
-              {h.mac ? <KV k="MAC" mono>{h.mac}{isLocalMac(h.mac) ? <span className="ml-2 font-sans text-ink-3" title={t('Adres MAC nadany lokalnie (kontener, maszyna wirtualna).', 'A locally assigned MAC address (container, virtual machine).')} data-testid="mac-local">{t('adres lokalny', 'local address')}</span> : h.vendor ? <span className="ml-2 font-sans text-ink-3">{h.vendor}</span> : null}</KV> : null}
-              <KV k={t('Zakresy', 'Scopes')}>{(h.scope_ids ?? []).map((sid) => scopes.data?.items.find((s) => s.id === sid)?.name ?? '#' + sid).join(', ') || '–'}</KV>
-              <KV k={t('Pierwsza obserwacja', 'First seen')}><span className="num">{fmtDateTime(h.first_seen)}</span></KV>
-              <KV k={t('Ostatnia obserwacja', 'Last seen')}><span className="num">{fmtDateTime(h.last_seen)}</span> <span className="text-ink-3">{fmtRelative(h.last_seen)}</span></KV>
-              <KV k={t('Ostatnia odpowiedź', 'Last response')}><span className="num">{h.last_up ? fmtDateTime(h.last_up) : '–'}</span></KV>
-              <KV k={t('Stabilność', 'Stability')}><span className="num">{fmtDec(h.stability)}</span> <span className="text-xs text-ink-3">{t('udział prób z odpowiedzią', 'share of probes with a response')}</span></KV>
-              <KV k={t('Źródło', 'Source')}>{h.source === 'import' ? t('import pliku', 'file import') : t('skan', 'scan')}</KV>
-            </dl>
-          </Panel>
+
         </div>
 
         <div className="min-w-0 space-y-4">
-          <Panel title={t('Usługi', 'Services')} count={services.data?.length} flush>
-            <DataTable inPanel rows={services.data} cols={svcCols} rowKey={(s) => s.id} rowHref={(s) => '/services/' + s.id} loading={services.isPending} error={services.error} retry={() => services.refetch()}
-              rowClass={(s) => (s.state === 'gone' ? 'text-ink-3' : undefined)}
-              empty={<p className="p-3 text-sm text-ink-2">{t('Brak otwartych usług.', 'No open services.')}</p>}
-              mobile={(s) => (
-                <div>
-                  <div className="flex items-center justify-between gap-2"><span className="mono text-sm">{s.port}/{s.proto} <span className="font-sans text-ink-2">{serviceName(s)}</span></span><InterestScore value={s.interest} /></div>
-                  <div className="mt-0.5 truncate text-xs text-ink-3">{s.title || productLine(shownProduct(s)) || '–'}</div>
+          <Tabs value={tab} onChange={(v) => u.set({ tab: v === 'services' ? null : v })} tabs={[
+            { id: 'services', label: t('Usługi', 'Services') },
+            { id: 'changes', label: t('Zmiany', 'Changes') },
+            { id: 'availability', label: t('Dostępność', 'Availability') },
+            { id: 'data', label: t('Dane ze skanów', 'Scan data') },
+          ]} />
+          {tab === 'services' ? (
+            <Panel flush>
+              <DataTable inPanel rows={services.data} cols={svcCols} rowKey={(s) => s.id} rowHref={(s) => '/services/' + s.id} loading={services.isPending} error={services.error} retry={() => services.refetch()}
+                rowClass={(s) => (s.state === 'gone' ? 'text-ink-3' : undefined)}
+                empty={<p className="p-3 text-sm text-ink-2">{t('Brak otwartych usług', 'No open services')}</p>}
+                mobile={(s) => (
+                  <div>
+                    <div className="flex items-center justify-between gap-2"><span className="mono text-sm">{s.port}/{s.proto} <span className="font-sans text-ink-2">{serviceName(s)}</span></span><InterestScore value={s.interest} /></div>
+                    <div className="mt-0.5 truncate text-xs text-ink-3">{s.title || productLine(shownProduct(s)) || '–'}</div>
+                  </div>
+                )} />
+            </Panel>
+  
+            ) : tab === 'changes' ? (
+            <Panel flush>
+              {changes.error ? <ErrorState error={changes.error} retry={() => changes.refetch()} /> : !changes.data ? <SkeletonRows rows={4} /> : changes.data.items.length === 0 ? (
+                <p className="p-3 text-sm text-ink-2">{t('Brak zmian', 'No changes')}</p>
+              ) : (
+                <ol>
+                  {changes.data.items.map((c) => (
+                    <li key={c.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 border-b border-rule px-3 py-2 last:border-b-0 sm:grid-cols-[150px_190px_minmax(0,1fr)_auto]">
+                      <span className="num hidden text-xs text-ink-3 sm:block" title={fmtDateTime(c.at)}>{fmtDateTime(c.at)}</span>
+                      <span><ChangeMark kind={c.kind} expected={c.expected} /></span>
+                      <span className="col-span-2 min-w-0 text-sm sm:col-span-1">
+                        {c.summary}
+                        {c.port ? <Link to={'/services/' + c.service_id} className="mono link ml-2 text-xs">:{c.port}</Link> : null}
+                        <span className="num ml-2 text-xs text-ink-3 sm:hidden">{fmtRelative(c.at)}</span>
+                      </span>
+                      <span className="hidden items-center gap-3 sm:flex">{c.expected ? <span className="text-xs text-ink-3">{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} />}<Link to={'/runs/' + c.run_id} className="num link text-xs">#{c.run_id}</Link></span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </Panel>
+          ) : tab === 'availability' ? (
+            <div className="space-y-4">
+            <Panel title={t('Dostępność w tygodniu', 'Availability over the week')}>
+              {avail.error ? <ErrorState error={avail.error} retry={() => avail.refetch()} /> : !avail.data ? <div className="skeleton h-[220px]" /> : obsCount(avail.data) < MIN_OBS ? (
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+                  <FewObservations a={avail.data} n={obsCount(avail.data)} />
+                  <ModelOutput h={h} a={avail.data} compact />
                 </div>
-              )} />
-          </Panel>
-
-          <Panel title={t('Dostępność w tygodniu', 'Availability over the week')}>
-            {avail.error ? <ErrorState error={avail.error} retry={() => avail.refetch()} /> : !avail.data ? <div className="skeleton h-[220px]" /> : obsCount(avail.data) < MIN_OBS ? (
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-                <FewObservations a={avail.data} n={obsCount(avail.data)} />
-                <ModelOutput h={h} a={avail.data} compact />
-              </div>
-            ) : (
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-                <WeekHeatmap buckets={avail.data.buckets} nowIndex={now.getDay() * 24 + now.getHours()} />
-                <ModelOutput h={h} a={avail.data} />
-              </div>
-            )}
-          </Panel>
-          <ReprobePanel hostId={h.id} />
-          <HostLifePanel hostId={h.id} />
-
-          <Panel title={t('Historia zmian', 'Change history')} count={changes.data?.total} flush>
-            {changes.error ? <ErrorState error={changes.error} retry={() => changes.refetch()} /> : !changes.data ? <SkeletonRows rows={4} /> : changes.data.items.length === 0 ? (
-              <p className="p-3 text-sm text-ink-2">{t('Brak zmian.', 'No changes.')}</p>
-            ) : (
-              <ol>
-                {changes.data.items.map((c) => (
-                  <li key={c.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 border-b border-rule px-3 py-2 last:border-b-0 sm:grid-cols-[150px_190px_minmax(0,1fr)_auto]">
-                    <span className="num hidden text-xs text-ink-3 sm:block" title={fmtDateTime(c.at)}>{fmtDateTime(c.at)}</span>
-                    <span><ChangeMark kind={c.kind} expected={c.expected} /></span>
-                    <span className="col-span-2 min-w-0 text-sm sm:col-span-1">
-                      {c.summary}
-                      {c.port ? <Link to={'/services/' + c.service_id} className="mono link ml-2 text-xs">:{c.port}</Link> : null}
-                      <span className="num ml-2 text-xs text-ink-3 sm:hidden">{fmtRelative(c.at)}</span>
-                    </span>
-                    <span className="hidden items-center gap-3 sm:flex">{c.expected ? <span className="text-xs text-ink-3">{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} />}<Link to={'/runs/' + c.run_id} className="num link text-xs">#{c.run_id}</Link></span>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </Panel>
+              ) : (
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+                  <WeekHeatmap buckets={avail.data.buckets} nowIndex={now.getDay() * 24 + now.getHours()} />
+                  <ModelOutput h={h} a={avail.data} />
+                </div>
+              )}
+            </Panel>
+            <ReprobePanel hostId={h.id} />
+            <HostLifePanel hostId={h.id} />
+            </div>
+          ) : (
+            <Panel>
+              <dl>
+                <KV k={t('System', 'OS')}>
+                  <InlineText label={t('System', 'OS')} value={h.os_guess} canEdit={canEdit} placeholder={t('nie rozpoznano', 'not recognised')} onSave={(v) => save.mutate({ os_guess: v })} />
+                  <OverrideNote o={h.overrides?.os_guess} canEdit={canEdit} onRevert={() => save.mutate({ os_guess: null })} />
+                </KV>
+                <KV k={t('Nazwy DNS', 'DNS names')} mono>
+                  {(h.hostnames ?? []).join(', ') || '–'}
+                  <OverrideNote o={h.overrides?.hostnames} canEdit={canEdit} onRevert={() => save.mutate({ hostnames: null })} />
+                </KV>
+                {h.mac ? <KV k="MAC" mono>{h.mac}{isLocalMac(h.mac) ? <span className="ml-2 font-sans text-ink-3" title={t('Adres MAC nadany lokalnie (kontener, maszyna wirtualna).', 'A locally assigned MAC address (container, virtual machine).')} data-testid="mac-local">{t('adres lokalny', 'local address')}</span> : h.vendor ? <span className="ml-2 font-sans text-ink-3">{h.vendor}</span> : null}</KV> : null}
+                <KV k={t('Zakresy', 'Scopes')}>{(h.scope_ids ?? []).map((sid) => scopes.data?.items.find((s) => s.id === sid)?.name ?? '#' + sid).join(', ') || '–'}</KV>
+                <KV k={t('Pierwsza obserwacja', 'First seen')}><span className="num">{fmtDateTime(h.first_seen)}</span></KV>
+                <KV k={t('Ostatnia obserwacja', 'Last seen')}><span className="num">{fmtDateTime(h.last_seen)}</span> <span className="text-ink-3">{fmtRelative(h.last_seen)}</span></KV>
+                <KV k={t('Ostatnia odpowiedź', 'Last response')}><span className="num">{h.last_up ? fmtDateTime(h.last_up) : '–'}</span></KV>
+                <KV k={t('Stabilność', 'Stability')}><span className="num">{fmtDec(h.stability)}</span> <span className="text-xs text-ink-3">{t('udział prób z odpowiedzią', 'share of probes with a response')}</span></KV>
+                <KV k={t('Źródło', 'Source')}>{h.source === 'import' ? t('import pliku', 'file import') : t('skan', 'scan')}</KV>
+              </dl>
+            </Panel>
+          )}
         </div>
       </div>
     </div>

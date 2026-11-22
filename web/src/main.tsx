@@ -2,6 +2,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
+import { installStaleBuildReload } from './lib/staleBuild';
+
+installStaleBuildReload();
 
 async function boot() {
   // Dev-only fixture layer. __CZUJKA_FIXTURES__ is a compile-time constant that

@@ -44,6 +44,7 @@ type apiError struct {
 
 // WriteJSON writes v with the status code.
 func WriteJSON(w http.ResponseWriter, status int, v any) {
+	v = localize(w, v)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)

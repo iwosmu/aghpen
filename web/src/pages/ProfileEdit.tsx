@@ -44,7 +44,7 @@ export function EstimateBox({ profileId, stale }: { profileId: number; stale?: b
       {hasWindow ? (
         <div className="border-b border-rule px-3 py-2">
           <div className="relative h-[8px] bg-raised" aria-hidden="true">
-            <div className="h-full" style={{ width: Math.min(100, (ratio / Math.max(1, ratio)) * 100) + '%', background: e.fits_window ? 'var(--accent)' : 'var(--st-changed)' }} />
+            <div className="h-full" style={{ width: Math.min(100, (ratio / Math.max(1, ratio)) * 100) + '%', background: e.fits_window ? 'var(--ink-2)' : 'var(--st-changed)' }} />
             <div className="absolute -bottom-1 -top-1 w-[2px] bg-ink" style={{ left: 'calc(' + Math.min(100, (1 / Math.max(1, ratio)) * 100) + '% - 1px)' }} />
           </div>
           <div className="mt-1 flex justify-between text-2xs text-ink-3"><span>{t('czas skanu', 'scan time')}</span><span>{t('kreska: koniec okna', 'tick: end of the window')}</span></div>
@@ -199,7 +199,7 @@ export default function ProfileEdit() {
           </>
         )}
       />
-      <fieldset disabled={ro} className="min-w-0 px-4 pb-10 sm:px-6">
+      <fieldset disabled={ro} className="min-w-0 px-4 pb-10 sm:px-6 lg:px-8">
         {invalid && dirty ? <p className="mt-3 text-xs text-danger">{invalid}</p> : null}
         <div className="mt-1"><InlineError error={save.error} /></div>
 
@@ -224,20 +224,20 @@ export default function ProfileEdit() {
               <input className="field mono" value={p.ports} onChange={(e) => up((d) => { d.ports = e.target.value; })} />
             </Field>
             <div className="flex items-end gap-1.5 pb-[22px]">
-              {['top-100', 'top-1000', '1-65535'].map((x) => <Button key={x} size="sm" onClick={() => up((d) => { d.ports = x; })} className={p.ports === x ? 'border-accent' : ''}><span className="mono">{x}</span></Button>)}
+              {['top-100', 'top-1000', '1-65535'].map((x) => <Button key={x} size="sm" onClick={() => up((d) => { d.ports = x; })} className={p.ports === x ? 'border-rule-strong bg-[color-mix(in_oklch,var(--raised),var(--ink)_8%)]' : ''}><span className="mono">{x}</span></Button>)}
             </div>
           </div>
           <div className="mt-4" role="radiogroup" aria-label={t('Tryb wykrywania hostów', 'Host discovery mode')} data-testid="discovery-mode">
             <span className="label mb-1.5 block">{t('Tryb wykrywania hostów', 'Host discovery mode')}</span>
-            <div className="grid gap-px border border-rule bg-rule sm:grid-cols-3">
+            <div className="grid gap-px overflow-hidden rounded-[10px] border border-rule bg-rule sm:grid-cols-3">
               {discoveryModes().map((m) => {
                 const on = (p.discovery.mode || 'balanced') === m.id;
                 return (
                   <button key={m.id} type="button" role="radio" aria-checked={on} disabled={ro}
                     onClick={() => up((d) => { d.discovery.mode = m.id; })}
                     className={cx('relative bg-panel px-3 py-2 text-left outline-offset-[-2px]', on ? 'bg-raised' : 'hover:bg-raised/60')}>
-                    {on ? <span className="absolute inset-x-0 top-0 h-[2px] bg-accent" aria-hidden="true" /> : null}
-                    <span className="flex items-center gap-1.5 text-sm font-medium"><span className={cx('inline-block size-2 rounded-full border', on ? 'border-accent bg-accent' : 'border-ink-3')} aria-hidden="true" />{m.label}</span>
+                    {on ? <span className="pointer-events-none absolute inset-0 shadow-[inset_0_0_0_1px_var(--rule-strong)]" aria-hidden="true" /> : null}
+                    <span className="flex items-center gap-1.5 text-sm font-medium"><span className={cx('inline-block size-2 rounded-[2px] border', on ? 'border-ink bg-ink' : 'border-ink-3')} aria-hidden="true" />{m.label}</span>
                     <span className="mt-1 block text-xs text-ink-3">{m.text}</span>
                   </button>
                 );

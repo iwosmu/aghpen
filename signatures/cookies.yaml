@@ -2,6 +2,7 @@
 
 - id: cookie-session-no-secure
   name: Ciasteczko sesji bez flagi Secure na HTTPS
+  name_en: Session cookie without the Secure flag on HTTPS
   category: cookie
   description: Ciasteczko sesji ustawione po HTTPS nie ma flagi Secure. Przeglądarka może je wysłać po nieszyfrowanym HTTP.
   interest: 40
@@ -13,6 +14,7 @@
 
 - id: cookie-session-no-httponly
   name: Ciasteczko sesji bez flagi HttpOnly
+  name_en: Session cookie without the HttpOnly flag
   category: cookie
   description: Ciasteczko sesji nie ma flagi HttpOnly. Skrypt na stronie może je odczytać (skutek XSS jest wtedy większy).
   interest: 35
@@ -22,6 +24,7 @@
 
 - id: cookie-jwt
   name: Token JWT w ciasteczku
+  name_en: JWT in a cookie
   category: cookie
   description: Wartość ciasteczka ma postać tokenu JWT. Treść tokenu jest czytelna dla każdego, kto go przechwyci.
   interest: 35
@@ -31,6 +34,7 @@
 
 - id: cookie-samesite-none-insecure
   name: Ciasteczko SameSite=None bez Secure
+  name_en: "SameSite=None cookie without Secure"
   category: cookie
   description: Ciasteczko ma SameSite=None, ale nie ma flagi Secure. Przeglądarki odrzucają takie ciasteczka, a konfiguracja jest błędna.
   interest: 20
@@ -40,6 +44,7 @@
 
 - id: cookie-bigip
   name: Ciasteczko F5 BIG-IP
+  name_en: F5 BIG-IP cookie
   category: cookie
   technology: F5 BIG-IP
   description: Ciasteczko BIGipServer koduje adres IP i port serwera zaplecza za load balancerem F5.
@@ -50,6 +55,7 @@
 
 - id: cookie-shiro-rememberme
   name: Ciasteczko rememberMe (Apache Shiro)
+  name_en: rememberMe cookie (Apache Shiro)
   category: cookie
   technology: Apache Shiro
   description: Odpowiedź ustawia rememberMe=deleteMe. To znak frameworka Apache Shiro.
@@ -62,6 +68,7 @@
 
 - id: cookie-backend-route
   name: Ciasteczko trasy do serwera zaplecza
+  name_en: Backend server route cookie
   category: cookie
   description: Ciasteczko load balancera (SERVERID, ROUTEID, AWSALB, BALANCEID) wskazuje serwer zaplecza obsługujący sesję.
   interest: 20
@@ -71,6 +78,7 @@
 
 - id: cookie-waf
   name: Ciasteczko zapory aplikacyjnej
+  name_en: Web application firewall cookie
   category: cookie
   description: Ciasteczko ustawione przez zaporę aplikacyjną albo usługę anty-DDoS (Imperva, F5 ASM, Cloudflare, Barracuda, Citrix).
   interest: 10
@@ -80,6 +88,7 @@
 
 - id: cookie-language-framework
   name: Ciasteczko sesji frameworka
+  name_en: Framework session cookie
   category: cookie
   description: Nazwa ciasteczka sesji zdradza technologię aplikacji (PHP, Java, ASP.NET, Laravel, Express, Django, Rails).
   interest: 5
@@ -115,6 +124,7 @@
 
 - id: cookie-remember-me-readable
   name: Ciasteczko trwałego logowania (remember_me) bez HttpOnly albo Secure
+  name_en: Persistent login cookie (remember_me) without HttpOnly or Secure
   category: cookie
   description: Ciasteczko „zapamiętaj mnie” daje dostęp do konta bez hasła. Bez HttpOnly odczyta je skrypt na stronie, bez Secure przejdzie po nieszyfrowanym HTTP.
   interest: 35

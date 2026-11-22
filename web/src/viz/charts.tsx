@@ -10,7 +10,7 @@ import { Icon } from '../ui/Icon';
 /** Ranked horizontal bars: one series, one colour, the value at the tip. */
 export function BarList({ items, href, mono, labelWidth = 132, extra }: { items: NameCount[]; href?: (i: NameCount) => string; mono?: boolean; labelWidth?: number; extra?: (i: NameCount) => ReactNode }) {
   const max = Math.max(1, ...items.map((i) => i.count));
-  if (items.length === 0) return <p className="text-sm text-ink-3">{t('Brak danych.', 'No data.')}</p>;
+  if (items.length === 0) return <p className="text-sm text-ink-3">{t('Brak danych', 'No data')}</p>;
   return (
     <ul>
       {items.map((i) => {
@@ -18,7 +18,7 @@ export function BarList({ items, href, mono, labelWidth = 132, extra }: { items:
           <>
             <span className={cx('flex-none truncate text-sm text-ink', mono && 'num')} style={{ width: labelWidth }} title={i.name}>{i.name}{extra ? <span className="ml-1.5 font-sans text-2xs text-ink-3">{extra(i)}</span> : null}</span>
             <span className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="h-[8px] rounded-r-sm bg-[var(--seq-3)] transition-[width] duration-500 group-hover:bg-accent-strong" style={{ width: Math.max(2, (i.count / max) * 100) + '%', maxWidth: 'calc(100% - 44px)' }} />
+              <span className="h-[8px] rounded-r-sm bg-[var(--seq-3)] transition-[width] duration-500 group-hover:bg-[var(--seq-4)]" style={{ width: Math.max(2, (i.count / max) * 100) + '%', maxWidth: 'calc(100% - 44px)' }} />
               <span className="num flex-none text-xs text-ink-2">{fmtInt(i.count)}</span>
             </span>
           </>
@@ -43,7 +43,7 @@ interface Series { key: keyof Pick<CountPoint, 'hosts' | 'services' | 'changes' 
 export function TrendRows({ points, series }: { points: CountPoint[]; series: Series[] }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [at, setAt] = useState<number | null>(null);
-  if (points.length < 2) return <p className="text-sm text-ink-3">{t('Trend pojawi się po dwóch skanach.', 'The trend appears after two scans.')}</p>;
+  if (points.length < 2) return <p className="text-sm text-ink-3">{t('Trend pojawi się po dwóch skanach', 'The trend appears after two scans')}</p>;
   const labelW = 92, valueW = 86, rowH = 40, pad = 6;
   const plotW = Math.max(60, width - labelW - valueW);
   const x = (i: number) => (i / (points.length - 1)) * (plotW - 8) + 4;

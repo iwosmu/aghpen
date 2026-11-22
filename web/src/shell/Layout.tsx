@@ -47,14 +47,14 @@ function navItems(): { title: string; items: NavItem[] }[] {
 
 function Logo() {
   return (
-    <Link to="/" className="flex h-[44px] items-center gap-2.5 px-4 text-rail-ink">
-      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+    <Link to="/" className="flex h-[56px] items-center gap-2.5 px-5 text-rail-ink">
+      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
         <path d="M4 16a8 8 0 0 1 16 0" fill="none" stroke="currentColor" strokeWidth="1.8" />
-        <path d="M8 16a4 4 0 0 1 8 0" fill="none" stroke="var(--accent)" strokeWidth="1.8" />
+        <path d="M8 16a4 4 0 0 1 8 0" fill="none" stroke="currentColor" strokeWidth="1.8" />
         <rect x="10.800" y="14.800" width="2.400" height="2.400" fill="currentColor" />
         <path d="M2.500 20h19" stroke="currentColor" strokeWidth="1.400" />
       </svg>
-      <span className="text-base font-semibold tracking-[-0.01em]">Czujka</span>
+      <span className="text-[17px] font-medium tracking-[-0.02em]">Czujka</span>
     </Link>
   );
 }
@@ -70,29 +70,28 @@ function Rail({ onNavigate }: { onNavigate?: () => void }) {
   });
   const u = session.user;
   return (
-    <div className="flex h-full w-[216px] flex-col bg-rail text-rail-ink" data-rail>
-      <div className="border-b border-rail-rule"><Logo /></div>
-      <nav className="min-h-0 flex-1 overflow-y-auto py-2" aria-label={t('Nawigacja główna', 'Main navigation')}>
+    <div className="flex h-full w-[240px] flex-col bg-rail text-rail-ink shadow-[inset_-1px_0_0_var(--rail-rule)]" data-rail>
+      <Logo />
+      <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-2" aria-label={t('Nawigacja główna', 'Main navigation')}>
         {navItems().map((group) => {
           const items = group.items.filter((i) => can(...i.perms));
           if (items.length === 0) return null;
           return (
-            <div key={group.title} className="mb-2">
-              <p className="px-4 pb-1 pt-2 text-2xs font-medium text-rail-ink-2">{group.title}</p>
-              <ul>
+            <div key={group.title}>
+              <p className="caps px-3 pb-2 pt-6">{group.title}</p>
+              <ul className="space-y-0.5">
                 {items.map((i) => (
                   <li key={i.to}>
                     <NavLink
                       to={i.to} end={i.end} onClick={onNavigate}
                       className={({ isActive }) => cx(
-                        'relative flex h-[30px] items-center gap-2.5 px-4 text-sm outline-offset-[-2px]',
-                        isActive ? 'bg-rail-active font-medium text-rail-ink' : 'text-rail-ink-2 hover:bg-rail-active/50 hover:text-rail-ink',
+                        'relative flex h-[34px] items-center gap-2.5 rounded-[8px] px-3 text-sm transition-colors duration-150 ease-[var(--ease)]',
+                        isActive ? 'bg-rail-active text-rail-ink shadow-[inset_0_0_0_1px_var(--rail-rule),inset_0_1px_0_rgb(255_255_255/0.05)]' : 'text-rail-ink-2 hover:bg-rail-active/60 hover:text-rail-ink',
                       )}
                     >
                       {({ isActive }) => (
                         <>
-                          {isActive ? <span className="absolute inset-y-0 left-0 w-px bg-accent" aria-hidden="true" /> : null}
-                          <Icon name={i.icon} />
+                          <Icon name={i.icon} className={isActive ? 'text-rail-ink' : 'text-ink-3'} />
                           {i.label}
                         </>
                       )}
@@ -104,23 +103,17 @@ function Rail({ onNavigate }: { onNavigate?: () => void }) {
           );
         })}
       </nav>
-      <div className="border-t border-rail-rule px-4 py-3" data-testid="whoami">
-        <p className="truncate text-sm font-medium text-rail-ink" title={u.email}>{u.name || u.email}</p>
-        <p className="mono truncate text-2xs text-rail-ink-2">{u.email}</p>
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="inline-flex min-w-0 items-center gap-1.5 border border-rail-rule px-1.5 py-0.5 text-xs text-rail-ink" title={roleScope(u.role_slug)}>
-            <Icon name={u.role_slug === 'viewer' ? 'eye' : u.role_slug === 'admin' ? 'shield' : 'user'} size={12} />
-            <span className="truncate">{roleLabel(u.role_slug, u.role_name)}</span>
-          </span>
-          <span className="flex items-center gap-3">
-            <button type="button" onClick={() => setPwOpen(true)} className="inline-flex items-center text-rail-ink-2 hover:text-rail-ink" title={t('Zmień hasło', 'Change password')} aria-label={t('Zmień hasło', 'Change password')} data-testid="password-open">
-              <Icon name="lock" size={12} />
-            </button>
-            <button type="button" onClick={() => logout.mutate(undefined)} className="inline-flex items-center gap-1 text-xs text-rail-ink-2 hover:text-rail-ink">
-              <Icon name="logout" size={12} />{t('Wyloguj', 'Sign out')}
-            </button>
-          </span>
+      <div className="flex items-center gap-2 border-t border-rail-rule px-4 py-3" data-testid="whoami">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-rail-ink" title={u.email}>{u.name || u.email}</p>
+          <p className="truncate text-xs text-rail-ink-2" title={u.email + ' · ' + roleScope(u.role_slug)}>{roleLabel(u.role_slug, u.role_name) === (u.name || u.email) ? u.email : roleLabel(u.role_slug, u.role_name)}</p>
         </div>
+        <button type="button" onClick={() => setPwOpen(true)} className="inline-flex h-[28px] w-[28px] items-center justify-center rounded-[6px] text-ink-3 hover:bg-rail-active hover:text-rail-ink" title={t('Zmień hasło', 'Change password')} aria-label={t('Zmień hasło', 'Change password')} data-testid="password-open">
+          <Icon name="lock" size={14} />
+        </button>
+        <button type="button" onClick={() => logout.mutate(undefined)} className="inline-flex h-[28px] w-[28px] items-center justify-center rounded-[6px] text-ink-3 hover:bg-rail-active hover:text-rail-ink" title={t('Wyloguj', 'Sign out')} aria-label={t('Wyloguj', 'Sign out')}>
+          <Icon name="logout" size={14} />
+        </button>
       </div>
       <PasswordDialog open={pwOpen} onClose={() => setPwOpen(false)} />
     </div>
@@ -157,6 +150,7 @@ function useGlobalEvents(enabled: boolean) {
 
 function ActiveRunStrip() {
   const { can } = useSession();
+  const onDashboard = useLocation().pathname === '/';
   const q = usePage<ScanRun>('/runs', { status: 'running', limit: 1 }, can('scans:read'));
   const listed = q.data?.items[0];
   // The list is refreshed only on run events; the live detail query (kept fresh by the run page and polling) has the current rate.
@@ -164,7 +158,7 @@ function ActiveRunStrip() {
   const run = listed ? (detail.data?.status === 'running' ? detail.data : listed) : undefined;
   const profile = useItem<ScanProfile>('/profiles/' + (run?.profile_id ?? 0), undefined, { enabled: Boolean(run?.profile_id) });
   const safety = useItem<SafetyPolicy>('/settings/safety', undefined, { enabled: Boolean(run) });
-  if (!run) return null;
+  if (!run || onDashboard) return null;
   const pct = run.stats.addresses_total ? run.stats.addresses_done / run.stats.addresses_total : 0;
   // The run cap is the stricter of the profile cap and the policy cap, as on the run page and the dashboard.
   const policyCap = safety.data?.max_pps ?? 0;
@@ -173,7 +167,7 @@ function ActiveRunStrip() {
   const pace = run.stats.current_pps_basis === 'pace';
   const tip = (over ? t('Tempo powyżej limitu skanu ' + fmtInt(cap) + ' pps. ', 'Rate above the scan limit of ' + fmtInt(cap) + ' pps. ') : '') + (pace ? paceTip() : '');
   return (
-    <Link to={'/runs/' + run.id} className="hidden min-w-0 items-center gap-2 text-xs text-ink-2 hover:text-ink md:inline-flex">
+    <Link to={'/runs/' + run.id} className="hidden h-[32px] min-w-0 items-center gap-2.5 rounded-[8px] px-3 text-xs text-ink-2 shadow-[inset_0_0_0_1px_var(--rule)] hover:text-ink md:inline-flex">
       <Glyph name="run" tone="accent" pulse size={12} />
       <span className="truncate">{t('Skan', 'Scan')} <span className="num">#{run.id}</span> · {run.profile_name}</span>
       <span className="num text-ink">{fmtPct(pct)}</span>
@@ -187,7 +181,7 @@ function EmergencyStop({ policy }: { policy: SafetyPolicy | undefined }) {
   const [open, setOpen] = useState(false);
   const stop = useAction(() => post<SafetyPolicy>('/emergency-stop'), {
     invalidate: ['/settings/safety', '/runs', '/dashboard'], silent: true,
-    success: t('Stop awaryjny włączony.', 'Emergency stop is on.'),
+    success: t('Stop awaryjny włączony', 'Emergency stop is on'),
     onSuccess: () => setOpen(false),
   });
   if (!can('safety:stop') || !policy || policy.emergency_stop) return null;
@@ -221,17 +215,17 @@ function StopBanner({ policy }: { policy: SafetyPolicy | undefined }) {
   const { can } = useSession();
   const release = useAction(() => post<SafetyPolicy>('/emergency-stop/release'), {
     invalidate: ['/settings/safety', '/runs', '/dashboard'],
-    success: t('Stop awaryjny wyłączony.', 'Emergency stop is off.'),
+    success: t('Stop awaryjny wyłączony', 'Emergency stop is off'),
   });
   if (!policy?.emergency_stop) return null;
   return (
-    <div role="alert" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-danger-solid px-4 py-2 text-sm text-danger-ink sm:px-6" data-testid="stop-banner">
+    <div role="alert" className="mx-3 mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[10px] bg-danger-solid px-4 py-2.5 text-sm text-danger-ink sm:mx-4 mt-2" data-testid="stop-banner">
       <span className="flex items-center gap-2 font-medium">
         <Icon name="stop" />
         {t('Stop awaryjny jest włączony. Żaden skan nie działa.', 'The emergency stop is on. No scan is running.')}
       </span>
       {can('safety:manage') ? (
-        <button type="button" disabled={release.isPending} onClick={() => release.mutate(undefined)} className="inline-flex h-[26px] items-center gap-1.5 border border-white/70 px-2 text-xs font-medium hover:bg-white/15">
+        <button type="button" disabled={release.isPending} onClick={() => release.mutate(undefined)} className="inline-flex h-[28px] items-center gap-1.5 rounded-[6px] bg-white/15 px-3 text-xs font-medium hover:bg-white/25">
           <Icon name="undo" size={14} />{t('Wyłącz stop', 'Turn off the stop')}
         </button>
       ) : (
@@ -259,10 +253,10 @@ function SafetyChip({ policy }: { policy: SafetyPolicy | undefined }) {
     + (op.length ? '. ' + t('Operator ograniczył skanowanie do ' + op.join(', ') + '.', 'The operator limits scanning to ' + op.join(', ') + '.') : '');
   return (
     <Link
-      to="/admin?tab=safety" className="hidden items-center gap-1.5 text-xs text-ink-2 hover:text-ink lg:inline-flex"
+      to="/admin?tab=safety" className="hidden h-[28px] items-center gap-1.5 rounded-[8px] px-2 text-xs text-ink-2 hover:bg-raised hover:text-ink lg:inline-flex"
       title={title} data-testid="safety-chip"
     >
-      <Icon name="shield" size={14} className="text-st-new" />
+      <Icon name="shield" size={14} className="text-ink-3" />
       {op.length ? <span className="inline-flex items-center gap-1" data-testid="safety-chip-lock"><Icon name="lock" size={12} className="text-ink-3" /><span className="mono text-ink">{op.length === 1 ? op[0] : op.length + ' ' + t('sieci', 'networks')}</span></span> : null}
       {health.data && health.data.engine === false ? <span className="text-st-changed">{t('brak skanera', 'no scanner')}</span> : null}
     </Link>
@@ -282,45 +276,44 @@ export function Layout() {
   const u = session.user;
   return (
     <div className="flex h-dvh min-h-0">
+      <div className="app-ground" aria-hidden="true" />
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:bg-accent focus:px-3 focus:py-1.5 focus:text-accent-ink">
         {t('Przejdź do treści', 'Skip to content')}
       </a>
-      <aside className="hidden flex-none border-r border-rail-rule lg:block"><Rail /></aside>
+      <aside className="hidden flex-none lg:block"><Rail /></aside>
       {menu ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button type="button" className="absolute inset-0 bg-black/55" aria-label={t('Zamknij menu', 'Close menu')} onClick={() => setMenu(false)} />
-          <div className="absolute inset-y-0 left-0 shadow-[var(--shadow)]" style={{ animation: 'slide-in 180ms var(--ease-out-expo) reverse backwards' }}><Rail onNavigate={() => setMenu(false)} /></div>
+          <div className="absolute inset-y-0 left-0" style={{ animation: 'slide-in 180ms var(--ease-out-expo) reverse backwards' }}><Rail onNavigate={() => setMenu(false)} /></div>
         </div>
       ) : null}
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-[44px] flex-none items-center justify-between gap-3 border-b border-rule bg-panel px-2 sm:px-4">
+        <div className="flex h-[56px] flex-none items-center justify-between gap-3 border-b border-rule px-3 sm:px-4 lg:px-8">
           <div className="flex min-w-0 items-center gap-2">
             <IconButton icon="menu" label={t('Menu', 'Menu')} className="lg:hidden" onClick={() => setMenu(true)} />
-            <span className="text-sm font-semibold lg:hidden">Czujka</span>
+            <span className="hidden text-[15px] font-medium tracking-[-0.02em] sm:inline lg:hidden">Czujka</span>
             <ActiveRunStrip />
           </div>
-          <div className="flex flex-none items-center gap-1.5 sm:gap-3">
+          <div className="flex flex-none items-center gap-1 sm:gap-2">
             <SafetyChip policy={safety.data} />
             <EmergencyStop policy={safety.data} />
-            <span className="hidden h-4 w-px bg-rule sm:block" />
             <button
               type="button" onClick={() => setLang(lang === 'pl' ? 'en' : 'pl')}
-              className="inline-flex h-[26px] items-center gap-1 rounded-sm px-1.5 text-xs text-ink-2 hover:bg-raised hover:text-ink"
+              className="inline-flex h-[28px] items-center rounded-[8px] bg-sunk p-[2px] text-2xs font-medium text-ink-3 shadow-[inset_0_0_0_1px_var(--rule)] hover:text-ink"
               aria-label={t('Zmień język na angielski', 'Switch language to Polish')} data-testid="lang-toggle"
             >
-              <span className={lang === 'pl' ? 'font-semibold text-ink' : ''}>PL</span>
-              <span className="text-ink-3">/</span>
-              <span className={lang === 'en' ? 'font-semibold text-ink' : ''}>EN</span>
+              <span className={cx('inline-flex h-[24px] items-center rounded-[6px] px-2', lang === 'pl' ? 'bg-raised text-ink shadow-[inset_0_0_0_1px_var(--rule-strong)]' : '')}>PL</span>
+              <span className={cx('inline-flex h-[24px] items-center rounded-[6px] px-2', lang === 'en' ? 'bg-raised text-ink shadow-[inset_0_0_0_1px_var(--rule-strong)]' : '')}>EN</span>
             </button>
             <IconButton icon={theme === 'dark' ? 'sun' : 'moon'} label={theme === 'dark' ? t('Jasny motyw', 'Light theme') : t('Ciemny motyw', 'Dark theme')} onClick={toggleTheme} data-testid="theme-toggle" />
-            <span className="inline-flex items-center gap-1.5 border border-rule-strong px-1.5 py-0.5 text-xs text-ink lg:hidden" title={u.email} data-testid="role-chip">
+            <span className="mr-1 inline-flex h-[24px] items-center gap-1.5 rounded-[6px] bg-raised px-2 text-2xs font-medium text-ink-2 lg:hidden" title={u.email} data-testid="role-chip">
               <Icon name={u.role_slug === 'viewer' ? 'eye' : u.role_slug === 'admin' ? 'shield' : 'user'} size={12} />
               {roleLabel(u.role_slug, u.role_name)}
             </span>
           </div>
         </div>
         <StopBanner policy={safety.data} />
-        <main id="main" className="min-h-0 flex-1 overflow-y-auto" tabIndex={-1}>
+        <main id="main" className="relative min-h-0 flex-1 overflow-y-auto" tabIndex={-1}>
           <ErrorBoundary key={loc.pathname}><Outlet /></ErrorBoundary>
         </main>
       </div>

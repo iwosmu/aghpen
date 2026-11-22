@@ -67,7 +67,7 @@ export function ResponseTimeChart({ serviceId }: { serviceId: number }) {
             <Link key={p.run_id} to={'/runs/' + p.run_id} className="group relative flex h-full min-w-[4px] max-w-[22px] flex-1 items-end" title={'#' + p.run_id + ' · ' + fmtDateTime(p.at) + ' · ' + (p.ms === null ? t('brak odpowiedzi HTTP', 'no HTTP response') : fmtMs(p.ms)) + (p.slow ? ' · ' + t('wolniej niż zwykle', 'slower than usual') : '')}>
               {p.ms === null
                 ? <span className="mb-0 w-full text-center text-xs leading-none text-st-gone">×</span>
-                : <span className={cx('w-full group-hover:opacity-80', p.slow ? 'bg-st-changed' : 'bg-accent')} style={{ height: Math.max(2, (p.ms / max) * H) }} />}
+                : <span className={cx('w-full group-hover:opacity-80', p.slow ? 'bg-st-changed' : 'bg-[var(--seq-3)]')} style={{ height: Math.max(2, (p.ms / max) * H) }} />}
             </Link>
           ))}
         </div>
