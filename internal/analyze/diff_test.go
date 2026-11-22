@@ -322,3 +322,31 @@ func TestDiffPortsUnknownIsNotGone(t *testing.T) {
 		t.Errorf("a finished scan reports the service gone: %+v", sum)
 	}
 }
+
+// An SSH server over its connection limit closes the connection before the
+// banner: nmap names the port "tcpwrapped". That answer says nothing about
+// the service, so its technologies and classes are unknown, not gone, and
+// they are not new when the banner comes back.
+func TestDiffTcpwrappedIsNoAnswer(t *testing.T) {
+	ssh := model.ServiceResult{Port: 22, Proto: "tcp", State: "open", Name: "ssh", Product: "Dropbear sshd", Version: "2025.88",
+		Banner: "SSH-2.0-dropbear_2025.88", Classes: []string{model.ClassRemoteAccess},
+		Technologies: []model.Technology{{Name: "Dropbear SSH", Version: "2025.88", Sources: []string{"banner"}}}}
+	wrapped := model.ServiceResult{Port: 22, Proto: "tcp", State: "open", Name: "tcpwrapped"}
+	for _, c := range []struct {
+		name      string
+		prev, cur model.ServiceResult
+	}{{"ssh then tcpwrapped", ssh, wrapped}, {"tcpwrapped then ssh", wrapped, ssh}} {
+		cs, _ := Diff(ptr(snap(1, host("10.77.0.5", model.HostUp, c.prev))), snap(2, host("10.77.0.5", model.HostUp, c.cur)), DiffOptions{})
+		if len(cs) != 0 {
+			t.Errorf("%s: %v", c.name, kinds(cs))
+		}
+	}
+	// a real change of the banner's technology is still a change
+	other := ssh
+	other.Product, other.Version, other.Banner = "OpenSSH", "9.6", "SSH-2.0-OpenSSH_9.6"
+	other.Technologies = []model.Technology{{Name: "OpenSSH", Version: "9.6", Sources: []string{"banner"}}}
+	cs, _ := Diff(ptr(snap(1, host("10.77.0.5", model.HostUp, ssh))), snap(2, host("10.77.0.5", model.HostUp, other)), DiffOptions{})
+	if len(cs) == 0 {
+		t.Errorf("Dropbear -> OpenSSH: no change")
+	}
+}
