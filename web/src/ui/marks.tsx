@@ -277,7 +277,7 @@ export function InterestBreakdown({ value, reasons }: { value: number; reasons: 
       </div>
       {segs.length ? (
         <div className="mt-3 flex h-[6px] w-full gap-px overflow-hidden rounded-[2px] bg-sunk" aria-hidden="true">
-          {segs.map((x) => <span key={x.i} className="h-full bg-accent" style={{ width: x.w + '%', opacity: shade(x.i) }} />)}
+          {segs.map((x) => <span key={x.i} className="h-full bg-ink-2" style={{ width: x.w + '%', opacity: shade(x.i) }} />)}
         </div>
       ) : null}
       {list.length === 0 ? (
@@ -286,7 +286,7 @@ export function InterestBreakdown({ value, reasons }: { value: number; reasons: 
         <ul className="mt-3">
           {list.map((r, i) => (
             <li key={i} className="grid grid-cols-[8px_36px_minmax(0,1fr)] items-baseline gap-x-2.5 border-b border-rule py-2 last:border-b-0">
-              <span className="h-[8px] w-[8px] rounded-[2px] bg-accent" style={{ opacity: shade(i) }} aria-hidden="true" />
+              <span className="h-[8px] w-[8px] rounded-[2px] bg-ink-2" style={{ opacity: shade(i) }} aria-hidden="true" />
               <span className="num text-right text-sm text-ink">+{r.points}</span>
               <span className="text-sm leading-snug text-ink">{r.text}</span>
             </li>
@@ -303,7 +303,7 @@ export function Confidence({ value, width = 34 }: { value: number; width?: numbe
     <span className="inline-flex items-center gap-1.5" title={t('Pewność identyfikacji: ', 'Identification confidence: ') + label}>
       <span className="num text-sm text-ink">{fmtPct(value)}</span>
       <span className="relative h-[4px] bg-rule" style={{ width }} aria-hidden="true">
-        <span className="absolute inset-y-0 left-0 bg-accent" style={{ width: Math.round(value * 100) + '%', opacity: 0.45 + value * 0.55 }} />
+        <span className="absolute inset-y-0 left-0 bg-ink-2" style={{ width: Math.round(value * 100) + '%', opacity: 0.45 + value * 0.55 }} />
       </span>
     </span>
   );

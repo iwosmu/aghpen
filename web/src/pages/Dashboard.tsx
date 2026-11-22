@@ -224,7 +224,7 @@ function LivePorts({ runId }: { runId: number }) {
       <p className="text-xs text-ink-3">{t('Otwarte usługi', 'Open services')} <span className="num text-ink-2">{items.length}</span></p>
       {items.length ? (
         <ul className="mt-1.5 flex flex-wrap gap-1">
-          {items.slice(0, 40).map((s) => <li key={s.id}><Link to={'/services/' + s.id} className="mono inline-block border border-rule-strong px-1.5 py-0.5 text-xs hover:border-accent" title={serviceName(s)}>{s.port}</Link></li>)}
+          {items.slice(0, 40).map((s) => <li key={s.id}><Link to={'/services/' + s.id} className="mono inline-block border border-rule-strong px-1.5 py-0.5 text-xs hover:border-ink-3" title={serviceName(s)}>{s.port}</Link></li>)}
         </ul>
       ) : <p className="mt-1.5 text-xs text-ink-2">{t('Oczekiwanie na odpowiedzi…', 'Waiting for responses…')}</p>}
     </div>

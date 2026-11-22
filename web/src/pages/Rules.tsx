@@ -114,7 +114,7 @@ export default function Rules() {
         <Panel title={t('Reguły', 'Rules')} count={items.length} flush>
           <ul className="divide-y divide-rule" data-testid="rule-list">
             {items.map((r) => (
-              <li key={r.id} className={cx('grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2 sm:px-4', rule?.id === r.id && sel !== 'new' && 'bg-accent-wash')}>
+              <li key={r.id} className={cx('grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2 sm:px-4', rule?.id === r.id && sel !== 'new' && 'bg-raised')}>
                 <button type="button" className="min-w-0 text-left" onClick={() => u.set({ rule: r.id, slug: null })}>
                   <span className={cx('block truncate text-sm', !r.enabled && 'text-ink-3')}>{r.name}</span>
                   <span className="flex items-center gap-2 text-xs text-ink-3"><Sev level={r.severity} compact /><span className={cx('num', r.violations > 0 && r.enabled ? 'text-ink' : '')}>{fmtInt(r.violations)} {plural(r.violations, ['naruszenie', 'naruszenia', 'naruszeń'], ['violation', 'violations'])}</span>{r.builtin ? <span>{t('wbudowana', 'built-in')}</span> : null}{r.last_eval_at ? <span>{fmtRelative(r.last_eval_at)}</span> : null}</span>

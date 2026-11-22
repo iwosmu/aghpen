@@ -120,7 +120,7 @@ export default function Changes() {
         </FilterField>
       </FilterBar>
       {canAck && selected.size > 0 ? (
-        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-rule-strong bg-accent-wash px-4 py-1.5 text-sm sm:px-6" role="region" aria-label={t('Akcje zbiorcze', 'Bulk actions')}>
+        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-rule-strong bg-raised px-4 py-1.5 text-sm sm:px-6" role="region" aria-label={t('Akcje zbiorcze', 'Bulk actions')}>
           <span><span className="num font-medium">{selected.size}</span> {plural(selected.size, ['zaznaczona zmiana', 'zaznaczone zmiany', 'zaznaczonych zmian'], ['change selected', 'changes selected'])}</span>
           <Button size="sm" variant="primary" icon="check" busy={ackMany.isPending} onClick={() => ackMany.mutate([...selected].map(Number))}>{t('Oznacz jako przejrzane', 'Mark as reviewed')}</Button>
           <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>{t('Odznacz', 'Deselect')}</Button>

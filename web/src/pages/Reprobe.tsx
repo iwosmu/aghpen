@@ -63,7 +63,7 @@ export function ReprobePanel({ hostId, limit = 8 }: { hostId?: number; limit?: n
               <li key={x.host_id + ':' + i} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 py-1.5 text-sm">
                 <span className="min-w-0">
                   {!hostId ? <Link to={'/hosts/' + x.host_id} className="mono link mr-2">{x.ip}</Link> : null}
-                  <span className={cx('mr-2 text-2xs uppercase tracking-wide', x.kind === 'confirm' ? 'text-st-changed' : 'text-accent')}>{x.kind === 'confirm' ? t('potwierdzenie', 'confirm') + ' ' + x.step + '/' + x.steps : t('spodziewana odpowiedź', 'response expected')}</span>
+                  <span className={cx('mr-2 text-2xs uppercase tracking-wide', x.kind === 'confirm' ? 'text-st-changed' : 'text-ink-2')}>{x.kind === 'confirm' ? t('potwierdzenie', 'confirm') + ' ' + x.step + '/' + x.steps : t('spodziewana odpowiedź', 'response expected')}</span>
                   <span className="text-ink-2">{x.reason}</span>
                   {ports(x.ports) ? <span className="mono ml-1.5 text-2xs text-ink-3">{ports(x.ports)}</span> : null}
                 </span>

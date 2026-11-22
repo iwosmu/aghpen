@@ -254,7 +254,7 @@ export default function Findings() {
         <FindingGroupList q={gq} active={active > 0} onOpen={(id) => u.set({ open: id }, { keepOffset: true })} />
       ) : null}
       {view === 'list' && selected.size > 0 && (canEdit || canExport) ? (
-        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-rule-strong bg-accent-wash px-4 py-1.5 text-sm sm:px-6" role="region" aria-label={t('Akcje zbiorcze', 'Bulk actions')} data-testid="bulk-bar">
+        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-rule-strong bg-raised px-4 py-1.5 text-sm sm:px-6" role="region" aria-label={t('Akcje zbiorcze', 'Bulk actions')} data-testid="bulk-bar">
           <span><span className="num font-medium">{selected.size}</span> {plural(selected.size, ['zaznaczone', 'zaznaczone', 'zaznaczonych'], ['selected', 'selected'])}</span>
           {canEdit ? (
             <>

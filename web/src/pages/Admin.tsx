@@ -146,7 +146,7 @@ function RolesTab({ canManage }: { canManage: boolean }) {
                         <td key={r.id} className="px-2 py-1">
                           {r.builtin || !canManage
                             ? on ? <span className="inline-flex items-center" title={label}><Glyph name="check" tone="neutral" size={13} /><span className="sr-only">{t('tak', 'yes')}</span></span> : <span className="text-ink-3" title={label}>·<span className="sr-only">{t('nie', 'no')}</span></span>
-                            : <input type="checkbox" className="h-[15px] w-[15px] accent-[var(--accent)]" checked={on} aria-label={label} onChange={(e) => setDraft((d) => ({ ...d, [r.id]: e.target.checked ? [...cur, p.permission] : cur.filter((x) => x !== p.permission) }))} />}
+                            : <input type="checkbox" className="h-[15px] w-[15px] accent-[var(--ink)]" checked={on} aria-label={label} onChange={(e) => setDraft((d) => ({ ...d, [r.id]: e.target.checked ? [...cur, p.permission] : cur.filter((x) => x !== p.permission) }))} />}
                         </td>
                       );
                     })}

@@ -69,11 +69,11 @@ function Scrubber({ runs, index, onIndex }: { runs: RunPoint[]; index: number; o
           const sel = i === index;
           return (
             <span key={r.run_id} title={'#' + r.run_id + ' · ' + fmtDateTime(r.at) + ' · ' + triggerLabel(r.trigger) + ' · ' + r.changes + ' ' + t('zmiana / zmiany / zmian (plural())', 'change / changes')}
-              className={cx('absolute bottom-1 -translate-x-1/2', sel ? 'bg-accent' : r.changes - r.changes_expected > 0 ? 'bg-ink-2' : 'bg-ink-3', light && !sel && 'opacity-60')}
+              className={cx('absolute bottom-1 -translate-x-1/2', sel ? 'bg-ink' : r.changes - r.changes_expected > 0 ? 'bg-ink-2' : 'bg-ink-3', light && !sel && 'opacity-60')}
               style={{ left: pos(i) + '%', height: h, width: light ? 2 : sel ? 6 : 4 }} />
           );
         })}
-        {cur ? <span className="pointer-events-none absolute -bottom-0.5 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-b border-r border-accent bg-panel" style={{ left: pos(index) + '%' }} /> : null}
+        {cur ? <span className="pointer-events-none absolute -bottom-0.5 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-b border-r border-ink bg-panel" style={{ left: pos(index) + '%' }} /> : null}
       </div>
       <div className="mt-1 flex justify-between px-2 text-2xs text-ink-3">
         <span className="num">{runs[0] ? fmtDateTime(runs[0].at) : ''}</span>
@@ -312,7 +312,7 @@ export default function TimeMachine() {
 
 // ---------- host swim lanes and service field history ----------
 
-const laneColor: Record<string, string> = { up: 'var(--st-new)', open: 'var(--accent)', missing: 'var(--st-changed)', unknown: 'var(--ink-3)', down: 'var(--st-gone)' };
+const laneColor: Record<string, string> = { up: 'var(--st-new)', open: 'var(--seq-3)', missing: 'var(--st-changed)', unknown: 'var(--ink-3)', down: 'var(--st-gone)' };
 
 function Lane({ intervals, t0, t1, height = 10 }: { intervals: LifeInterval[]; t0: number; t1: number; height?: number }) {
   const span = Math.max(1, t1 - t0);
