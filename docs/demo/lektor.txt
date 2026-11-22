@@ -1,26 +1,26 @@
 Lektor do filmu czujka-demo.mp4 (czas filmu 1:49, 136 słów ≈ 80 s przy 1,7 słowa/s; każdy akapit ma co najmniej 1,5 s zapasu i 0,5 s na wejście).
 Nagraj głos na film; kody czasu to początek i koniec ujęcia. Wygenerowane przez record.mjs.
 
-[0:00–0:19] install (18.7 s; 18 słów ≈ 10.6 s przy 1,7 słowa/s; zapas 8.1 s)
+[0:00–0:18] install (18.3 s; 18 słów ≈ 10.6 s przy 1,7 słowa/s; zapas 7.7 s)
 Czujka staje jednym poleceniem. Kreator prowadzi od pierwszego logowania do skanu: hasło, zakresy i limity od właściciela sieci.
 
-[0:19–0:34] scan (15.6 s; 19 słów ≈ 11.2 s przy 1,7 słowa/s; zapas 4.4 s)
+[0:18–0:34] scan (15.9 s; 19 słów ≈ 11.2 s przy 1,7 słowa/s; zapas 4.7 s)
 Skan całej sieci /16. Mapa pokazuje każdy blok dwustu pięćdziesięciu sześciu adresów. Tempo nigdy nie przekracza limitu z polityki.
 
-[0:34–0:45] changes (10.2 s; 14 słów ≈ 8.2 s przy 1,7 słowa/s; zapas 2.0 s)
+[0:34–0:44] changes (10.2 s; 14 słów ≈ 8.2 s przy 1,7 słowa/s; zapas 2.0 s)
 Drugi skan porównuje się z pierwszym: nowe hosty, zniknięte usługi, zmienione wersje i tytuły.
 
-[0:45–1:02] unstable (17.3 s; 26 słów ≈ 15.3 s przy 1,7 słowa/s; zapas 2.0 s)
+[0:44–1:02] unstable (17.3 s; 26 słów ≈ 15.3 s przy 1,7 słowa/s; zapas 2.0 s)
 Ten host odpowiada nieregularnie. Czujka zna jego rytm tygodnia, więc cisza w zwykłej porze nie jest alarmem. Gdy milknie poza rytmem, sprawdza ponownie tylko ten adres.
 
-[1:02–1:16] time (13.8 s; 20 słów ≈ 11.8 s przy 1,7 słowa/s; zapas 2.0 s)
+[1:02–1:15] time (13.8 s; 20 słów ≈ 11.8 s przy 1,7 słowa/s; zapas 2.0 s)
 Oś czasu pokazuje sieć taką, jaka była po dowolnym skanie, i to, co od tamtej pory zniknęło albo się zmieniło.
 
-[1:16–1:34] rules (17.9 s; 27 słów ≈ 15.9 s przy 1,7 słowa/s; zapas 2.0 s)
+[1:15–1:33] rules (17.9 s; 27 słów ≈ 15.9 s przy 1,7 słowa/s; zapas 2.0 s)
 Reguła mówi, czego w sieci być nie może, i sprawdza się po każdym skanie bez pakietów. Z jednej usługi Czujka proponuje sygnaturę i testuje ją na historii.
 
-[1:34–1:43] stop (9.1 s; 8 słów ≈ 4.7 s przy 1,7 słowa/s; zapas 4.4 s)
+[1:33–1:42] stop (8.9 s; 8 słów ≈ 4.7 s przy 1,7 słowa/s; zapas 4.2 s)
 Stop awaryjny zatrzymuje wszystkie skany w ułamku sekundy.
 
-[1:43–1:49] end (6.2 s; 4 słów ≈ 3.8 s przy 1,7 słowa/s; zapas 2.4 s)
+[1:42–1:49] end (6.2 s; 4 słów ≈ 3.8 s przy 1,7 słowa/s; zapas 2.4 s)
 Czujka. Działa na czujka.dev.
