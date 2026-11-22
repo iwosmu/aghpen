@@ -156,15 +156,25 @@ func (r *run) deepPass(ctx context.Context) {
 
 // deepHost scans the rest of the ports on one host, describes what it
 // finds and sends the host's updated result. It returns the new services.
-func (r *run) deepHost(ctx context.Context, h model.HostResult, rest *probe.PortSet, rate int, gs *groupStats) (int, bool) {
+func (r *run) deepHost(ctx context.Context, h model.HostResult, all *probe.PortSet, rate int, gs *groupStats) (int, bool) {
 	a, _ := netip.ParseAddr(h.IP)
 	g := &group{v6: a.Is6()}
+	// the ports this run already scanned on the host (the wide pass for
+	// dense hosts) are not scanned, described or counted a second time
+	todo := *all
+	if v, ok := r.covered.Load(h.IP); ok {
+		todo.Remove(v.(*probe.PortSet))
+	}
+	rest := &todo
 	t0 := r.e.now()
 	end := r.stats.begin(rate)
 	endPass := r.stats.passBegin(model.PassDeep, 1, int64(rest.Count()), rate)
-	ps, err := r.prober.PortScan(ctx, probe.PortScanRequest{
-		Hosts: []string{h.IP}, Ports: rest, MaxRate: rate, MaxRetries: 1, HostTimeout: portScanTimeout(1, rest.Count(), rate), IPv6: g.v6,
-	})
+	ps, err := &probe.Result{Hosts: []probe.Host{{IP: h.IP, Up: true}}}, error(nil) // nothing left to scan
+	if rest.Count() > 0 {
+		ps, err = r.prober.PortScan(ctx, probe.PortScanRequest{
+			Hosts: []string{h.IP}, Ports: rest, MaxRate: rate, MaxRetries: 1, HostTimeout: portScanTimeout(1, rest.Count(), rate), IPv6: g.v6,
+		})
+	}
 	endPass()
 	end()
 	r.account(gs, ps, t0)
@@ -192,8 +202,17 @@ func (r *run) deepHost(ctx context.Context, h model.HostResult, rest *probe.Port
 		if err != nil {
 			return 0, false
 		}
+		have := map[int]bool{}
+		for _, s := range h.Services {
+			if s.Proto != "udp" {
+				have[s.Port] = true
+			}
+		}
 		for _, x := range add {
 			for _, s := range x.Services {
+				if s.Proto != "udp" && have[s.Port] {
+					continue // the host already has this port
+				}
 				s.DeepPass = true
 				res.Services = append(res.Services, s)
 				if s.State == "open" {

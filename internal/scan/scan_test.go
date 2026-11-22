@@ -1679,3 +1679,40 @@ func TestSilentPortScanIsUnknownNotClosed(t *testing.T) {
 		t.Errorf("stats: ports_unknown %d, warnings %q", out.Stats.PortsUnknown, out.Stats.Warnings)
 	}
 }
+
+// A dense host's wide pass (1-10000) already found its high ports: the deep
+// pass scans only the ports left, adds no port twice and counts each once.
+func TestDeepPassSkipsPortsTheWidePassFound(t *testing.T) {
+	dense := []int{21, 22, 23, 25, 53, 80, 110, 139, 143, 443, 445, 993, 995}
+	dense = append(dense, 7004, 9001, 40000) // 7004, 9001: wide pass; 40000: deep pass
+	net := &fakeNet{hosts: map[string][]int{"10.9.0.5": dense, "10.9.0.6": {80}}}
+	plan := basePlan("10.9.0.0/23")
+	plan.Profile.Ports = "top-100"
+	sink := newSink()
+	out := New(Deps{Prober: net, Logger: quiet}).Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	h := sink.host("10.9.0.5")
+	if h == nil || !h.FullPorts {
+		t.Fatalf("10.9.0.5 = %+v, want the deep pass done", h)
+	}
+	seen := map[int]int{}
+	for _, s := range h.Services {
+		seen[s.Port]++
+		if s.DeepPass != (s.Port == 40000) {
+			t.Errorf("port %d deep_pass %v", s.Port, s.DeepPass)
+		}
+	}
+	for p, n := range seen {
+		if n != 1 {
+			t.Errorf("port %d reported %d times", p, n)
+		}
+	}
+	if len(seen) != len(dense) {
+		t.Errorf("ports %v, want %v", seen, dense)
+	}
+	if want := len(dense) + 1; out.Stats.ServicesOpen != want {
+		t.Errorf("services open %d, want %d (each service once)", out.Stats.ServicesOpen, want)
+	}
+}
