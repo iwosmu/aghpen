@@ -92,7 +92,9 @@ export default function Hosts() {
     { id: 'seen', header: t('Ostatnia obserwacja', 'Last seen'), width: '128px', min: 700, sort: 'last_seen', cell: (h) => <span className="num text-ink-2" title={fmtDateTime(h.last_seen)}>{fmtRelative(h.last_seen)}</span> },
     { id: 'interest', header: t('Ciekawość', 'Interest'), width: '86px', min: 0, sort: 'interest', align: 'right', cell: (h) => <InterestScore value={h.interest} /> },
   ];
-  const cols = allCols.filter((c) => width === 0 || width >= c.min);
+  // a column of dashes says nothing: hide the name column when no loaded host has a name or a label
+  const anyName = rows.length === 0 || rows.some((h) => h.label || (h.hostnames ?? []).length);
+  const cols = allCols.filter((c) => (width === 0 || width >= c.min) && (c.id !== 'name' || anyName));
   const grid = cols.map((c) => c.width).join(' ');
   const sort = u.get('sort', '-interest');
   const active = FILTERS.filter((k) => u.get(k)).length;

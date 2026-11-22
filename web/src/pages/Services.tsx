@@ -18,6 +18,9 @@ import { productLine, shownProduct } from '../lib/shownProduct';
 
 const FILTERS = ['q', 'state', 'port', 'name', 'tech', 'class', 'tag', 'min_interest', 'tls', 'group_key', 'host_id', 'run_id'];
 
+/** how many technology chips fit the column: two short ones, else one */
+const svcTechFit = (s: Service) => { const xs = (s.technologies ?? []).map((x) => x.name + (x.version ? ' ' + x.version : '')); return xs.length > 1 && xs[0].length + xs[1].length <= 22 ? 2 : 1; };
+
 export default function Services() {
   const u = useUrlState();
   const canEdit = useCan('results:update');
@@ -44,16 +47,16 @@ export default function Services() {
   const anyTime = (list.data?.items ?? []).some((s) => s.response_ms !== undefined);
   const cols: Col<Service>[] = [
     { id: 'addr', header: t('Adres', 'Address'), sort: 'ip', cell: (s) => <Link to={'/services/' + s.id} className="mono link">{s.ip}:{s.port}</Link> },
-    { id: 'state', header: t('Stan', 'Status'), hide: 'lg', cell: (s) => <ServiceStateMark state={s.state} /> },
+    { id: 'state', header: t('Stan', 'Status'), hide: '2xl', cell: (s) => <ServiceStateMark state={s.state} /> },
     { id: 'name', header: t('Usługa', 'Service'), sort: 'name', cell: (s) => <span>{serviceName(s)}{s.tls ? <span className="ml-1.5 text-2xs text-ink-3">TLS</span> : null}{isSelf(s) ? <SelfTag /> : null}</span> },
     { id: 'title', header: t('Tytuł / produkt', 'Title / product'), cell: (s) => (
-      <span className="block max-w-[300px] truncate" title={s.title}>{s.title || <span className="text-ink-2"><ProductValue s={s} /></span>}
+      <span className="block max-w-[300px] truncate text-ink" title={s.title}>{s.title || <span className="text-ink-2"><ProductValue s={s} /></span>}
         {s.overrides && Object.keys(s.overrides).length ? <span className="ml-1.5 text-2xs text-st-changed" title={t('wartość poprawiona przez analityka', 'value corrected by an analyst')}>{t('poprawione', 'edited')}</span> : null}</span>
     ) },
-    { id: 'tech', header: t('Technologie', 'Technologies'), hide: 'md', cell: (s) => <span className="block max-w-[210px] truncate text-ink-2">{(s.technologies ?? []).map((x) => x.name + (x.version ? ' ' + x.version : '')).join(', ') || '–'}</span> },
+    { id: 'tech', header: t('Technologie', 'Technologies'), hide: 'md', cell: (s) => (s.technologies ?? []).length ? <span className="flex max-w-[230px] gap-1 overflow-hidden" title={(s.technologies ?? []).map((x) => x.name + (x.version ? ' ' + x.version : '')).join(', ')}>{(s.technologies ?? []).slice(0, svcTechFit(s)).map((x) => <span key={x.name} className="chip-fact max-w-[130px]"><span className="truncate">{x.name}{x.version ? ' ' + x.version : ''}</span></span>)}{(s.technologies ?? []).length > svcTechFit(s) ? <span className="chip-fact num">+{(s.technologies ?? []).length - svcTechFit(s)}</span> : null}</span> : <span className="text-ink-3">–</span> },
     { id: 'class', header: t('Klasy', 'Classes'), hide: 'lg', cell: (s) => <span className="inline-flex whitespace-nowrap"><ClassChips classes={s.classes} max={1} /></span> },
-    ...(anyTime ? [{ id: 'rt', header: t('Czas odpowiedzi', 'Response time'), align: 'right' as const, hide: 'md' as const, cell: (s: Service) => <ResponseCell s={s} /> }] : []),
-    { id: 'group', header: t('Podobne', 'Similar'), align: 'right', hide: 'xl', cell: (s) => s.group_size > 1 ? <Link to={'/services?group_key=' + encodeURIComponent(s.group_key)} className="num link" title={t('usługi o tej samej treści i technologiach', 'services with the same content and technologies')}>×{s.group_size}</Link> : <span className="text-ink-3">–</span> },
+    ...(anyTime ? [{ id: 'rt', header: t('Czas odpowiedzi', 'Response time'), align: 'right' as const, hide: '2xl' as const, cell: (s: Service) => <ResponseCell s={s} /> }] : []),
+    { id: 'group', header: t('Podobne', 'Similar'), align: 'right', hide: '2xl', cell: (s) => s.group_size > 1 ? <Link to={'/services?group_key=' + encodeURIComponent(s.group_key)} className="num link" title={t('usługi o tej samej treści i technologiach', 'services with the same content and technologies')}>×{s.group_size}</Link> : <span className="text-ink-3">–</span> },
     { id: 'interest', header: t('Ciekawość', 'Interest'), sort: 'interest', align: 'right', cell: (s) => <InterestScore value={s.interest} reasons={s.interest_why} /> },
   ];
   const gcols: Col<ServiceGroup>[] = [
@@ -72,7 +75,7 @@ export default function Services() {
         readOnly={!canEdit}
         actions={view === 'list' ? <ExportButtons kind="services" query={filters} /> : null}
       />
-      <div className="px-4 pt-2 sm:px-6">
+      <div className="px-4 pb-3 sm:px-6 lg:px-8">
         <Tabs value={view} onChange={(v) => u.set({ view: v === 'list' ? null : v })} tabs={[{ id: 'list', label: t('Lista', 'List') }, { id: 'groups', label: t('Grupy', 'Groups') }]} />
       </div>
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>

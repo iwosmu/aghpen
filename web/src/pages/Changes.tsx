@@ -131,7 +131,7 @@ export default function Changes() {
         sort={u.get('sort', '-at')} onSort={(s) => u.set({ sort: s })}
         selected={canAck ? selected : undefined} onSelect={canAck ? setSelected : undefined}
         rowClass={(c) => cx(c.acked_at && 'opacity-70')}
-        group={u.get('sort', '-at').endsWith('at') ? (c) => ({ key: String(c.run_id), label: <><Link to={'/runs/' + c.run_id} className="link normal-case">{t('Skan', 'Scan')} #{c.run_id}</Link><span className="text-ink-3"> · </span><span className="normal-case tracking-normal">{fmtRelative(c.at)}</span></> }) : undefined}
+        group={u.get('sort', '-at').endsWith('at') ? (c) => ({ key: String(c.run_id), label: <><Link to={'/runs/' + c.run_id} className="link">{t('Skan', 'Scan')} #{c.run_id}</Link><span className="text-ink-3"> · </span><span>{fmtRelative(c.at)}</span></> }) : undefined}
         empty={<Empty icon="changes" title={active ? t('Żadna zmiana nie pasuje do filtrów', 'No changes match the filters') : t('Brak zmian', 'No changes yet')} hint={active ? undefined : t('Zmiany pojawią się po drugim skanie.', 'Changes appear after the second scan.')} action={active ? undefined : <NextSteps />} />}
         mobile={(c) => (
           <div>
