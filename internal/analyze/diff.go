@@ -414,7 +414,7 @@ func (d *differ) service(h *HostSnapshot, p, c *model.ServiceResult) {
 	httpComparable := p.HTTP != nil && c.HTTP != nil && c.HTTP.Error == "" && p.HTTP.Error == ""
 	httpSame := (p.HTTP == nil) == (c.HTTP == nil) && (c.HTTP == nil || c.HTTP.Error == "")
 
-	if httpSame && !noAnswer(p) && !noAnswer(c) {
+	if httpSame && !ClosedBeforeAnswer(p) && !ClosedBeforeAnswer(c) {
 		d.techs(h, p, c, at)
 		d.classes(h, p, c, at)
 	}
@@ -434,12 +434,12 @@ func (d *differ) service(h *HostSnapshot, p, c *model.ServiceResult) {
 	}
 }
 
-// noAnswer reports a service that closed the connection before it said
+// ClosedBeforeAnswer reports a service that closed the connection before it said
 // anything ("tcpwrapped": no banner, no product, no page). Its technologies
 // and classes are unknown, not gone. Measured on the 10 000-host scale lab:
 // an SSH server over its connection limit gave 8 018 changes of technology
 // and class in a second scan of an unchanged network.
-func noAnswer(s *model.ServiceResult) bool {
+func ClosedBeforeAnswer(s *model.ServiceResult) bool {
 	return strings.EqualFold(s.Name, "tcpwrapped") && s.HTTP == nil && s.Banner == "" && !versionMeasured(s)
 }
 
