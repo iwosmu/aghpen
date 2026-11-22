@@ -12,109 +12,125 @@
 @font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("../node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-500-normal.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
 
 
-/* ---------- Tokens: the watch book. Blue-black ink, bone paper, hairline rules. ---------- */
+/* ---------- Tokens: the login's night, inside. Colour is light behind glass, chrome is ink. ---------- */
 :root,
 :root[data-theme="dark"],
 .night {
   color-scheme: dark;
-  --bg: #0e131b;
-  --panel: #131a24;
-  --raised: #1a2330;
-  --sunk: #0a0e15;
-  --rule: #232e3f;
-  --rule-strong: #364459;
-  --ink: #e9e5da;
-  --ink-2: #b9b7ad;
-  --ink-3: #8d93a0;
-  --accent: #6ea3f2;
-  --accent-strong: #8fb8f6;
-  --accent-ink: #0a111c;
-  --accent-wash: #16263f;
-  --rail: #0a0e15;
-  --rail-ink: #e9e5da;
-  --rail-ink-2: #8d93a0;
-  --rail-rule: #1b2433;
-  --rail-active: #16263f;
-  /* state marks: validated with dataviz validate_palette.js --pairs all on --panel */
-  --st-new: #22a89a;
-  --st-gone: #e5556a;
-  --st-changed: #c98500;
-  --st-unstable: #9085e9;
-  --st-expected: #7b8494;
-  --st-new-wash: #10302f;
-  --st-gone-wash: #3a1a24;
-  --st-changed-wash: #33270d;
-  --st-unstable-wash: #262447;
-  --danger: #e5556a;
-  --danger-solid: #c93a4f;
+  --bg: #050913;
+  --panel: rgb(14 21 40 / 0.62);
+  --panel-solid: #0d1428;
+  --raised: #17213b;
+  --sunk: rgb(3 6 16 / 0.42);
+  --rule: rgb(255 255 255 / 0.07);
+  --rule-strong: rgb(255 255 255 / 0.15);
+  --ink: #f3f1ea;
+  --ink-2: #c6cad6;
+  --ink-3: #959eb2;
+  --accent: #8fb8f6;
+  --accent-strong: #b9d3fa;
+  --accent-ink: #08101f;
+  --accent-wash: rgb(110 163 242 / 0.14);
+  --coral: #ff8a7a;
+  --rail: transparent;
+  --rail-ink: #f3f1ea;
+  --rail-ink-2: #b4bbcb;
+  --rail-rule: rgb(255 255 255 / 0.08);
+  --rail-active: rgb(255 255 255 / 0.1);
+  /* state marks: the earlier validated set, kept */
+  --st-new: #2bb5a6;
+  --st-gone: #f06272;
+  --st-changed: #d99a1e;
+  --st-unstable: #9d93f0;
+  --st-expected: #8a93a6;
+  --st-new-wash: rgb(43 181 166 / 0.14);
+  --st-gone-wash: rgb(240 98 114 / 0.14);
+  --st-changed-wash: rgb(217 154 30 / 0.14);
+  --st-unstable-wash: rgb(157 147 240 / 0.15);
+  --danger: #ff7a85;
+  --danger-solid: #d8394f;
   --danger-ink: #ffffff;
   /* sequential ramp (one hue). Dark: more is lighter. */
-  --seq-0: #1b2533;
-  --seq-1: #184f95;
-  --seq-2: #256abf;
-  --seq-3: #3987e5;
-  --seq-4: #6da7ec;
-  --seq-5: #b7d3f6;
-  --shadow: 0 8px 24px -8px rgb(0 0 0 / 0.6);
-  /* the one primary action and the focus ring: warm off-white on night */
-  --primary: #e9e5da;
+  --seq-0: rgb(255 255 255 / 0.06);
+  --seq-1: #1f4f9a;
+  --seq-2: #2c6bc8;
+  --seq-3: #4b8ce8;
+  --seq-4: #80b0f2;
+  --seq-5: #c9defb;
+  --shadow: 0 24px 60px -24px rgb(0 0 0 / 0.8);
+  --primary: #f3f1ea;
   --primary-hover: #ffffff;
-  --primary-press: #d6d1c3;
-  --primary-ink: #0a0e15;
-  --focus: #e9e5da;
-  --card-shadow: 0 0 0 1px rgb(255 255 255 / 0.035) inset, 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 18px 40px -24px rgb(0 0 0 / 0.75);
+  --primary-press: #dcd8cc;
+  --primary-ink: #08101f;
+  --focus: #f3f1ea;
+  --card-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.055);
+  /* dark frost: the one material for surfaces that float over the picture */
+  --glass: rgb(12 18 36 / 0.34);
+  --glass-edge: rgb(255 255 255 / 0.14);
+  --glass-filter: blur(32px) saturate(1.6) brightness(0.62);
+  --tip: #1b2643;
+  --row-hover: rgb(255 255 255 / 0.045);
+  --row-selected: rgb(110 163 242 / 0.12);
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f4f1e9;
-  --panel: #fbf9f4;
+  --bg: #f1f1ee;
+  --panel: #ffffff;
+  --panel-solid: #ffffff;
   --raised: #ffffff;
-  --sunk: #ece8dd;
-  --rule: #dfdacc;
-  --rule-strong: #bfb9a8;
-  --ink: #161b24;
-  --ink-2: #454b57;
-  --ink-3: #666b76;
-  --accent: #1f55b5;
-  --accent-strong: #17438f;
+  --sunk: #f4f4f1;
+  --rule: rgb(16 22 36 / 0.08);
+  --rule-strong: rgb(16 22 36 / 0.18);
+  --ink: #11151e;
+  --ink-2: #3d4452;
+  --ink-3: #5d6472;
+  --accent: #1d4fb0;
+  --accent-strong: #163f8f;
   --accent-ink: #ffffff;
-  --accent-wash: #dfe9f9;
-  --rail: #151c28;
-  --rail-ink: #ece8dd;
-  --rail-ink-2: #98a0ae;
-  --rail-rule: #263142;
-  --rail-active: #24344d;
+  --accent-wash: #e3ebfa;
+  --coral: #c2413a;
+  --rail: transparent;
+  --rail-ink: #11151e;
+  --rail-ink-2: #4a5160;
+  --rail-rule: rgb(16 22 36 / 0.08);
+  --rail-active: rgb(16 22 36 / 0.07);
   --st-new: #0a8f7f;
   --st-gone: #cf3f3f;
-  --st-changed: #b58a00;
+  --st-changed: #b07f00;
   --st-unstable: #6250d6;
-  --st-expected: #7a7f89;
-  --st-new-wash: #d9f0ec;
-  --st-gone-wash: #f8e0de;
-  --st-changed-wash: #f5ead0;
-  --st-unstable-wash: #e6e2fa;
+  --st-expected: #747a86;
+  --st-new-wash: #dcf1ed;
+  --st-gone-wash: #f9e2e0;
+  --st-changed-wash: #f6ecd3;
+  --st-unstable-wash: #e8e4fb;
   --danger: #b8303a;
   --danger-solid: #b8303a;
   --danger-ink: #ffffff;
-  /* Light: more is darker. */
-  --seq-0: #e7e3d8;
+  --seq-0: #e9e9e5;
   --seq-1: #b7d3f6;
   --seq-2: #86b6ef;
   --seq-3: #3987e5;
   --seq-4: #1c5cab;
   --seq-5: #0d366b;
-  --shadow: 0 8px 24px -10px rgb(22 27 36 / 0.28);
-  --primary: #161b24;
-  --primary-hover: #2a3140;
+  --shadow: 0 18px 40px -18px rgb(16 22 36 / 0.3);
+  --primary: #11151e;
+  --primary-hover: #262c39;
   --primary-press: #000000;
-  --primary-ink: #f4f1e9;
-  --focus: #161b24;
-  --card-shadow: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 14px 32px -22px rgb(22 27 36 / 0.35);
+  --primary-ink: #f6f5f1;
+  --focus: #11151e;
+  --card-shadow: 0 0 0 1px rgb(16 22 36 / 0.06), 0 10px 30px -22px rgb(16 22 36 / 0.25);
+  --glass: rgb(255 255 255 / 0.72);
+  --glass-edge: rgb(16 22 36 / 0.08);
+  --glass-filter: blur(24px) saturate(1.4);
+  --tip: #ffffff;
+  --row-hover: rgb(16 22 36 / 0.035);
+  --row-selected: #e3ebfa;
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-panel: var(--panel);
+  --color-panel-solid: var(--panel-solid);
   --color-raised: var(--raised);
   --color-sunk: var(--sunk);
   --color-rule: var(--rule);
@@ -126,6 +142,7 @@
   --color-accent-strong: var(--accent-strong);
   --color-accent-ink: var(--accent-ink);
   --color-accent-wash: var(--accent-wash);
+  --color-coral: var(--coral);
   --color-rail: var(--rail);
   --color-rail-ink: var(--rail-ink);
   --color-rail-ink-2: var(--rail-ink-2);
@@ -151,23 +168,25 @@
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --text-2xs: 11px;
-  --text-2xs--line-height: 14px;
-  --text-xs: 12px;
-  --text-xs--line-height: 16px;
-  --text-sm: 13px;
-  --text-sm--line-height: 18px;
+  /* body 14, labels 13, small 12; one large size per screen lives in .font-display */
+  --text-2xs: 12px;
+  --text-2xs--line-height: 16px;
+  --text-xs: 13px;
+  --text-xs--line-height: 18px;
+  --text-sm: 14px;
+  --text-sm--line-height: 20px;
   --text-base: 15px;
   --text-base--line-height: 22px;
   --text-lg: 20px;
   --text-lg--line-height: 26px;
-  --text-xl: 27px;
+  --text-xl: 28px;
   --text-xl--line-height: 34px;
-  --radius-xs: 1px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-xs: 4px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 @layer base {
@@ -175,8 +194,8 @@
     background: var(--bg);
     color: var(--ink);
     font-family: var(--font-sans);
-    font-size: 13px;
-    line-height: 18px;
+    font-size: 14px;
+    line-height: 20px;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     scrollbar-color: var(--rule-strong) transparent;
@@ -186,10 +205,9 @@
   ::selection { background: var(--accent); color: var(--accent-ink); }
   * { caret-color: var(--accent); }
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-  /* titles and big figures: the UI sans, one weight, tight, tabular numerals */
-  .font-display { font-weight: 500; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; text-wrap: balance; }
-  /* the rail stays dark in the light theme: its focus ring uses the rail ink */
-  [data-rail] :focus-visible { outline-color: var(--rail-ink); outline-offset: -3px; }
+  /* the one large thing on a screen: the UI sans, 500, tight */
+  .font-display { font-weight: 500; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; text-wrap: balance; }
+  [data-rail] :focus-visible { outline-color: var(--rail-ink); outline-offset: -2px; }
   a { color: inherit; text-decoration: none; }
   button { cursor: pointer; }
   button:disabled { cursor: not-allowed; }
@@ -198,32 +216,66 @@
   input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); width: 15px; height: 15px; }
   table { border-collapse: collapse; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-thumb { background: var(--rule-strong); border: 3px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb { background: var(--rule-strong); border: 3px solid transparent; background-clip: content-box; border-radius: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
 }
 
 @layer components {
-  .mono { font-family: var(--font-mono); font-variant-ligatures: none; }
-  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .mono { font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: -0.01em; }
+  /* figures stay in the sans with tabular digits; mono is for addresses, ports and hashes */
+  .num { font-variant-numeric: tabular-nums; }
   .link { color: var(--accent); text-underline-offset: 3px; }
   .link:hover { text-decoration: underline; }
-  .label { font-size: 12px; line-height: 16px; color: var(--ink-3); }
+  .label { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--ink); }
   .field {
-    height: 34px; width: 100%; padding: 0 10px; background: var(--sunk); border: 1px solid var(--rule-strong);
-    border-radius: 6px; color: var(--ink); font-size: 13px; transition: border-color 150ms;
+    height: 38px; width: 100%; padding: 0 12px; background: var(--sunk); border: 1px solid var(--rule-strong);
+    border-radius: 12px; color: var(--ink); font-size: 14px; transition: border-color 150ms, background-color 150ms;
   }
-  textarea.field { height: auto; padding: 8px 10px; line-height: 18px; }
-  select.field { appearance: none; padding-right: 28px; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%238d93a0' stroke-width='1.5'/></svg>"); background-repeat: no-repeat; background-position: right 10px center; }
-  .card { background: var(--panel); border-radius: 10px; box-shadow: var(--card-shadow); }
+  textarea.field { height: auto; padding: 9px 12px; line-height: 20px; }
+  select.field { appearance: none; padding-right: 30px; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23959eb2' stroke-width='1.5'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; }
+  .card { background: var(--panel); border-radius: 20px; box-shadow: var(--card-shadow); }
   .field::placeholder { color: var(--ink-3); }
-  .field:hover { border-color: var(--ink-3); }
-  .field:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-  .field:-webkit-autofill { -webkit-text-fill-color: var(--ink); -webkit-box-shadow: 0 0 0 100px var(--sunk) inset; transition: background-color 9999s; }
+  .field:hover { border-color: color-mix(in oklch, var(--rule-strong), var(--ink) 18%); }
+  .field:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-color: transparent; }
+  .field:-webkit-autofill { -webkit-text-fill-color: var(--ink); -webkit-box-shadow: 0 0 0 100px var(--panel-solid) inset; transition: background-color 9999s; }
   .field[aria-invalid="true"] { border-color: var(--danger); }
   .field:disabled { opacity: 0.55; }
   .hatch {
     background-image: repeating-linear-gradient(135deg, var(--st-changed) 0 1.5px, transparent 1.5px 5px);
   }
+  /* dark frost: rail, top bar, dialogs, toasts. Never on cards or rows. */
+  .glass {
+    background: linear-gradient(160deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0) 42%), var(--glass);
+    -webkit-backdrop-filter: var(--glass-filter); backdrop-filter: var(--glass-filter);
+    box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 rgb(255 255 255 / 0.1);
+  }
+  /* small segmented control and filter pills */
+  .seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--sunk); box-shadow: inset 0 0 0 1px var(--rule); }
+  .seg > button, .seg > a { height: 28px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out); }
+  .seg > [aria-pressed="true"], .seg > [aria-selected="true"], .seg > [aria-current="page"] { background: var(--primary); color: var(--primary-ink); }
+  @media (hover: hover) and (pointer: fine) {
+    .seg > button:not([aria-pressed="true"]):not([aria-selected="true"]):hover { color: var(--ink); background: var(--row-hover); }
+  }
+  /* section heading: label in ink, not grey */
+  .eyebrow { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--ink); }
+}
+
+/* The ground: a still, dim piece of the login's field. One fixed layer, no animation. */
+.app-ground {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(46% 38% at 6% -6%, rgb(38 97 220 / 0.30), transparent 70%),
+    radial-gradient(22% 26% at 2% 52%, rgb(110 163 242 / 0.10), transparent 70%),
+    radial-gradient(40% 34% at 100% 108%, rgb(229 85 106 / 0.17), transparent 70%),
+    radial-gradient(30% 26% at 78% 104%, rgb(163 43 122 / 0.13), transparent 72%),
+    radial-gradient(36% 30% at 96% -10%, rgb(38 97 220 / 0.10), transparent 70%),
+    linear-gradient(180deg, #071028, #050913 60%);
+}
+:root[data-theme="light"] .app-ground {
+  background:
+    radial-gradient(46% 38% at 6% -6%, rgb(38 97 220 / 0.10), transparent 70%),
+    radial-gradient(40% 34% at 100% 108%, rgb(229 85 106 / 0.08), transparent 70%),
+    linear-gradient(180deg, #eef0f4, #f3f3f0 60%);
 }
 
 @keyframes pulse-ring { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
@@ -231,8 +283,8 @@
 @keyframes rise-in { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 .skeleton {
-  background: linear-gradient(90deg, var(--raised) 25%, var(--rule) 50%, var(--raised) 75%);
-  background-size: 200% 100%; animation: shimmer 1.6s linear infinite; border-radius: 4px;
+  background: linear-gradient(90deg, var(--rule) 25%, var(--rule-strong) 50%, var(--rule) 75%);
+  background-size: 200% 100%; animation: shimmer 1.6s linear infinite; border-radius: 6px;
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
@@ -248,6 +300,8 @@
 .bar-over { background: repeating-linear-gradient(-45deg, var(--danger) 0 4px, color-mix(in oklch, var(--danger) 55%, transparent) 4px 8px); }
 @keyframes bar-move { from { background-position: 0 0; } to { background-position: 17px 0; } }
 @media (prefers-reduced-motion: reduce) { .bar-active { animation: none; } }
+.nf-pulse { animation: pulse-ring 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .nf-pulse { animation: none; } }
 
 /* Presentation mode (?present=1 or Shift+P): one step larger for a 1080p recording. */
 html[data-present] { zoom: 1.125; }

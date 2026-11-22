@@ -54,7 +54,7 @@ export interface TableProps<T> {
 }
 
 export function DataTable<T>(p: TableProps<T>) {
-  const edge = p.inPanel ? '' : 'first:pl-4 last:pr-4 sm:first:pl-6 sm:last:pr-6';
+  const edge = p.inPanel ? 'first:pl-5 last:pr-5' : 'first:pl-5 last:pr-5 sm:first:pl-6 sm:last:pr-6';
   const navigate = useNavigate();
   const narrow = useIsNarrow();
   if (p.error) return <ErrorState error={p.error} retry={p.retry} />;
@@ -85,11 +85,11 @@ export function DataTable<T>(p: TableProps<T>) {
 
   if (narrow && p.mobile) {
     return (
-      <ul className={cx('transition-opacity', p.dim && 'opacity-60')}>
+      <ul className={cx('transition-opacity', !p.inPanel && 'card mx-3 overflow-hidden rounded-[22px] py-1 sm:mx-6', p.dim && 'opacity-60')}>
         {rows.map((row) => {
           const k = p.rowKey(row);
           return (
-            <li key={k} className={cx('flex items-start gap-2 border-b border-rule px-4 py-2.5', sel?.has(k) && 'bg-accent-wash')}>
+            <li key={k} className={cx('flex items-start gap-2 border-b border-rule px-4 py-3 last:border-b-0', sel?.has(k) && 'bg-[var(--row-selected)]')}>
               {sel ? <input type="checkbox" className="mt-1" checked={sel.has(k)} onChange={() => toggle(k)} aria-label={t('Zaznacz wiersz', 'Select row')} /> : null}
               <div className="min-w-0 flex-1" onClick={clickable ? () => go(row) : undefined} role={clickable ? 'link' : undefined}>{p.mobile!(row)}</div>
             </li>
@@ -100,11 +100,11 @@ export function DataTable<T>(p: TableProps<T>) {
   }
 
   return (
-    <div className={cx('overflow-x-auto transition-opacity', p.dim && 'opacity-60')}>
+    <div className={cx('overflow-x-auto transition-opacity', !p.inPanel && 'card mx-3 rounded-[22px] sm:mx-6 lg:mx-8', p.dim && 'opacity-60')}>
       <table className="w-full min-w-max text-sm sm:min-w-0">
         {p.caption ? <caption className="sr-only">{p.caption}</caption> : null}
         <thead>
-          <tr className="border-b border-rule-strong text-left text-xs text-ink-3">
+          <tr className="border-b border-rule text-left text-2xs text-ink-2">
             {sel ? (
               <th className={cx('w-[34px] px-3 py-0', edge)}>
                 <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label={t('Zaznacz wszystkie', 'Select all')} />
@@ -114,7 +114,7 @@ export function DataTable<T>(p: TableProps<T>) {
               const active = c.sort && (p.sort === c.sort || p.sort === '-' + c.sort);
               const desc = p.sort === '-' + c.sort;
               return (
-                <th key={c.id} scope="col" style={{ width: c.width }} className={cx('h-[30px] whitespace-nowrap px-3 py-0 font-medium', edge, c.align === 'right' && 'text-right', c.hide && HIDE[c.hide])} aria-sort={active ? (desc ? 'descending' : 'ascending') : undefined}>
+                <th key={c.id} scope="col" style={{ width: c.width }} className={cx('h-[44px] whitespace-nowrap px-3 py-0 font-medium', edge, c.align === 'right' && 'text-right', c.hide && HIDE[c.hide])} aria-sort={active ? (desc ? 'descending' : 'ascending') : undefined}>
                   {c.sort && p.onSort ? (
                     <button type="button" className={cx('inline-flex items-center gap-1 hover:text-ink', active && 'text-ink')} onClick={() => p.onSort!(p.sort === '-' + c.sort ? c.sort! : '-' + c.sort)}>
                       {c.header}
@@ -133,13 +133,13 @@ export function DataTable<T>(p: TableProps<T>) {
               <tr
                 key={k}
                 onClick={clickable ? (e) => { if (!(e.target as HTMLElement).closest('a,button,input,select,label')) go(row); } : undefined}
-                className={cx('border-b border-rule last:border-b-0', clickable && 'cursor-pointer hover:bg-raised', sel?.has(k) && 'bg-accent-wash', p.rowClass?.(row))}
+                className={cx('border-b border-rule last:border-b-0', clickable && 'cursor-pointer hover:bg-[var(--row-hover)]', sel?.has(k) && 'bg-[var(--row-selected)]', p.rowClass?.(row))}
               >
                 {sel ? (
                   <td className={cx('px-3 py-0', edge)}><input type="checkbox" checked={sel.has(k)} onChange={() => toggle(k)} aria-label={t('Zaznacz wiersz', 'Select row')} /></td>
                 ) : null}
                 {p.cols.map((c) => (
-                  <td key={c.id} className={cx('h-[30px] px-3 py-1 align-middle', edge, c.align === 'right' && 'text-right', c.hide && HIDE[c.hide], !c.wrap && 'whitespace-nowrap')}>
+                  <td key={c.id} className={cx('h-[46px] px-3 py-1.5 align-middle', edge, c.align === 'right' && 'text-right', c.hide && HIDE[c.hide], !c.wrap && 'whitespace-nowrap')}>
                     {c.cell(row)}
                   </td>
                 ))}
@@ -155,12 +155,12 @@ export function DataTable<T>(p: TableProps<T>) {
 export function Pager({ total, limit, offset, onOffset }: { total: number; limit: number; offset: number; onOffset: (o: number) => void }) {
   if (total === 0) return null;
   if (total <= limit && offset === 0) {
-    return <div className="border-t border-rule px-4 py-2 text-xs text-ink-3 sm:px-6">{fmtInt(total)} {plural(total, ['wiersz', 'wiersze', 'wierszy'], ['row', 'rows'])}</div>;
+    return <div className="px-5 py-3 text-xs text-ink-2 sm:px-8">{fmtInt(total)} {plural(total, ['wiersz', 'wiersze', 'wierszy'], ['row', 'rows'])}</div>;
   }
   const from = total === 0 ? 0 : offset + 1;
   const to = Math.min(total, offset + limit);
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-rule px-4 py-2 text-xs text-ink-3 sm:px-6">
+    <div className="flex items-center justify-between gap-3 px-5 py-3 text-xs text-ink-2 sm:px-8">
       <span className="num">{fmtInt(from)}–{fmtInt(to)} {t('z', 'of')} {fmtInt(total)}</span>
       <span className="flex gap-1">
         <Button size="sm" icon="chevronLeft" disabled={offset <= 0} onClick={() => onOffset(Math.max(0, offset - limit))}>{t('Poprzednie', 'Previous')}</Button>
@@ -173,7 +173,7 @@ export function Pager({ total, limit, offset, onOffset }: { total: number; limit
 /** A row of filters above the content they scope. */
 export function FilterBar({ children, onClear, active }: { children: ReactNode; onClear?: () => void; active?: number }) {
   return (
-    <div className="flex flex-wrap items-end gap-2 border-b border-rule px-4 py-2.5 sm:px-6">
+    <div className="flex flex-wrap items-end gap-2.5 px-4 pb-4 sm:px-6 lg:px-8">
       {children}
       {onClear && active ? (
         <Button variant="ghost" size="md" icon="x" onClick={onClear}>{t('Wyczyść filtry', 'Clear filters')} ({active})</Button>
@@ -185,7 +185,7 @@ export function FilterBar({ children, onClear, active }: { children: ReactNode; 
 export function FilterField({ label, children, width = 150 }: { label: string; children: ReactNode; width?: number }) {
   return (
     <label className="block" style={{ width }}>
-      <span className="label mb-1 block">{label}</span>
+      <span className="label mb-1.5 block pl-1">{label}</span>
       {children}
     </label>
   );
@@ -201,9 +201,9 @@ export function SearchField({ value, onChange, placeholder, width = 220 }: { val
   }, [local]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <label className="relative block" style={{ width }}>
-      <span className="label mb-1 block">{t('Szukaj', 'Search')}</span>
-      <Icon name="search" size={14} className="pointer-events-none absolute bottom-2 left-2 text-ink-3" />
-      <input type="search" className="field pl-7" value={local} placeholder={placeholder} onChange={(e) => setLocal(e.target.value)} />
+      <span className="label mb-1.5 block pl-1">{t('Szukaj', 'Search')}</span>
+      <Icon name="search" size={14} className="pointer-events-none absolute bottom-3 left-3 text-ink-3" />
+      <input type="search" className="field pl-8" value={local} placeholder={placeholder} onChange={(e) => setLocal(e.target.value)} />
     </label>
   );
 }

@@ -1,11 +1,12 @@
-import { type ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router';
 import { SETUP_DONE_KEY } from './Setup';
 import { useItem, usePage } from '../api/hooks';
-import type { Change, Dashboard as Dash, Finding, Page, RunMap, ScanProfile, ScanRun, Scope, Service } from '../api/types';
+import type { Change, Dashboard as Dash, Finding, Host, Page, RunMap, ScanProfile, ScanRun, Scope, Service } from '../api/types';
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtDec, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtSigned } from '../lib/format';
-import { useLiveRun, useNow } from '../lib/hooks';
+import { useLiveRun, useNow, useWidth } from '../lib/hooks';
+import { NetworkField, NightStrip, Ring, Spark, TickBars, networkFields, runChanges } from '../viz/Night';
 import { ErrorState, Panel, SkeletonRows } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, changeKindInfo, type GlyphName, type Tone } from '../ui/marks';
@@ -54,7 +55,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   if (!run && partial) {
     return (
       <div>
-        <p className="font-display text-[30px] leading-[1.1] sm:text-[40px]" data-testid="handover">{t('Nie ma jeszcze pełnego skanu profilu do porównania.', 'No full profile scan to compare yet.')}</p>
+        <p className="font-display text-[34px] leading-[1.05] text-ink sm:text-[46px]" data-testid="handover">{t('Nie ma jeszcze pełnego skanu profilu do porównania.', 'No full profile scan to compare yet.')}</p>
         <p className="mt-2 text-sm text-ink-2" data-testid="handover-partial">{t('Ostatnio', 'Last')}: {partialRunPhrase(partial)} (<Link to={'/runs/' + partial.id} className="num link">#{partial.id}</Link>, {fmtRelative(partial.finished_at)}).</p>
       </div>
     );
@@ -62,7 +63,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   if (!run) {
     return (
       <div>
-        <p className="font-display text-[30px] leading-[1.1] sm:text-[40px]">{t('Nie ma jeszcze zakończonego skanu.', 'No scan has completed yet.')}</p>
+        <p className="font-display text-[34px] leading-[1.05] text-ink sm:text-[46px]">{t('Nie ma jeszcze zakończonego skanu.', 'No scan has completed yet.')}</p>
         <p className="mt-2 text-base text-ink-2">{t('Dodaj cele, przygotuj profil i uruchom skan.', 'Add targets, prepare a profile and start a scan.')}</p>
         <Link to="/targets" className="link mt-3 inline-block text-sm">{t('Dodaj cele', 'Add targets')}</Link>
       </div>
@@ -91,7 +92,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
       : (() => { const n = added + gone + changed + missing + s!.hosts_unstable + returned + slower + recovered + confirmedGone; return t(fmtInt(n) + ' ' + plural(n, ['zmiana', 'zmiany', 'zmian'], ['', '']) + ' od poprzedniego skanu.', fmtInt(n) + ' ' + (n === 1 ? 'change' : 'changes') + ' since the previous scan.'); })();
   return (
     <div>
-      <p className="font-display text-[30px] leading-[1.1] text-ink sm:text-[40px] xl:text-[48px]" data-testid="handover">{headline}</p>
+      <p className="font-display text-[34px] leading-[1.05] text-ink sm:text-[46px] xl:text-[54px]" data-testid="handover">{headline}</p>
       <p className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-ink-2" data-testid="handover-attention">
         {h.admin_panels > 0 ? (
           <Link to="/services?class=admin-panel" className="inline-flex items-center gap-2 text-ink hover:text-ink">
@@ -112,7 +113,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
       ) : null}
       {s && !baseline ? <RunStory runId={run.id} className="mt-3 space-y-1" testId="handover-story" /> : null}
       {s && !baseline && storyShown === false && !(quiet && !expected && !unreachable) ? (
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-0.5 border-t border-rule pt-2.5" data-testid="handover-counts">
+        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1" data-testid="handover-counts">
           <Count n={s.hosts_new} glyph="plus" tone="new" label={plural(s.hosts_new, ['nowy host', 'nowe hosty', 'nowych hostów'], ['new host', 'new hosts'])} to={'/changes?run_id=' + run.id + '&kind=host_new'} />
           <Count n={s.services_new} glyph="plus" tone="new" label={plural(s.services_new, ['nowa usługa', 'nowe usługi', 'nowych usług'], ['new service', 'new services'])} to={'/changes?run_id=' + run.id + '&kind=service_new'} />
           <Count n={s.hosts_gone} glyph="minus" tone="gone" label={plural(s.hosts_gone, ['host nieaktywny', 'hosty nieaktywne', 'hostów nieaktywnych'], ['host down', 'hosts down'])} to={'/changes?run_id=' + run.id + '&kind=host_gone&expected=false'} />
@@ -131,37 +132,98 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   );
 }
 
-function Stat({ label, value, delta, deltaTitle, to, mono = true }: { label: string; value: ReactNode; delta?: number | null; deltaTitle?: string; to?: string; mono?: boolean }) {
+function Stat({ label, value, delta, deltaTitle, to, mono = true, pic }: { label: string; value: ReactNode; delta?: number | null; deltaTitle?: string; to?: string; mono?: boolean; pic?: ReactNode }) {
   const inner = (
     <>
-      <dd className="flex items-baseline gap-2">
-        <span className={cx('text-ink', mono ? 'font-display text-[36px] leading-none sm:text-[44px]' : 'text-base font-medium')}>{value}</span>
-        {delta !== undefined && delta !== null ? (
-          <span className="num text-xs text-ink-3" title={deltaTitle ?? t('zmiana względem poprzedniego skanu', 'change against the previous scan')}>{delta === 0 ? '±0' : fmtSigned(delta)}</span>
-        ) : null}
+      <dt className="text-[13px] font-medium text-ink">{label}</dt>
+      <dd className="mt-auto flex items-end justify-between gap-3 pt-3">
+        <span className="flex items-baseline gap-2">
+          <span className={cx('text-ink', mono ? 'font-display text-[40px] leading-none sm:text-[46px]' : 'text-base font-medium')}>{value}</span>
+          {delta !== undefined && delta !== null ? (
+            <span className="num text-xs text-ink-2" title={deltaTitle ?? t('zmiana względem poprzedniego skanu', 'change against the previous scan')}>{delta === 0 ? '±0' : fmtSigned(delta)}</span>
+          ) : null}
+        </span>
+        {pic ? <span className="mb-1 flex-none">{pic}</span> : null}
       </dd>
-      <dt className="mt-1.5 text-xs text-ink-3 group-hover:text-ink-2">{label}</dt>
     </>
   );
+  if (!mono) return <div className="flex flex-col py-1.5">{inner}</div>;
+  const cls = 'card group flex min-h-[116px] flex-col rounded-[22px] px-5 py-4 transition-colors';
   return to
-    ? <Link to={to} className="group -mx-2 flex flex-col rounded-md px-2 py-1.5 transition-colors hover:bg-raised">{inner}</Link>
-    : <div className="flex flex-col py-1.5">{inner}</div>;
+    ? <Link to={to} className={cx(cls, 'hover:bg-[color-mix(in_oklch,var(--panel),var(--ink)_5%)]')}>{inner}</Link>
+    : <div className={cls}>{inner}</div>;
 }
 
-function Inventory({ d, pair }: { d: Dash; pair?: { full?: ScanRun; prev?: ScanRun } }) {
+/** Full runs of the widest profile, oldest first: the series behind the host and service figures. */
+function widestFullRuns(runs: ScanRun[]): ScanRun[] {
+  const full = runs.filter(isFullRun);
+  const top = Math.max(0, ...full.map((r) => r.stats.addresses_total));
+  return full.filter((r) => r.stats.addresses_total === top).sort((a, b) => a.id - b.id).slice(-30);
+}
+
+function Inventory({ d, pair, runs }: { d: Dash; pair?: { full?: ScanRun; prev?: ScanRun }; runs: ScanRun[] }) {
   const h = d.headline;
   // Deltas only between two full runs of the same profile, never across a partial run.
   const full = pair?.full, prev = pair?.prev;
   const dHosts = full && prev ? full.stats.hosts_up - prev.stats.hosts_up : null;
   const dServices = full && prev ? full.stats.services_open - prev.stats.services_open : null;
   const deltaTitle = full && prev ? t('zmiana między pełnymi skanami #' + prev.id + ' i #' + full.id + (full.profile_name ? ' (' + full.profile_name + ')' : ''), 'change between the full scans #' + prev.id + ' and #' + full.id + (full.profile_name ? ' (' + full.profile_name + ')' : '')) : undefined;
+  const series = widestFullRuns(runs);
+  const recent = [...runs].filter((r) => r.status === 'completed').sort((a, b) => a.id - b.id).slice(-40);
   return (
-    <dl className="grid max-w-[1100px] grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4" data-testid="dash-numbers">
-      <Stat label={t('Aktywne hosty', 'Hosts up')} value={fmtInt(h.hosts_up)} delta={dHosts} deltaTitle={deltaTitle} to="/hosts?status=up" />
-      <Stat label={t('Otwarte usługi', 'Open services')} value={fmtInt(h.services_open)} delta={dServices} deltaTitle={deltaTitle} to="/services?state=open" />
-      <Stat label={t('Nieprzejrzane zmiany', 'Unreviewed changes')} value={fmtInt(h.changes_unacked)} to="/changes?acked=false&expected=false" />
-      <Stat label={t('Znaleziska wysokiej wagi', 'High-severity findings')} value={fmtInt(h.findings_high)} to="/findings?severity=high&status=new,triaged" />
+    <dl className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4" data-testid="dash-numbers">
+      <Stat label={t('Aktywne hosty', 'Hosts up')} value={fmtInt(h.hosts_up)} delta={dHosts} deltaTitle={deltaTitle} to="/hosts?status=up" pic={<Spark values={series.map((r) => r.stats.hosts_up)} width={84} height={34} />} />
+      <Stat label={t('Otwarte usługi', 'Open services')} value={fmtInt(h.services_open)} delta={dServices} deltaTitle={deltaTitle} to="/services?state=open" pic={<Spark values={series.map((r) => r.stats.services_open)} width={84} height={34} />} />
+      <Stat label={t('Nieprzejrzane zmiany', 'Unreviewed changes')} value={fmtInt(h.changes_unacked)} to="/changes?acked=false&expected=false" pic={<TickBars values={recent.map(runChanges)} width={84} height={34} />} />
+      <Stat label={t('Znaleziska wysokiej wagi', 'High-severity findings')} value={fmtInt(h.findings_high)} to="/findings?severity=high&status=new,triaged" pic={h.findings_open ? <Ring value={h.findings_high} max={h.findings_open} size={38} /> : undefined} />
     </dl>
+  );
+}
+
+/** The network as the picture: every /24 of the scanned /16 (or every address of one /24) as a cell. */
+function Stage({ d }: { d: Dash }) {
+  const { can } = useSession();
+  const hostsQ = usePage<Host>('/hosts', { limit: 1000 });
+  const lastId = d.last_run?.id;
+  const chQ = usePage<Change>('/changes', { run_id: lastId, expected: false, limit: 500 }, Boolean(lastId));
+  const active = d.active_run;
+  const map = useItem<RunMap>('/runs/' + (active?.id ?? 0) + '/map', undefined, { enabled: Boolean(active) && can('scans:read'), refetchInterval: 3000 });
+  const hosts = hostsQ.data?.items;
+  const changes = chQ.data?.items;
+  const blocks = map.data?.blocks;
+  const fields = useMemo(
+    () => networkFields(hosts ?? [], changes ?? [], (blocks ?? []).filter((b) => b.status === 'running').map((b) => b.cidr)),
+    [hosts, changes, blocks],
+  );
+  const [ref, w] = useWidth<HTMLDivElement>();
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
+  const main = fields[0];
+  const size = Math.floor(Math.max(240, Math.min(w - 40, vh - 470, 600)));
+  const unitSteps = main?.unit === 'block' ? [['2', '1'], ['3', '2–3'], ['4', '4–9'], ['5', '10+']] : [];
+  return (
+    <section className="card relative flex min-h-[320px] flex-col overflow-hidden rounded-[28px] bg-[radial-gradient(60%_55%_at_50%_52%,rgb(38_97_220/0.13),transparent_75%),var(--panel)] p-5 sm:p-6" data-testid="dash-field">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p className="mono text-[15px] text-ink">{main?.label ?? ''}</p>
+        {unitSteps.length ? (
+          <p className="flex items-center gap-3 text-2xs text-ink-2" aria-hidden="true">
+            {unitSteps.map(([s, l]) => <span key={s} className="num inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: 'var(--seq-' + s + ')' }} />{l}</span>)}
+          </p>
+        ) : null}
+      </div>
+      <div ref={ref} className="flex flex-1 items-center justify-center py-5">
+        {hostsQ.isPending ? <div className="skeleton rounded-[18px]" style={{ width: size, height: size }} /> : main && w ? <NetworkField field={main} size={size} /> : null}
+      </div>
+      {fields.length > 1 ? (
+        <div className="flex flex-wrap gap-5">
+          {fields.slice(1, 5).map((f) => (
+            <div key={f.key} className="flex items-center gap-3">
+              <NetworkField field={f} size={64} />
+              <span className="mono text-xs text-ink-2">{f.label}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -194,14 +256,14 @@ function ActiveRun({ initial }: { initial: ScanRun; d?: Dash }) {
   const activeAddrs = (map.data?.blocks ?? []).filter((b) => b.status === 'running').reduce((a, b) => a + b.size, 0);
   void profile;
   return (
-    <section className="card px-4 py-3" data-testid="dash-active-run">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
+    <section data-testid="dash-active-run">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
         <RunStatusMark status={run.status} pauseReason={run.pause_reason} />
         <Link to={'/runs/' + run.id} className="text-ink hover:underline">{t('Skan', 'Scan')} <span className="num">#{run.id}</span> <span className="text-ink-2">· {run.profile_name}</span></Link>
         <span className="num text-ink">{small ? fmtInt(s.services_open) + ' ' + plural(s.services_open, ['usługa', 'usługi', 'usług'], ['service', 'services']) : fmtPct(pct)}</span>
         {run.status === 'analyzing' ? <span className="text-ink-2">{t('analiza zmian…', 'analysing changes…')}</span> : s.eta_sec > 0 ? <span className="text-ink-2">{t('pozostało', 'remaining')} <span className="num text-ink">{fmtDuration(s.eta_sec)}</span></span> : null}
-        <span className="num text-ink-3">{fmtInt(s.current_pps)} pps</span>
-        <Link to={'/runs/' + run.id} className="link ml-auto inline-flex items-center gap-1 whitespace-nowrap">{t('Otwórz skan', 'Open scan')}<Icon name="arrowRight" size={12} /></Link>
+        <span className="num text-ink-2">{fmtInt(s.current_pps)} pps</span>
+        <Link to={'/runs/' + run.id} className="ml-auto inline-flex h-[30px] items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-3.5 text-xs font-semibold text-primary-ink hover:bg-primary-hover">{t('Otwórz skan', 'Open scan')}<Icon name="arrowRight" size={12} /></Link>
       </div>
       <div className="mt-2.5"><ProgressBar value={s.addresses_done} max={s.addresses_total} active={activeAddrs} label={t('Postęp skanu', 'Scan progress')} /></div>
       <PartialNote run={run} className="mt-2" />
@@ -213,17 +275,32 @@ function ActiveRun({ initial }: { initial: ScanRun; d?: Dash }) {
 function IdleRun({ d }: { d: Dash }) {
   const run = d.last_run;
   return (
-    <section className="flex flex-wrap items-center gap-x-6 gap-y-1 border-y border-rule/70 py-2.5 text-sm text-ink-2" data-testid="dash-idle-run">
-      <span className="inline-flex items-center gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-ink-3" aria-hidden="true" />{t('Żaden skan teraz nie działa', 'No scan is running')}</span>
+    <section className="grid gap-1.5 text-sm text-ink-2" data-testid="dash-idle-run">
+      <span className="flex items-center justify-between gap-3">
+        <span className="inline-flex items-center gap-2 font-medium text-ink"><span className="inline-block h-2 w-2 rounded-full bg-ink-3" aria-hidden="true" />{t('Żaden skan teraz nie działa', 'No scan is running')}</span>
+        <Link to="/runs" className="link text-xs">{t('Wszystkie', 'All')}</Link>
+      </span>
       {run ? <span>{t('Ostatni', 'Last')} <Link className="link num" to={'/runs/' + run.id}>#{run.id}</Link> · {fmtDateTime(run.finished_at)} · {fmtDuration(run.stats.elapsed_sec)}</span> : null}
       <span>{t('Następny', 'Next')} {d.next_run_at ? <><span className="text-ink">{fmtDateTime(d.next_run_at)}</span> <span className="text-ink-3">({fmtRelative(d.next_run_at)})</span></> : t('brak harmonogramu', 'not scheduled')}</span>
-      <Link to="/runs" className="link ml-auto">{t('Wszystkie', 'All')}</Link>
     </section>
   );
 }
 
 function Row({ to, children }: { to: string; children: ReactNode }) {
-  return <li><Link to={to} className="flex min-h-[48px] items-start gap-3 border-b border-rule/60 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-raised">{children}</Link></li>;
+  return <li><Link to={to} className="-mx-3 flex min-h-[52px] items-start gap-3 rounded-[14px] px-3 py-2.5 transition-colors hover:bg-[var(--row-hover)]">{children}</Link></li>;
+}
+
+/** A list in the dashboard's side rail: a label in ink, an "all" link, roomy rows. */
+function RailList({ title, to, children }: { title: string; to: string; children: ReactNode }) {
+  return (
+    <section>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h2 className="eyebrow">{title}</h2>
+        <Link to={to} className="link text-xs">{t('Wszystkie', 'All')}</Link>
+      </div>
+      {children}
+    </section>
+  );
 }
 
 /** One row per finding kind (as on the findings page): count of places, worst score, newest first seen. */
@@ -232,24 +309,24 @@ function TopFindings() {
   const q = usePage<Finding>('/findings', { status: 'new,triaged', sort: '-interest', limit: 1000 });
   const rows = findingRows(q.data?.items ?? []);
   return (
-    <Panel title={t('Najważniejsze znaleziska', 'Top findings')} flush actions={<Link to="/findings" className="link">{t('Wszystkie', 'All')}</Link>}>
-      {q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : !q.data ? <SkeletonRows rows={4} /> : rows.length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Brak otwartych znalezisk.', 'No open findings.')}</p> : null}
+    <RailList title={t('Najważniejsze znaleziska', 'Top findings')} to="/findings">
+      {q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : !q.data ? <SkeletonRows rows={4} /> : rows.length === 0 ? <p className="py-3 text-sm text-ink-2">{t('Brak otwartych znalezisk.', 'No open findings.')}</p> : null}
       <ul data-testid="top-findings">
-        {rows.map(({ group: g, newest, to }) => {
+        {rows.slice(0, 6).map(({ group: g, newest, to }) => {
           const services = g.items.every((f) => f.port);
           return (
             <Row key={g.key} to={to}>
               <span className="mt-0.5"><Sev level={g.severity} compact /></span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm text-ink">{g.title} <span className="whitespace-nowrap text-ink-2">· <span className="num">{g.places}</span> {services ? plural(g.places, ['usługa', 'usługi', 'usług'], ['service', 'services']) : plural(g.places, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}</span></span>
-                <span className="mt-0.5 block text-xs text-ink-3">{t('najnowsze', 'newest')} {fmtRelative(newest)}</span>
+                <span className="block truncate text-sm text-ink" title={g.title}>{g.title}</span>
+                <span className="mt-0.5 block text-xs text-ink-2"><span className="num text-ink">{g.places}</span> {services ? plural(g.places, ['usługa', 'usługi', 'usług'], ['service', 'services']) : plural(g.places, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])} · {t('najnowsze', 'newest')} {fmtRelative(newest)}</span>
               </span>
               <span className="mt-0.5 flex-none"><InterestScore value={g.interest} /></span>
             </Row>
           );
         })}
       </ul>
-    </Panel>
+    </RailList>
   );
 }
 
@@ -258,10 +335,10 @@ function RecentChanges({ fallback }: { fallback: Change[] }) {
   const q = usePage<Change>('/changes', { expected: false, sort: '-at', limit: 100 });
   const rows = rowsByAddress(q.data?.items ?? fallback);
   return (
-    <Panel title={t('Najnowsze zmiany', 'Recent changes')} flush actions={<Link to="/changes" className="link">{t('Wszystkie', 'All')}</Link>}>
-      {rows.length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Brak zmian w ostatnim skanie.', 'No changes in the last scan.')}</p> : null}
+    <RailList title={t('Najnowsze zmiany', 'Recent changes')} to="/changes">
+      {rows.length === 0 ? <p className="py-3 text-sm text-ink-2">{t('Brak zmian w ostatnim skanie.', 'No changes in the last scan.')}</p> : null}
       <ul data-testid="recent-changes">
-        {rows.map(({ ip, latest: c, items, spanSec }) => {
+        {rows.slice(0, 6).map(({ ip, latest: c, items, spanSec }) => {
           const many = items.length > 1;
           const to = many ? '/changes?expected=false&q=' + encodeURIComponent(ip) : c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id;
           return (
@@ -269,8 +346,8 @@ function RecentChanges({ fallback }: { fallback: Change[] }) {
               <span className="mt-0.5"><Glyph name={changeKindInfo(c.kind).glyph} tone={changeKindInfo(c.kind).tone} /></span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-ink" title={c.summary}>{c.summary}</span>
-                <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
-                  <span className="mono">{many ? ip : ip + (c.port ? ':' + c.port : '')}</span>
+                <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-2">
+                  <span className="mono text-ink">{many ? ip : ip + (c.port ? ':' + c.port : '')}</span>
                   {many ? <span data-testid="change-run">· {items.length} {plural(items.length, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes'])}{spanText(spanSec) ? ' ' + spanText(spanSec) : ''}</span> : null}
                   <Sev level={c.severity} />
                 </span>
@@ -279,7 +356,16 @@ function RecentChanges({ fallback }: { fallback: Change[] }) {
           );
         })}
       </ul>
-    </Panel>
+    </RailList>
+  );
+}
+
+function SafeRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex min-h-[36px] items-baseline justify-between gap-3 py-1.5">
+      <dt className="text-xs text-ink-2">{label}</dt>
+      <dd className="text-right text-sm font-medium text-ink">{value}</dd>
+    </div>
   );
 }
 
@@ -292,11 +378,11 @@ function SafetyPanel({ st }: { st: Dash['safety'] }) {
         {st.emergency_stop ? t('Stop awaryjny włączony', 'Emergency stop is on') : t('Tylko GET i HEAD', 'GET and HEAD only')}
       </p>
       <dl>
-        <Stat label={t('Limit pakietów', 'Packet limit')} value={<>{fmtInt(st.max_pps)} <span className="font-sans text-xs font-normal text-ink-3">pps</span></>} />
-        <Stat label={t('Limit żądań HTTP', 'HTTP request limit')} value={<>{st.max_http_rps} <span className="font-sans text-xs font-normal text-ink-3">{t('na s, ', 'per s, ')}{st.max_per_host_rps} {t('na host', 'per host')}</span></>} />
-        <Stat label={t('Metody HTTP', 'HTTP methods')} value={(st.allowed_methods ?? []).join(', ')} />
-        <Stat label={t('Wykluczenia', 'Exclusions')} value={(st.exclusions ?? []).length} />
-        <Stat label={t('Stop awaryjny', 'Emergency stop')} value={<HostlessState on={st.emergency_stop} />} mono={false} />
+        <SafeRow label={t('Limit pakietów', 'Packet limit')} value={<>{fmtInt(st.max_pps)} <span className="font-sans text-xs font-normal text-ink-3">pps</span></>} />
+        <SafeRow label={t('Limit żądań HTTP', 'HTTP request limit')} value={<>{st.max_http_rps} <span className="font-sans text-xs font-normal text-ink-3">{t('na s, ', 'per s, ')}{st.max_per_host_rps} {t('na host', 'per host')}</span></>} />
+        <SafeRow label={t('Metody HTTP', 'HTTP methods')} value={(st.allowed_methods ?? []).join(', ')} />
+        <SafeRow label={t('Wykluczenia', 'Exclusions')} value={(st.exclusions ?? []).length} />
+        <SafeRow label={t('Stop awaryjny', 'Emergency stop')} value={<HostlessState on={st.emergency_stop} />} />
       </dl>
     </Panel>
   );
@@ -377,12 +463,12 @@ export default function Dashboard() {
   const { can } = useSession();
   const q = useItem<Dash>('/dashboard', undefined, { refetchInterval: 60_000 });
   const runs = usePage<ScanRun>('/runs', { limit: 100, status: 'completed', sort: '-id' }, can('scans:read'));
+  const allRuns = usePage<ScanRun>('/runs', { limit: 300, sort: '-id' }, can('scans:read'));
   const now = useNow();
   if (q.error) return <ErrorState error={q.error} retry={() => q.refetch()} />;
   if (!q.data) return <div className="p-4 sm:p-6"><div className="skeleton mb-3 h-8 w-[min(520px,80%)]" /><div className="skeleton mb-6 h-4 w-[min(380px,60%)]" /><SkeletonRows rows={10} /></div>;
   const d = q.data;
   const pair = lastFullPair(runs.data?.items ?? []);
-  void now;
   const st = d.safety;
   const h0 = d.headline;
   const fresh = !d.last_run && !d.active_run && h0.hosts_up + h0.hosts_down + h0.hosts_unstable + h0.services_open + h0.findings_open + h0.changes_unacked === 0;
@@ -405,23 +491,28 @@ export default function Dashboard() {
     );
   }
   return (
-    <div className="mx-auto max-w-[1480px] space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="mx-auto max-w-[1680px] space-y-5 px-4 pb-8 pt-1 sm:px-6 lg:px-8">
       <h1 className="sr-only">{t('Pulpit', 'Dashboard')}</h1>
-      <div className="space-y-7 pt-1">
-        <Handover d={d} full={runs.data ? (pair.full ?? null) : undefined} />
-        <div className="border-t border-rule/70 pt-5"><Inventory d={d} pair={runs.data ? pair : undefined} /></div>
+      <Handover d={d} full={runs.data ? (pair.full ?? null) : undefined} />
+
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="min-w-0 space-y-4">
+          <Stage d={d} />
+          <Inventory d={d} pair={runs.data ? pair : undefined} runs={allRuns.data?.items ?? []} />
+        </div>
+        <aside className="card min-w-0 space-y-7 rounded-[28px] p-5 sm:p-6">
+          <div className="space-y-4">
+            {d.active_run ? <ActiveRun initial={d.active_run} d={d} /> : <IdleRun d={d} />}
+            <NightStrip runs={allRuns.data?.items ?? []} active={d.active_run} currentId={d.active_run ? undefined : d.last_run?.id} now={now} />
+          </div>
+          <RecentChanges fallback={d.recent_changes ?? []} />
+          <TopFindings />
+        </aside>
       </div>
 
-      {d.active_run ? <ActiveRun initial={d.active_run} d={d} /> : <IdleRun d={d} />}
-
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <RecentChanges fallback={d.recent_changes ?? []} />
-        <div className="grid gap-5">
-        <TopFindings />
-
-
-        <Panel title={t('Najciekawsze usługi', 'Most interesting services')} flush actions={<Link to="/services?sort=-interest" className="link">{t('Wszystkie', 'All')}</Link>}>
-          <ul>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Panel title={t('Najciekawsze usługi', 'Most interesting services')} flush className="xl:col-span-3" actions={<Link to="/services?sort=-interest" className="link">{t('Wszystkie', 'All')}</Link>}>
+          <ul className="grid px-5 lg:grid-cols-2 lg:gap-x-8">
             {(d.top_services ?? []).slice(0, 7).map((s) => (
               <Row key={s.id} to={'/services/' + s.id}>
                 <span className="min-w-0 flex-1">
@@ -437,7 +528,6 @@ export default function Dashboard() {
             ))}
           </ul>
         </Panel>
-        </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
