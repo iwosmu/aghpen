@@ -179,11 +179,13 @@ function SnapshotLists({ runId }: { runId: number }) {
   const cur = tab === 'hosts' ? hosts : tab === 'services' ? services : findings;
   return (
     <Panel flush>
+      <div className="px-4 pb-3 pt-4 sm:px-6 lg:px-8">
       <Tabs value={tab} onChange={(id) => u.set({ list: id })} tabs={[
         { id: 'hosts', label: t('Hosty', 'Hosts'), count: hosts.data?.total },
         { id: 'services', label: t('Usługi', 'Services'), count: services.data?.total },
         { id: 'findings', label: t('Znaleziska', 'Findings'), count: findings.data?.total },
       ]} />
+      </div>
       <FilterBar onClear={() => u.clear(['hstatus', 'sstate', 'fsev'])} active={[status, state, sev].filter(Boolean).length}>
         {tab === 'hosts' ? <FilterField label={t('Stan wtedy', 'Status then')} width={180}><Select value={status} onChange={(v) => u.set({ hstatus: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'up', label: t('aktywne', 'up') }, { value: 'not responding', label: t('nie odpowiada', 'not responding') }, { value: 'unstable', label: t('niestabilne', 'unstable') }, { value: 'expected-offline', label: t('poza godzinami', 'outside usual hours') }, { value: 'down', label: t('nieaktywne', 'down') }]} /></FilterField> : null}
         {tab === 'services' ? <FilterField label={t('Stan wtedy', 'Status then')} width={180}><Select value={state} onChange={(v) => u.set({ sstate: v })} options={[{ value: '', label: t('otwarte i nieznane', 'open and unknown') }, { value: 'open', label: t('otwarte', 'open') }, { value: 'unknown', label: t('nieznane', 'unknown') }, { value: 'gone', label: t('zniknęły', 'gone') }, { value: 'all', label: t('wszystkie', 'all') }]} /></FilterField> : null}
@@ -227,12 +229,12 @@ export default function TimeMachine() {
   }, [cur, runs]);
 
   const header = <PageHeader title={t('Oś czasu', 'Timeline')} />;
-  if (tl.error) return <div>{header}<div className="p-4 sm:p-6">{routeMissing(tl.error) ? <Unavailable /> : <ErrorState error={tl.error} retry={() => tl.refetch()} />}</div></div>;
+  if (tl.error) return <div>{header}<div className="px-4 pb-6 sm:px-6 lg:px-8">{routeMissing(tl.error) ? <Unavailable /> : <ErrorState error={tl.error} retry={() => tl.refetch()} />}</div></div>;
   if (!tl.data) return <div>{header}<SkeletonRows rows={10} /></div>;
-  if (runs.length === 0) return <div>{header}<div className="p-4 sm:p-6"><Empty icon="history" title={t('Brak skanów', 'No scans yet')} /></div></div>;
+  if (runs.length === 0) return <div>{header}<div className="px-4 pb-6 sm:px-6 lg:px-8"><Empty icon="history" title={t('Brak skanów', 'No scans yet')} /></div></div>;
   if (runs.length === 1) {
     return (
-      <div>{header}<div className="p-4 sm:p-6" data-testid="tm-one-run">
+      <div>{header}<div className="px-4 pb-6 sm:px-6 lg:px-8" data-testid="tm-one-run">
         <Empty icon="history" title={t('Potrzeba co najmniej dwóch skanów', 'At least two scans are needed')}          action={<Link to={'/runs/' + runs[0].run_id} className="link text-sm">{t('Otwórz skan', 'Open scan')} #{runs[0].run_id}</Link>} />
       </div></div>
     );
@@ -257,7 +259,7 @@ export default function TimeMachine() {
     return (
       <div>
         {header}
-        <div className="space-y-4 p-4 sm:p-6">
+        <div className="space-y-4 px-4 pb-6 sm:px-6 lg:px-8">
           <Panel title={<span>{t('Skan', 'Scan')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
             actions={<span className="num text-ink-3">{cur + 1} / {runs.length}</span>}>
             <Scrubber runs={runs} index={cur} onIndex={setIndex} />
@@ -276,7 +278,7 @@ export default function TimeMachine() {
   return (
     <div>
       {header}
-      <div className="space-y-4 p-4 sm:p-6">
+      <div className="space-y-4 px-4 pb-6 sm:px-6 lg:px-8">
         <Panel title={<span>{t('Skan', 'Scan')} <Link to={'/runs/' + run.run_id} className="num link">#{run.run_id}</Link> <span className="font-normal text-ink-2">· {fmtDateTime(run.at)} · {run.profile_name} · {triggerLabel(run.trigger)}</span></span>}
           actions={<span className="num text-ink-3">{cur + 1} / {runs.length}</span>}>
           <Scrubber runs={runs} index={cur} onIndex={setIndex} />

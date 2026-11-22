@@ -133,7 +133,7 @@ function FindingGroupList({ q, active, onOpen }: { q: ReturnType<typeof usePage<
                 className="grid min-h-[60px] w-full grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-x-3 px-5 py-2.5 text-left transition-colors duration-150 hover:bg-[var(--row-hover)]">
                 <Icon name={isOpen ? 'chevronDown' : 'chevronRight'} size={12} className="text-ink-3" />
                 <span className="min-w-0">
-                  <span className="block truncate text-[15px] text-ink">{g.title}</span>
+                  <span className="line-clamp-2 block text-[15px] text-ink">{g.title}</span>
                   <span className="mt-1 flex flex-wrap items-center gap-1.5">
                     <span className="chip-fact"><span className="num">{g.places}</span> {g.items.every((f) => f.port) ? plural(g.places, ['usługa', 'usługi', 'usług'], ['service', 'services']) : plural(g.places, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}</span>
                     {STATUS_ORDER.filter((s) => g.statuses[s]).map((s) => <span key={s} className="chip-fact"><span className="num">{g.statuses[s]}</span> {findingStatusInfo(s as FindingStatus).label}</span>)}

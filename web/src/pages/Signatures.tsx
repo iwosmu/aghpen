@@ -18,8 +18,8 @@ export function Switch({ checked, onChange, label, disabled }: { checked: boolea
   return (
     <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled}
       onClick={(e) => { e.stopPropagation(); e.preventDefault(); onChange(!checked); }}
-      className={'relative inline-flex h-[20px] w-[36px] flex-none items-center rounded-full border transition-colors disabled:opacity-50 ' + (checked ? 'border-primary bg-primary' : 'border-rule-strong bg-sunk')}>
-      <span className={'block h-[14px] w-[14px] rounded-full transition-transform duration-150 ' + (checked ? 'translate-x-[18px] bg-primary-ink' : 'translate-x-[2px] bg-ink-3')} />
+      className={'relative inline-flex h-[20px] w-[36px] flex-none items-center rounded-full border transition-colors disabled:opacity-50 ' + (checked ? 'border-transparent bg-[var(--seq-2)]' : 'border-rule-strong bg-sunk')}>
+      <span className={'block h-[14px] w-[14px] rounded-full transition-transform duration-150 ease-[var(--ease)] ' + (checked ? 'translate-x-[18px] bg-ink' : 'translate-x-[2px] bg-ink-3')} />
     </button>
   );
 }

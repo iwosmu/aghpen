@@ -130,7 +130,7 @@ export default function HostDetail() {
         readOnly={!canEdit}
         actions={<span className="flex items-center gap-2 text-sm text-ink-2">{t('Ciekawość', 'Interest')} <InterestScore value={h.interest} /></span>}
       />
-      <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+      <div className="grid gap-4 px-4 pb-6 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
         <div className="space-y-4">
           <Panel title={t('Opis analityka', 'Analyst notes')}>
             <dl>

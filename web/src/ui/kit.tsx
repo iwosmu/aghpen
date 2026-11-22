@@ -146,7 +146,7 @@ export function KV({ k, children, mono }: { k: ReactNode; children: ReactNode; m
 
 export function Tabs({ tabs, value, onChange }: { tabs: { id: string; label: ReactNode; count?: number }[]; value: string; onChange: (id: string) => void }) {
   return (
-    <div role="tablist" className="mx-4 flex w-fit max-w-[calc(100%-32px)] gap-0.5 overflow-x-auto rounded-[8px] bg-sunk p-[2px] shadow-[inset_0_0_0_1px_var(--rule)] sm:mx-6 lg:mx-8">
+    <div role="tablist" className="flex w-fit max-w-full gap-0.5 overflow-x-auto rounded-[8px] bg-sunk p-[2px] shadow-[inset_0_0_0_1px_var(--rule)]">
       {tabs.map((tab) => (
         <button
           key={tab.id} role="tab" type="button" aria-selected={value === tab.id} onClick={() => onChange(tab.id)}
