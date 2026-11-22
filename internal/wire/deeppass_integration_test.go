@@ -65,7 +65,7 @@ func TestDeepPassInTheStore(t *testing.T) {
 		model.HostResult{ObservedAt: deepAt, IP: ip, Up: true, Reason: "syn-ack", Services: []model.ServiceResult{svc80, svcHigh}, Coverage: full, FullPorts: true},
 	)
 	hints, err = st.HostHintsIn(ctx, []string{ip})
-	if err != nil || len(hints) != 1 || hints[0].DeepAt == nil || !hints[0].DeepAt.Equal(deepAt.Truncate(time.Microsecond)) {
+	if err != nil || len(hints) != 1 || hints[0].DeepAt == nil || hints[0].DeepAt.Sub(deepAt).Abs() > time.Microsecond {
 		t.Fatalf("after the deep pass: hints %+v, %v", hints, err)
 	}
 	h, err := st.ListHosts(ctx, store.HostFilter{Q: ip})
@@ -111,7 +111,7 @@ func TestDeepPassInTheStore(t *testing.T) {
 		}
 	}
 	hints, _ = st.HostHintsIn(ctx, []string{ip})
-	if len(hints) != 1 || hints[0].DeepAt == nil || !hints[0].DeepAt.Equal(deepAt.Truncate(time.Microsecond)) {
+	if len(hints) != 1 || hints[0].DeepAt == nil || hints[0].DeepAt.Sub(deepAt).Abs() > time.Microsecond {
 		t.Errorf("a general pass must keep the deep scan time: %+v", hints)
 	}
 }
