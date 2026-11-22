@@ -115,8 +115,8 @@ export default function Runs() {
   const cols: Col<ScanRun>[] = [
     { id: 'id', header: '#', sort: 'id', width: 64, cell: (r) => <Link to={'/runs/' + r.id} className="num link">#{r.id}</Link> },
     { id: 'status', header: t('Stan', 'Status'), cell: (r) => <RunStatusMark status={r.status} pauseReason={r.pause_reason} /> },
-    { id: 'profile', header: t('Profil / źródło', 'Profile / source'), cell: (r) => <span className="block max-w-[280px] truncate" title={r.profile_name + (r.note ? ' · ' + r.note : '')}>{r.label ? <span className="mr-1.5 border border-rule-strong px-1 text-2xs text-ink-2">{r.label}</span> : null}{isFullRun(r) || r.status !== 'completed' && r.profile_id != null ? r.profile_name : <>{partialRunPhrase(r)}{r.profile_name ? <span className="text-ink-3"> · {t('opcje profilu', 'profile options')} {r.profile_name}</span> : null}</>}</span> },
-    { id: 'trigger', header: t('Tryb', 'Trigger'), hide: 'lg', cell: (r) => <span className={r.trigger === 'reprobe' ? 'text-accent' : 'text-ink-2'}>{triggerLabel(r.trigger)}</span> },
+    { id: 'profile', header: t('Profil / źródło', 'Profile / source'), cell: (r) => <span className="block max-w-[280px] truncate" title={r.profile_name + (r.note ? ' · ' + r.note : '')}>{r.label ? <span className="chip-fact mr-1.5">{r.label}</span> : null}{isFullRun(r) || r.status !== 'completed' && r.profile_id != null ? r.profile_name : <>{partialRunPhrase(r)}{r.profile_name ? <span className="text-ink-3"> · {t('opcje profilu', 'profile options')} {r.profile_name}</span> : null}</>}</span> },
+    { id: 'trigger', header: t('Tryb', 'Trigger'), hide: 'lg', cell: (r) => <span className="text-ink-2">{triggerLabel(r.trigger)}</span> },
     { id: 'started', header: t('Rozpoczęty', 'Started'), sort: 'started_at', cell: (r) => <span className="num text-ink-2" title={fmtDateTime(r.started_at)}>{fmtRelative(r.started_at)}</span> },
     { id: 'dur', header: t('Czas trwania', 'Duration'), align: 'right', hide: 'md', cell: (r) => <span className="num">{fmtDuration(r.stats.elapsed_sec)}</span> },
     { id: 'progress', header: t('Adresy', 'Addresses'), width: 170, cell: (r) => {
@@ -128,13 +128,16 @@ export default function Runs() {
     } },
     { id: 'host / hosts', header: t('Hosty', 'Hosts'), align: 'right', cell: (r) => <span className="num">{fmtInt(r.stats.hosts_up)}</span> },
     { id: 'svc', header: t('Usługi', 'Services'), align: 'right', hide: 'md', cell: (r) => <span className="num">{fmtInt(r.stats.services_open)}</span> },
-    { id: 'diff', header: t('Zmiany', 'Changes'), hide: 'lg', cell: (r) => r.summary ? (
-      <span className="inline-flex items-center gap-2.5 text-xs">
-        <span className="inline-flex items-center gap-1"><Glyph name="plus" tone="new" size={11} /><span className="num">{r.summary.hosts_new + r.summary.services_new}</span></span>
-        <span className="inline-flex items-center gap-1"><Glyph name="minus" tone="gone" size={11} /><span className="num">{r.summary.hosts_gone + r.summary.services_gone}</span></span>
-        <span className="inline-flex items-center gap-1"><Glyph name="delta" tone="changed" size={11} /><span className="num">{r.summary.services_changed}</span></span>
-      </span>
-    ) : <span className="text-ink-3">–</span> },
+    { id: 'diff', header: t('Zmiany', 'Changes'), hide: 'lg', cell: (r) => {
+      const s = r.summary;
+      const parts = s ? ([['plus', 'new', s.hosts_new + s.services_new], ['minus', 'gone', s.hosts_gone + s.services_gone], ['delta', 'changed', s.services_changed]] as const).filter(([, , n]) => n > 0) : [];
+      // only the kinds that happened; a run without changes reads as a quiet dash
+      return parts.length ? (
+        <span className="inline-flex items-center gap-1.5 text-xs">
+          {parts.map(([g, tone, n]) => <span key={g} className="chip-fact"><Glyph name={g} tone={tone} size={11} /><span className="num text-ink">{n}</span></span>)}
+        </span>
+      ) : <span className="text-ink-3">–</span>;
+    } },
   ];
   const active = ['status', 'profile_id'].filter((k) => u.get(k)).length;
   return (
@@ -157,7 +160,8 @@ export default function Runs() {
         </FilterField>
       </FilterBar>
       <DataTable
-        rows={q.data?.items} cols={cols} rowKey={(r) => r.id} rowHref={(r) => '/runs/' + r.id} loading={q.isPending} error={q.error} retry={() => q.refetch()} dim={q.isPlaceholderData}
+        rows={q.data?.items} cols={cols} rowKey={(r) => r.id} rowHref={(r) => '/runs/' + r.id}
+        group={u.get('sort', '-id').match(/id|started_at/) ? (r) => { const day = fmtDateTime(r.started_at).slice(0, 10); return { key: day, label: <span className="num">{day}</span> }; } : undefined} loading={q.isPending} error={q.error} retry={() => q.refetch()} dim={q.isPlaceholderData}
         sort={u.get('sort', '-id')} onSort={(s) => u.set({ sort: s })}
         empty={<Empty icon="runs" title={active ? t('Żaden skan nie pasuje do filtrów', 'No scans match the filters') : t('Brak skanów', 'No scans yet')} hint={active ? undefined : t('Przygotuj profil i uruchom pierwszy skan.', 'Prepare a profile and start the first scan.')} action={canRun && !active ? <Button variant="primary" icon="play" onClick={() => setStartOpen(true)}>{t('Uruchom skan', 'Start scan')}</Button> : undefined} />}
         mobile={(r) => (
