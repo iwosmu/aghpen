@@ -27,6 +27,9 @@ const FILTERS = ['q', 'status', 'scope_id', 'tag', 'tech', 'port', 'min_interest
 
 interface VCol { id: string; header: string; width: string; min: number; sort?: string; align?: 'right'; cell: (h: Host) => ReactNode }
 
+/** how many technology chips fit the column: two short names, else one */
+const techFit = (xs: string[]) => (xs.length > 1 && xs[0].length + xs[1].length <= 20 ? 2 : 1);
+
 export default function Hosts() {
   const u = useUrlState();
   const navigate = useNavigate();
@@ -73,17 +76,17 @@ export default function Hosts() {
   useEffect(() => { virt.measure(); }, [rowH]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allCols: VCol[] = [
-    { id: 'status', header: t('Stan', 'Status'), width: '168px', min: 0, cell: (h) => <HostStatusMark status={h.status} /> },
+    { id: 'status', header: t('Stan', 'Status'), width: '132px', min: 0, cell: (h) => <HostStatusMark status={h.status} /> },
     { id: 'ip', header: 'IP', width: '124px', min: 0, sort: 'ip', cell: (h) => <span className="mono">{h.ip}</span> },
     { id: 'name', header: t('Nazwa / etykieta', 'Name / label'), width: 'minmax(160px, 1.4fr)', min: 0, cell: (h) => (
       <span className="block truncate">
         {h.label ? <span className="text-ink">{h.label}</span> : null}
         {h.label && h.hostnames?.length ? <span className="text-ink-3"> · </span> : null}
-        <span className={cx('mono', h.label ? 'text-ink-3' : 'text-ink-2')}>{h.hostnames?.[0] ?? (h.label ? '' : '–')}</span>
+        <span className={h.label ? 'text-ink-3' : 'text-ink'}>{h.hostnames?.[0] ?? (h.label ? '' : '–')}</span>
       </span>
     ) },
-    { id: 'ports', header: t('Otwarte porty', 'Open ports'), width: 'minmax(120px, 1fr)', min: 900, sort: 'service_count', cell: (h) => (h.open_ports ?? []).length ? <span className="mono block truncate text-ink-2">{(h.open_ports ?? []).join(' ')}</span> : <span className="block truncate text-xs text-ink-3" title={noPortsText(h.status)}>{h.status === 'down' ? noPortsText(h.status) : t('brak otwartych portów', 'no open port')}</span> },
-    { id: 'tech', header: t('Technologie', 'Technologies'), width: 'minmax(140px, 1.2fr)', min: 1080, cell: (h) => <span className="block truncate text-ink-2">{(h.technologies ?? []).join(', ') || ((h.open_ports ?? []).length ? '–' : '')}</span> },
+    { id: 'ports', header: t('Otwarte porty', 'Open ports'), width: 'minmax(120px, 1fr)', min: 900, sort: 'service_count', cell: (h) => (h.open_ports ?? []).length ? <span className="flex gap-1 overflow-hidden">{(h.open_ports ?? []).slice(0, 4).map((p) => <span key={p} className="chip-fact mono">{p}</span>)}{(h.open_ports ?? []).length > 4 ? <span className="chip-fact num">+{(h.open_ports ?? []).length - 4}</span> : null}</span> : <span className="block truncate text-xs text-ink-3" title={noPortsText(h.status)}>{h.status === 'down' ? noPortsText(h.status) : t('brak otwartych portów', 'no open port')}</span> },
+    { id: 'tech', header: t('Technologie', 'Technologies'), width: 'minmax(140px, 1.2fr)', min: 1080, cell: (h) => (h.technologies ?? []).length ? <span className="flex gap-1 overflow-hidden" title={(h.technologies ?? []).join(', ')}>{(h.technologies ?? []).slice(0, techFit(h.technologies ?? [])).map((x) => <span key={x} className="chip-fact max-w-[140px]"><span className="truncate">{x}</span></span>)}{(h.technologies ?? []).length > techFit(h.technologies ?? []) ? <span className="chip-fact num">+{(h.technologies ?? []).length - techFit(h.technologies ?? [])}</span> : null}</span> : <span className="text-ink-3">{(h.open_ports ?? []).length ? '–' : ''}</span> },
     { id: 'tags', header: t('Tagi', 'Tags'), width: '150px', min: 1320, cell: (h) => <Tags tags={h.tags} max={2} /> },
     { id: 'palive', header: t('Obecność', 'Presence'), width: '62px', min: 760, sort: 'p_alive', align: 'right', cell: (h) => <span className="num text-ink-2">{fmtDec(h.p_alive)}</span> },
     { id: 'seen', header: t('Ostatnia obserwacja', 'Last seen'), width: '128px', min: 700, sort: 'last_seen', cell: (h) => <span className="num text-ink-2" title={fmtDateTime(h.last_seen)}>{fmtRelative(h.last_seen)}</span> },

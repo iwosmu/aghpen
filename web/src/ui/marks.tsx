@@ -178,7 +178,8 @@ export function severityLabel(s: Severity | string): string {
 }
 export function Sev({ level, compact }: { level: Severity | string; compact?: boolean }) {
   const n = SEV_LEVEL[level] ?? 1;
-  const color = n === 4 ? 'var(--st-gone)' : n === 3 ? 'var(--st-changed)' : n === 2 ? 'var(--accent)' : 'var(--ink-3)';
+  // one accent rule: only the top level is coral; the rest stay in ink tones
+  const color = n === 4 ? 'var(--coral)' : n >= 2 ? 'var(--ink-2)' : 'var(--ink-3)';
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap" title={t('Waga: ', 'Severity: ') + severityLabel(level)}>
       <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" style={{ flex: 'none' }}>
@@ -195,7 +196,7 @@ export function Sev({ level, compact }: { level: Severity | string; compact?: bo
 export const FINDING_STATUSES: FindingStatus[] = ['new', 'triaged', 'accepted', 'false_positive', 'resolved'];
 export function findingStatusInfo(s: FindingStatus | string): { tone: Tone; glyph: GlyphName; label: string } {
   switch (s) {
-    case 'new': return { tone: 'accent', glyph: 'dot', label: t('nowe', 'new') };
+    case 'new': return { tone: 'neutral', glyph: 'dot', label: t('nowe', 'new') };
     case 'triaged': return { tone: 'neutral', glyph: 'half', label: t('w analizie', 'in analysis') };
     case 'accepted': return { tone: 'neutral', glyph: 'check', label: t('zaakceptowane', 'accepted') };
     case 'false_positive': return { tone: 'expected', glyph: 'x', label: t('fałszywy alarm', 'false positive') };
@@ -249,13 +250,13 @@ export const TECH_CATEGORIES = ['cms', 'framework', 'app-server', 'web-server', 
 
 // ---------- Scores: never a bare number ----------
 export function InterestScore({ value, reasons, showTip }: { value: number; reasons?: InterestReason[] | null; showTip?: (e: React.MouseEvent | React.FocusEvent, body: ReactNode) => void }) {
-  const tone = value >= 70 ? 'var(--st-gone)' : value >= 40 ? 'var(--st-changed)' : 'var(--ink-3)';
+  const tone = value >= 90 ? 'var(--coral)' : 'var(--ink-3)';
   const title = reasons && reasons.length ? reasons.map((r) => '+' + r.points + ' ' + r.text).join('\n') : undefined;
   return (
     <span className="inline-flex items-center gap-1.5" title={showTip ? undefined : title}>
       <span className="num w-[22px] text-right text-sm text-ink">{value}</span>
-      <span className="relative h-[4px] w-[34px] bg-rule" aria-hidden="true">
-        <span className="absolute inset-y-0 left-0" style={{ width: Math.min(100, value) + '%', background: tone }} />
+      <span className="relative h-[4px] w-[34px] overflow-hidden rounded-full bg-rule" aria-hidden="true">
+        <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: Math.min(100, value) + '%', background: tone }} />
       </span>
     </span>
   );
