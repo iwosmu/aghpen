@@ -6,7 +6,7 @@ import { invalidate, useAction, useItem, usePage } from '../api/hooks';
 import { ApiError, del, patch, post } from '../api/client';
 import type { DefectDojoSettings, DojoExportResult, Finding, FindingStatus, Severity } from '../api/types';
 import { t, plural } from '../i18n';
-import { cx, fmtDateTime, fmtRelative } from '../lib/format';
+import { cx, fmtDateTime } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
 import { Button, Dialog, Empty, ErrorState, Field, InlineError, KV, PageHeader, Select, SkeletonRows, Tabs, TagInput, Tags } from '../ui/kit';
 import { groupFindings, type FindingGroup } from '../lib/findingGroups';
@@ -111,6 +111,12 @@ function ManualDialog({ onClose }: { onClose: () => void }) {
 const STATUS_ORDER = ['new', 'triaged', 'accepted', 'false_positive', 'resolved'];
 
 /** Findings grouped by what they are ("Panel administracyjny poza siecią zarządzania · 7 usług"), each expandable to its addresses. */
+/** The title without a trailing ' — address' that the address column already shows. */
+function bareTitle(f: Finding): string {
+  const addr = f.ip + (f.port ? ':' + f.port : '');
+  return f.title.endsWith(' — ' + addr) ? f.title.slice(0, -(addr.length + 3)) : f.title;
+}
+
 function FindingGroupList({ q, active, onOpen }: { q: ReturnType<typeof usePage<Finding>>; active: boolean; onOpen: (id: number) => void }) {
   const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
   const groups = useMemo(() => groupFindings(q.data?.items ?? []), [q.data]);
@@ -130,15 +136,10 @@ function FindingGroupList({ q, active, onOpen }: { q: ReturnType<typeof usePage<
           return (
             <li key={g.key} className="border-b border-rule last:border-b-0">
               <button type="button" aria-expanded={isOpen} onClick={() => toggle(g.key)} data-testid="finding-group"
-                className="grid min-h-[60px] w-full grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-x-3 px-5 py-2.5 text-left transition-colors duration-150 hover:bg-[var(--row-hover)]">
+                className="grid h-[48px] w-full grid-cols-[18px_minmax(0,1fr)_auto_auto] items-center gap-x-4 px-5 text-left transition-colors duration-150 hover:bg-[var(--row-hover)]">
                 <Icon name={isOpen ? 'chevronDown' : 'chevronRight'} size={12} className="text-ink-3" />
-                <span className="min-w-0">
-                  <span className="line-clamp-2 block text-[15px] text-ink">{g.title}</span>
-                  <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <span className="chip-fact"><span className="num">{g.places}</span> {g.items.every((f) => f.port) ? plural(g.places, ['usługa', 'usługi', 'usług'], ['service', 'services']) : plural(g.places, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}</span>
-                    {STATUS_ORDER.filter((s) => g.statuses[s]).map((s) => <span key={s} className="chip-fact"><span className="num">{g.statuses[s]}</span> {findingStatusInfo(s as FindingStatus).label}</span>)}
-                  </span>
-                </span>
+                <span className="min-w-0 truncate text-[15px] text-ink" title={g.title}>{g.title}</span>
+                <span className="num text-sm text-ink-2" title={g.places + ' ' + (g.items.every((f) => f.port) ? plural(g.places, ['usługa', 'usługi', 'usług'], ['service', 'services']) : plural(g.places, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])) + ' · ' + STATUS_ORDER.filter((s) => g.statuses[s]).map((s) => g.statuses[s] + ' ' + findingStatusInfo(s as FindingStatus).label).join(', ')}>×{g.places}</span>
                 <span className="justify-self-end"><InterestScore value={g.interest} /></span>
               </button>
               {isOpen ? (
@@ -160,10 +161,7 @@ function FindingGroupList({ q, active, onOpen }: { q: ReturnType<typeof usePage<
           </ul>
         </section>
       ))}
-      <p className="px-1 pb-2 text-xs text-ink-2">
-        {t(groups.length + ' ' + plural(groups.length, ['rodzaj', 'rodzaje', 'rodzajów'], ['', '']) + ', ' + shown + ' ' + plural(shown, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']), groups.length + ' ' + (groups.length === 1 ? 'type' : 'types') + ', ' + shown + ' ' + (shown === 1 ? 'finding' : 'findings'))}
-        {q.data.total > shown ? t('; pokazano ' + shown + ' z ' + q.data.total, '; showing ' + shown + ' of ' + q.data.total) : ''}.
-      </p>
+      {q.data.total > shown ? <p className="num px-1 pb-2 text-xs text-ink-3">{shown} / {q.data.total}</p> : null}
     </div>
   );
 }
@@ -217,17 +215,9 @@ export default function Findings() {
   const active = FILTERS.filter((k) => u.get(k)).length;
   const cols: Col<Finding>[] = [
     { id: 'sev', header: t('Waga', 'Severity'), sort: 'severity', width: 110, cell: (f) => <Sev level={f.severity} /> },
-    { id: 'title', header: t('Znalezisko', 'Finding'), wrap: true, cell: (f) => (
-      <div className="min-w-[220px] py-1">
-        <div className="text-ink">{f.title}{f.manual ? <span className="ml-1.5 text-2xs text-ink-3">{t('ręczne', 'manual')}</span> : null}</div>
-        <div className="mono text-xs text-ink-3">{f.ip}{f.port ? ':' + f.port : ''}</div>
-      </div>
-    ) },
+    { id: 'title', header: t('Znalezisko', 'Finding'), cell: (f) => <span className="block max-w-[420px] truncate text-ink" title={f.title}>{bareTitle(f)}{f.manual ? <span className="ml-1.5 text-2xs text-ink-3">{t('ręczne', 'manual')}</span> : null}</span> },
+    { id: 'addr', header: t('Adres', 'Address'), cell: (f) => <span className="mono text-ink-2">{f.ip}{f.port ? ':' + f.port : ''}</span> },
     { id: 'status', header: t('Status', 'Status'), sort: 'status', cell: (f) => <FindingStatusMark status={f.status} /> },
-    { id: 'assignee', header: t('Przypisane do', 'Assignee'), hide: 'lg', cell: (f) => f.assignee ? <span className="text-ink-2">{f.assignee.split('@')[0]}</span> : <span className="text-ink-3">–</span> },
-    { id: 'tags', header: t('Tagi', 'Tags'), hide: 'xl', cell: (f) => <span className="inline-flex whitespace-nowrap"><Tags tags={f.tags} max={1} /></span> },
-    { id: 'note', header: t('Notatka', 'Note'), hide: 'xl', cell: (f) => <span className="block max-w-[140px] truncate text-xs text-ink-2" title={f.note}>{f.note || '–'}</span> },
-    { id: 'seen', header: t('Od', 'Since'), sort: 'first_seen', hide: 'md', cell: (f) => <span className="num text-ink-2" title={fmtDateTime(f.first_seen)}>{fmtRelative(f.first_seen)}</span> },
     { id: 'dojo', header: 'DefectDojo', hide: 'lg', cell: (f) => f.dojo_id ? <a className="num link inline-flex items-center gap-1" href={f.dojo_url} target="_blank" rel="noreferrer noopener" onClick={(e) => e.stopPropagation()}>#{f.dojo_id}<Icon name="external" size={11} /></a> : <span className="text-ink-3">–</span> },
     { id: 'interest', header: t('Ciekawość', 'Interest'), sort: 'interest', align: 'right', cell: (f) => <InterestScore value={f.interest} /> },
   ];
@@ -241,14 +231,15 @@ export default function Findings() {
       <div className="px-4 pb-3 sm:px-6 lg:px-8">
         <Tabs value={view} onChange={(v) => u.set({ view: v === 'groups' ? null : v })} tabs={[{ id: 'groups', label: t('Według rodzaju', 'By type') }, { id: 'list', label: t('Lista', 'List') }]} />
       </div>
-      <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
+      <FilterBar onClear={() => u.clear(FILTERS)} active={active} moreActive={['severity', 'type', 'exported'].filter((k) => u.get(k)).length} more={<>
+        <FilterField label={t('Waga', 'Severity')} width={120}><Select value={u.get('severity')} onChange={(v) => u.set({ severity: v })} options={[{ value: '', label: t('dowolna', 'any') }, ...sevOpts()]} /></FilterField>
+        <FilterField label={t('Rodzaj', 'Type')} width={130}><Select value={u.get('type')} onChange={(v) => u.set({ type: v })} options={[{ value: '', label: t('dowolny', 'any') }, ...['signature', 'exposure', 'policy-violation', 'tls', 'change', 'manual'].map((x) => ({ value: x, label: typeLabel(x) }))]} /></FilterField>
+        <FilterField label="DefectDojo" width={150}><Select value={u.get('exported')} onChange={(v) => u.set({ exported: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'false', label: t('niewyeksportowane', 'not exported') }, { value: 'true', label: t('wyeksportowane', 'exported') }]} /></FilterField>
+      </>}>
         <SearchField value={text} onChange={setText} placeholder={t('tytuł, adres, opis', 'title, address, text')} />
         <FilterField label={t('Status', 'Status')} width={170}>
           <Select value={u.get('status', 'open')} onChange={(v) => u.set({ status: v === 'open' ? null : v })} options={[{ value: 'open', label: t('otwarte', 'open') }, { value: 'all', label: t('wszystkie', 'all') }, ...statusOpts()]} />
         </FilterField>
-        <FilterField label={t('Waga', 'Severity')} width={120}><Select value={u.get('severity')} onChange={(v) => u.set({ severity: v })} options={[{ value: '', label: t('dowolna', 'any') }, ...sevOpts()]} /></FilterField>
-        <FilterField label={t('Rodzaj', 'Type')} width={130}><Select value={u.get('type')} onChange={(v) => u.set({ type: v })} options={[{ value: '', label: t('dowolny', 'any') }, ...['signature', 'exposure', 'policy-violation', 'tls', 'change', 'manual'].map((x) => ({ value: x, label: typeLabel(x) }))]} /></FilterField>
-        <FilterField label="DefectDojo" width={150}><Select value={u.get('exported')} onChange={(v) => u.set({ exported: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'false', label: t('niewyeksportowane', 'not exported') }, { value: 'true', label: t('wyeksportowane', 'exported') }]} /></FilterField>
       </FilterBar>
       {view === 'groups' ? (
         <FindingGroupList q={gq} active={active > 0} onOpen={(id) => u.set({ open: id }, { keepOffset: true })} />
