@@ -8,7 +8,10 @@ DEV_DB_NAME ?= czujka-dev-pg
 DEV_DB_PORT ?= 55432
 DEV_DB_URL  ?= postgres://czujka:czujka@127.0.0.1:$(DEV_DB_PORT)/czujka?sslmode=disable
 
-.PHONY: help dev dev-db dev-db-stop test test-integration bench build web fmt up down logs clean e2e-core e2e-full init bundle release
+NUCLEI_TEMPLATES ?= /tmp/nuclei-templates
+NUCLEI_COMMIT    ?= 1ad258956016afba455d4284539812eb24be690a
+
+.PHONY: sigimport help dev dev-db dev-db-stop test test-integration bench build web fmt up down logs clean e2e-core e2e-full init bundle release
 
 help:
 	@echo "make dev              start the dev database and run czujka on http://127.0.0.1:8080"
@@ -22,6 +25,12 @@ help:
 	@echo "make release          static linux amd64/arm64 binaries with the UI, systemd unit, guide (dist/release)"
 	@echo "make e2e-core         end-to-end check without a scan: import, analysis, diff, DefectDojo, exports (needs lab/defectdojo)"
 	@echo "make e2e-full         full end-to-end check: real scans of a docker lab through the REST API (e2e/full)"
+	@echo "make sigimport        regenerate signatures/community from a nuclei-templates checkout at the pinned commit"
+
+# signatures/community: passive nuclei templates converted to Czujka signatures (MIT, see community/LICENSES.md).
+sigimport:
+	@test "$$(git -C $(NUCLEI_TEMPLATES) rev-parse HEAD)" = "$(NUCLEI_COMMIT)" || { echo "check out $(NUCLEI_COMMIT) in $(NUCLEI_TEMPLATES) first"; exit 1; }
+	go run ./cmd/sigimport -src $(NUCLEI_TEMPLATES) -commit $(NUCLEI_COMMIT)
 
 dev-db:
 	@docker image inspect czujka-db:17 >/dev/null 2>&1 || docker build -t czujka-db:17 deploy/db

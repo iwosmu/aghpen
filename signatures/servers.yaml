@@ -225,6 +225,33 @@
       - {type: title, regex: '^Welcome to (?:WildFly|JBoss)', weight: 0.9}
       - {type: body, regex: 'Your WildFly instance is running|JBoss EAP is running|/console/index\.html">Administration Console', weight: 0.9}
 
+- id: wildfly-default-page
+  name: WildFly – strona powitalna
+  category: app-server
+  technology: WildFly / JBoss
+  description: 'Strona powitalna WildFly albo JBoss EAP: serwer bez wdrożonej aplikacji pod /.'
+  tags: [java]
+  interest: 30
+  classes: [default-page]
+  match:
+    rules:
+      - {type: title, regex: '^Welcome to (?:WildFly|JBoss)', weight: 0.95}
+
+- id: wildfly-hal-console
+  name: WildFly – konsola zarządzania HAL
+  category: app-server
+  technology: WildFly / JBoss
+  description: Konsola zarządzania HAL (WildFly, JBoss EAP) na porcie zarządzania, zwykle 9990. Nie powinna być osiągalna z sieci użytkowników.
+  tags: [java, admin]
+  interest: 70
+  classes: [admin-panel]
+  implies: [Java]
+  match:
+    min_confidence: 0.8
+    rules:
+      - {type: title, equals: 'HAL Management Console', weight: 0.9}
+      - {type: body, contains: 'hal.nocache.js', weight: 0.8}
+
 - id: weblogic
   name: Oracle WebLogic
   category: app-server
@@ -452,6 +479,20 @@
     rules:
       - {type: header, name: Server, equals: envoy, weight: 0.95}
       - {type: header, name: X-Envoy-Upstream-Service-Time, exists: true, weight: 0.9}
+
+- id: envoy-admin
+  name: Envoy – interfejs administracyjny
+  category: proxy
+  technology: Envoy
+  description: Interfejs administracyjny Envoy bez uwierzytelnienia. Jego GET-y czytają konfigurację, a POST-y zmieniają stan procesu (np. /quitquitquit go zatrzymuje).
+  interest: 85
+  classes: [admin-panel, unauth-control-api]
+  match:
+    min_confidence: 0.85
+    rules:
+      - {type: title, equals: 'Envoy Admin', weight: 0.8}
+      - {type: body, contains_all: ['quitquitquit', 'server_info'], weight: 0.85}
+      - {type: header, name: Server, equals: envoy, weight: 0.3}
 
 - id: squid
   name: Squid

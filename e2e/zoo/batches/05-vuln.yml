@@ -1,0 +1,19 @@
+# Zoo batch 05: deliberately vulnerable trainers (the template has DVWA) and bare dev servers.
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:v20.4.0
+    ports: ["3000:3000"]
+  webgoat:
+    image: webgoat/webgoat:v2026.5
+    ports: ["8080:8080", "9090:9090"]
+  bwapp:
+    image: raesene/bwapp:latest
+    ports: ["36080:80"]
+  phpinfo:
+    image: php:8.3.37-cli-alpine
+    command: ["sh", "-c", "mkdir -p /srv && echo '<?php phpinfo();' > /srv/index.php && exec php -S 0.0.0.0:8000 -t /srv"]
+    ports: ["8000:8000"]
+  pyhttp:
+    image: python:3.14.10-alpine
+    command: ["python", "-m", "http.server", "8000", "--directory", "/usr/local/lib"]
+    ports: ["48000:8000"]

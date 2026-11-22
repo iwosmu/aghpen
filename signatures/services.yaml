@@ -361,6 +361,8 @@
     rules:
       - {type: service, field: name, equals: rtsp, weight: 0.8}
       - {type: banner, regex: '^RTSP/1\.0 ', weight: 0.9}
+      # nmap names some HTTP servers rtsp (Keycloak 26 on Quarkus answers its probe with 400): an HTTP answer vetoes.
+      - {type: status, status: [200, 204, 301, 302, 303, 307, 308, 401, 403, 404], not: true}
 
 - id: ics-protocol
   name: Protokół przemysłowy (Modbus, S7, BACnet, DNP3, EtherNet/IP)
