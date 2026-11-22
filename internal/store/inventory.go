@@ -225,10 +225,17 @@ func (s *Store) AvailabilityBuckets(ctx context.Context, hostIDs []int64) (map[i
 
 const serviceCols = `s.id, s.host_id, host(s.ip) AS ip, s.hostname, s.port, s.proto, s.state, s.name, s.product, s.version, s.banner,
   s.confidence, s.tls, s.title, s.http_status, s.url, s.technologies, s.classes, s.interest, s.interest_why, s.group_key,
-  (CASE WHEN s.group_key = '' THEN 0 ELSE (SELECT count(*) FROM services g WHERE g.group_key = s.group_key) END) AS group_size,
+  COALESCE(gs.n, 0) AS group_size,
   s.note_enc AS note, s.tags, s.first_seen, s.last_seen, s.last_changed, s.overrides,
   (SELECT NULLIF(` + responseExpr + `, -1) FROM service_observations o WHERE o.service_id = s.id ORDER BY o.at DESC, o.id DESC LIMIT 1) AS response_ms,
   s.response_slow`
+
+// serviceFrom counts every group once. A count per row (a subquery in the
+// select list) ran for every row a deep page skips: 11 s for the page at
+// offset 22 440 of the 10 000-host lab, whose largest group has 10 782
+// services.
+const serviceFrom = `services s LEFT JOIN (SELECT group_key, count(*) AS n FROM services WHERE group_key <> '' GROUP BY group_key) gs
+  ON gs.group_key = s.group_key`
 
 var serviceSort = map[string]string{"id": "s.id", "ip": "s.ip", "port": "s.port", "state": "s.state", "name": "s.name", "product": "s.product",
 	"version": "s.version", "interest": serviceLiveInterest, "title": "s.title", "http_status": "s.http_status", "first_seen": "s.first_seen",
@@ -328,17 +335,17 @@ func (s *Store) CountCarried(ctx context.Context, runID int64) (int, error) {
 
 // ListServices returns a page of services.
 func (s *Store) ListServices(ctx context.Context, f ServiceFilter) (model.Page[model.Service], error) {
-	return listPage[model.Service](ctx, s.db, serviceColsFor(f), "services s", f.where(), orderBy(f.Sort, serviceSort, serviceLiveInterest+" DESC, s.interest DESC", "s.ip, s.port"), f.ListOpts, s.postService)
+	return listPage[model.Service](ctx, s.db, serviceColsFor(f), serviceFrom, f.where(), orderBy(f.Sort, serviceSort, serviceLiveInterest+" DESC, s.interest DESC", "s.ip, s.port"), f.ListOpts, s.postService)
 }
 
 // EachService streams every service that matches the filter.
 func (s *Store) EachService(ctx context.Context, f ServiceFilter, fn func(*model.Service) error) error {
-	return streamAll[model.Service](ctx, s.db, serviceColsFor(f), "services s", f.where(), orderBy(f.Sort, serviceSort, "s.ip ASC", "s.port, s.id"), s.postService, fn)
+	return streamAll[model.Service](ctx, s.db, serviceColsFor(f), serviceFrom, f.where(), orderBy(f.Sort, serviceSort, "s.ip ASC", "s.port, s.id"), s.postService, fn)
 }
 
 // GetService returns one service; withLatest also loads its newest observation.
 func (s *Store) GetService(ctx context.Context, id int64, withLatest bool) (model.Service, error) {
-	v, err := jsonRow[model.Service](ctx, s.db, wrapJSON("SELECT "+serviceCols+" FROM services s WHERE s.id = $1"), id)
+	v, err := jsonRow[model.Service](ctx, s.db, wrapJSON("SELECT "+serviceCols+" FROM "+serviceFrom+" WHERE s.id = $1"), id)
 	if err != nil {
 		return v, err
 	}
