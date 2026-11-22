@@ -172,9 +172,9 @@ func summaryPL(c model.Change, d map[string]any) string {
 		if strOf(after["error"]) == "no_answer" || after["ms"] == nil {
 			return fmt.Sprintf("Usługa %s nie odpowiada na HTTP, port otwarty (%s)", at, usual)
 		}
-		return fmt.Sprintf("Usługa %s odpowiada wolniej: %d ms (%s)", at, intOf(after["ms"]), usual)
+		return fmt.Sprintf("Usługa %s odpowiada wolniej: %s (%s)", at, msText(intOf(after["ms"]), "pl"), usual)
 	case model.ChangeResponseRecovered:
-		return fmt.Sprintf("Usługa %s znów szybka: %d ms (%s)", at, intOf(mapOf(c.After)["ms"]), usualText(intOf(mapOf(c.Before)["baseline_ms"])))
+		return fmt.Sprintf("Usługa %s znów szybka: %s (%s)", at, msText(intOf(mapOf(c.After)["ms"]), "pl"), usualText(intOf(mapOf(c.Before)["baseline_ms"])))
 	}
 	return ""
 }
@@ -288,9 +288,9 @@ func summaryEN(c model.Change, d map[string]any) string {
 		if strOf(after["error"]) == "no_answer" || after["ms"] == nil {
 			return fmt.Sprintf("Service %s not responding to HTTP, port open (%s)", at, usual)
 		}
-		return fmt.Sprintf("Service %s responds slower: %d ms (%s)", at, intOf(after["ms"]), usual)
+		return fmt.Sprintf("Service %s responds slower: %s (%s)", at, msText(intOf(after["ms"]), "en"), usual)
 	case model.ChangeResponseRecovered:
-		return fmt.Sprintf("Service %s fast again: %d ms (%s)", at, intOf(mapOf(c.After)["ms"]), usualTextEN(intOf(mapOf(c.Before)["baseline_ms"])))
+		return fmt.Sprintf("Service %s fast again: %s (%s)", at, msText(intOf(mapOf(c.After)["ms"]), "en"), usualTextEN(intOf(mapOf(c.Before)["baseline_ms"])))
 	}
 	return ""
 }
@@ -326,6 +326,18 @@ func orNoneEN(s string) string {
 		return "(none)"
 	}
 	return s
+}
+
+// msText is a measured response time: "poniżej 1 ms" / "under 1 ms" below
+// one millisecond (the store keeps whole milliseconds, so 0 means under 1).
+func msText(ms int, lang string) string {
+	if ms < 1 {
+		if lang == "en" {
+			return "under 1 ms"
+		}
+		return "poniżej 1 ms"
+	}
+	return fmt.Sprintf("%d ms", ms)
 }
 
 func usualTextEN(baselineMs int) string {
