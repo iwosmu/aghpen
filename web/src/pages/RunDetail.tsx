@@ -215,7 +215,7 @@ export default function RunDetail() {
         )}
       />
 
-      <div className="space-y-5 p-4 sm:p-6 lg:px-8">
+      <div className="space-y-5 px-4 pb-6 sm:px-6 lg:px-8">
         <RunNote run={run} canEdit={canRun} />
         {run.error ? (
           <div role="alert" className="flex items-start gap-2 rounded-[10px] bg-st-gone-wash px-4 py-3 text-sm">

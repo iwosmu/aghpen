@@ -214,7 +214,7 @@ export default function ServiceDetail() {
         readOnly={!canEdit}
         actions={<span className="flex items-center gap-3 text-sm text-ink-2">{canSuggest ? <SuggestButton serviceId={s.id} /> : null}<span className="flex items-center gap-2">{t('Ciekawość', 'Interest')} <InterestScore value={s.interest} /></span></span>}
       />
-      <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,400px)] xl:grid-rows-[auto_1fr]">
+      <div className="grid gap-4 px-4 pb-6 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,400px)] xl:grid-rows-[auto_1fr]">
         <div className="min-w-0 xl:col-start-2 xl:row-start-1">
           <Panel title={t('Ocena ciekawości', 'Interest score')}><InterestBreakdown value={s.interest} reasons={s.interest_why} /></Panel>
         </div>

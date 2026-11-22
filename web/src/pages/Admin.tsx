@@ -68,7 +68,7 @@ function UsersTab() {
   ];
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 px-4 py-2 sm:px-6">
+      <div className="flex items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:px-8">
         <p className="text-sm text-ink-2">{users.data ? <><span className="num text-ink">{users.data.total}</span> {plural(users.data.total, ['konto', 'konta', 'kont'], ['account', 'accounts'])}</> : null}</p>
         <Button variant="primary" icon="plus" onClick={() => setAdd(true)}>{t('Nowy użytkownik', 'New user')}</Button>
       </div>
@@ -108,7 +108,7 @@ function RolesTab({ canManage }: { canManage: boolean }) {
   const list = roles.data;
   const en = getLang() === 'en';
   return (
-    <div className="p-4 sm:p-6">
+    <div className="px-4 pb-6 pt-4 sm:px-6 lg:px-8">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 {canManage ? <Button variant="primary" icon="plus" onClick={() => setAdd(true)}>{t('Nowa rola', 'New role')}</Button> : null}
       </div>
@@ -239,7 +239,7 @@ function SafetyTab() {
   const dirty = JSON.stringify(lines(excl)) !== JSON.stringify(q.data.exclusions ?? []) || JSON.stringify(lines(nets)) !== JSON.stringify(q.data.allowed_networks ?? [])
     || JSON.stringify({ ...f, exclusions: null, allowed_networks: null }) !== JSON.stringify({ ...q.data, exclusions: null, allowed_networks: null });
   return (
-    <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="grid gap-4 px-4 pb-6 pt-4 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_360px]">
       <Panel title={t('Polityka bezpieczeństwa', 'Safety policy')} actions={canManage ? <Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!dirty} onClick={() => save.mutate(undefined)}>{t('Zapisz politykę', 'Save policy')}</Button> : undefined}>
         {!canManage ? <div className="mb-3"><ReadOnlyNote text={t('Tylko do odczytu', 'Read only')} /></div> : null}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -379,7 +379,7 @@ function DojoTab() {
   const freeScope = (scopes.data?.items ?? []).find((s) => !maps.some((m) => m.scope_id === s.id));
   const count = (x: unknown) => (Array.isArray(x) ? x.length : typeof x === 'number' ? x : 0);
   return (
-    <div className="max-w-[860px] p-4 sm:p-6">
+    <div className="max-w-[860px] px-4 pb-6 pt-4 sm:px-6 lg:px-8">
       <Panel title="DefectDojo" actions={<Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!dirty} onClick={() => save.mutate(undefined)}>{t('Zapisz ustawienia', 'Save settings')}</Button>}>
                 <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label={t('Integracja włączona', 'Integration enabled')} />
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -495,7 +495,7 @@ export default function Admin() {
   return (
     <div>
       <PageHeader title={t('Administracja', 'Administration')} readOnly={readOnly} />
-      <div className="px-4 pt-2 sm:px-6"><Tabs tabs={tabs} value={tab} onChange={(id) => u.set({ tab: id, q: null, action: null, entity: null })} /></div>
+      <div className="px-4 pt-2 sm:px-6 lg:px-8"><Tabs tabs={tabs} value={tab} onChange={(id) => u.set({ tab: id, q: null, action: null, entity: null })} /></div>
       {tab === 'users' ? <UsersTab /> : null}
       {tab === 'roles' ? <RolesTab canManage={can('roles:manage')} /> : null}
       {tab === 'audit' ? <AuditTab /> : null}

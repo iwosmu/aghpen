@@ -105,12 +105,12 @@ export default function Rules() {
   const toggle = useAction((r: ExposureRule) => patch('/rules/' + r.id, { enabled: !r.enabled }), { invalidate: ['/rules', '/findings'], silent: true });
   const evaluate = useAction(() => post<{ violations: number; took_ms: number }>('/rules/evaluate'), { invalidate: ['/rules', '/findings'], success: (r) => t('Naruszenia: ' + r.violations, 'Violations: ' + r.violations) });
   const header = <PageHeader title={t('Reguły ekspozycji', 'Exposure rules')}    actions={<>{canEvaluate && items.length ? <Button icon="refresh" busy={evaluate.isPending} onClick={() => evaluate.mutate(undefined)}>{t('Sprawdź teraz', 'Check now')}</Button> : null}{canCreate ? <Button variant="primary" icon="plus" onClick={() => u.set({ rule: 'new', slug: null })}>{t('Nowa reguła', 'New rule')}</Button> : null}</>} />;
-  if (q.error) return <div>{header}<div className="p-4 sm:p-6">{routeMissing(q.error) ? <Unavailable /> : <ErrorState error={q.error} retry={() => q.refetch()} />}</div></div>;
+  if (q.error) return <div>{header}<div className="px-4 pb-6 sm:px-6 lg:px-8">{routeMissing(q.error) ? <Unavailable /> : <ErrorState error={q.error} retry={() => q.refetch()} />}</div></div>;
   if (!q.data) return <div>{header}<SkeletonRows rows={8} /></div>;
   return (
     <div>
       {header}
-      <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[400px_minmax(0,1fr)]">
+      <div className="grid gap-4 px-4 pb-6 sm:px-6 lg:px-8 xl:grid-cols-[400px_minmax(0,1fr)]">
         <Panel title={t('Reguły', 'Rules')} count={items.length} flush>
           <ul className="divide-y divide-rule" data-testid="rule-list">
             {items.map((r) => (

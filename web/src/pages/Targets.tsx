@@ -223,7 +223,7 @@ export default function Targets() {
       {scopes.error ? <ErrorState error={scopes.error} retry={() => scopes.refetch()} /> : scopes.isPending ? <SkeletonRows rows={8} /> : list.length === 0 ? (
         <Empty icon="targets" title={t('Brak zakresów', 'No scopes yet')} hint={t('Utwórz zakres i dodaj sieci, które wolno skanować.', 'Create a scope and add the networks that may be scanned.')} action={canCreate ? <Button variant="primary" icon="plus" onClick={() => setDialog('new')}>{t('Nowy zakres', 'New scope')}</Button> : undefined} />
       ) : (
-        <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="grid gap-4 px-4 pb-6 sm:px-6 lg:px-8 xl:grid-cols-[300px_minmax(0,1fr)]">
           <nav aria-label={t('Zakresy', 'Scopes')}>
             <ul className="border border-rule bg-panel">
               {list.map((s) => (

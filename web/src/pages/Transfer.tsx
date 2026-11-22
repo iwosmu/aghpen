@@ -123,7 +123,7 @@ export default function Transfer() {
   return (
     <div>
       <PageHeader title={t('Import i eksport', 'Import and export')} readOnly={!canImport} />
-      <div className="grid gap-4 p-4 sm:p-6 xl:grid-cols-2">
+      <div className="grid gap-4 px-4 pb-6 sm:px-6 lg:px-8 xl:grid-cols-2">
         <Panel title={t('Import wyników', 'Import results')}>
           {canImport ? (
             <div className="space-y-3">
