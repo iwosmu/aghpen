@@ -112,30 +112,44 @@ uniform vec2 uRes;
 uniform float uRib;
 uniform float uDpr;
 
+float luma(vec3 c) { return dot(c, vec3(0.3, 0.59, 0.11)); }
+float hash1(float n) { return fract(sin(n * 91.345) * 47453.5453); }
+
 void main() {
   vec2 px = gl_FragCoord.xy;
   float s = fract(px.x / uRib);
   float idx = floor(px.x / uRib);
   float n = s * 2.0 - 1.0;
-  // a cylindrical lens: a strip about 2.6 ribs wide, squeezed into one rib,
-  // bending harder at the edges; the slice is offset from the rib under it
-  float lens = n * 1.45 + 0.45 * n * n * n;
-  float cx = (idx + 0.5) * uRib + lens * uRib + 0.7 * uRib;
-  float dy = n * n * uRib * 0.35;
+
+  // How steep is the picture under this rib? Where colour changes fast, the
+  // slices are offset further, so the shapes visibly break from rib to rib.
+  vec2 cuv = vec2((idx + 0.5) * uRib, px.y) / uRes;
+  vec2 st = vec2(1.5 * uRib / uRes.x, 1.5 * uRib / uRes.y);
+  float gx = luma(texture2D(uField, cuv + vec2(st.x, 0.0)).rgb) - luma(texture2D(uField, cuv - vec2(st.x, 0.0)).rgb);
+  float gy = luma(texture2D(uField, cuv + vec2(0.0, st.y)).rgb) - luma(texture2D(uField, cuv - vec2(0.0, st.y)).rgb);
+  float steep = clamp(length(vec2(gx, gy)) * 5.0, 0.0, 1.0);
+  float jit = hash1(idx) - 0.5;
+
+  // each rib is a small cylindrical lens: a strip about 1.6 ribs wide,
+  // squeezed into one rib and bending harder at the edges, so the image
+  // jumps by about half a rib at every seam
+  float lens = n * 0.6 + 0.2 * n * n * n;
+  float cx = (idx + 0.5) * uRib + lens * uRib + uRib * (0.7 + steep * (0.9 + 2.2 * jit));
+  float dy = n * n * uRib * 0.2 + steep * jit * uRib * 0.6;
   vec2 uv = vec2(cx, px.y + dy) / uRes;
-  float disp = 0.12 * uRib * n / uRes.x;
+  float disp = 0.10 * uRib * n / uRes.x;
   vec3 c;
   c.r = texture2D(uField, uv + vec2(disp, 0.0)).r;
   c.g = texture2D(uField, uv).g;
   c.b = texture2D(uField, uv - vec2(disp, 0.0)).b;
 
-  float lum = dot(c, vec3(0.3, 0.59, 0.11));
-  float d = s * uRib / uDpr;                 // css px from the light edge
-  float e = (1.0 - s) * uRib / uDpr;         // css px from the shaded edge
-  c += exp(-d / 0.8) * (0.02 + 0.45 * lum) * vec3(0.92, 0.96, 1.0);
-  float gs = (s - 0.28) / 0.16;
-  c += exp(-gs * gs) * (0.006 + 0.08 * lum);
-  c *= 1.0 - 0.16 * smoothstep(0.45, 1.0, s) - 0.12 * exp(-e / 1.0);
+  float lum = luma(c);
+  float d = s * uRib / uDpr;                 // css px from the lit edge
+  float e = (1.0 - s) * uRib / uDpr;         // css px from the far edge
+  // a soft specular edge with a brighter core, stronger where there is light to catch
+  c += (exp(-d / 2.4) * 0.55 + exp(-d / 0.7) * 0.45) * (0.012 + 0.5 * lum) * vec3(0.93, 0.97, 1.0);
+  // a gradual shade across the width, and only a hint of a seam
+  c *= 1.0 - 0.09 * smoothstep(0.2, 1.0, s) - 0.04 * exp(-e / 0.7);
 
   float g = fract(sin(dot(floor(px / uDpr), vec2(12.9898, 78.233))) * 43758.5453);
   c += (g - 0.5) * 0.05 * (0.55 + lum);
@@ -210,8 +224,8 @@ export function FlutedField({ className }: { className?: string }) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      // ribs about 20 css px on a desktop, narrower on a phone; a whole number of device pixels
-      rib = Math.round(Math.min(22, Math.max(12, cw / 70)) * dpr);
+      // ribs about 25 css px at 1440, narrower on a phone; a whole number of device pixels
+      rib = Math.round(Math.min(30, Math.max(14, cw / 58)) * dpr);
     };
 
     const draw = (t: number) => {
