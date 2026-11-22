@@ -1,7 +1,7 @@
 # Czujka: skaner, który rozumie czas
 
 ```sh
-git clone https://github.com/iwosmu/aghpen.git czujka && cd czujka
+git clone --depth 1 https://github.com/iwosmu/aghpen.git czujka && cd czujka
 docker compose up -d
 ```
 
@@ -15,18 +15,18 @@ Liczby pochodzą z [`docs/WYNIKI.md`](docs/WYNIKI.md) (jedno źródło). Pełna 
 
 | Waga | Kryterium | Ekran albo polecenie | Zmierzone | Dowód |
 | --- | --- | --- | --- | --- |
-| 30% | Discovery i identyfikacja usług w dużej sieci | przebieg /16 laboratorium; „Hosty”, „Usługi” | hosty 67 z 67, otwarte porty 154 ze 155, 0 fałszywych | [WYNIKI](docs/WYNIKI.md#wykrywanie-w-sieci-16), `e2e/lab-gate.sh` |
-| 20% | Uruchomienie, import/eksport, DefectDojo, dokumentacja | `docker compose up -d`; „Import i eksport”; „Znaleziska” → „Eksport do DefectDojo” | start 51–115 s; e2e 100 ze 100 kontroli | [WYNIKI](docs/WYNIKI.md#uruchomienie), `e2e/full/transcript.txt`, `web/REPORT-LAB.md` §11 |
+| 30% | Discovery i identyfikacja usług w dużej sieci | przebieg /16 laboratorium; „Hosty”, „Usługi” | laboratorium: hosty 67 z 67, otwarte porty 154 ze 155, 0 fałszywych; skala: 10 000 z 10 000 żywych adresów, porty 22 500 z 22 500 | [WYNIKI](docs/WYNIKI.md#wykrywanie-w-sieci-16), `e2e/lab-gate.sh` |
+| 20% | Uruchomienie, import/eksport, DefectDojo, dokumentacja | `docker compose up -d`; „Import i eksport”; „Znaleziska” → „Wszystkie do DefectDojo” | start 51–115 s; test szablonu jury 160 kontroli bez błędu; e2e 26 z 26 | [WYNIKI](docs/WYNIKI.md#uruchomienie), `e2e/full/transcript.txt`, `web/REPORT-LAB.md` §11 |
 | 15% | Zmiany w czasie, niestabilne hosty, raport | szablon: `./quickstart.sh change` i drugi skan → „Usługa zniknęła”; `up` → „Usługa wróciła”; zatrzymany host → „nie odpowiada (niepotwierdzone)”, po około minucie „nieaktywny” | skan szablonu 49 s (`nmap -sV` na tych samych portach: 51 s) | [WYNIKI](docs/WYNIKI.md#szablon-organizatorów-jedna-maszyna), [ALGORYTMY](docs/ALGORYTMY.md) §3.4 |
-| 15% | Bezpieczeństwo, tempo skanu, czytelny pulpit | górny pasek: limit, GET/HEAD, „Stop awaryjny”; „Pulpit” | żadnej sekundy ponad limit + 10% na /16; stop w 0,09 s | [WYNIKI](docs/WYNIKI.md#tempo-i-bezpieczeństwo-skanowania), [BEZPIECZENSTWO](docs/BEZPIECZENSTWO.md) |
-| 10% | Fingerprinting, technologie, nagłówki, ciasteczka, sygnatury | usługa → „Technologie i dowody”; „Sygnatury” | technologie: precyzja 1,000, czułość 0,990; tytuły 122 ze 122 | [WYNIKI](docs/WYNIKI.md#wykrywanie-w-sieci-16), [SIGNATURES](docs/SIGNATURES.md) |
+| 15% | Bezpieczeństwo, tempo skanu, czytelny pulpit | górny pasek: „Stop awaryjny”; „Pulpit”: stopka „Tylko GET i HEAD” z limitami; „Administracja” → „Bezpieczeństwo” | żadnej sekundy ponad limit + 10% na /16; drugi limit w jądrze; stop w 0,09 s | [WYNIKI](docs/WYNIKI.md#tempo-i-bezpieczeństwo-skanowania), [BEZPIECZENSTWO](docs/BEZPIECZENSTWO.md) |
+| 10% | Fingerprinting, technologie, nagłówki, ciasteczka, sygnatury | usługa → „Technologie”; „Usługi” → „Technologie”; „Sygnatury” | technologie: precyzja 1,000, czułość 0,990; tytuły 122 ze 122 | [WYNIKI](docs/WYNIKI.md#wykrywanie-w-sieci-16), [SIGNATURES](docs/SIGNATURES.md) |
 | 10% | Role i ochrona danych | „Administracja”; `/healthz` → `"tde":true` | 4 role i własne, 22 uprawnienia; `pg_tde` i AES-256-GCM | `TestRBACMatrixCSRFAndAudit`, [BEZPIECZENSTWO](docs/BEZPIECZENSTWO.md) §2 |
 
 Zmierzone na czystej maszynie (`docker:dind`, 0 obrazów; zapis: [`deploy/e2e/fresh-clone-dind.txt`](deploy/e2e/fresh-clone-dind.txt)):
 
 | Krok | Czas |
 | --- | --- |
-| `git clone` | 1 s |
+| `git clone --depth 1` | 10 s (45 MB na dysku; pomiar 22.11 na łączu domowym) |
 | `docker compose up -d` do zdrowego API (pobranie obrazów i budowa) | 51–115 s, zależnie od łącza (trzy pomiary: 79 s z Docker Hub, 115 s i 51 s przez mirror.gcr.io) |
 | zamiast tego paczka offline (`make bundle`, 354 MiB): rozpakowanie i `sh install.sh` | 26–29 s, bez sieci |
 | logowanie, „Ten komputer”, „Uruchom skan” (przeglądarka sterowana skryptem) | 9 s |
@@ -41,18 +41,18 @@ Wysyła tylko `GET` i `HEAD` i nigdy się nie loguje. Cały produkt to jedna bin
 
 Zgłoszenie do zadania „Attack Surface Intelligence” Centrum Bezpieczeństwa Informacji AGH, HackNation 2026. Zespół: Iwo Smura, Iwo Wojtakajtis.
 
-![Pulpit Czujki po skanie laboratorium /16](web/screenshots/lab/40-dashboard-pl-dark-1440.png)
+![Pulpit Czujki na działającej instancji: laboratorium /16, 70 hostów, historia skanów z nocy](docs/img/pulpit.png)
 
 ## Dla jury
 
 | Co | Gdzie |
 | --- | --- |
 | Prezentacja (10 slajdów) | [`docs/slides/czujka.pdf`](docs/slides/czujka.pdf) |
-| Film demo (około 2 minut, nagrany skryptem z prawdziwego interfejsu) | [`docs/demo/czujka-demo.mp4`](docs/demo/czujka-demo.mp4), tekst lektora [`docs/demo/lektor.txt`](docs/demo/lektor.txt) |
+| Film demo (poniżej 2 minut, nagrany skryptem na działającej instancji `czujka.dev`, z lektorem) | [`docs/demo/czujka-demo.mp4`](docs/demo/czujka-demo.mp4), tekst lektora [`docs/demo/lektor.txt`](docs/demo/lektor.txt) |
 | Scenariusz pokazu, notatki do slajdów, pytania | [`docs/DEMO.md`](docs/DEMO.md) |
 | Zgodność z treścią zadania: każde wymaganie, 12 punktów weryfikacji, 6 kryteriów, z dowodem | [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md) |
-| Wyniki zmierzone na laboratorium 70 hostów (precyzja, czułość, czas /16) | [`docs/WYNIKI.md`](docs/WYNIKI.md) |
-| Działająca instancja z laboratorium 70 hostów | `https://czujka.dev`, konto do odczytu: dane logowania w zgłoszeniu |
+| Wyniki zmierzone: laboratorium 70 hostów (precyzja, czułość, czas /16), skala 2 000 i 10 000 żywych adresów, 20 obcych usług spoza zestawu strojenia | [`docs/WYNIKI.md`](docs/WYNIKI.md) |
+| Działająca instancja z laboratorium 70 hostów i historią skanów od 21.11 | `https://czujka.dev`; cztery konta jury, po jednym na rolę (administrator, edytor, analityk, obserwator): dane logowania w zgłoszeniu |
 | Spis całej dokumentacji | [`docs/DOKUMENTACJA.md`](docs/DOKUMENTACJA.md) |
 
 Skanuj tylko sieci, do których masz uprawnienia.
@@ -62,7 +62,7 @@ Skanuj tylko sieci, do których masz uprawnienia.
 Szablon `lab/jury` to jedna maszyna z usługami w Dockerze na portach hosta. Czujka działa w kontenerze, więc cel `localhost` (także `127.0.0.1` i `::1`) skanuje hosta dockera (`host.docker.internal`), a nie własny kontener. Podgląd celu pokazuje adres, pod którym cel jest skanowany. Szablon zajmuje port 8080, dlatego Czujka dostaje port 9180.
 
 ```sh
-git clone https://github.com/iwosmu/aghpen.git czujka && cd czujka
+git clone --depth 1 https://github.com/iwosmu/aghpen.git czujka && cd czujka
 CZUJKA_PORT=9180 docker compose up -d
 docker compose logs czujka | grep -A3 "first administrator"
 cd lab/jury && ./quickstart.sh up
@@ -92,14 +92,14 @@ Wdrożenie to jedno polecenie. Produkt to dwa kontenery: binarka z interfejsem W
 
 ## Stan
 
-Produkt działa od końca do końca: `e2e/full/run.sh` przechodzi 100 ze 100 sprawdzeń przez REST API na prawdziwych usługach (zapis: `e2e/full/transcript.txt`). Interfejs sprawdzono na laboratorium /16 z 70 hostami (`web/REPORT-LAB.md`). Dokładny stan każdego wymagania: [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md).
+Produkt działa od końca do końca. Kontrola wydania na wersji końcowej: `make e2e-core` 26 z 26 (zapis: `deploy/e2e/transcript.txt`), test na szablonie organizatorów 160 kontroli bez błędu i 1 luka platformy (baner vsftpd pod Rosettą; `docs/TEST-JURY.md`). Wcześniejszy pełny test `e2e/full/run.sh`: 100 ze 100 (zapis: `e2e/full/transcript.txt`). Interfejs sprawdzono na laboratorium /16 z 70 hostami (`web/REPORT-LAB.md`). Dokładny stan każdego wymagania: [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md).
 
 Pomiary trafności, tempa i czasu startu: [`docs/WYNIKI.md`](docs/WYNIKI.md). Wysyłkę z ekranu produktu do żywego DefectDojo 3.5.202 zapisuje `web/REPORT-LAB.md` §11. Alerty: webhook po każdym przebiegu, zgodny z Slack i Mattermost, z podpisem HMAC ([`docs/API.md`](docs/API.md), „Alert webhook”).
 
 ## Ograniczenia
 
 - Zakresy CIDR IPv6 są odrzucane; pojedyncze adresy IPv6 działają. Nazwy domen dają tylko adresy IPv4 (rekordy A).
-- UDP: tylko 7 portów z niegroźnymi zapytaniami (53, 123, 137, 161, 500, 1900, 5353), bez wykrywania wersji.
+- UDP: tylko 7 portów z niegroźnymi zapytaniami (53, 123, 137, 161, 500, 1900, 5353). Wersję usługi UDP podaje `nmap -sU -sV` z najniższą intensywnością, tylko na otwartych portach z tej listy.
 - REST API działa z sesją i tokenem CSRF; nie ma tokenów API. Skrypt loguje się jak przeglądarka: [`docs/API.md`](docs/API.md), „API with curl”. Logowanie nie ma drugiego składnika.
 - Skala jest zmierzona na serwerze OMEN: 2 000 i 10 000 żywych adresów (2 i 10 kontenerów po 1 000 adresów) w sieci /16 ([`docs/WYNIKI.md`](docs/WYNIKI.md#skala-2-000-i-10-000-żywych-hostów)); czas dla innej liczby hostów to ekstrapolacja z tych pomiarów.
 
@@ -158,7 +158,7 @@ go run ./cmd/scanprobe -targets 127.0.0.1 -ports 8080 -pps 50
 | --- | --- |
 | `cmd/czujka` | binarka produktu; `cmd/scanprobe`, `cmd/fpprobe`, `cmd/dojoprobe` to narzędzia do testów modułów |
 | `internal/scan`, `probe`, `targets`, `sched`, `enginewire` | silnik skanu, nmap i prober własny, cele, harmonogram i okna, połączenie silnika z produktem |
-| `internal/httpfp`, `sig`, `sigwire`, `sigsuggest`, `signatures/` | kolektor HTTP/TLS, silnik sygnatur, sygnatury w bazie, sygnatura z przykładu, biblioteka 398 sygnatur |
+| `internal/httpfp`, `sig`, `sigwire`, `sigsuggest`, `signatures/` | kolektor HTTP/TLS, silnik sygnatur, sygnatury w bazie, sygnatura z przykładu, biblioteka: 416 własnych sygnatur i 1 831 pasywnych sygnatur z nuclei-templates (MIT, `signatures/community/`) |
 | `internal/analyze`, `timeline`, `reprobe`, `rules` | analiza i model dostępności, oś czasu, ponowne sprawdzenia, reguły ekspozycji |
 | `internal/report`, `interchange`, `passive`, `defectdojo` | raport, formaty wymiany, źródła pasywne, klient DefectDojo |
 | `internal/store`, `crypto`, `auth`, `api`, `runner`, `wire`, `config` | baza i migracje, szyfrowanie, role, REST API, menedżer przebiegów, składanie produktu, konfiguracja |
@@ -176,3 +176,7 @@ make e2e-full           # cały produkt przez REST API na prawdziwych usługach 
 ```
 
 Technologie: Go, PostgreSQL 17 (dystrybucja Percona z `pg_tde`), nmap, chi, pgx, React. Tylko oprogramowanie bezpłatne i otwarte; bez płatnych API.
+
+## Licencja
+
+Kod Czujki: [MIT](LICENSE). Sygnatury z nuclei-templates: MIT, z zachowaną informacją o pochodzeniu ([`signatures/community/LICENSES.md`](signatures/community/LICENSES.md)). nmap jest osobnym programem uruchamianym przez Czujkę, na własnej licencji.

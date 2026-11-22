@@ -272,5 +272,5 @@ func (r *run) deepHost(ctx context.Context, h model.HostResult, all *probe.PortS
 
 // deepNote is the run note of the deep pass.
 func deepNote(covered, waiting int) string {
-	return fmt.Sprintf("głębszy przebieg: reszta portów 1-65535 objęła %d hostów; czeka jeszcze %d (następne przebiegi biorą najpierw hosty nigdy nie skanowane w pełni, potem najdawniej skanowane)", covered, waiting)
+	return fmt.Sprintf("głębszy przebieg: porty 1-65535, hosty w tym przebiegu: %d, czekające: %d", covered, waiting)
 }

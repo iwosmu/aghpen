@@ -2,11 +2,13 @@
 # Live showcase kit: one "jury machine" (docker:28-dind) with Czujka and the organisers' template inside.
 # Only Czujka's UI leaves the machine: http://127.0.0.1:${LIVE_UI_PORT:-18730}. Nothing is scanned outside it:
 # the operator lock (CZUJKA_ALLOWED_NETWORKS) is the machine's own bridge gateway and one test host.
+# The deep pass is off by default here (CZUJKA_DEEP_PASS_HOSTS=0; it adds about 86 s per host per run): set it to turn it on.
 #
 #   docs/demo/live/live.sh prewarm     build and pull every image (run with Internet, before the event)
 #   docs/demo/live/live.sh start       start the machine (about 2 minutes), print the admin password once
 #   docs/demo/live/live.sh 1 .. 7      reset Czujka in the machine and prepare case N (docs/demo/LIVE.md)
 #   docs/demo/live/live.sh 1 change    the live step of a case (each case lists its steps: live.sh N help)
+#   docs/demo/live/live.sh jury [out]  reset, then the organisers' template check (e2e/jury/run.sh) inside the machine
 #   docs/demo/live/live.sh reset       empty Czujka (new database, same admin password), all stacks down
 #   docs/demo/live/live.sh stop        remove the machine
 set -uo pipefail
@@ -50,9 +52,20 @@ start)
   GW=$(inner "docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}'")
   PW="Live-$(date +%s)-$RANDOM$RANDOM"
   printf 'TAG=%s\nGW=%s\nHIP=%s\nPW=%s\n' "$TAG" "$GW" "$HIP" "$PW" | docker exec -i "$N" sh -c 'cat > /work/.live && chmod 600 /work/.live'
-  docker exec "$N" bash /work/docs/demo/live/inner.sh czujka_up || exit 1
+  docker exec -e CZUJKA_DEEP_PASS_HOSTS="${CZUJKA_DEEP_PASS_HOSTS:-0}" "$N" bash /work/docs/demo/live/inner.sh czujka_up || exit 1
   log "ready in $(( $(date +%s) - t0 )) s: http://127.0.0.1:$UI  login admin@czujka.local  password $PW (shown only here)" ;;
 stop) docker rm -f -v "$N" >/dev/null 2>&1; log "machine removed" ;;
+jury) # e2e/jury/run.sh as dind.sh runs it, but in this machine (fresh database first; about 30 minutes)
+  running || { echo "the machine is not running: docs/demo/live/live.sh start"; exit 1; }
+  out=${2:-e2e/jury/transcript.txt}
+  COPYFILE_DISABLE=1 tar --exclude='._*' -c docs/demo/live e2e/jury | docker exec -i "$N" sh -c 'tar -x -C /work'
+  docker exec -e CZUJKA_DEEP_PASS_HOSTS="${CZUJKA_DEEP_PASS_HOSTS:-0}" "$N" bash /work/docs/demo/live/inner.sh reset >/dev/null || exit 1
+  log "e2e/jury/run.sh on $(git rev-parse --short HEAD) inside $N; transcript: $out"
+  PWJ=$(docker exec "$N" sh -c '. /work/.live; echo "$PW"')
+  if sed --version >/dev/null 2>&1; then SEDU="sed -u"; else SEDU="sed -l"; fi # line-buffered: the transcript grows while it runs
+  docker exec -e CZ_URL=http://127.0.0.1:18080 -e CZ_PASSWORD="$PWJ" -e JURY_TARGET=localhost -e JURY_GUARD=0 -e JURY_HOST_IP="$HIP" -e JURY_ONLY="${JURY_ONLY:-}" "$N" \
+    bash -c 'cd /work && [ -n "$JURY_ONLY" ] || unset JURY_ONLY; bash e2e/jury/run.sh' 2>&1 | $SEDU "s/$PWJ/<hasło>/g" | tee "$out"
+  exit "${PIPESTATUS[0]}" ;;
 pass) running && docker exec "$N" sh -c '. /work/.live; echo "admin@czujka.local $PW"' ;;
 help|-h|--help) sed -n 2,14p "$0" ;;
 *)
@@ -60,5 +73,5 @@ help|-h|--help) sed -n 2,14p "$0" ;;
   # keep the scripts in the machine in step with this checkout
   COPYFILE_DISABLE=1 tar --exclude='._*' -c docs/demo/live e2e/jury | docker exec -i "$N" sh -c 'tar -x -C /work'
   cmd=$1; shift; case $cmd in [1-7]) cmd=c$cmd ;; reset|run|changes_after|full) ;; *) echo "unknown command: $cmd (live.sh help)"; exit 2 ;; esac
-  docker exec -e LIVE_UI="http://127.0.0.1:$UI" "$N" bash /work/docs/demo/live/inner.sh "$cmd" "$@" ;;
+  docker exec -e LIVE_UI="http://127.0.0.1:$UI" -e CZUJKA_DEEP_PASS_HOSTS="${CZUJKA_DEEP_PASS_HOSTS:-0}" "$N" bash /work/docs/demo/live/inner.sh "$cmd" "$@" ;;
 esac

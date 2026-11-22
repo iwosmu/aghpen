@@ -70,7 +70,7 @@ Zacznij od `README.md` (czym jest Czujka, uruchomienie), `docs/ZGODNOSC.md` (ka�
 | [`web/README.md`](../web/README.md) | budowanie i uruchamianie interfejsu |
 | [`web/DESIGN.md`](../web/DESIGN.md), [`web/PRODUCT.md`](../web/PRODUCT.md) | system wizualny i kontekst produktu |
 | [`docs/samples/raport-przyklad.html`](samples/raport-przyklad.html) | przykładowy raport z przebiegu (także `.md` i zrzut strony 1) |
-| `web/screenshots/lab/` | zrzuty ekranów interfejsu na danych laboratorium /16 |
+| `web/screenshots/lab/` (gałąź `archive/screenshots`) | zrzuty ekranów interfejsu sprzed uproszczenia, na danych laboratorium /16; w gałęzi głównej zostają tylko zrzuty cytowane wprost |
 
 ## Narzędzia wiersza poleceń
 

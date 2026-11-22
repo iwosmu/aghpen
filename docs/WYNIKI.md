@@ -1,6 +1,6 @@
 # Wyniki pomiarów
 
-Ten plik zawiera tylko liczby zmierzone na działającym produkcie. Każda ma źródło, z którego da się ją odtworzyć. Stan: 21.11.2026, silnik skanowania w wersji `6f39557`. Inne dokumenty cytują liczby stąd.
+Ten plik zawiera tylko liczby zmierzone na działającym produkcie. Każda ma źródło, z którego da się ją odtworzyć. Stan: 22.11.2026, silnik skanowania w wersji `dab9d0e` (pomiary skali: `736ff9a`). Inne dokumenty cytują liczby stąd.
 
 ## Jak mierzymy
 

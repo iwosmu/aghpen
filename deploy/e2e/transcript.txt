@@ -1,55 +1,55 @@
-$ make e2e-core        # 2026-11-21, DefectDojo 3.5.202 from lab/defectdojo, stack project czcore-e2e
-
+$ make e2e-core        # 2026-11-22, build e8c7a9d (product head 5fa2bd0), DefectDojo 3.5.202 from lab/defectdojo, stack project czcore-rel
 === 0. Preconditions ===
 DefectDojo answers at http://127.0.0.1:18080 (user admin)
 
 === 1. Start the stack from a clean state ===
- Container czcore-e2e-db-1 Healthy 
- Container czcore-e2e-db-1 Healthy 
- Container czcore-e2e-czujka-1 Healthy 
-{"status":"ok","db":"ok","tde":true,"tables":21,"encrypted":21,"engine":false}
-  OK    healthz: ok tde=true engine=false
+  OK    healthz without a session: status and version only: status,version
 
 === 2. Log in; the first start seeded a safety policy and one profile, nothing else ===
 {"user":"admin@czujka.local","role":"admin","permissions":22}
+{"status":"ok","db":"ok","tde":true,"tables":21,"encrypted":21,"engine":true}
+  OK    healthz with a session: ok tde=true engine=true
 {"max_pps":1000,"max_http_rps":50,"max_per_host_rps":2,"allowed_methods":["GET","HEAD"],"emergency_stop":false}
-{"name":"Domyślny (bezpieczne rozpoznanie)","ports":"top-100","max_pps":300,"scope_ids":[],"schedule_enabled":false}
+{"name":"Domyślny","ports":"top-1000,1521,2379,2380,5984,6379,7474,8086,9042,9200,9300,11211,27017,28017,1883,4369,5671,5672,8883,15672,15692,25672,61613,61616,2375,2376,4243,6443,9443,10250,10255,3000,5601,9090,9093,9100,9113,9187,9216,5985,5986,18080,50000,5173","max_pps":1000,"scope_ids":[],"schedule_enabled":false}
   OK    seed: profiles=1 hosts=0 findings=0 scopes=0
 
 === 3. Create a scope ===
 {"valid":1,"address_count":256,"invalid":0}
 
 === 4. Import a real nmap XML file (lab/defectdojo/sample-nmap.xml) ===
-{"format":"nmap-xml","run_id":1,"hosts":4,"services":12,"targets":0,"skipped":0,"invalid":[]}
-{"id":1,"status":"completed","trigger":"import","import_file":"sample-nmap.xml","hosts_up":4,"services_open":3,"summary":{"prev_run_id":null,"hosts_new":0,"hosts_gone":0,"hosts_back":0,"hosts_unstable":0,"services_new":0,"services_gone":0,"services_changed":0,"by_kind":{},"findings_new":4}}
+{"format":"nmap-xml","run_id":1,"hosts":4,"services":12,"targets":0,"skipped":0,"invalid":[],"hosts_down":0}
+{"id":1,"status":"completed","trigger":"import","import_file":"sample-nmap.xml","hosts_up":4,"services_open":3,"summary":{"prev_run_id":null,"hosts_new":0,"hosts_gone":0,"hosts_back":0,"hosts_unstable":0,"services_new":0,"services_gone":0,"services_changed":0,"services_returned":0,"responses_slower":0,"hosts_missing":0,"services_unreachable":0,"by_kind":{},"findings_new":4}}
   OK    run 1: completed changes=0
 -- services with their interest score and reasons:
   172.31.250.4:6379 Redis key-value store 7.4.12  interest=30  classes=database  why=database+25 scope-criticality+5
   172.31.250.2:80 nginx 1.31.9  interest=15  classes=default-page  why=default-page+5 sensitive-header+5 scope-criticality+5
   172.31.250.3:80 Apache httpd 2.4.71  interest=10  classes=  why=sensitive-header+5 scope-criticality+5
 -- findings derived from the import:
-  #4 [new] database-exposed 172.31.250.4:6379 interest=30  Baza danych dostępna z sieci: Redis key-value store 7.4.12 (172.31.250.4:6379)
-  #2 [new] interesting-header 172.31.250.2:80 interest=15  Nagłówki ujawniają szczegóły oprogramowania: Server (172.31.250.2:80)
-  #1 [new] default-page 172.31.250.2:80 interest=15  Strona domyślna serwera: Welcome to nginx! (172.31.250.2:80)
-  #3 [new] interesting-header 172.31.250.3:80 interest=10  Nagłówki ujawniają szczegóły oprogramowania: Server (172.31.250.3:80)
+  #4 [new] database-exposed 172.31.250.4:6379 interest=75  Baza danych dostępna z sieci: Redis key-value store 7.4.12 (172.31.250.4:6379)
+  #6 [new] policy-violation 172.31.250.4:6379 interest=63  Port bazy danych otwarty na sieć skanowaną — 172.31.250.4:6379
+  #5 [new] policy-violation 172.31.250.2:80 interest=31  Domyślna strona serwera — 172.31.250.2:80
+  #3 [new] interesting-header 172.31.250.3:80 interest=20  Nagłówki HTTP: Server (172.31.250.3:80)
+  #2 [new] interesting-header 172.31.250.2:80 interest=20  Nagłówki HTTP: Server (172.31.250.2:80)
+  #1 [new] default-page 172.31.250.2:80 interest=20  Strona domyślna serwera: Welcome to nginx! (172.31.250.2:80)
   OK    scope match: 4
 
 === 5. Analyst edits ===
-{"id":1,"product":"nginx (reverse proxy dziekanatu)","version":"1.31.9","note":"zgloszone do DSI","tags":["dziekanat"],"override":{"value":"nginx (reverse proxy dziekanatu)","observed":"nginx","by":"admin@czujka.local","at":"2026-11-21T12:49:32.808348792Z"}}
+{"id":1,"product":"nginx (reverse proxy dziekanatu)","version":"1.31.9","note":"zgloszone do DSI","tags":["dziekanat"],"override":{"value":"nginx (reverse proxy dziekanatu)","observed":"nginx","by":"admin@czujka.local","at":"2026-11-22T04:06:46.480753209Z"}}
 {"id":4,"type":"database-exposed","status":"accepted","note":"baza testowa, ryzyko zaakceptowane","assignee":"ola"}
 
 === 6. Import a second, modified file (new nginx version, SSH opened, Apache closed, one host silent) ===
   changed XML tokens: 10
-{"format":"nmap-xml","run_id":2,"hosts":4,"services":12,"targets":0,"skipped":0,"invalid":[]}
-{"id":2,"status":"completed","summary":{"prev_run_id":1,"hosts_new":0,"hosts_gone":0,"hosts_back":0,"hosts_unstable":1,"services_new":1,"services_gone":1,"services_changed":1,"by_kind":{"headers_changed":1,"host_unstable":1,"service_changed":1,"service_gone":1,"service_new":1,"tech_version":1},"findings_new":2}}
+{"format":"nmap-xml","run_id":2,"hosts":3,"services":12,"targets":0,"skipped":0,"invalid":[],"hosts_down":1}
+{"id":2,"status":"completed","summary":{"prev_run_id":1,"hosts_new":0,"hosts_gone":0,"hosts_back":0,"hosts_unstable":0,"services_new":1,"services_gone":1,"services_changed":1,"services_returned":0,"responses_slower":0,"hosts_missing":1,"services_unreachable":0,"by_kind":{"headers_changed":1,"host_missing":1,"service_changed":1,"service_gone":1,"service_new":1,"tech_version":1},"findings_new":2}}
 -- changes of run 2:
   service_changed [low] Zmiana wersji 172.31.250.2:80: nginx 1.31.9 → nginx 1.33.0
-  tech_version [low] Zmiana wersji nginx na 172.31.250.2:80: 1.31.9 → 1.33.0
+  tech_version [low] Zmiana wersji nginx, 172.31.250.2:80: 1.31.9 → 1.33.0
   headers_changed [info] Zmiana nagłówków 172.31.250.2:80: Server: nginx/1.31.9 → nginx/1.33.0
   service_gone [low] Usługa 172.31.250.3:80 zniknęła (Apache httpd 2.4.71)
   service_new [medium] Nowa usługa 172.31.250.4:22 (OpenSSH 9.9)
-  host_unstable [low] Host 172.31.250.5 nie odpowiedział w porze, w której zwykle odpowiada; jeszcze nie jest zgłoszony jako nieaktywny
-  OK    changes: headers_changed,host_unstable,service_changed,service_gone,service_new,tech_version
+  host_missing [medium] Host 172.31.250.5 nie odpowiada (niepotwierdzone)
+  OK    changes: headers_changed,host_missing,service_changed,service_gone,service_new,tech_version
+  OK    the silent host is missing, unconfirmed: 172.31.250.5
 -- hosts after run 2 (stability model):
   172.31.250.2 status=up p_alive=1 misses=0 interest=15 open_ports=80
   172.31.250.3 status=up p_alive=1 misses=0 interest=0 open_ports=
@@ -62,8 +62,10 @@ DefectDojo answers at http://127.0.0.1:18080 (user admin)
   #2 [new] interesting-header 172.31.250.2:80 first_run=1 last_run=2
   #3 [resolved] interesting-header 172.31.250.3:80 first_run=1 last_run=1
   #4 [accepted] database-exposed 172.31.250.4:6379 first_run=1 last_run=2
-  #8 [new] remote-access-exposed 172.31.250.4:22 first_run=2 last_run=2
-  #9 [new] new-exposure 172.31.250.4:22 first_run=2 last_run=2
+  #5 [new] policy-violation 172.31.250.2:80 first_run=1 last_run=2
+  #6 [new] policy-violation 172.31.250.4:6379 first_run=1 last_run=2
+  #10 [new] remote-access-exposed 172.31.250.4:22 first_run=2 last_run=2
+  #11 [new] new-exposure 172.31.250.4:22 first_run=2 last_run=2
   OK    new findings from the new SSH service: 2
   OK    finding of the closed Apache port: resolved
 -- the edits survive the second import:
@@ -72,84 +74,91 @@ DefectDojo answers at http://127.0.0.1:18080 (user admin)
   OK    finding triage: accepted / baza testowa, ryzyko zaakceptowane / last_run=2
 
 === 7. Diff of the two runs (GET /diff?from=1&to=2) ===
-{"from":1,"to":2,"summary":{"prev_run_id":1,"hosts_new":0,"hosts_gone":0,"hosts_back":0,"hosts_unstable":1,"services_new":1,"services_gone":1,"services_changed":1,"by_kind":{"headers_changed":1,"host_unstable":1,"service_changed":1,"service_gone":1,"service_new":1,"tech_version":1},"findings_new":0},"changes":["service_changed 172.31.250.2:80","tech_version 172.31.250.2:80","headers_changed 172.31.250.2:80","service_gone 172.31.250.3:80","service_new 172.31.250.4:22","host_unstable 172.31.250.5:0"]}
+{"from":1,"to":2,"summary":{"prev_run_id":1,"hosts_new":0,"hosts_gone":0,"hosts_back":0,"hosts_unstable":0,"services_new":1,"services_gone":1,"services_changed":1,"services_returned":0,"responses_slower":0,"hosts_missing":1,"services_unreachable":0,"by_kind":{"headers_changed":1,"host_missing":1,"service_changed":1,"service_gone":1,"service_new":1,"tech_version":1},"findings_new":0},"changes":["service_changed 172.31.250.2:80","tech_version 172.31.250.2:80","headers_changed 172.31.250.2:80","service_gone 172.31.250.3:80","service_new 172.31.250.4:22","host_missing 172.31.250.5:0"]}
   OK    diff: new=1 gone=1 changed=1
 
 === 8. DefectDojo: settings, connection test, export of findings (twice), nmap XML of the run (twice) ===
-{"enabled":true,"url":"http://host.docker.internal:18080","api_key_set":true,"product_name":"Czujka e2e 20261121-134914","engagement_name":"e2e 20261121-134914","product_type_name":"","verify_tls":true,"auto_export":false,"min_interest":0}
+{"enabled":true,"url":"http://host.docker.internal:18080","api_key_set":true,"product_name":"Czujka e2e 20261122-050614","engagement_name":"e2e 20261122-050614","product_type_name":"","verify_tls":true,"auto_export":false,"min_interest":0,"status_sync":false,"scope_mappings":[],"link_url":""}
   OK    the API key is not returned: absent set=true
-stored as: czk1.e809fccf7510.6pIROT9kEH6xR_pyobWQm8... (190 chars)
+stored as: czk1.c48ca7b9cfb2.TmUM795N2kw6Y8z8oTpIwK... (190 chars)
   OK    the API key is not in the database in clear text: 0
 {"message":"Połączono z DefectDojo 3.5.202 jako admin","ok":true,"version":"3.5.202"}
-first export:  {"exported":5,"updated":0,"failed":0,"test_id":15,"test_url":"http://host.docker.internal:18080/test/15","errors":[]}
-second export: {"exported":0,"updated":5,"failed":0,"test_id":15,"test_url":"http://host.docker.internal:18080/test/15","errors":[]}
-  OK    first export creates: exported=5 updated=0 failed=0
-  OK    second export updates, no duplicates: exported=0 updated=5 failed=0
-  OK    findings in the DefectDojo test after export 1 and 2: 5 5
+first export:  {"exported":7,"updated":0,"failed":0,"test_id":37,"test_url":"http://host.docker.internal:18080/test/37","errors":[]}
+second export: {"exported":0,"updated":7,"failed":0,"test_id":37,"test_url":"http://host.docker.internal:18080/test/37","errors":[]}
+  OK    first export creates: exported=7 updated=0 failed=0
+  OK    second export updates, no duplicates: exported=0 updated=7 failed=0
+  OK    findings in the DefectDojo test after export 1 and 2: 7 7
 -- dojo_id and dojo_url written back:
-  #1 default-page -> dojo_id=58 http://host.docker.internal:18080/finding/58
-  #2 interesting-header -> dojo_id=57 http://host.docker.internal:18080/finding/57
-  #4 database-exposed -> dojo_id=54 http://host.docker.internal:18080/finding/54
-  #8 remote-access-exposed -> dojo_id=56 http://host.docker.internal:18080/finding/56
-  #9 new-exposure -> dojo_id=55 http://host.docker.internal:18080/finding/55
+  #1 default-page -> dojo_id=748 http://host.docker.internal:18080/finding/748
+  #2 interesting-header -> dojo_id=747 http://host.docker.internal:18080/finding/747
+  #4 database-exposed -> dojo_id=742 http://host.docker.internal:18080/finding/742
+  #5 policy-violation -> dojo_id=746 http://host.docker.internal:18080/finding/746
+  #6 policy-violation -> dojo_id=743 http://host.docker.internal:18080/finding/743
+  #10 remote-access-exposed -> dojo_id=745 http://host.docker.internal:18080/finding/745
+  #11 new-exposure -> dojo_id=744 http://host.docker.internal:18080/finding/744
 -- the same findings as DefectDojo holds them:
-  dojo #54 [Low] Baza Danych Dostępna Z Sieci: Redis Key-Value Store 7.4.12 (172.31.250.4:6379)  unique_id=database-exposed/172.31.250.4/tcp-6379
-  dojo #55 [Info] Nowa Ekspozycja: OpenSSH 9.9 (172.31.250.4:22)  unique_id=new-exposure/172.31.250.4/tcp-22
-  dojo #56 [Info] Usługa Zdalnego Dostępu: OpenSSH 9.9 (172.31.250.4:22)  unique_id=remote-access-exposed/172.31.250.4/tcp-22
-  dojo #57 [Info] Nagłówki Ujawniają Szczegóły Oprogramowania: Server (172.31.250.2:80)  unique_id=interesting-header/172.31.250.2/tcp-80
-  dojo #58 [Info] Strona Domyślna Serwera: Welcome to Nginx! (172.31.250.2:80)  unique_id=default-page/172.31.250.2/tcp-80
-nmap XML upload 1: {"test_id":16,"test_url":"http://host.docker.internal:18080/test/16","reimport":false,"created":3,"closed":0,"reactivated":0,"untouched":0,"total":3}
-nmap XML upload 2: {"test_id":16,"test_url":"http://host.docker.internal:18080/test/16","reimport":true,"created":0,"closed":0,"reactivated":0,"untouched":3,"total":3}
+  dojo #742 [Low] Baza Danych Dostępna Z Sieci: Redis Key-Value Store 7.4.12 (172.31.250.4:6379)  unique_id=database-exposed/172.31.250.4/tcp-6379
+  dojo #743 [High] Port Bazy Danych Otwarty Na Sieć Skanowaną — 172.31.250.4:6379  unique_id=policy-violation|database-port-exposed|172.31.250.4|6379/tcp
+  dojo #744 [Info] Nowa Ekspozycja: OpenSSH 9.9 (172.31.250.4:22)  unique_id=new-exposure/172.31.250.4/tcp-22
+  dojo #745 [Info] Usługa Zdalnego Dostępu: OpenSSH 9.9 (172.31.250.4:22)  unique_id=remote-access-exposed/172.31.250.4/tcp-22
+  dojo #746 [Low] Domyślna Strona Serwera — 172.31.250.2:80  unique_id=policy-violation|default-server-page|172.31.250.2|80/tcp
+  dojo #747 [Info] Nagłówki HTTP: Server (172.31.250.2:80)  unique_id=interesting-header/172.31.250.2/tcp-80
+  dojo #748 [Info] Strona Domyślna Serwera: Welcome to Nginx! (172.31.250.2:80)  unique_id=default-page/172.31.250.2/tcp-80
+nmap XML upload 1: {"test_id":38,"test_url":"http://host.docker.internal:18080/test/38","reimport":false,"mode":"import","title":"Czujka nmap: przebieg 2","created":3,"closed":0,"reactivated":0,"untouched":0,"total":3}
+nmap XML upload 2: {"test_id":38,"test_url":"http://host.docker.internal:18080/test/38","reimport":true,"mode":"reimport","title":"Czujka nmap: przebieg 2","created":0,"closed":0,"reactivated":0,"untouched":3,"total":3}
   OK    nmap upload: first imports, second re-imports into the same test: false true same-test
 
 === 9. JSON, CSV and XML exports of run 2 import again without a change ===
-  json: 3350 bytes -> {"format":"czujka-json","run_id":3,"hosts":4,"services":6,"skipped":0,"invalid":0}
+  json: 3350 bytes -> {"format":"czujka-json","run_id":3,"hosts":3,"hosts_down":1,"services":6,"skipped":0,"invalid":0}
        against run 2: service changes: 0; host status changes: host_gone 172.31.250.5
-  OK    json round trip: hosts=4 services=6 invalid=0 service_changes=0
-  csv: 1358 bytes -> {"format":"csv","run_id":4,"hosts":4,"services":6,"skipped":0,"invalid":0}
+  OK    json round trip: hosts=3 hosts_down=1 services=6 invalid=0 service_changes=0
+  csv: 1373 bytes -> {"format":"csv","run_id":4,"hosts":3,"hosts_down":1,"services":6,"skipped":0,"invalid":0}
        against run 2: service changes: 0; host status changes: none
-  OK    csv round trip: hosts=4 services=6 invalid=0 service_changes=0
-  xml: 3124 bytes -> {"format":"nmap-xml","run_id":5,"hosts":4,"services":6,"skipped":0,"invalid":0}
+  OK    csv round trip: hosts=3 hosts_down=1 services=6 invalid=0 service_changes=0
+  xml: 3124 bytes -> {"format":"nmap-xml","run_id":5,"hosts":3,"hosts_down":1,"services":6,"skipped":0,"invalid":0}
        against run 2: service changes: 0; host status changes: none
-  OK    xml round trip: hosts=4 services=6 invalid=0 service_changes=0
+  OK    xml round trip: hosts=3 hosts_down=1 services=6 invalid=0 service_changes=0
   OK    Czujka JSON is lossless (export -> import -> export): identical
 -- first lines of the Czujka JSON export:
-{"format":"czujka-json","version":1,"generated_at":"2026-11-21T12:49:32.861183Z","run_id":2,"hosts":[
+{"format":"czujka-json","version":1,"generated_at":"2026-11-22T04:06:46.685289Z","run_id":2,"hosts":[
 {"run_id":2,"ip":"172.31.250.2","hostnames":["czujka-an-nginx.czujka-an-net"],"up":true,"reason":"arp-response","rtt_ms":0.01,"attempts":1,"mac":"72:F8:25:39:A1:2E","vendor":"","os_guess":"","observed_at":"2026-11-21T12:05:49Z","services":[{"port":80,"proto":"tcp","state":"open","name":"http","product":"nginx","versi ...
 -- CSV export:
 ip,hostname,up,port,proto,state,service,product,version,extra_info,banner,tls,url,status,title,server,redirect,technologies,classes,cert_cn,cert_issuer,cert_not_after,cert_sha256,cookies,cpe,os,mac,ve
 172.31.250.2,czujka-an-nginx.czujka-an-net,true,80,tcp,open,http,nginx,1.33.0,,,,http://172.31.250.2:80/,,Welcome to nginx!,nginx/1.33.0,,nginx:1.33.0,,,,,,,cpe:/a:igor_sysoev:nginx:1.33.0,,72:F8:25:3
-172.31.250.3,czujka-an-httpd.czujka-an-net,true,,,,,,,,,,,,,,,,,,,,,,,,6A:ED:52:6D:D6:DB,,0.044,arp-response,,2026-11-21T12:05:49Z
+172.31.250.3,czujka-an-httpd.czujka-an-net,true,,,,,,,,,,,,,,,,,,,,,,,,6A:ED:52:6D:D6:DB,,0.044,arp-response,,2026-11-21T12:05:49Z,
   OK    inventory after the re-imports: hosts=4 open_services=3
 
 === 10. Automatic export after a run (auto_export with min_interest 25) ===
-{"product_name":"Czujka e2e auto 20261121-134914","auto_export":true,"min_interest":25}
-  dojo #62 [Low] Baza Danych Dostępna Z Sieci: Redis Key-Value Store 7.4.12 (172.31.250.4:6379)
-{"user_email":"system","action":"finding.export.defectdojo","detail":{"auto":true,"exported":1,"failed":0,"run_id":6,"selected":1,"updated":0}}
-  OK    run 6 exported its findings with interest >= 25 by itself: 1
+{"product_name":"Czujka e2e auto 20261122-050614","auto_export":true,"min_interest":25}
+  dojo #752 [Low] Baza Danych Dostępna Z Sieci: Redis Key-Value Store 7.4.12 (172.31.250.4:6379)
+  dojo #753 [High] Port Bazy Danych Otwarty Na Sieć Skanowaną — 172.31.250.4:6379
+  dojo #754 [Low] Domyślna Strona Serwera — 172.31.250.2:80
+  dojo #755 [Info] Usługa Zdalnego Dostępu: OpenSSH 9.9 (172.31.250.4:22)
+{"user_email":"system","action":"finding.export.defectdojo","detail":{"auto":true,"exported":4,"failed":0,"run_id":6,"selected":4,"updated":0}}
+  OK    run 6 exported its findings with interest >= 25 by itself: 4
   OK    at least one finding passed the threshold: yes
 
 === 11. Audit log of this flow ===
-  12:49:32 admin@czujka.local result.import 1 status=201
-  12:49:32 admin@czujka.local service.update 1 status=200
-  12:49:32 admin@czujka.local finding.update 4 status=200
-  12:49:32 admin@czujka.local result.import 2 status=201
-  12:49:33 admin@czujka.local integration.defectdojo.update defectdojo status=200
-  12:49:33 admin@czujka.local integration.defectdojo.test defectdojo status=200
-  12:49:33 admin@czujka.local finding.export.defectdojo  status=200
-  12:49:34 admin@czujka.local finding.export.defectdojo  status=200
-  12:49:34 admin@czujka.local run.export.defectdojo 2 status=200
-  12:49:34 admin@czujka.local run.export.defectdojo 2 status=200
-  12:49:34 admin@czujka.local export.run 2 status=200
-  12:49:34 admin@czujka.local export.run 2 status=200
-  12:49:34 admin@czujka.local result.import 3 status=201
-  12:49:34 admin@czujka.local export.run 2 status=200
-  12:49:34 admin@czujka.local result.import 4 status=201
-  12:49:34 admin@czujka.local export.run 2 status=200
-  12:49:34 admin@czujka.local result.import 5 status=201
-  12:49:34 admin@czujka.local export.run 3 status=200
-  12:49:34 admin@czujka.local integration.defectdojo.update defectdojo status=200
-  12:49:34 system finding.export.defectdojo 6 status=null
-  12:49:34 admin@czujka.local result.import 6 status=201
+  04:06:46 admin@czujka.local result.import 1 status=201
+  04:06:46 admin@czujka.local service.update 1 status=200
+  04:06:46 admin@czujka.local finding.update 4 status=200
+  04:06:46 admin@czujka.local result.import 2 status=201
+  04:06:47 admin@czujka.local integration.defectdojo.update defectdojo status=200
+  04:06:51 admin@czujka.local integration.defectdojo.test defectdojo status=200
+  04:06:55 admin@czujka.local finding.export.defectdojo  status=200
+  04:06:56 admin@czujka.local finding.export.defectdojo  status=200
+  04:06:56 admin@czujka.local run.export.defectdojo 2 status=200
+  04:06:57 admin@czujka.local run.export.defectdojo 2 status=200
+  04:06:57 admin@czujka.local export.run 2 status=200
+  04:06:57 admin@czujka.local export.run 2 status=200
+  04:06:57 admin@czujka.local result.import 3 status=201
+  04:06:57 admin@czujka.local export.run 2 status=200
+  04:06:57 admin@czujka.local result.import 4 status=201
+  04:06:58 admin@czujka.local export.run 2 status=200
+  04:06:58 admin@czujka.local result.import 5 status=201
+  04:06:58 admin@czujka.local export.run 3 status=200
+  04:06:58 admin@czujka.local integration.defectdojo.update defectdojo status=200
+  04:06:59 system finding.export.defectdojo 6 status=null
+  04:06:59 admin@czujka.local result.import 6 status=201
 
 E2E OK: every check passed
