@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { usePage, useAction, useItem } from '../api/hooks';
 import { post } from '../api/client';
 import type { SafetyPolicy, ScanProfile, ScanRun } from '../api/types';
-import { t } from '../i18n';
+import { t, plural } from '../i18n';
 import { fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelative } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
 import { Button, Dialog, Empty, InlineError, PageHeader, Select } from '../ui/kit';
@@ -168,7 +168,7 @@ export default function Runs() {
           <div>
             <div className="flex items-center justify-between gap-2"><span className="num text-sm font-medium">#{r.id}</span><RunStatusMark status={r.status} pauseReason={r.pause_reason} /></div>
             <div className="mt-0.5 truncate text-sm text-ink-2">{r.profile_name}</div>
-            <div className="mt-0.5 text-xs text-ink-3">{fmtRelative(r.started_at)} · {fmtInt(r.stats.hosts_up)} {t('host / hosty / hostów (plural())', 'host / hosts')} · {fmtDuration(r.stats.elapsed_sec)}</div>
+            <div className="mt-0.5 text-xs text-ink-3">{fmtRelative(r.started_at)} · {fmtInt(r.stats.hosts_up)} {plural(r.stats.hosts_up, ['host', 'hosty', 'hostów'], ['host', 'hosts'])} · {fmtDuration(r.stats.elapsed_sec)}</div>
           </div>
         )}
       />

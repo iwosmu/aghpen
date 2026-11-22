@@ -68,7 +68,7 @@ function Scrubber({ runs, index, onIndex }: { runs: RunPoint[]; index: number; o
           const h = light ? 8 : 10 + Math.round(Math.sqrt(r.changes / maxChanges) * (H - 12));
           const sel = i === index;
           return (
-            <span key={r.run_id} title={'#' + r.run_id + ' · ' + fmtDateTime(r.at) + ' · ' + triggerLabel(r.trigger) + ' · ' + r.changes + ' ' + t('zmiana / zmiany / zmian (plural())', 'change / changes')}
+            <span key={r.run_id} title={'#' + r.run_id + ' · ' + fmtDateTime(r.at) + ' · ' + triggerLabel(r.trigger) + ' · ' + r.changes + ' ' + plural(r.changes, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes'])}
               className={cx('absolute bottom-1 -translate-x-1/2', sel ? 'bg-ink' : r.changes - r.changes_expected > 0 ? 'bg-ink-2' : 'bg-ink-3', light && !sel && 'opacity-60')}
               style={{ left: pos(i) + '%', height: h, width: light ? 2 : sel ? 6 : 4 }} />
           );
