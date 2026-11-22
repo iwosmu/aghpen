@@ -134,7 +134,8 @@ export default function RunDetail() {
   const { run: runQ, recent, connected } = useLiveRun(id, { withChunks: true });
   const run = runQ.data;
   const chunks = useItem<Chunk[]>('/runs/' + id + '/chunks', undefined, { enabled: Boolean(run) });
-  const map = useItem<RunMap>('/runs/' + id + '/map', undefined, { enabled: Boolean(run) });
+  // Chunk events move single blocks; the poll keeps the counts and the host density current while the scan runs.
+  const map = useItem<RunMap>('/runs/' + id + '/map', undefined, { enabled: Boolean(run), refetchInterval: run && (run.status === 'running' || run.status === 'analyzing') ? 2000 : false });
   const profile = useItem<ScanProfile>('/profiles/' + run?.profile_id, undefined, { enabled: Boolean(run?.profile_id) });
   const safety = useItem<SafetyPolicy>('/settings/safety');
   const [hoverChunk, setHoverChunk] = useState<number | null>(null);
