@@ -23,28 +23,29 @@ export function BeforeAfter({ c }: { c: Change }) {
   const b = c.field ? fieldValue(c.field, before) : show(before), a = c.field ? fieldValue(c.field, c.after) : show(c.after);
   if (!b && !a) return null;
   // never two equal values with an arrow
-  if (b && a && b === a) return <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs">{c.field ? <span className="text-ink-3" title={c.field}>{fieldLabel(c.field)}:</span> : null}<span className="mono text-ink">{a}</span></span>;
+  if (b && a && b === a) return <span className="flex min-w-0 items-center gap-x-1.5 whitespace-nowrap text-xs">{c.field ? <span className="text-ink-3" title={c.field}>{fieldLabel(c.field)}:</span> : null}<span className="mono text-ink">{a}</span></span>;
   return (
-    <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs">
+    <span className="flex min-w-0 items-center gap-x-1.5 whitespace-nowrap text-xs">
       {c.field ? <span className="text-ink-3" title={c.field}>{fieldLabel(c.field)}:</span> : null}
-      {b ? <span className="mono max-w-[180px] truncate text-ink-3 line-through decoration-[var(--ink-3)]" title={b}>{b}</span> : <span className="text-ink-3">{t('brak', 'none')}</span>}
+      {b ? <span className="mono max-w-[130px] truncate text-ink-3 line-through decoration-[var(--ink-3)]" title={b}>{b}</span> : <span className="text-ink-3">{t('brak', 'none')}</span>}
       <Icon name="arrowRight" size={11} className="text-ink-3" />
-      {a ? <span className="mono max-w-[180px] truncate text-ink" title={a}>{a}</span> : <span className="text-ink-3">{t('brak', 'none')}</span>}
+      {a ? <span className="mono max-w-[130px] truncate text-ink" title={a}>{a}</span> : <span className="text-ink-3">{t('brak', 'none')}</span>}
     </span>
   );
 }
 
 /** The internal measures of a change, folded: small mono key/value pairs. */
-export function ChangeDetail({ c }: { c: Change }) {
+export function ChangeDetail({ c, withSummary }: { c: Change; withSummary?: boolean }) {
   const entries = Object.entries(c.detail ?? {}).filter(([, v]) => v !== null && v !== undefined && v !== '');
-  if (!entries.length) return null;
+  if (!entries.length && !(withSummary && c.summary)) return null;
   const val = (v: unknown) => (typeof v === 'object' ? JSON.stringify(v) : String(v));
   return (
     <details className="mt-0.5 text-xs open:basis-full" data-testid="change-detail">
       <summary className="cursor-pointer select-none text-ink-3 hover:text-ink-2">{t('Szczegóły', 'Details')}</summary>
-      <dl className="mono mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-2xs text-ink-2">
+      {withSummary && c.summary ? <p className="mt-1 whitespace-normal text-sm text-ink-2">{c.summary}</p> : null}
+      {entries.length ? <dl className="mono mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-2xs text-ink-2">
         {entries.map(([k, v]) => <div key={k} className="contents"><dt className="text-ink-3">{k}</dt><dd className="break-all">{val(v)}</dd></div>)}
-      </dl>
+      </dl> : null}
     </details>
   );
 }
@@ -71,17 +72,20 @@ export default function Changes() {
   const active = FILTERS.filter((k) => u.get(k)).length;
   const rows = q.data?.items;
   const cols: Col<Change>[] = [
-    { id: 'kind', header: t('Rodzaj', 'Type'), cell: (c) => <ChangeMark kind={c.kind} expected={c.expected} /> },
-    { id: 'what', header: t('Co się zmieniło', 'What changed'), wrap: true, cell: (c) => (
-      <div className="min-w-[220px] max-w-[560px] py-2"><div className={cx('text-[15px] leading-[21px]', c.expected ? 'text-ink-2' : 'text-ink')}>{c.summary}</div><div className="flex flex-wrap items-baseline gap-x-4"><BeforeAfter c={c} /><ChangeDetail c={c} /></div></div>
-    ) },
+    { id: 'kind', header: t('Rodzaj', 'Type'), cell: (c) => <ChangeMark kind={c.kind} expected={c.expected} plain /> },
     { id: 'addr', header: t('Adres', 'Address'), sort: 'ip', cell: (c) => <Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link">{c.ip}{c.port ? ':' + c.port : ''}</Link> },
+    { id: 'what', header: t('Przed → po', 'Before → after'), wrap: true, cell: (c) => (
+      <div className="flex min-w-[200px] max-w-[600px] flex-wrap items-baseline gap-x-3 py-1.5" title={c.summary}><BeforeAfter c={c} /><ChangeDetail c={c} withSummary /></div>
+    ) },
     { id: 'sev', header: t('Waga', 'Severity'), sort: 'severity', hide: 'md', cell: (c) => c.expected ? <span className="text-xs text-ink-3">{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} /> },
     { id: 'at', header: t('Kiedy', 'When'), sort: 'at', hide: 'xl', cell: (c) => <span className="num text-ink-2" title={fmtDateTime(c.at)}>{fmtRelative(c.at)}</span> },
     { id: 'ack', header: t('Przejrzana', 'Reviewed'), cell: (c) => c.acked_at
       ? <span className="inline-flex items-center gap-1.5 text-xs text-ink-2" title={fmtDateTime(c.acked_at)}><Icon name="check" size={12} className="text-st-new" />{c.acked_by.split('@')[0]}</span>
       : canAck ? <Button size="sm" onClick={(e) => { e.stopPropagation(); e.preventDefault(); ackOne.mutate(c.id); }}>{t('Oznacz', 'Mark')}</Button> : <span className="text-xs text-ink-3">{t('nie', 'no')}</span> },
   ];
+  // grouped by run, the group heading already says when; the column would repeat it
+  const grouped = u.get('sort', '-at').endsWith('at');
+  const shown = grouped ? cols.filter((c) => c.id !== 'at') : cols;
   return (
     <div>
       <PageHeader
@@ -101,8 +105,7 @@ export default function Changes() {
           );
         })}
       </div>
-      <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
-        <SearchField value={text} onChange={setText} placeholder={t('adres albo opis', 'address or text')} />
+      <FilterBar onClear={() => u.clear(FILTERS)} active={active} moreActive={['run_id', 'kind', 'severity', 'expected', 'acked'].filter((k) => u.get(k)).length} more={<>
         <FilterField label={t('Skan', 'Scan')} width={150}>
           <Select value={u.get('run_id')} onChange={(v) => u.set({ run_id: v })} options={[{ value: '', label: t('wszystkie', 'all') }, ...(runs.data?.items ?? []).map((r) => ({ value: String(r.id), label: '#' + r.id + ' · ' + fmtDateTime(r.finished_at).slice(0, 10) }))]} />
         </FilterField>
@@ -118,6 +121,8 @@ export default function Changes() {
         <FilterField label={t('Przejrzane', 'Reviewed')} width={140}>
           <Select value={u.get('acked')} onChange={(v) => u.set({ acked: v })} options={[{ value: '', label: t('wszystkie', 'all') }, { value: 'false', label: t('nieprzejrzane', 'not reviewed') }, { value: 'true', label: t('przejrzane', 'reviewed') }]} />
         </FilterField>
+      </>}>
+        <SearchField value={text} onChange={setText} placeholder={t('adres albo opis', 'address or text')} />
       </FilterBar>
       {canAck && selected.size > 0 ? (
         <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-rule-strong bg-raised px-4 py-1.5 text-sm sm:px-6" role="region" aria-label={t('Akcje zbiorcze', 'Bulk actions')}>
@@ -127,7 +132,7 @@ export default function Changes() {
         </div>
       ) : null}
       <DataTable
-        rows={rows} cols={cols} rowKey={(c) => c.id} loading={q.isPending} error={q.error} retry={() => q.refetch()} dim={q.isPlaceholderData}
+        rows={rows} cols={shown} rowKey={(c) => c.id} loading={q.isPending} error={q.error} retry={() => q.refetch()} dim={q.isPlaceholderData}
         sort={u.get('sort', '-at')} onSort={(s) => u.set({ sort: s })}
         selected={canAck ? selected : undefined} onSelect={canAck ? setSelected : undefined}
         rowClass={(c) => cx(c.acked_at && 'opacity-70')}
@@ -136,9 +141,8 @@ export default function Changes() {
         empty={<Empty icon="changes" title={active ? t('Żadna zmiana nie pasuje do filtrów', 'No changes match the filters') : t('Brak zmian', 'No changes yet')} hint={active ? undefined : t('Zmiany pojawią się po drugim skanie', 'Changes appear after the second scan')} action={active ? undefined : <NextSteps />} />}
         mobile={(c) => (
           <div>
-            <div className="flex items-center justify-between gap-2"><ChangeMark kind={c.kind} expected={c.expected} /><span className="num text-xs text-ink-3">#{c.run_id}</span></div>
-            <div className="mt-0.5 text-sm">{c.summary}</div>
-            <div className="mono mt-0.5 text-xs text-ink-3">{c.ip}{c.port ? ':' + c.port : ''}</div>
+            <div className="flex items-center justify-between gap-2"><ChangeMark kind={c.kind} expected={c.expected} /><span className="mono truncate text-xs text-ink-2">{c.ip}{c.port ? ':' + c.port : ''}</span></div>
+            <div className="mt-0.5 min-w-0 overflow-hidden"><BeforeAfter c={c} /></div>
           </div>
         )}
       />

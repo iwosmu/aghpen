@@ -93,10 +93,10 @@ export const CHANGE_KINDS: ChangeKind[] = [
   'content_changed', 'redirect_changed', 'class_changed',
 ];
 
-export function ChangeMark({ kind, expected }: { kind: ChangeKind | string; expected?: boolean }) {
+export function ChangeMark({ kind, expected, plain }: { kind: ChangeKind | string; expected?: boolean; /** the row says 'expected' elsewhere */ plain?: boolean }) {
   const i = changeKindInfo(kind);
   if (expected) {
-    return <Mark glyph="dashring" tone="expected" title={t('Zmiana zgodna ze wzorcem dostępności hosta', 'The change fits the host availability pattern')}><span className="text-ink-3">{i.label} · {t('oczekiwana', 'expected')}</span></Mark>;
+    return <Mark glyph="dashring" tone="expected" title={t('Zmiana zgodna ze wzorcem dostępności hosta', 'The change fits the host availability pattern')}><span className="text-ink-3">{i.label}{plain ? null : <> · {t('oczekiwana', 'expected')}</>}</span></Mark>;
   }
   return <Mark glyph={i.glyph} tone={i.tone}>{i.label}</Mark>;
 }
