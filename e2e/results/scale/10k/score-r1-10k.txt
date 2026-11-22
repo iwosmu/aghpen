@@ -1,0 +1,185 @@
+Ground truth state scale-10x1000 (hard cases excused)
+
+category                  TP    FP    FN  precision   recall       F1
+hosts                  10000     0     0      1.000    1.000    1.000
+ports                  22500     0     0      1.000    1.000    1.000
+service names          18762  3738  3738      0.834    0.834    0.834
+technologies           18762     0  3738      1.000    0.834    0.909
+classes                    0     0     0      0.000    0.000    0.000
+
+check (recall only)                              right   share
+service versions                               18762/22500   0.834
+technology versions                            18762/18762   1.000
+page titles                                    13500/13500   1.000
+
+SERVICE NAMES
+  missed (3738):
+    10.77.0.100:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.101:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.102:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.103:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.107:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.108:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.109:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.10:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.110:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.115:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.120:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.124:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.125:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.126:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.127:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.128:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.129:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.130:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.133:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.134:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.135:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.136:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.137:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.138:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.139:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.13:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.140:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.141:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.142:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.143:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.144:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.146:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.151:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.167:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.168:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.169:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.16:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.170:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.176:22/tcp want ssh, got "tcpwrapped"
+    10.77.0.177:22/tcp want ssh, got "tcpwrapped"
+    ... and 3698 more
+  false positives (3738):
+    10.77.0.100:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.101:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.102:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.103:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.107:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.108:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.109:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.10:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.110:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.115:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.120:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.124:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.125:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.126:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.127:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.128:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.129:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.130:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.133:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.134:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.135:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.136:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.137:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.138:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.139:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.13:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.140:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.141:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.142:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.143:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.144:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.146:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.151:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.167:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.168:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.169:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.16:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.170:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.176:22/tcp "tcpwrapped" (want ssh)
+    10.77.0.177:22/tcp "tcpwrapped" (want ssh)
+    ... and 3698 more
+TECHNOLOGIES
+  missed (3738):
+    10.77.0.100:22/tcp Dropbear SSH
+    10.77.0.101:22/tcp Dropbear SSH
+    10.77.0.102:22/tcp Dropbear SSH
+    10.77.0.103:22/tcp Dropbear SSH
+    10.77.0.107:22/tcp Dropbear SSH
+    10.77.0.108:22/tcp Dropbear SSH
+    10.77.0.109:22/tcp Dropbear SSH
+    10.77.0.10:22/tcp Dropbear SSH
+    10.77.0.110:22/tcp Dropbear SSH
+    10.77.0.115:22/tcp Dropbear SSH
+    10.77.0.120:22/tcp Dropbear SSH
+    10.77.0.124:22/tcp Dropbear SSH
+    10.77.0.125:22/tcp Dropbear SSH
+    10.77.0.126:22/tcp Dropbear SSH
+    10.77.0.127:22/tcp Dropbear SSH
+    10.77.0.128:22/tcp Dropbear SSH
+    10.77.0.129:22/tcp Dropbear SSH
+    10.77.0.130:22/tcp Dropbear SSH
+    10.77.0.133:22/tcp Dropbear SSH
+    10.77.0.134:22/tcp Dropbear SSH
+    10.77.0.135:22/tcp Dropbear SSH
+    10.77.0.136:22/tcp Dropbear SSH
+    10.77.0.137:22/tcp Dropbear SSH
+    10.77.0.138:22/tcp Dropbear SSH
+    10.77.0.139:22/tcp Dropbear SSH
+    10.77.0.13:22/tcp Dropbear SSH
+    10.77.0.140:22/tcp Dropbear SSH
+    10.77.0.141:22/tcp Dropbear SSH
+    10.77.0.142:22/tcp Dropbear SSH
+    10.77.0.143:22/tcp Dropbear SSH
+    10.77.0.144:22/tcp Dropbear SSH
+    10.77.0.146:22/tcp Dropbear SSH
+    10.77.0.151:22/tcp Dropbear SSH
+    10.77.0.167:22/tcp Dropbear SSH
+    10.77.0.168:22/tcp Dropbear SSH
+    10.77.0.169:22/tcp Dropbear SSH
+    10.77.0.16:22/tcp Dropbear SSH
+    10.77.0.170:22/tcp Dropbear SSH
+    10.77.0.176:22/tcp Dropbear SSH
+    10.77.0.177:22/tcp Dropbear SSH
+    ... and 3698 more
+SERVICE VERSIONS
+  wrong or missing (3738):
+    10.77.0.100:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.101:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.102:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.103:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.107:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.108:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.109:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.10:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.110:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.115:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.120:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.124:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.125:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.126:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.127:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.128:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.129:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.130:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.133:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.134:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.135:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.136:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.137:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.138:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.139:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.13:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.140:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.141:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.142:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.143:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.144:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.146:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.151:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.167:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.168:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.169:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.16:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.170:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.176:22/tcp Dropbear sshd: want 2025.88, got ""
+    10.77.0.177:22/tcp Dropbear sshd: want 2025.88, got ""
+    ... and 3698 more

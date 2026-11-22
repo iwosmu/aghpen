@@ -85,6 +85,64 @@ Koniec skanu wyznacza najwolniejsze wykrywanie wersji w nmapie: instalator Gitei
 
 Usługa na porcie, którego dany skan nie objął, zachowuje stan i dostaje znacznik „nie skanowana w tym przebiegu”. Czujka nie zgłasza jej jako znikniętej.
 
+## Skala: 2 000 i 10 000 żywych hostów
+
+Laboratorium [`lab/scale/`](../lab/scale/README.md) na serwerze OMEN. Kontener „farma” obsługuje 1 000 żywych adresów: prawdziwy stos TCP/IP Linuksa, nginx, Dropbear SSH i lighttpd. Pomiar 2 000 to 2 kontenery, pomiar 10 000 to 10 kontenerów: tyle żywych adresów, nie tyle maszyn. Prawdę wzorcową pisze ten sam skrypt (`lab/scale/scale.sh truth`).
+Zakres skanu: `10.77.0.0/16` (65 536 adresów). Profil domyślny (top-1000 i porty infrastruktury, UDP, wykrywanie wersji). Wersja `736ff9a`. Wszystko przez REST API (`lab/scale/measure.sh`), pakiety liczy `tcpdump` w przestrzeni sieciowej Czujki.
+Limity: 2 000 z domyślną polityką (1 000 pakietów/s, `http_rps` 20). 10 000 z limitem podniesionym do 10 000 pakietów/s; `http_rps` 20 w przebiegu 1; przebiegi 2 (bez zmian w sieci) i 3 (farma 10 wyłączona) idą z `http_rps` 50, maksimum domyślnej polityki, i trafią tu po zakończeniu. Surowe liczby: [`e2e/results/scale/`](../e2e/results/scale/README.md).
+
+| Miara | 2 000, 1 000 pakietów/s | 10 000, przebieg 1 |
+| --- | --- | --- |
+| `http_rps` | 20 | 20 |
+| Hosty | 2 000 z 2 000 | 10 000 z 10 000 |
+| Otwarte porty | 4 500 z 4 500 | 22 500 z 22 500 |
+| Fałszywe wyniki | 0 | 0 |
+| Tytuły stron | 2 700 z 2 700 | 13 500 z 13 500 |
+| Technologie WWW z wersjami | 2 700 z 2 700 | 13 500 z 13 500 |
+| Nazwy i wersje usług | 4 500 z 4 500 | 18 762 z 22 500 (uwaga 1) |
+| Czas przebiegu | 4 885 s (1 h 21 min) | 8 144 s (2 h 16 min) |
+| Analiza | 4 s | 20 s |
+| Pakiety na przewodzie | 3 067 499 | 13 784 368 |
+| Średnio / najwyższa sekunda | 628 / 1 065 pakietów/s | 1 693 / 11 415 pakietów/s |
+| Pamięć Czujki (maks.) | 914 MiB | 908 MiB |
+| Pamięć PostgreSQL (maks.) | 253 MiB | 405 MiB |
+| Rozmiar bazy | 45 MiB | 166 MiB |
+| Zgłoszone zmiany | 0 (pierwszy skan) | 0 (pierwszy skan) |
+
+Czasy API (sekundy, druga z dwóch prób; strona po 50 pozycji, „daleka strona” to przesunięcie na koniec listy):
+
+| Zapytanie | 2 000 | 10 000 |
+| --- | --- | --- |
+| Hosty: pierwsza / daleka strona | 0,012 / 0,023 | 0,030 / 0,113 |
+| Usługi: pierwsza / daleka strona | 0,022 / 0,77 | 0,06 / 12,9 (przed poprawką, uwaga 5) |
+| Usługi przebiegu: daleka strona | 0,85 | 13,1 (przed poprawką) |
+| Zmiany, obserwacje, pulpit | 0,002 / 0,017 / 0,027 | 0,002 / 0,017 / 0,073 |
+| Oś czasu / stan w chwili przebiegu | 0,006 / 0,165 | 0,006 / 0,77 |
+| Wyszukiwanie „nginx” | 0,038 | 0,134 |
+| Eksport przebiegu JSON | 0,87 (19,6 MB) | 3,2 (96,1 MB) |
+| Eksport przebiegu CSV / nmap XML | 0,60 (1,2 MB) / 0,66 (2,4 MB) | 2,7 (5,3 MB) / 2,9 (10,8 MB) |
+| Eksport usług CSV | 0,92 | 15,2 (przed poprawką, uwaga 5) |
+| Raport HTML / Markdown | 0,13 / 0,13 | 0,45 / 0,51 |
+
+Koszt jednego żywego hosta (z różnicy 10 000 − 2 000, przy tej mieszance usług: 2,25 otwartego portu i 1,35 usługi WWW na host): około 1 340 pakietów, 14,4 żądania HTTP (GET/HEAD) i 15 KB bazy na przebieg. Martwa część /16 kosztuje około 390 000 pakietów (około 6 na adres). Pamięć Czujki nie rośnie z liczbą hostów (około 910 MiB): wyznacza ją liczba równoległych porcji, nie wielkość sieci.
+
+Ekstrapolacja na pełną sieć /16 z tą samą mieszanką usług (to rachunek z dwóch pomiarów, nie pomiar):
+
+| Żywe adresy w /16 | Pakiety | Żądania HTTP | Domyślna polityka (1 000 pakietów/s, `http_rps` 20) | 10 000 pakietów/s, `http_rps` 20 | 10 000 pakietów/s, `http_rps` 50 |
+| --- | --- | --- | --- | --- | --- |
+| 5 % (3 277) | 4,8 mln | 47 000 | około 2,1 h | około 55 min | około 31 min |
+| 20 % (13 107) | 18,0 mln | 189 000 | około 7,9 h | około 2,9 h | około 1,3 h |
+
+Rachunek: przy 1 000 pakietów/s czas wyznaczają pakiety przy zmierzonej średniej 628 pakietów/s; przy 10 000 pakietów/s czas wyznacza etap HTTP (żądania / `http_rps`) plus około 900 s na skan portów i martwe adresy, tak jak w przebiegu 1.
+
+Ograniczenia tego pomiaru:
+
+1. 3 738 portów SSH w przebiegu 1 dostało nazwę `tcpwrapped` zamiast `ssh` (od 348 do 508 na farmę). To cecha laboratorium: jeden proces Dropbear obsługuje 900 adresów farmy, a jego limit `MAX_UNAUTH_PER_IP` (5) liczy każde połączenie ze skanera, który ma jeden adres. Przy 10 000 pakietów/s próby wykrywania wersji przekraczają ten limit i Dropbear zamyka połączenie od razu. Pomiar 2 000 przy 1 000 pakietów/s miał 1 800 z 1 800 poprawnych. W prawdziwej sieci każdy host ma własny serwer SSH.
+2. Przebieg 1 przekroczył limit 10 000 pakietów/s przez 27 sekund, najwyższa sekunda: 11 415 pakietów. Wersja `736ff9a` nie ma limitu w jądrze. Późniejsza wersja ogranicza ruch limitem w jądrze; kontrola laboratorium mierzy to przy 1 000 pakietów/s (rozdział „Tempo i bezpieczeństwo skanowania”).
+3. Na gęstej sieci czas przebiegu wyznacza etap HTTP, nie pakiety. W przebiegu 1 sam etap HTTP to 144 276 żądań / 20 na sekundę = 7 214 s z 8 144 s. Grupa czterech gęstych porcji (1 000 hostów, 1 350 usług WWW) trwa około 13 minut niezależnie od limitu pakietów.
+4. Szacunek planisty przed skanem (5 944 s) nie liczy etapu HTTP; przebieg 1 trwał 8 144 s.
+5. Daleka strona listy usług i eksport usług rosły szybciej niż dane (0,8 s przy 2 000, 13–38 s przy 10 000). Przyczyna: rozmiar grupy usług liczony osobno dla każdego wiersza; największa grupa ma 10 782 usługi. Poprawka `1623497` liczy każdą grupę raz. Na bazie 10 000: zapytanie dalekiej strony 13,2 s → 0,079 s, uporządkowany przebieg pod eksportem 11,9 s → 0,032 s (pomiar zapytań SQL na tej samej bazie; tabela API pokazuje wersję `736ff9a` sprzed poprawki).
+
 ## Szablon organizatorów (jedna maszyna)
 
 Środowisko z `lab/jury/` uruchamiamy razem z Czujką w kontenerze `docker:dind`, żeby skan nie dotykał niczego poza szablonem. Tabela kontroli, czasy każdego stosu i sposób odtworzenia: [`docs/TEST-JURY.md`](TEST-JURY.md), zapis w `e2e/jury/transcript.txt`.

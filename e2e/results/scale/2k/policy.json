@@ -1,0 +1,20 @@
+{
+  "max_pps": 1000,
+  "max_http_rps": 50,
+  "max_per_host_rps": 2,
+  "max_paths_per_host": 8,
+  "allowed_ports": "",
+  "denied_ports": "",
+  "exclusions": [],
+  "allowed_methods": [
+    "GET",
+    "HEAD"
+  ],
+  "emergency_stop": false,
+  "user_agent": "Czujka/1.0 (attack surface inventory; safe detection only)",
+  "updated_at": "2026-11-21T21:58:54.545404Z",
+  "allowed_networks": [],
+  "operator_networks": [
+    "10.77.0.0/16"
+  ]
+}
