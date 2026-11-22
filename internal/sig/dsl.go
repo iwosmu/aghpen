@@ -102,6 +102,8 @@ type Def struct {
 	Name          string
 	Category      string
 	Description   string
+	NameEN        string // optional English display name (name_en)
+	DescriptionEN string // optional English description (description_en)
 	Author        string
 	CPE           string
 	Technology    string // technology name this signature supports; default Name
@@ -467,6 +469,12 @@ func (p *parser) parseDef(n *yaml.Node, prefix string) *Def {
 	}
 	if v, k := m.get("description", "desc", "summary", "details", "comment", "notes"); v != nil {
 		d.Description = strings.TrimSpace(p.str(v, at(k)))
+	}
+	if v, k := m.get("name_en"); v != nil {
+		d.NameEN = strings.TrimSpace(p.str(v, at(k)))
+	}
+	if v, k := m.get("description_en"); v != nil {
+		d.DescriptionEN = strings.TrimSpace(p.str(v, at(k)))
 	}
 	if v, k := m.get("author", "authors"); v != nil {
 		d.Author = strings.Join(cleanList(p.strList(v, at(k))), ", ")

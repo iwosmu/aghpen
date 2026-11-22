@@ -5,6 +5,7 @@
 
 - id: toxiproxy-api
   name: Toxiproxy – API sterujące
+  name_en: Toxiproxy – control API
   category: devops
   technology: Toxiproxy
   description: API sterujące Toxiproxy bez uwierzytelnienia. Każdy, kto je widzi, może dodać opóźnienia, ograniczyć pasmo albo zerwać połączenia do usług za proxy.
@@ -22,6 +23,7 @@
 
 - id: traefik-api-insecure
   name: Traefik – API bez uwierzytelnienia
+  name_en: Traefik – API without authentication
   category: devops
   technology: Traefik
   description: Traefik uruchomiony z api.insecure=true. API i panel pokazują routery, usługi i adresy zaplecza każdemu bez logowania.
@@ -36,6 +38,7 @@
 
 - id: nginx-proxy-manager-default-site
   name: Nginx Proxy Manager – domyślna strona
+  name_en: Nginx Proxy Manager – default page
   category: proxy
   technology: Nginx Proxy Manager
   description: Domyślna strona Nginx Proxy Manager. Proxy działa, ale ten adres nie ma skonfigurowanego hosta; panel administracyjny jest zwykle na porcie 81.
@@ -83,6 +86,7 @@
 
 - id: wordpress-installer
   name: WordPress – niedokończona instalacja
+  name_en: WordPress – unfinished installation
   category: cms
   technology: WordPress
   description: Instalator WordPressa (wp-admin/install.php) jest dostępny. Kto go wypełni, zostaje administratorem strony i może uruchomić własny kod PHP.
@@ -101,6 +105,7 @@
 
 - id: redis-no-auth
   name: Redis bez hasła
+  name_en: Redis without password
   category: database
   technology: false
   description: Redis odpowiada na polecenie INFO bez uwierzytelnienia (nmap odczytał wersję). Każdy w sieci może czytać i zmieniać dane.

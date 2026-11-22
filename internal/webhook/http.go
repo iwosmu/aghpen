@@ -23,6 +23,7 @@ func (n *Notifier) Register(r chi.Router, can Middleware) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
+	v = localize(w, v)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)

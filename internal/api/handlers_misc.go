@@ -803,7 +803,9 @@ func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 		}
 		rw = newRowWriter(w, kind, format, []string{"id", "key", "type", "title", "severity", "status", "interest", "ip", "port", "url", "signature",
 			"tags", "assignee", "first_seen", "last_seen", "dojo_url", "manual", "description", "note"})
+		flang := ResponseLang(w) // an export: Polish unless ?lang=en
 		err = s.st.EachFinding(ctx, f, func(v *model.Finding) error {
+			*v = findingIn(*v, flang)
 			return rw.write(v, func() []string {
 				return []string{strconv.FormatInt(v.ID, 10), v.Key, v.Type, v.Title, string(v.Severity), string(v.Status), strconv.Itoa(v.Interest), v.IP,
 					strconv.Itoa(v.Port), v.URL, v.Signature, strings.Join(v.Tags, " "), v.Assignee, ts(v.FirstSeen), ts(v.LastSeen), v.DojoURL,
