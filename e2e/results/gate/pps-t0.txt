@@ -1,11 +1,11 @@
-seconds 764, cap 1000 pps
-nmap raw packets per second: max 842, p99 841, avg 292.5, top5 [842 842 841 841 841]; seconds over cap 0 (over cap+5%: 0)
-all sent packets per second: max 973, p99 847; seconds over cap 0
-  arp         139602
-  raw_syn     82754
-  icmp        4
-  udp_probe   1156
-  dns         400
-  kernel_rst  481
-  kernel_tcp  13444
+seconds 2138, cap 1000 pps
+nmap raw packets per second: max 764, p99 752, avg 582.9, top5 [764 763 763 758 756]; seconds over cap 0 (over cap+5%: 0)
+all sent packets per second: max 913, p99 752; seconds over cap 0
+  arp         139530
+  raw_syn     1105731
+  icmp        8
+  udp_probe   1161
+  dns         394
+  kernel_rst  479
+  kernel_tcp  12461
   other       0

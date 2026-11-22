@@ -1,0 +1,21 @@
+check                                        value                  limit                  result
+recall: hosts                                1.000 (67/67)          >= 0.97                ok
+recall: ports                                0.994 (154/155)        >= 0.75                ok
+recall: technologies                         0.990 (103/104)        >= 0.90                ok
+share right: service versions                1.000 (32/32)          >= 0.90                ok
+share right: page titles                     1.000 (122/122)        >= 0.98                ok
+stability: t0 twice, changes in run 2        0 of 0 changes         0 tech/version         ok
+run status                                   completed              completed              ok
+engine warnings                              0                      0                      ok
+nmap packets: max per second                 764                    <= 1050 (cap 1000)     ok
+all packets: seconds over 1100               0 of 2138 (max 913)    <= 3                   ok
+all packets: p99 per second                  752                    <= 1000                ok
+wall time t0: general pass / deep pass       767 s / 1368 s         deep: 16 hosts         info (54 waiting, 0 new)
+wall time t0-2: general pass / deep pass     934 s / 1380 s         deep: 16 hosts         info (54 waiting, 0 new)
+general pass: run 2 vs run 1                 934 s vs 767 s         <= 1.15 x run 1        FAIL
+kernel cap: active/max 100ms/max 1s/drops    t0 true/172/764/393 t0-2 true/118/758/22  true/<=220/<=1000/traced ok
+  kernel cap t0: max100 172 at 03:18:11.1 max1s 764 at 03:18:11 near 03:18:21.2:22/129 03:40:03.8:0/111 03:23:09.7:0/108 03:18:08.3:65/115 03:18:11.1:0/172 03:18:18.5:17/124 ; dropped in this run 393
+  kernel cap t0-2: max100 118 at 03:47:58.4 max1s 758 at 04:03:16 near 03:59:00.7:75/102 03:59:01.6:39/111 03:47:58.4:0/118 03:48:05.0:24/101 04:01:00.7:41/112 04:16:38.5:52/99 ; dropped in this run 22
+neighbour table: entries after, overflows    359 / +0               +0 overflows           ok
+run 2134 s, 70 hosts up, 157 open services, 1254588 packets; output e2e/out/gate-acc27
+GATE FAILED

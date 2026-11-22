@@ -1,0 +1,5 @@
+H2 wire run, acc27 (dab9d0e), CZUJKA_KERNEL_CAP=off (engine alone), CZUJKA_DEEP_PASS_HOSTS=0.
+Run 1: /16 (lab, t0), started 02:44:56, completed in 815 s.
+Run 2: 10.66.10.0/24, own scope and profile copy, started 02:46:56 (120 s in); still in its full-range pass at 189 pps when stopped at 03:04.
+Both runs active 02:46:56-02:58:32 (696 s): all scanner packets max 756/s (02:48:14), p99 531/s, p50 197/s, 0 seconds over 1100 (policy max_pps 1000).
+Capture: tcpdump-t0.txt.gz (src 10.66.0.30 or arp).
