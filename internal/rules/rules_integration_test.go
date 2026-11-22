@@ -251,8 +251,8 @@ func TestHTTPRoutes(t *testing.T) {
 		t.Fatalf("create: %d %v", code, out)
 	}
 	id := int64(out["rule"].(map[string]any)["id"].(float64))
-	if code, _ = do("POST", "/", `{"yaml":"id: no-http-80\nmatch: {port: 80}"}`); code != 409 {
-		t.Fatalf("duplicate id: %d", code)
+	if code, out = do("POST", "/", `{"yaml":"id: no-http-80\nmatch: {port: 80}"}`); code != 409 || out["error"].(map[string]any)["message"] != "Reguła o id „no-http-80” już istnieje." {
+		t.Fatalf("duplicate id: %d %v", code, out)
 	}
 	svc.Wait() // the background evaluation after the change
 	code, out = do("GET", fmt.Sprintf("/%d/violations", id), "")

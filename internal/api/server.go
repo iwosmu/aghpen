@@ -250,7 +250,7 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		errors.As(err, &a)
 		writeErrDetails(w, http.StatusConflict, "run_active", fmt.Sprintf("Ten profil ma już skan #%d. Zakończ albo anuluj go przed nowym.", a.RunID), map[string]int64{"run_id": a.RunID})
 	case errors.Is(err, auth.ErrLastAdmin), errors.Is(err, store.ErrConflict), errors.Is(err, runner.ErrActiveRun), errors.Is(err, runner.ErrBadState):
-		writeErr(w, http.StatusConflict, "conflict", msg)
+		writeErr(w, http.StatusConflict, "conflict", strings.TrimPrefix(msg, store.ErrConflict.Error()+": "))
 	case errors.Is(err, auth.ErrForbidden), errors.Is(err, auth.ErrBuiltinRole):
 		writeErr(w, http.StatusForbidden, "forbidden", msg)
 	case errors.Is(err, store.ErrInvalid), errors.Is(err, auth.ErrValidation), errors.Is(err, runner.ErrInvalid), errors.Is(err, errValidation):

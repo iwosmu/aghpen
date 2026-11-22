@@ -79,7 +79,7 @@ func (s *Service) fail(w http.ResponseWriter, err error, val *Validation) {
 	case errors.Is(err, ErrInvalid):
 		WriteErr(w, http.StatusUnprocessableEntity, "validation", "reguła ma błędy", val)
 	case errors.Is(err, ErrConflict):
-		WriteErr(w, http.StatusConflict, "conflict", err.Error(), nil)
+		WriteErr(w, http.StatusConflict, "conflict", strings.TrimPrefix(err.Error(), ErrConflict.Error()+": "), nil)
 	case errors.Is(err, context.Canceled):
 	default:
 		s.log.Error("rules request failed", "error", err)

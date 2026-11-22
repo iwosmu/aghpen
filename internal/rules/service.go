@@ -204,7 +204,7 @@ func (s *Service) Create(ctx context.Context, text string, enabled *bool, author
 	out, err := scanRule(s.st.Pool().QueryRow(ctx, `INSERT INTO policy_rules (slug, name, severity, description, yaml, enabled, builtin, author)
 		VALUES ($1, $2, $3, $4, $5, $6, false, $7) RETURNING `+ruleCols, r.ID, r.Name, string(r.Severity), r.Description, text, en, author))
 	if isUnique(err) {
-		return out, val, fmt.Errorf("%w: reguła o id „%s” już istnieje", ErrConflict, r.ID)
+		return out, val, fmt.Errorf("%w: Reguła o id „%s” już istnieje.", ErrConflict, r.ID)
 	}
 	if err == nil {
 		s.changed()
@@ -222,7 +222,7 @@ func (s *Service) Update(ctx context.Context, id int64, text *string, enabled *b
 	}
 	if text != nil && *text != cur.YAML {
 		if cur.Builtin {
-			return cur, val, fmt.Errorf("%w: reguły wbudowanej nie można edytować; skopiuj ją jako własną regułę (inne id) i wyłącz wbudowaną", ErrConflict)
+			return cur, val, fmt.Errorf("%w: Reguły wbudowanej nie można edytować. Skopiuj ją jako własną regułę (inne id) i wyłącz wbudowaną.", ErrConflict)
 		}
 		r, v := Parse(*text)
 		if r == nil {
@@ -237,7 +237,7 @@ func (s *Service) Update(ctx context.Context, id int64, text *string, enabled *b
 	out, err := scanRule(s.st.Pool().QueryRow(ctx, `UPDATE policy_rules SET slug = $2, name = $3, severity = $4, description = $5, yaml = $6,
 		enabled = $7, updated_at = now() WHERE id = $1 RETURNING `+ruleCols, id, cur.Slug, cur.Name, cur.Severity, cur.Description, cur.YAML, cur.Enabled))
 	if isUnique(err) {
-		return out, val, fmt.Errorf("%w: reguła o id „%s” już istnieje", ErrConflict, cur.Slug)
+		return out, val, fmt.Errorf("%w: Reguła o id „%s” już istnieje.", ErrConflict, cur.Slug)
 	}
 	if err == nil {
 		s.changed()
@@ -252,7 +252,7 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 		return err
 	}
 	if cur.Builtin {
-		return fmt.Errorf("%w: reguły wbudowanej nie można usunąć; wyłącz ją", ErrConflict)
+		return fmt.Errorf("%w: Reguły wbudowanej nie można usunąć. Wyłącz ją.", ErrConflict)
 	}
 	if _, err := s.st.Pool().Exec(ctx, `DELETE FROM policy_rules WHERE id = $1`, id); err != nil {
 		return err

@@ -6,6 +6,12 @@ describe('format', () => {
     expect(fmtDuration(42)).toBe('42 s');
     expect(fmtDuration(95)).toBe('1 min 35 s');
     expect(fmtDuration(4310)).toBe('1 h 11 min');
+    // the same table as internal/analyze TestDurationTextMatchesTheUI
+    expect(fmtDuration(108)).toBe('1 min 48 s');
+    expect(fmtDuration(120)).toBe('2 min');
+    expect(fmtDuration(7200)).toBe('2 h');
+    expect(fmtDuration(3 * 86400)).toBe('3 dni');
+    expect(fmtDuration(3 * 86400 + 4 * 3600)).toBe('3 dni 4 h');
     expect(fmtDuration(-1)).toBe('–');
     expect(fmtDuration(null)).toBe('–');
   });

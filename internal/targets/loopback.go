@@ -141,3 +141,28 @@ func ResolveHostGateway(ctx context.Context, setting string, inContainer bool, r
 	}
 	return netip.Addr{}, errors.New(s + ": no IPv4 address")
 }
+
+// ShownHostname is the name a service or a run export shows for an address.
+// A loopback name ("localhost") on an address that is not loopback is a
+// loopback target mapped to the docker host (MapsTo): shown or exported, it
+// would name Czujka's own container, so the address is shown instead ("").
+func ShownHostname(name, ip string) string {
+	if name == "" || !IsLoopbackValue(name) {
+		return name
+	}
+	if a, err := netip.ParseAddr(ip); err != nil || a.Unmap().IsLoopback() {
+		return name
+	}
+	return ""
+}
+
+// ShownHostnames applies ShownHostname to a list of names of one address.
+func ShownHostnames(names []string, ip string) []string {
+	out := make([]string, 0, len(names))
+	for _, n := range names {
+		if ShownHostname(n, ip) != "" {
+			out = append(out, n)
+		}
+	}
+	return out
+}

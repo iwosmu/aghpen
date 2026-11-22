@@ -86,6 +86,10 @@ func allKindCases() []kindCase {
 		{ch(model.ChangeServiceReturned, 8787, "state", map[string]any{"state": "gone", "away_seconds": 7200, "runs_away": 1}, "open", false,
 			map[string]any{DetailProduct: "http"}),
 			"Usługa 10.0.0.5:8787 wróciła po 2 h (http)", "Service 10.0.0.5:8787 back after 2 h (http)"},
+		// the dashboard says "nie było jej 1 min 48 s": the summary uses the same units
+		{ch(model.ChangeServiceReturned, 8787, "state", map[string]any{"state": "gone", "away_seconds": 108, "runs_away": 1}, "open", false,
+			map[string]any{DetailProduct: "http"}),
+			"Usługa 10.0.0.5:8787 wróciła po 1 min 48 s (http)", "Service 10.0.0.5:8787 back after 1 min 48 s (http)"},
 		{ch(model.ChangeResponseSlower, 80, "http.response_ms", map[string]any{"baseline_ms": 40, "ms": 41}, map[string]any{"ms": 900}, false, nil),
 			"Usługa 10.0.0.5:80 odpowiada wolniej: 900 ms (zwykle 40 ms)", "Service 10.0.0.5:80 responds slower: 900 ms (usually 40 ms)"},
 		{ch(model.ChangeResponseRecovered, 80, "http.response_ms", map[string]any{"baseline_ms": 40, "ms": 900}, map[string]any{"ms": 42}, false, nil),
@@ -222,5 +226,19 @@ func TestPatternText(t *testing.T) {
 		if got := PatternText(c.in, "en"); got != c.en {
 			t.Errorf("en %q: %q", c.in, got)
 		}
+	}
+}
+
+// The same table as web/src/lib/format.test.ts (fmtDuration): the change
+// summary and the UI write one absence with the same units.
+func TestDurationTextMatchesTheUI(t *testing.T) {
+	for sec, want := range map[int]string{42: "42 s", 95: "1 min 35 s", 108: "1 min 48 s", 120: "2 min", 4310: "1 h 11 min",
+		7200: "2 h", 3 * 86400: "3 dni", 3*86400 + 4*3600: "3 dni 4 h"} {
+		if got := awayText(time.Duration(sec) * time.Second); got != want {
+			t.Errorf("awayText(%d s) = %q, want %q", sec, got, want)
+		}
+	}
+	if got := awayTextEN(3*24*time.Hour + 4*time.Hour); got != "3 days 4 h" {
+		t.Errorf("awayTextEN = %q", got)
 	}
 }
