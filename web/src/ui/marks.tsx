@@ -228,7 +228,7 @@ export function ClassChips({ classes, max = 3 }: { classes: string[] | null | un
   return (
     <span className={max <= 1 ? 'inline-flex items-center gap-1 whitespace-nowrap' : 'inline-flex flex-wrap items-center gap-1'}>
       {classes.slice(0, max).map((c) => (
-        <span key={c} className="inline-flex h-[18px] items-center rounded-sm bg-accent-wash px-1.5 text-2xs text-ink">{classLabel(c)}</span>
+        <span key={c} className="inline-flex h-[22px] items-center whitespace-nowrap rounded-full bg-[var(--rule)] px-2.5 text-[12px] text-ink">{classLabel(c)}</span>
       ))}
       {classes.length > max ? <span className="text-xs text-ink-3">+{classes.length - max}</span> : null}
     </span>

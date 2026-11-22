@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router';
 import { SETUP_DONE_KEY } from './Setup';
 import { useItem, usePage } from '../api/hooks';
@@ -8,11 +8,12 @@ import { cx, fmtDateTime, fmtDec, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtS
 import { useLiveRun, useNow, useWidth } from '../lib/hooks';
 import { NetworkField, NightStrip, Ring, Spark, TickBars, networkFields } from '../viz/Night';
 import { ErrorState, Panel, SkeletonRows } from '../ui/kit';
+import { useIsNarrow } from '../ui/table';
 import { Icon } from '../ui/Icon';
 import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, changeKindInfo, type GlyphName, type Tone } from '../ui/marks';
 import { BarList, ProgressBar } from '../viz/charts';
 import { useSession } from '../session';
-import { RunStory, useRunStoryShown } from '../ui/RunStory';
+import { useRunStoryShown } from '../ui/RunStory';
 import { useHostVerdicts } from '../ui/MissingHosts';
 import { PartialNote } from '../ui/RunPasses';
 import { useArrivalOrder } from '../ui/arrivalOrder';
@@ -111,7 +112,6 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
           {t('Ostatnio', 'Last')}: {partialRunPhrase(partial)} (<Link to={'/runs/' + partial.id} className="num link">#{partial.id}</Link>, {fmtRelative(partial.finished_at)}); {t('skan częściowy.', 'a partial scan.')}
         </p>
       ) : null}
-      {s && !baseline ? <RunStory runId={run.id} className="mt-3 space-y-1" testId="handover-story" /> : null}
       {s && !baseline && storyShown === false && !(quiet && !expected && !unreachable) ? (
         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1" data-testid="handover-counts">
           <Count n={s.hosts_new} glyph="plus" tone="new" label={plural(s.hosts_new, ['nowy host', 'nowe hosty', 'nowych hostów'], ['new host', 'new hosts'])} to={'/changes?run_id=' + run.id + '&kind=host_new'} />
@@ -132,13 +132,23 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   );
 }
 
+function useViewportHeight(): number {
+  const [h, setH] = useState(() => (typeof window === 'undefined' ? 900 : window.innerHeight));
+  useEffect(() => {
+    const fn = () => setH(window.innerHeight);
+    window.addEventListener('resize', fn);
+    return () => window.removeEventListener('resize', fn);
+  }, []);
+  return h;
+}
+
 function Stat({ label, value, delta, deltaTitle, to, mono = true, pic }: { label: string; value: ReactNode; delta?: number | null; deltaTitle?: string; to?: string; mono?: boolean; pic?: ReactNode }) {
   const inner = (
     <>
       <dt className="text-[13px] font-medium text-ink">{label}</dt>
-      <dd className="mt-auto flex items-end justify-between gap-3 pt-3">
+      <dd className="mt-auto flex items-end justify-between gap-3 pt-3 xl:flex-col xl:items-start xl:gap-1.5 xl:pt-1.5">
         <span className="flex items-baseline gap-2">
-          <span className={cx('text-ink', mono ? 'font-display text-[40px] leading-none sm:text-[46px]' : 'text-base font-medium')}>{value}</span>
+          <span className={cx('text-ink', mono ? 'font-display text-[40px] leading-none sm:text-[46px] xl:text-[40px] 2xl:text-[46px]' : 'text-base font-medium')}>{value}</span>
           {delta !== undefined && delta !== null ? (
             <span className="num text-xs text-ink-2" title={deltaTitle ?? t('zmiana względem poprzedniego skanu', 'change against the previous scan')}>{delta === 0 ? '±0' : fmtSigned(delta)}</span>
           ) : null}
@@ -148,7 +158,7 @@ function Stat({ label, value, delta, deltaTitle, to, mono = true, pic }: { label
     </>
   );
   if (!mono) return <div className="flex flex-col py-1.5">{inner}</div>;
-  const cls = 'card group flex min-h-[116px] flex-col rounded-[22px] px-5 py-4 transition-colors';
+  const cls = 'card group flex min-h-[116px] flex-col rounded-[22px] px-5 py-4 transition-colors xl:min-h-0 xl:py-3 2xl:py-4';
   return to
     ? <Link to={to} className={cx(cls, 'hover:bg-[color-mix(in_oklch,var(--panel),var(--ink)_5%)]')}>{inner}</Link>
     : <div className={cls}>{inner}</div>;
@@ -165,7 +175,7 @@ function Inventory({ d, pair, runs }: { d: Dash; pair?: { full?: ScanRun; prev?:
   const trend = d.trend ?? [];
   void runs;
   return (
-    <dl className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4" data-testid="dash-numbers">
+    <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 xl:h-full xl:grid-cols-1 xl:grid-rows-4" data-testid="dash-numbers">
       <Stat label={t('Aktywne hosty', 'Hosts up')} value={fmtInt(h.hosts_up)} delta={dHosts} deltaTitle={deltaTitle} to="/hosts?status=up" pic={<Spark values={trend.map((p) => p.hosts)} width={96} height={34} />} />
       <Stat label={t('Otwarte usługi', 'Open services')} value={fmtInt(h.services_open)} delta={dServices} deltaTitle={deltaTitle} to="/services?state=open" pic={<Spark values={trend.map((p) => p.services)} width={96} height={34} />} />
       <Stat label={t('Nieprzejrzane zmiany', 'Unreviewed changes')} value={fmtInt(h.changes_unacked)} to="/changes?acked=false&expected=false" pic={<TickBars values={trend.map((p) => p.changes)} width={96} height={34} />} />
@@ -191,10 +201,13 @@ function Stage({ d }: { d: Dash }) {
   );
   const [ref, w] = useWidth<HTMLDivElement>();
   const main = fields[0];
-  const size = Math.floor(Math.max(240, Math.min(w - 2 * Math.max(16, w / 32), 760)));
+  const vh = useViewportHeight();
+  const wide = !useIsNarrow(1280);
+  // from 1280 px the field stays square beside the tiles and above the fold: about 500 to 540 px
+  const size = Math.floor(Math.max(240, Math.min(w - 2 * Math.max(16, w / 32), wide ? Math.max(340, Math.min(540, vh - 340)) : 760)));
   const unitSteps = main?.unit === 'block' ? [['2', '1'], ['3', '2–3'], ['4', '4–9'], ['5', '10+']] : [];
   return (
-    <section className="card relative flex min-h-[320px] flex-col overflow-hidden rounded-[28px] bg-[radial-gradient(60%_55%_at_50%_52%,rgb(38_97_220/0.13),transparent_75%),var(--panel)] p-5 sm:p-6" data-testid="dash-field">
+    <section className="card relative flex h-full min-h-[320px] flex-col overflow-hidden rounded-[28px] bg-[radial-gradient(60%_55%_at_50%_52%,rgb(38_97_220/0.13),transparent_75%),var(--panel)] p-5 sm:p-6" data-testid="dash-field">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="mono text-[15px] text-ink">{main?.label ?? ''}</p>
         {unitSteps.length ? (
@@ -203,7 +216,7 @@ function Stage({ d }: { d: Dash }) {
           </p>
         ) : null}
       </div>
-      <div ref={ref} className="flex flex-1 items-center justify-center py-5">
+      <div ref={ref} className="flex flex-1 items-center justify-center py-4">
         {hostsQ.isPending ? <div className="skeleton rounded-[18px]" style={{ width: size, height: size }} /> : main && w ? <NetworkField field={main} size={size} /> : null}
       </div>
       {fields.length > 1 ? (
@@ -488,10 +501,12 @@ export default function Dashboard() {
       <h1 className="sr-only">{t('Pulpit', 'Dashboard')}</h1>
       <Handover d={d} full={runs.data ? (pair.full ?? null) : undefined} />
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="min-w-0 space-y-4">
-          <Stage d={d} />
-          <Inventory d={d} pair={runs.data ? pair : undefined} runs={allRuns.data?.items ?? []} />
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_190px] 2xl:grid-cols-[minmax(0,1fr)_230px]">
+            <div className="xl:order-2"><Inventory d={d} pair={runs.data ? pair : undefined} runs={allRuns.data?.items ?? []} /></div>
+            <div className="min-w-0 xl:order-1"><Stage d={d} /></div>
+          </div>
           <Panel title={t('Najciekawsze usługi', 'Most interesting services')} flush actions={<Link to="/services?sort=-interest" className="link">{t('Wszystkie', 'All')}</Link>}>
           <ul className="grid px-5 lg:grid-cols-2 lg:gap-x-8">
             {(d.top_services ?? []).slice(0, 7).map((s) => (
