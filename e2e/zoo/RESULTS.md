@@ -37,7 +37,7 @@ commita `047412b` (sygnatury ręczne, import nuclei-templates, samoopis).
 
 Po skanie usunęliśmy jeszcze jeden import (`nuclei-td-sonarqubes`: liczba mnoga naszej sygnatury SonarQube,
 commit `b5f08e8`). Ponowne dopasowanie tych samych eksportów obecnym silnikiem (`rematch`) daje **1** błędną
-etykietę: klasa `login` na Redis Commander (strona ma wyłączone pole `type="password"` hasła Sentinel w formularzu dodawania serwera).
+etykietę: klasa `login` na Redis Commander. Strona zawiera ukryte okno logowania (`signinPassword`), używane tylko przy włączonym uwierzytelnieniu; domyślnie jest wyłączone, więc prawda nie przewiduje klasy `login`.
 
 ## Zbiór odłożony (20 usług, 23 porty): usługi, których Czujka nigdy nie widziała
 
