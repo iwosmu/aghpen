@@ -71,7 +71,7 @@ func (r *run) hintsIn(g *group) []model.HostHint {
 // scanGroup runs the stages of one group: discovery, port scan, service
 // detection, HTTP/TLS and signatures, then the retries for hinted hosts
 // that did not answer.
-func (r *run) scanGroup(ctx context.Context, g *group, rate int, gs *groupStats) error {
+func (r *run) scanGroup(ctx context.Context, g *group, sh *share, gs *groupStats) error {
 	tgts := g.nmapTargets()
 	if len(tgts) == 0 {
 		return nil // everything in this group is excluded now
@@ -92,14 +92,14 @@ func (r *run) scanGroup(ctx context.Context, g *group, rate int, gs *groupStats)
 		}
 	} else {
 		var err error
-		if live, err = r.discover(ctx, g, tgts, rate, gs); err != nil {
+		if live, err = r.discover(ctx, g, tgts, sh.grow(), gs); err != nil {
 			return err
 		}
 	}
 	gs.mu.Lock()
 	gs.discovered, gs.live = true, len(live)
 	gs.mu.Unlock()
-	if err := r.deepScan(ctx, g, live, 1, rate, gs, found); err != nil {
+	if err := r.deepScan(ctx, g, live, 1, sh, gs, found); err != nil {
 		return err
 	}
 
@@ -133,13 +133,13 @@ func (r *run) scanGroup(ctx context.Context, g *group, rate int, gs *groupStats)
 			return context.Cause(ctx)
 		}
 		attempts = 1 + round
-		back, err := r.retryRound(ctx, g, missing, round == rounds, rate, gs)
+		back, err := r.retryRound(ctx, g, missing, round == rounds, sh.grow(), gs)
 		if err != nil {
 			return err
 		}
 		if len(back) > 0 {
 			r.log.Info("unstable host answered on retry", "hosts", len(back), "round", round)
-			if err := r.deepScan(ctx, g, back, attempts, rate, gs, found); err != nil {
+			if err := r.deepScan(ctx, g, back, attempts, sh, gs, found); err != nil {
 				return err
 			}
 		}
@@ -255,7 +255,8 @@ func (r *run) retryRound(ctx context.Context, g *group, missing []model.HostHint
 
 // deepScan runs the port scan, the service detection and the HTTP stage for
 // hosts that answered, and reports each of them to the sink.
-func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attempts, rate int, gs *groupStats, found map[string]bool) error {
+func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attempts int, sh *share, gs *groupStats, found map[string]bool) error {
+	rate := sh.grow()
 	if len(hosts) == 0 {
 		return nil
 	}
@@ -334,7 +335,7 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 	full := len(claimed) > 0
 	if full {
 		r.stats.passState(model.PassTopPorts, model.PassDone)
-	} else if err := r.densePass(ctx, g, scanned, rate, gs); err != nil {
+	} else if err := r.densePass(ctx, g, scanned, sh.grow(), gs); err != nil {
 		return err
 	}
 	unknown := map[string]bool{}
@@ -396,6 +397,7 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 	for _, h := range up {
 		found[h.IP] = true
 	}
+	rate = sh.grow()
 	describeRate := rate
 	var wide chan fullScan
 	if full {

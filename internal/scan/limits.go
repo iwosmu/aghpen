@@ -184,6 +184,19 @@ func (b *Budget) Acquire(ctx context.Context, want int) (int, error) {
 	}
 }
 
+// TryAcquire takes up to want of the free budget without waiting and
+// returns what it took (0 when nothing is free).
+func (b *Budget) TryAcquire(want int) int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	n := min(want, b.total-b.inUse)
+	if n < 1 {
+		return 0
+	}
+	b.inUse += n
+	return n
+}
+
 // Release gives a share back.
 func (b *Budget) Release(n int) {
 	b.mu.Lock()

@@ -576,7 +576,11 @@ func (m *Manager) finish(ctx context.Context, a *activeRun, p *model.ScanProfile
 	a.mu.Unlock()
 	run = m.save(a, EventDone)
 	if p != nil {
-		if err := m.st.SetProfileLastRun(ctx, p.ID, run.ID, run.Stats.AvgPPS); err != nil {
+		pps := run.Stats.AvgPPS
+		if run.Stats.GeneralPPS > 0 { // a deep pass followed: learn the general pass speed
+			pps = run.Stats.GeneralPPS
+		}
+		if err := m.st.SetProfileLastRun(ctx, p.ID, run.ID, pps); err != nil {
 			m.log.Error("set profile last run", "err", err)
 		}
 	}

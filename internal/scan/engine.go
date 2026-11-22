@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math"
 	"net/netip"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -57,11 +58,13 @@ type GroupEvent struct {
 
 // Engine implements model.Engine.
 type Engine struct {
-	deps   Deps
-	log    *slog.Logger
-	now    func() time.Time
-	once   sync.Once
-	prober probe.Prober
+	// deepHosts: the hosts the deep pass may take per run (CZUJKA_DEEP_PASS_HOSTS, 0 = off)
+	deepHosts int
+	deps      Deps
+	log       *slog.Logger
+	now       func() time.Time
+	once      sync.Once
+	prober    probe.Prober
 	// direct is the "second method" of the last retry round: a TCP connect
 	// to the ports a host had open before. Tests replace it.
 	direct func(ctx context.Context, ip string, ports []int, timeout time.Duration, lim *probe.Limiter) (probe.Host, int64)
@@ -183,7 +186,7 @@ var _ model.Engine = (*Engine)(nil)
 
 // New builds an engine. The prober (nmap or native) is chosen on first use.
 func New(d Deps) *Engine {
-	e := &Engine{deps: d, log: d.Logger, now: d.Now, direct: probe.ConnectProbe}
+	e := &Engine{deps: d, log: d.Logger, now: d.Now, direct: probe.ConnectProbe, deepHosts: deepHostsSetting(os.Getenv("CZUJKA_DEEP_PASS_HOSTS"))}
 	if e.log == nil {
 		e.log = slog.Default()
 	}
@@ -435,7 +438,7 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 		s.AddressesTotal = s.AddressesDone + total
 		s.ChunksTotal = s.ChunksDone + len(units)
 	})
-	if !r.fullRangePlanned(int64(total)) && deepFor(plan.Profile.Ports, r.ports, int64(total)) {
+	if !r.fullRangePlanned(int64(total)) && e.deepHosts > 0 && deepFor(plan.Profile.Ports, r.ports, int64(total)) {
 		r.deepPlanned = true
 		r.stats.addPass(model.PassTopPorts)
 		r.stats.addPass(model.PassDeep)
@@ -535,6 +538,12 @@ loop:
 	}
 	wg.Wait()
 	if r.deepPlanned && workCtx.Err() == nil && r.allChunksDone() {
+		// the speed the planner learns from is the general pass's: the deep
+		// pass sends at the run's whole share, one host at a time, and would
+		// make the next run's first group too large (one group, every live
+		// host, a small share)
+		gen := r.stats.snapshot().AvgPPS
+		r.stats.update(func(s *model.RunStats) { s.GeneralPPS = gen })
 		r.deepPass(workCtx)
 	}
 	close(progStop)
@@ -650,8 +659,10 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 				r.budget.Release(rate - got)
 				rate = got
 			}
-			err = r.scanGroup(ctx, g, rate, gs)
-			r.global.Release(rate)
+			sh := &share{r: r, rate: rate}
+			err = r.scanGroup(ctx, g, sh, gs)
+			r.global.Release(sh.rate)
+			rate = sh.rate // what the group held at the end, given back below
 		}
 		r.budget.Release(rate)
 	}
@@ -874,13 +885,13 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 	if ports, err := probe.EffectivePorts(plan.Profile.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil {
 		nPorts = float64(ports.Count())
 		fullRange = fullRangeFor(plan.Profile.Ports, ports, est.Addresses)
-		deep = !fullRange && deepFor(plan.Profile.Ports, ports, est.Addresses)
+		deep = !fullRange && e.deepHosts > 0 && deepFor(plan.Profile.Ports, ports, est.Addresses)
 	}
 	if deep {
-		// the rotating deep pass: up to deepPassHosts live hosts get the rest of
+		// the rotating deep pass: up to deepHosts live hosts get the rest of
 		// 1-65535; the known live hosts beyond that wait for later runs
-		est.DeepMaxHosts = deepPassHosts
-		est.DeepWaitingHosts = max(0, len(plan.Hints)-deepPassHosts)
+		est.DeepMaxHosts = e.deepHosts
+		est.DeepWaitingHosts = max(0, len(plan.Hints)-e.deepHosts)
 	}
 	if fullRange {
 		est.FullRangeMaxHosts = fullRangeMaxHosts
@@ -938,7 +949,7 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 			packets += math.Min(fh, fullRangeMaxHosts) * (65535 - nPorts) * 1.02
 		}
 		if deep {
-			packets += math.Min(live, deepPassHosts) * (65535 - nPorts) * 1.02
+			packets += math.Min(live, float64(e.deepHosts)) * (65535 - nPorts) * 1.02
 		}
 		if plan.Profile.ServiceDetection {
 			packets += live * 3 * 14 // about 3 open ports per host, about 14 packets per version probe
@@ -1000,6 +1011,39 @@ func (r *run) sanityCheck() {
 		r.log.Warn("sanity check: most live hosts gave the port scan no answer", "hosts_up", s.HostsUp, "answered", answered)
 		r.stats.warn(fmt.Sprintf("Wykrywanie znalazło %d hostów, a na skan portów odpowiedziało tylko %d. Wynik portów jest niepełny: sprawdź limit pakietów, limit czasu i obciążenie sieci.", s.HostsUp, answered))
 	}
+}
+
+// share is the packet rate a running group holds in the run budget and in
+// the global budget. It is fixed for each nmap process; between the
+// group's stages grow adds the budget that other groups gave back.
+type share struct {
+	r    *run
+	rate int
+}
+
+// grow adds free packet budget to the group's share between its nmap
+// stages, only when no group waits to start (the tail of the run): a long
+// group that started with a small share does not run on at it while the
+// rest of the budget is idle. It never waits, never takes more than the
+// run's probe rate, and stays inside both budgets.
+func (s *share) grow() int {
+	r := s.r
+	r.mu.Lock()
+	waiting := len(r.pending) > 0 && !r.windowStop
+	r.mu.Unlock()
+	if want := r.lim.ProbePPS() - s.rate; !waiting && want > 0 {
+		if n := r.budget.TryAcquire(want); n > 0 {
+			got := r.global.TryAcquire(n)
+			if got < n {
+				r.budget.Release(n - got)
+			}
+			if got > 0 {
+				r.log.Debug("group share grew", "from", s.rate, "to", s.rate+got)
+				s.rate += got
+			}
+		}
+	}
+	return s.rate
 }
 
 // discoveryShare is the part of a group's work that host discovery stands

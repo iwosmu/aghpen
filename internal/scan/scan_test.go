@@ -1716,3 +1716,76 @@ func TestDeepPassSkipsPortsTheWidePassFound(t *testing.T) {
 		t.Errorf("services open %d, want %d (each service once)", out.Stats.ServicesOpen, want)
 	}
 }
+
+func TestDeepHostsSetting(t *testing.T) {
+	for v, want := range map[string]int{"": 16, "abc": 16, "-3": 16, "0": 0, "40": 40, " 8 ": 8, "500": 64} {
+		if got := deepHostsSetting(v); got != want {
+			t.Errorf("CZUJKA_DEEP_PASS_HOSTS=%q: %d, want %d", v, got, want)
+		}
+	}
+}
+
+// CZUJKA_DEEP_PASS_HOSTS=0 switches the deep pass off; a custom value bounds
+// its hosts. The planner learns the general pass speed, not the deep pass's.
+func TestDeepPassHostsFromTheEnvironment(t *testing.T) {
+	hosts := map[string][]int{}
+	for i := 1; i <= 6; i++ {
+		hosts[fmt.Sprintf("10.8.0.%d", i)] = []int{80, 40000}
+	}
+	run := func(env string) (model.ScanEstimate, model.RunOutcome, *memSink) {
+		t.Setenv("CZUJKA_DEEP_PASS_HOSTS", env)
+		e := New(Deps{Prober: &fakeNet{hosts: hosts}, Logger: quiet})
+		plan := basePlan("10.8.0.0/23")
+		plan.Profile.Ports = "top-100"
+		sink := newSink()
+		est := e.Estimate(plan)
+		out := e.Run(context.Background(), plan, sink)
+		if out.Status != model.RunCompleted {
+			t.Fatalf("outcome = %+v", out)
+		}
+		return est, out, sink
+	}
+	deepHosts := func(out model.RunOutcome) int {
+		for _, p := range out.Stats.Passes {
+			if p.Name == model.PassDeep {
+				return p.Hosts
+			}
+		}
+		return -1
+	}
+	est, out, sink := run("0")
+	if deepHosts(out) != -1 || est.DeepMaxHosts != 0 || out.Stats.GeneralPPS != 0 {
+		t.Errorf("off: deep hosts %d, estimate %d, general pps %v", deepHosts(out), est.DeepMaxHosts, out.Stats.GeneralPPS)
+	}
+	if h := sink.host("10.8.0.1"); h == nil || h.FullPorts || len(h.Services) != 1 {
+		t.Errorf("off: 10.8.0.1 = %+v", h)
+	}
+	est, out, _ = run("2")
+	if deepHosts(out) != 2 || est.DeepMaxHosts != 2 {
+		t.Errorf("2: deep hosts %d, estimate %d", deepHosts(out), est.DeepMaxHosts)
+	}
+	if out.Stats.GeneralPPS <= 0 {
+		t.Errorf("general pps %v: the planner must learn the general pass speed", out.Stats.GeneralPPS)
+	}
+}
+
+// A running group takes the budget other groups gave back, between its
+// stages, only when no group waits to start, and within both budgets.
+func TestGroupShareGrowsAtTheTail(t *testing.T) {
+	r := &run{budget: NewBudget(1000), global: NewBudget(1000), lim: Limits{PPS: 1000}, log: quiet}
+	r.budget.inUse, r.global.inUse = 120, 120 // the group's own share
+	r.pending = []*unit{{}}
+	sh := &share{r: r, rate: 120}
+	if got := sh.grow(); got != 120 {
+		t.Errorf("a group waits to start: share %d, want 120", got)
+	}
+	r.pending = nil
+	r.global.inUse += 500 // another run holds 500 of the global budget
+	want := min(r.lim.ProbePPS(), 120+380)
+	if got := sh.grow(); got != want || r.budget.InUse() != want || r.global.InUse() != 1000 {
+		t.Errorf("tail: share %d (want %d), run budget in use %d, global %d", got, want, r.budget.InUse(), r.global.InUse())
+	}
+	if got := sh.grow(); got != want {
+		t.Errorf("nothing free: share %d", got)
+	}
+}

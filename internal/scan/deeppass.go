@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,6 +26,20 @@ import (
 // longest ago, then the address. Each run so reaches other hosts, and every
 // live host is covered in turn.
 const deepPassHosts = 16
+
+// maxDeepPassHosts bounds CZUJKA_DEEP_PASS_HOSTS.
+const maxDeepPassHosts = 64
+
+// deepHostsSetting reads the operator setting CZUJKA_DEEP_PASS_HOSTS: the
+// hosts the deep pass may take per run. Empty or not a number: the default
+// (16); 0 switches the deep pass off; above 64: 64.
+func deepHostsSetting(v string) int {
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil || n < 0 {
+		return deepPassHosts
+	}
+	return min(n, maxDeepPassHosts)
+}
 
 // deepFor reports whether a run gets the deep pass.
 func deepFor(spec string, ports *probe.PortSet, addresses int64) bool {
@@ -113,7 +128,7 @@ func (r *run) deepPass(ctx context.Context) {
 		r.stats.passState(model.PassDeep, model.PassSkipped)
 		return
 	}
-	n := min(len(cs), deepPassHosts)
+	n := min(len(cs), r.e.deepHosts)
 	pick, waiting := cs[:n], len(cs)-n
 	r.stats.passSkipHosts(model.PassDeep, waiting)
 	r.log.Info("deep pass", "hosts", n, "waiting", waiting, "ports", rest.Count())

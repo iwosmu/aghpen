@@ -382,10 +382,14 @@ type RunStats struct {
 	// or estimated counts). The UI must not present "pace" as a measurement.
 	CurrentPPSBasis string  `json:"current_pps_basis,omitempty"`
 	AvgPPS          float64 `json:"avg_pps"`
-	ElapsedSec      int64   `json:"elapsed_sec"` // active time only, pauses excluded
-	ETASec          int64   `json:"eta_sec"`
-	Retried         int     `json:"retried"` // unstable hosts probed again
-	Errors          int     `json:"errors"`
+	// GeneralPPS is the average speed of the general pass (every chunk),
+	// set when a deep pass follows it; the profile's measured speed is
+	// learned from it, not from AvgPPS. 0: AvgPPS is that speed.
+	GeneralPPS float64 `json:"general_pps,omitempty"`
+	ElapsedSec int64   `json:"elapsed_sec"` // active time only, pauses excluded
+	ETASec     int64   `json:"eta_sec"`
+	Retried    int     `json:"retried"` // unstable hosts probed again
+	Errors     int     `json:"errors"`
 	// PortsUnknown counts live hosts whose port scan did not finish (nmap
 	// --host-timeout, even after one more try): their services are not
 	// measured in this run, not gone.
