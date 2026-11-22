@@ -150,6 +150,7 @@ export function AddressMap(p: Props) {
   }
   return (
     <div ref={ref} className="min-w-0">
+      {!p.compact ? <MapLegend counts={counts} densityOnly={p.snapshot} /> : null}
       <div
         ref={wrapRef} tabIndex={p.compact ? -1 : 0} onKeyDown={p.compact ? undefined : onKey} onBlur={() => { setActive(null); p.onHover?.(null); }}
         role="group"
@@ -174,7 +175,6 @@ export function AddressMap(p: Props) {
               <span className="text-ink-3">{t('Jedna komórka to blok /24 (256 adresów).', 'One cell is a /24 block (256 addresses).')}</span>
             )}
           </p>
-          <MapLegend counts={counts} densityOnly={p.snapshot} />
         </>
       ) : null}
       {tip.node}
@@ -193,18 +193,18 @@ function Swatch({ children, label, n }: { children: ReactNode; label: string; n?
 
 export function MapLegend({ counts, densityOnly }: { counts: { pending: number; running: number; done: number; deferred: number; failed: number; hosts: number }; densityOnly?: boolean }) {
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-rule pt-2 text-xs text-ink-2">
+    <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-ink-2" data-testid="map-legend">
       {densityOnly ? null : <>
       <Swatch label={t('oczekuje', 'pending')} n={counts.pending}><rect x="0.500" y="0.500" width="11" height="11" fill="var(--panel)" stroke="var(--rule-strong)" /></Swatch>
       <Swatch label={t('w toku', 'running')} n={counts.running}><rect x="0.750" y="0.750" width="10.500" height="10.500" fill="var(--accent-wash)" stroke="var(--accent)" strokeWidth="1.500" /></Swatch>
-      <Swatch label={t('odroczony', 'deferred')} n={counts.deferred}>
+      {counts.deferred > 0 ? <Swatch label={t('odroczony', 'deferred')} n={counts.deferred}>
         <defs><pattern id="lg-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4" height="4" fill="var(--st-changed-wash)" /><rect width="1.400" height="4" fill="var(--st-changed)" /></pattern></defs>
         <rect width="12" height="12" fill="url(#lg-hatch)" /><rect x="0.500" y="0.500" width="11" height="11" fill="none" stroke="var(--st-changed)" />
-      </Swatch>
+      </Swatch> : null}
       </>}
       {counts.failed > 0 && !densityOnly ? <Swatch label={t('błąd', 'failed')} n={counts.failed}><rect x="0.500" y="0.500" width="11" height="11" fill="var(--st-gone-wash)" stroke="var(--danger)" /></Swatch> : null}
       <span className="inline-flex items-center gap-1.5">
-        <span>{densityOnly ? t('aktywne hosty w bloku:', 'hosts up in the block:') : t('gotowy, aktywne hosty w bloku:', 'done, hosts up in the block:')}</span>
+        <span>{densityOnly ? t('aktywne hosty w bloku:', 'hosts up in the block:') : <>{t('gotowy', 'done')} <span className="num text-ink-3">{fmtInt(counts.done)}</span> · {t('aktywne hosty w bloku:', 'hosts up in the block:')}</>}</span>
         <span className="inline-flex items-center gap-px">
           {DENSITY_STEPS.map((s, i) => (
             <span key={i} className="inline-flex flex-col items-center gap-0.5">

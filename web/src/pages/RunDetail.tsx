@@ -286,11 +286,11 @@ export default function RunDetail() {
         {tab === 'map' && !small ? <Panel title={t('Mapa przestrzeni adresowej', 'Address-space map')} count={(map.data?.blocks.length ?? 0) + ' × /24'}>
             {map.error ? <ErrorState error={map.error} retry={() => map.refetch()} /> : !map.data ? <div className="skeleton h-[260px]" /> : map.data.blocks.length === 1 ? (
               <RunAddressField runId={run.id} cidr={map.data.blocks[0].cidr} live={isLive} fallback={
-                <AddressMap blocks={map.data.blocks} highlight={highlight} onHover={setHoverCidr} onSelect={(b: MapBlock) => navigate('/hosts?cidr=' + encodeURIComponent(b.cidr))} />
+                <AddressMap maxCell={34} blocks={map.data.blocks} highlight={highlight} onHover={setHoverCidr} onSelect={(b: MapBlock) => navigate('/hosts?cidr=' + encodeURIComponent(b.cidr))} />
               } />
             ) : (
               <AddressMap
-                blocks={map.data.blocks} highlight={highlight} onHover={setHoverCidr}
+                maxCell={34} blocks={map.data.blocks} highlight={highlight} onHover={setHoverCidr}
                 onSelect={(b: MapBlock) => navigate('/hosts?cidr=' + encodeURIComponent(b.cidr))}
                 describe={(b) => { const c = chunkOf.get(b.cidr); return c ? t('podgrupa', 'chunk') + ' #' + c.seq : null; }}
               />
