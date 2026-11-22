@@ -5,7 +5,9 @@ import { download, qs, upload, type Query } from '../api/client';
 import type { FindingsImportReport, ImportReport, ScanRun } from '../api/types';
 import { t } from '../i18n';
 import { fmtBytes, fmtDateTime, fmtInt } from '../lib/format';
-import { Button, Field, InlineError, KV, PageHeader, Panel, Select, toast, toastError, FileInput } from '../ui/kit';
+import { Button, Field, InlineError, KV, PageHeader, Panel, Select, Tabs, toast, toastError, FileInput } from '../ui/kit';
+import { MenuButton } from '../ui/edit';
+import { useUrlState } from '../lib/hooks';
 import { FINDING_STATUSES, Glyph, HOST_STATUSES, findingStatusInfo, hostStatusInfo } from '../ui/marks';
 import { useSession } from '../session';
 import { NoAccess } from '../shell/Layout';
@@ -26,16 +28,10 @@ function ExportRow({ kind, title, filter, runs }: { kind: Kind; title: string; f
     setBusy('');
   };
   return (
-    <li className="grid gap-x-4 gap-y-2 border-b border-rule py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_200px_auto] md:items-end">
-      <div>
-        <div className="text-sm font-medium">{title}</div>
-        <div className="text-xs"><Link to={'/' + kind} className="link">{t('Więcej filtrów na liście', 'More filters on the list')}</Link></div>
-      </div>
-      <label className="block"><span className="label mb-1 block">{filter.label}</span><Select value={value} onChange={setValue} options={[{ value: '', label: t('wszystkie', 'all') }, ...filter.options]} /></label>
-      <div className="flex gap-1.5">
-        <Button icon="download" busy={busy === 'csv'} onClick={() => run('csv')}>CSV</Button>
-        <Button icon="download" busy={busy === 'json'} onClick={() => run('json')}>JSON</Button>
-      </div>
+    <li className="grid min-h-[52px] grid-cols-[minmax(0,1fr)_180px_auto] items-center gap-x-4 border-b border-rule py-2 last:border-b-0">
+      <Link to={'/' + kind} className="text-sm text-ink hover:underline">{title}</Link>
+      <Select label={filter.label} value={value} onChange={setValue} options={[{ value: '', label: t('wszystkie', 'all') }, ...filter.options]} />
+      <MenuButton label={t('Eksport', 'Export')} icon="download" busy={Boolean(busy)} items={[{ label: 'CSV', onSelect: () => run('csv') }, { label: 'JSON', onSelect: () => run('json') }]} />
     </li>
   );
 }
@@ -50,7 +46,7 @@ function FindingsImport() {
   });
   return (
     <div className="space-y-3">
-      <Field label={t('Plik ze znaleziskami', 'Findings file')} hint={t('DefectDojo Generic Findings (JSON albo CSV), lista znalezisk z API DefectDojo albo eksport znalezisk Czujki.', 'DefectDojo Generic Findings (JSON or CSV), a findings list from the DefectDojo API, or a Czujka findings export.')}>
+      <Field label={t('Plik ze znaleziskami', 'Findings file')} hint={<span className="mono" title={t('DefectDojo Generic Findings (JSON albo CSV), lista znalezisk z API DefectDojo albo eksport znalezisk Czujki.', 'DefectDojo Generic Findings (JSON or CSV), a findings list from the DefectDojo API, or a Czujka findings export.')}>DefectDojo · JSON · CSV</span>}>
         <FileInput inputRef={input} testId="findings-import-file" accept=".json,.csv,application/json,text/csv" file={f} onFile={(x) => { setF(x); setRep(null); }} />
       </Field>
       <Button variant="primary" icon="upload" busy={imp.isPending} disabled={!f} onClick={() => f && imp.mutate(f)}>{t('Importuj znaleziska', 'Import findings')}</Button>
@@ -86,14 +82,9 @@ function DojoExportRow() {
     setBusy('');
   };
   return (
-    <div className="mt-3 grid gap-x-4 gap-y-2 border-t border-rule pt-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-      <div>
-        <div className="text-sm font-medium">{t('Znaleziska w formacie DefectDojo', 'Findings in DefectDojo format')}</div>
-              </div>
-      <div className="flex gap-1.5">
-        <Button icon="download" busy={busy === 'json'} onClick={() => run('json')} data-testid="dojo-export-json">JSON</Button>
-        <Button icon="download" busy={busy === 'csv'} onClick={() => run('csv')}>CSV</Button>
-      </div>
+    <div className="grid min-h-[52px] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 border-t border-rule py-2">
+      <span className="text-sm text-ink">{t('Znaleziska w formacie DefectDojo', 'Findings in DefectDojo format')}</span>
+      <MenuButton label={t('Eksport', 'Export')} icon="download" busy={Boolean(busy)} items={[{ label: 'JSON', onSelect: () => run('json'), testId: 'dojo-export-json' }, { label: 'CSV', onSelect: () => run('csv') }]} />
     </div>
   );
 }
@@ -102,6 +93,8 @@ export default function Transfer() {
   const { can } = useSession();
   const canImport = can('results:create');
   const canExport = can('export:run');
+  const u = useUrlState();
+  const tab = u.get('tab', canImport ? 'import' : 'export');
   const runs = usePage<ScanRun>('/runs', { limit: 100, status: 'completed' }, canExport);
   const [file, setFile] = useState<File | null>(null);
   const [report, setReport] = useState<ImportReport | null>(null);
@@ -123,11 +116,15 @@ export default function Transfer() {
   return (
     <div>
       <PageHeader title={t('Import i eksport', 'Import and export')} readOnly={!canImport} />
-      <div className="grid gap-4 px-4 pb-6 sm:px-6 lg:px-8 xl:grid-cols-2">
+      <div className="px-4 pb-4 sm:px-6 lg:px-8">
+        <Tabs value={tab} onChange={(v) => u.set({ tab: v === 'import' ? null : v })} tabs={[{ id: 'import', label: t('Import', 'Import') }, { id: 'export', label: t('Eksport', 'Export') }]} />
+      </div>
+      <div className="grid items-start gap-4 px-4 pb-6 sm:px-6 lg:px-8 xl:grid-cols-2">
+        {tab === 'import' ? <>
         <Panel title={t('Import wyników', 'Import results')}>
           {canImport ? (
             <div className="space-y-3">
-              <Field label={t('Plik z wynikami', 'Result file')} hint={t('nmap XML (-oX), JSON Czujki albo CSV z kolumnami ip, port, proto, service.', 'nmap XML (-oX), Czujka JSON or a CSV with the columns ip, port, proto, service.')}>
+              <Field label={t('Plik z wynikami', 'Result file')} hint={<span className="mono" title={t('nmap XML (-oX), JSON Czujki albo CSV z kolumnami ip, port, proto, service.', 'nmap XML (-oX), Czujka JSON or a CSV with the columns ip, port, proto, service.')}>nmap XML · JSON · CSV</span>}>
                 <FileInput inputRef={input} accept=".xml,.json,.csv,text/xml,application/json,text/csv" file={file} onFile={(x) => { setFile(x); setReport(null); }} />
               </Field>
               <Button variant="primary" icon="upload" busy={imp.isPending} disabled={!file} onClick={() => file && imp.mutate(file)}>{t('Importuj wyniki', 'Import results')}</Button>
@@ -154,7 +151,7 @@ export default function Transfer() {
         </Panel>
 
         {canImport ? <Panel title={t('Import znalezisk', 'Import findings')}><FindingsImport /></Panel> : null}
-
+        </> : (
         <Panel title={t('Eksport danych', 'Export data')}>
           {canExport ? (
             <>
@@ -164,18 +161,16 @@ export default function Transfer() {
                 <ExportRow kind="findings" title={t('Znaleziska', 'Findings')} filter={{ key: 'status', label: t('Status', 'Status'), options: FINDING_STATUSES.map((s) => ({ value: s, label: findingStatusInfo(s).label })) }} />
                 <ExportRow kind="changes" title={t('Zmiany', 'Changes')} filter={{ key: 'run_id', label: t('Skan', 'Scan'), options: runOpts }} />
               </ul>
-              <div className="mt-3 grid gap-x-4 gap-y-2 border-t border-rule-strong pt-3 md:grid-cols-[minmax(0,1fr)_200px_auto] md:items-end">
-                <div>
-                  <div className="text-sm font-medium">{t('Skan jako nmap XML', 'A scan as nmap XML')}</div>
-                  <div className="text-xs text-ink-3">{t('W DefectDojo wybierz typ „Nmap Scan”.', 'In DefectDojo choose the "Nmap Scan" type.')}</div>
-                </div>
-                <label className="block"><span className="label mb-1 block">{t('Skan', 'Scan')}</span><Select value={chosenRun} onChange={setRunId} options={runOpts} /></label>
-                <Button icon="download" busy={xmlBusy} disabled={!chosenRun} onClick={nmapXml}>XML</Button>
+              <div className="grid min-h-[52px] grid-cols-[minmax(0,1fr)_180px_auto] items-center gap-x-4 border-t border-rule py-2">
+                <span className="text-sm text-ink" title={t('W DefectDojo wybierz typ „Nmap Scan”.', 'In DefectDojo choose the "Nmap Scan" type.')}>{t('Skan jako nmap XML', 'A scan as nmap XML')}</span>
+                <Select label={t('Skan', 'Scan')} value={chosenRun} onChange={setRunId} options={runOpts} />
+                <Button size="sm" icon="download" busy={xmlBusy} disabled={!chosenRun} onClick={nmapXml}>XML</Button>
               </div>
               <DojoExportRow />
             </>
           ) : <p className="text-sm text-ink-2">{t('Twoja rola nie może eksportować danych.', 'Your role cannot export data.')}</p>}
         </Panel>
+        )}
       </div>
     </div>
   );

@@ -84,3 +84,25 @@ export function ReprobePanel({ hostId, limit = 8 }: { hostId?: number; limit?: n
     </Panel>
   );
 }
+
+/** One mono line for the scans page: what the re-probe planner will do; the settings open under it. */
+export function ReprobeLine() {
+  const q = useItem<ReprobePlan>('/reprobe/plan', undefined, { refetchInterval: 60_000 });
+  const settings = useItem<ReprobeSettings>('/settings/reprobe', undefined, { enabled: useCan('scans:configure') });
+  const [open, setOpen] = useState(false);
+  if (!q.data) return null;
+  const p = q.data;
+  const s = settings.data ?? p.settings;
+  return (
+    <div className="px-4 pb-4 sm:px-6 lg:px-8" data-testid="reprobe-line">
+      <p className="mono text-[12px] text-ink-3">
+        {p.enabled ? <>
+          {p.blocked ? <span className="text-danger">{p.blocked} · </span> : null}
+          {fmtInt(p.due_now)} {t('do sprawdzenia teraz', 'due now')} · {fmtInt(p.used_last_hour)} / {fmtInt(p.budget_per_hour)} {t('adresów w ostatniej godzinie', 'addresses in the last hour')}
+        </> : t('Ponowne sprawdzenia są wyłączone', 'Re-probing is off')}
+        {settings.data ? <> · <button type="button" className="hover:text-ink hover:underline" aria-expanded={open} onClick={() => setOpen((v) => !v)}>{t('Ustawienia', 'Settings')}</button></> : null}
+      </p>
+      {open && s ? <div className="max-w-[560px]"><SettingsForm s={s} onDone={() => setOpen(false)} /></div> : null}
+    </div>
+  );
+}

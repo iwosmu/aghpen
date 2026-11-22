@@ -3,10 +3,9 @@ import { Link } from 'react-router';
 import { usePage } from '../api/hooks';
 import type { ScanProfile, Scope } from '../api/types';
 import { t } from '../i18n';
-import { fmtDateTime, fmtInt, fmtRelative } from '../lib/format';
+import { cx, fmtDateTime } from '../lib/format';
 import { Button, Empty, LinkButton, PageHeader } from '../ui/kit';
 import { DataTable, type Col } from '../ui/table';
-import { Glyph } from '../ui/marks';
 import { describeWindows } from '../viz/WindowPicker';
 import { useCan } from '../session';
 import { StartRunDialog } from './Runs';
@@ -29,25 +28,17 @@ export default function Profiles() {
   const [start, setStart] = useState<number | null>(null);
   const scopeName = (id: number) => scopes.data?.items.find((s) => s.id === id)?.name ?? '#' + id;
   const cols: Col<ScanProfile>[] = [
-    { id: 'name', header: t('Profil', 'Profile'), wrap: true, cell: (p) => (
-      <div className="min-w-[200px] py-1">
-        <Link to={'/profiles/' + p.id} className="link font-medium">{p.name}</Link>
-        <div className="text-xs text-ink-3">{p.description}</div>
-      </div>
-    ) },
-    { id: 'scopes', header: t('Zakresy', 'Scopes'), wrap: true, hide: 'lg', cell: (p) => <span className="text-ink-2">{p.scope_ids.map(scopeName).join(', ')}</span> },
+    { id: 'name', header: t('Profil', 'Profile'), cell: (p) => <span className="block max-w-[320px] truncate" title={p.description}><Link to={'/profiles/' + p.id} className={cx('link', !p.enabled && 'text-ink-3')}>{p.name}</Link></span> },
+    { id: 'scopes', header: t('Zakresy', 'Scopes'), hide: 'lg', cell: (p) => <span className="block max-w-[220px] truncate text-ink-2" title={p.scope_ids.map(scopeName).join(', ')}>{p.scope_ids.map(scopeName).join(', ') || '–'}</span> },
     { id: 'ports', header: t('Porty', 'Ports'), cell: (p) => <span className="mono" title={p.ports}>{portsShort(p.ports)}</span> },
-    { id: 'rate', header: t('Tempo', 'Rate'), align: 'right', hide: 'md', cell: (p) => <span className="num">{fmtInt(p.rate.max_pps)} <span className="font-sans text-xs text-ink-3">pps</span></span> },
-    { id: 'schedule', header: t('Harmonogram', 'Schedule'), wrap: true, cell: (p) => (
-      <div className="py-1">
-        <div className={p.schedule.enabled ? 'mono whitespace-nowrap text-sm' : 'text-ink-3'}>{scheduleText(p)}</div>
-        <div className="text-xs text-ink-3">{t('okna:', 'windows:')} {describeWindows(p.schedule.windows)}</div>
-      </div>
+    { id: 'schedule', header: t('Harmonogram', 'Schedule'), cell: (p) => (
+      <span className="whitespace-nowrap" title={t('okna: ', 'windows: ') + describeWindows(p.schedule.windows)}>
+        <span className={p.schedule.enabled ? 'mono text-sm' : 'text-ink-3'}>{scheduleText(p)}</span>
+        {p.next_run_at ? <span className="num text-ink-3" title={fmtDateTime(p.next_run_at)}> · {fmtDateTime(p.next_run_at)}</span> : null}
+      </span>
     ) },
-    { id: 'next', header: t('Następny skan', 'Next scan'), hide: 'md', cell: (p) => p.next_run_at ? <span title={fmtDateTime(p.next_run_at)}><span className="num">{fmtDateTime(p.next_run_at)}</span> <span className="text-xs text-ink-3">{fmtRelative(p.next_run_at)}</span></span> : <span className="text-ink-3">–</span> },
     { id: 'last', header: t('Ostatni', 'Last'), hide: 'lg', cell: (p) => p.last_run_id ? <Link to={'/runs/' + p.last_run_id} className="num link">#{p.last_run_id}</Link> : <span className="text-ink-3">–</span> },
-    { id: 'enabled', header: t('Stan', 'Status'), cell: (p) => p.enabled ? <span className="inline-flex items-center gap-1.5"><Glyph name="dot" tone="neutral" />{t('włączony', 'enabled')}</span> : <span className="inline-flex items-center gap-1.5 text-ink-3"><Glyph name="ring" tone="expected" />{t('wyłączony', 'disabled')}</span> },
-    ...(canRun ? [{ id: 'act', header: '', align: 'right' as const, cell: (p: ScanProfile) => <Button size="sm" icon="play" disabled={!p.enabled} onClick={() => setStart(p.id)}>{t('Uruchom', 'Start')}</Button> }] : []),
+    { id: 'act', header: '', align: 'right' as const, cell: (p: ScanProfile) => !p.enabled ? <span className="text-xs text-ink-3">{t('wyłączony', 'disabled')}</span> : canRun ? <Button size="sm" icon="play" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setStart(p.id); }}>{t('Uruchom', 'Start')}</Button> : null },
   ];
   return (
     <div>
@@ -60,10 +51,9 @@ export default function Profiles() {
         rows={q.data?.items} cols={cols} rowKey={(p) => p.id} rowHref={(p) => '/profiles/' + p.id} loading={q.isPending} error={q.error} retry={() => q.refetch()}
         empty={<Empty icon="profiles" title={t('Brak profili', 'No profiles yet')} action={canEdit ? <LinkButton to="/profiles/new" variant="primary" icon="plus">{t('Nowy profil', 'New profile')}</LinkButton> : undefined} />}
         mobile={(p) => (
-          <div>
-            <div className="text-sm font-medium">{p.name}</div>
-            <div className="mt-0.5 text-xs text-ink-3"><span className="mono" title={p.ports}>{portsShort(p.ports)}</span> · {scheduleText(p)}</div>
-            <div className="text-xs text-ink-3">{describeWindows(p.schedule.windows)}</div>
+          <div className="flex items-center gap-3">
+            <span className="min-w-0 flex-1 truncate text-sm">{p.name}</span>
+            <span className="flex-none text-xs text-ink-3">{scheduleText(p)}</span>
           </div>
         )}
       />

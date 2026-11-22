@@ -3,13 +3,14 @@ import { Link, useNavigate } from 'react-router';
 import { usePage, useAction, useItem } from '../api/hooks';
 import { post } from '../api/client';
 import type { SafetyPolicy, ScanProfile, ScanRun } from '../api/types';
-import { t, plural } from '../i18n';
+import { t } from '../i18n';
 import { fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelative } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
 import { Button, Dialog, Empty, InlineError, PageHeader, Select } from '../ui/kit';
 import { DataTable, FilterBar, FilterField, Pager, type Col } from '../ui/table';
-import { RUN_STATUSES, RunStatusMark, runStatusInfo, Glyph } from '../ui/marks';
-import { ProgressBar } from '../viz/charts';
+import { RUN_STATUSES, RunStatusMark, runStatusInfo } from '../ui/marks';
+import { runChanges } from '../viz/Night';
+import { ReprobeLine } from './Reprobe';
 import { useCan } from '../session';
 import { EstimateBox } from './ProfileEdit';
 import { OperatorLockNote } from './Targets';
@@ -103,6 +104,23 @@ export function AdHocRunDialog({ open, onClose }: { open: boolean; onClose: () =
   );
 }
 
+/** The profile, a small tag for a run that is not a full profile run, and the state only when it is not 'completed'. */
+function RunProfileCell({ r }: { r: ScanRun }) {
+  const full = isFullRun(r) || (r.status !== 'completed' && r.profile_id != null && !r.ad_hoc);
+  const tag = full ? null : r.trigger === 'reprobe' || r.trigger === 'import' || r.trigger === 'manual-entry' ? triggerLabel(r.trigger) : t('wybrane adresy', 'chosen addresses');
+  const live = runStatusInfo(r.status).live || r.status === 'paused';
+  const pct = r.stats.addresses_total ? r.stats.addresses_done / r.stats.addresses_total : 0;
+  return (
+    <span className="flex min-w-0 max-w-[340px] items-center gap-2" title={partialRunPhrase(r) + (r.note ? ' · ' + r.note : '')}>
+      {r.status !== 'completed' ? <span className="flex-none"><RunStatusMark status={r.status} pauseReason={r.pause_reason} /></span> : null}
+      {live ? <span className="num flex-none text-xs text-ink-2">{fmtPct(pct)}</span> : null}
+      <span className="min-w-0 truncate">{r.profile_name || r.import_file || ''}</span>
+      {tag ? <span className="chip-fact flex-none">{tag}</span> : null}
+      {r.label ? <span className="chip-fact flex-none">{r.label}</span> : null}
+    </span>
+  );
+}
+
 export default function Runs() {
   const u = useUrlState();
   const canRun = useCan('scans:run');
@@ -114,30 +132,12 @@ export default function Runs() {
   const profiles = usePage<ScanProfile>('/profiles', { limit: 100 });
   const cols: Col<ScanRun>[] = [
     { id: 'id', header: '#', sort: 'id', width: 64, cell: (r) => <Link to={'/runs/' + r.id} className="num link">#{r.id}</Link> },
-    { id: 'status', header: t('Stan', 'Status'), cell: (r) => <RunStatusMark status={r.status} pauseReason={r.pause_reason} /> },
-    { id: 'profile', header: t('Profil / źródło', 'Profile / source'), cell: (r) => <span className="block max-w-[280px] truncate" title={r.profile_name + (r.note ? ' · ' + r.note : '')}>{r.label ? <span className="chip-fact mr-1.5">{r.label}</span> : null}{isFullRun(r) || r.status !== 'completed' && r.profile_id != null ? r.profile_name : <>{partialRunPhrase(r)}{r.profile_name ? <span className="text-ink-3"> · {t('opcje profilu', 'profile options')} {r.profile_name}</span> : null}</>}</span> },
-    { id: 'trigger', header: t('Tryb', 'Trigger'), hide: 'lg', cell: (r) => <span className="text-ink-2">{triggerLabel(r.trigger)}</span> },
-    { id: 'started', header: t('Rozpoczęty', 'Started'), sort: 'started_at', cell: (r) => <span className="num text-ink-2" title={fmtDateTime(r.started_at)}>{fmtRelative(r.started_at)}</span> },
-    { id: 'dur', header: t('Czas trwania', 'Duration'), align: 'right', hide: 'md', cell: (r) => <span className="num">{fmtDuration(r.stats.elapsed_sec)}</span> },
-    { id: 'progress', header: t('Adresy', 'Addresses'), width: 170, cell: (r) => {
-      const pct = r.stats.addresses_total ? r.stats.addresses_done / r.stats.addresses_total : 0;
-      const live = runStatusInfo(r.status).live || r.status === 'paused';
-      return live
-        ? <span className="flex items-center gap-2"><span className="w-[84px]"><ProgressBar value={r.stats.addresses_done} max={r.stats.addresses_total} /></span><span className="num text-xs text-ink-2">{fmtPct(pct)}</span></span>
-        : <span className="num text-ink-2">{fmtInt(r.stats.addresses_done)}</span>;
-    } },
+    { id: 'profile', header: t('Profil', 'Profile'), cell: (r) => <RunProfileCell r={r} /> },
+    { id: 'started', header: t('Kiedy', 'When'), sort: 'started_at', cell: (r) => <span className="num text-ink-2" title={fmtDateTime(r.started_at)}>{fmtRelative(r.started_at)}</span> },
+    { id: 'dur', header: t('Czas', 'Duration'), align: 'right', hide: 'md', cell: (r) => <span className="num text-ink-2">{fmtDuration(r.stats.elapsed_sec)}</span> },
     { id: 'host / hosts', header: t('Hosty', 'Hosts'), align: 'right', cell: (r) => <span className="num">{fmtInt(r.stats.hosts_up)}</span> },
     { id: 'svc', header: t('Usługi', 'Services'), align: 'right', hide: 'md', cell: (r) => <span className="num">{fmtInt(r.stats.services_open)}</span> },
-    { id: 'diff', header: t('Zmiany', 'Changes'), hide: 'lg', cell: (r) => {
-      const s = r.summary;
-      const parts = s ? ([['plus', 'new', s.hosts_new + s.services_new], ['minus', 'gone', s.hosts_gone + s.services_gone], ['delta', 'changed', s.services_changed]] as const).filter(([, , n]) => n > 0) : [];
-      // only the kinds that happened; a run without changes reads as a quiet dash
-      return parts.length ? (
-        <span className="inline-flex items-center gap-1.5 text-xs">
-          {parts.map(([g, tone, n]) => <span key={g} className="chip-fact"><Glyph name={g} tone={tone} size={11} /><span className="num text-ink">{n}</span></span>)}
-        </span>
-      ) : <span className="text-ink-3">–</span>;
-    } },
+    { id: 'diff', header: t('Zmiany', 'Changes'), align: 'right', cell: (r) => { const n = r.summary ? runChanges(r) : 0; return n ? <Link to={'/changes?run_id=' + r.id + '&expected=false'} className="num link" onClick={(e) => e.stopPropagation()}>{fmtInt(n)}</Link> : <span className="text-ink-3">–</span>; } },
   ];
   const active = ['status', 'profile_id'].filter((k) => u.get(k)).length;
   return (
@@ -151,6 +151,7 @@ export default function Runs() {
           {canRun ? <Button variant="primary" icon="play" onClick={() => setStartOpen(true)}>{t('Uruchom skan', 'Start scan')}</Button> : null}
         </>}
       />
+      <ReprobeLine />
       <FilterBar onClear={() => u.clear(['status', 'profile_id'])} active={active}>
         <FilterField label={t('Stan', 'Status')}>
           <Select value={u.get('status')} onChange={(v) => u.set({ status: v })} options={[{ value: '', label: t('wszystkie', 'all') }, ...RUN_STATUSES.map((s) => ({ value: s, label: runStatusInfo(s).label.split(' · ')[0] }))]} />
@@ -165,10 +166,10 @@ export default function Runs() {
         sort={u.get('sort', '-id')} onSort={(s) => u.set({ sort: s })}
         empty={<Empty icon="runs" title={active ? t('Żaden skan nie pasuje do filtrów', 'No scans match the filters') : t('Brak skanów', 'No scans yet')} hint={active ? undefined : t('Przygotuj profil i uruchom pierwszy skan.', 'Prepare a profile and start the first scan.')} action={canRun && !active ? <Button variant="primary" icon="play" onClick={() => setStartOpen(true)}>{t('Uruchom skan', 'Start scan')}</Button> : undefined} />}
         mobile={(r) => (
-          <div>
-            <div className="flex items-center justify-between gap-2"><span className="num text-sm font-medium">#{r.id}</span><RunStatusMark status={r.status} pauseReason={r.pause_reason} /></div>
-            <div className="mt-0.5 truncate text-sm text-ink-2">{r.profile_name}</div>
-            <div className="mt-0.5 text-xs text-ink-3">{fmtRelative(r.started_at)} · {fmtInt(r.stats.hosts_up)} {plural(r.stats.hosts_up, ['host', 'hosty', 'hostów'], ['host', 'hosts'])} · {fmtDuration(r.stats.elapsed_sec)}</div>
+          <div className="flex items-center gap-3">
+            <span className="num flex-none text-sm font-medium">#{r.id}</span>
+            <span className="min-w-0 flex-1 truncate text-sm text-ink-2"><RunProfileCell r={r} /></span>
+            <span className="num flex-none text-xs text-ink-3">{fmtRelative(r.started_at)}</span>
           </div>
         )}
       />
