@@ -9842,19 +9842,6 @@ match:
   rules:
     - {type: body, contains: 易族智汇javashop, case_sensitive: true, weight: 0.8}
 ---
-id: nuclei-fph-jboss-as
-name: Jboss As
-category: other
-description: FingerprintHub Technology Fingerprint tests run in nuclei.
-author: 'pdteam, righettod'
-source: 'projectdiscovery/nuclei-templates@1ad258956016 http/technologies/fingerprinthub-web-fingerprints.yaml id=fingerprinthub-web-fingerprints-jboss-as licence=MIT'
-tags: [tech, discovery, nuclei-templates, opt-in-path]
-interest: 10
-enabled: false
-match:
-  rules:
-    - {type: body, contains: manage this jboss as instance, case_sensitive: true, weight: 0.8}
----
 id: nuclei-fph-jeecgboot
 name: Jeecgboot
 category: other
@@ -17768,19 +17755,6 @@ match:
   rules:
     - {type: body, contains: '<h1>whitelabel error page</h1>', case_sensitive: true, weight: 0.8}
 ---
-id: nuclei-fph-springer
-name: Springer
-category: other
-description: FingerprintHub Technology Fingerprint tests run in nuclei.
-author: 'pdteam, righettod'
-source: 'projectdiscovery/nuclei-templates@1ad258956016 http/technologies/fingerprinthub-web-fingerprints.yaml id=fingerprinthub-web-fingerprints-springer licence=MIT'
-tags: [tech, discovery, nuclei-templates, opt-in-path]
-interest: 10
-enabled: false
-match:
-  rules:
-    - {type: body, contains: 'src="//static.springer.com/', case_sensitive: true, weight: 0.8}
----
 id: nuclei-fph-sq580-system
 name: Sq580 System
 category: other
@@ -17901,21 +17875,6 @@ enabled: false
 match:
   rules:
     - {type: body, contains: stormtimestr, case_sensitive: true, weight: 0.8}
----
-id: nuclei-fph-struts2
-name: Struts2
-category: other
-description: FingerprintHub Technology Fingerprint tests run in nuclei.
-author: 'pdteam, righettod'
-source: 'projectdiscovery/nuclei-templates@1ad258956016 http/technologies/fingerprinthub-web-fingerprints.yaml id=fingerprinthub-web-fingerprints-struts2 licence=MIT'
-tags: [tech, discovery, nuclei-templates, opt-in-path]
-interest: 10
-enabled: false
-match:
-  rules:
-    - {type: body, contains: struts problem report, case_sensitive: true, weight: 0.8}
-    - {type: body, contains: there is no action mapped for namespace, case_sensitive: true, weight: 0.8}
-    - {type: body, contains: no result defined for action and result input, case_sensitive: true, weight: 0.8}
 ---
 id: nuclei-fph-subrion-cms
 name: Subrion CMS
@@ -18098,19 +18057,6 @@ enabled: false
 match:
   rules:
     - {type: body, contains: 'id="ctl00_topcontrol1_lblsitedescription"', case_sensitive: true, weight: 0.8}
----
-id: nuclei-fph-supervisord
-name: Supervisord
-category: other
-description: FingerprintHub Technology Fingerprint tests run in nuclei.
-author: 'pdteam, righettod'
-source: 'projectdiscovery/nuclei-templates@1ad258956016 http/technologies/fingerprinthub-web-fingerprints.yaml id=fingerprinthub-web-fingerprints-supervisord licence=MIT'
-tags: [tech, discovery, nuclei-templates, opt-in-path]
-interest: 10
-enabled: false
-match:
-  rules:
-    - {type: body, contains: images/supervisor.gif, case_sensitive: true, weight: 0.8}
 ---
 id: nuclei-fph-support-incident-tracker
 name: Support Incident Tracker
@@ -20067,3 +20013,60 @@ enabled: false
 match:
   rules:
     - {type: body, contains: '<!-- begin myconnection server applet -->', case_sensitive: true, weight: 0.8}
+---
+id: nuclei-fph-vmedia-multimedia-publishing-pla
+name: Vmedia Multimedia Publishing Platform
+category: other
+description: FingerprintHub Technology Fingerprint tests run in nuclei.
+author: 'pdteam, righettod'
+source: 'projectdiscovery/nuclei-templates@1ad258956016 http/technologies/fingerprinthub-web-fingerprints.yaml id=fingerprinthub-web-fingerprints-vmedia-multimedia-publishing-pla licence=MIT'
+tags: [tech, discovery, nuclei-templates, opt-in-path]
+interest: 10
+enabled: false
+match:
+  rules:
+    - {type: body, contains: function toggle(targetid), case_sensitive: true, weight: 0.8}
+    - {type: body, contains: 'class="video_00"', case_sensitive: true, weight: 0.8}
+---
+id: nuclei-fph-vmware-horizon
+name: Vmware Horizon
+category: other
+description: FingerprintHub Technology Fingerprint tests run in nuclei.
+author: 'pdteam, righettod'
+source: 'projectdiscovery/nuclei-templates@1ad258956016 http/technologies/fingerprinthub-web-fingerprints.yaml id=fingerprinthub-web-fingerprints-vmware-horizon licence=MIT'
+tags: [tech, discovery, nuclei-templates, opt-in-path]
+interest: 10
+enabled: false
+match:
+  rules:
+    - {type: body, contains: 'href=''https://www.vmware.com/go/viewclients''', case_sensitive: true, weight: 0.8}
+    - {type: body, contains: 'alt="vmware horizon">', case_sensitive: true, weight: 0.8}
+---
+id: nuclei-fph-vmware-server-2
+name: Vmware Server 2
+category: other
+description: FingerprintHub Technology Fingerprint tests run in nuclei.
+author: 'pdteam, righettod'
+source: 'projectdiscovery/nuclei-templates@1ad258956016 http/technologies/fingerprinthub-web-fingerprints.yaml id=fingerprinthub-web-fingerprints-vmware-server-2 licence=MIT'
+tags: [tech, discovery, nuclei-templates, opt-in-path]
+interest: 10
+enabled: false
+match:
+  rules:
+    - {type: body, contains: 'content="vmware server is virtual', case_sensitive: true, weight: 0.8}
+---
+id: nuclei-fph-vmware-virtualcenter
+name: Vmware Virtualcenter
+category: other
+description: FingerprintHub Technology Fingerprint tests run in nuclei.
+author: 'pdteam, righettod'
+source: 'projectdiscovery/nuclei-templates@1ad258956016 http/technologies/fingerprinthub-web-fingerprints.yaml id=fingerprinthub-web-fingerprints-vmware-virtualcenter licence=MIT'
+tags: [tech, discovery, nuclei-templates, opt-in-path]
+interest: 10
+enabled: false
+match:
+  rules:
+    - {type: body, contains: 'content="vmware virtualcenter', case_sensitive: true, weight: 0.8}
+    - {type: body, contains: 'content="vmware vsphere', case_sensitive: true, weight: 0.8}
+    - {type: body, contains: url=vcops-vsphere/, case_sensitive: true, weight: 0.8}
+    - {type: body, contains: the vshield manager requires, case_sensitive: true, weight: 0.8}

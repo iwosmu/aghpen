@@ -5682,17 +5682,6 @@ match:
   rules:
     - {type: body, regex: '<title>Shopware ([\d\.]+) [^<]+', case_sensitive: true, weight: 0.8}
 ---
-id: nuclei-td-webmine
-name: Webmine
-category: other
-author: 'hakluke, righettod, matejsmycka'
-source: 'projectdiscovery/nuclei-templates@1ad258956016 http/technologies/tech-detect.yaml id=tech-detect-webmine licence=MIT'
-tags: [tech, discovery, nuclei-templates]
-interest: 10
-match:
-  rules:
-    - {type: body, regex: '<iframe[^>]+src=[\''"]https://webmine\.cz/miner\?key=', case_sensitive: true, weight: 0.8}
----
 id: nuclei-td-fluxbb
 name: Fluxbb
 category: other
@@ -5747,17 +5736,6 @@ interest: 10
 match:
   rules:
     - {type: body, regex: '<[^>]+https://www\.datocms-assets\.com', case_sensitive: true, weight: 0.8}
----
-id: nuclei-td-sonarqubes
-name: Sonarqubes
-category: other
-author: 'hakluke, righettod, matejsmycka'
-source: 'projectdiscovery/nuclei-templates@1ad258956016 http/technologies/tech-detect.yaml id=tech-detect-sonarqubes licence=MIT'
-tags: [tech, discovery, nuclei-templates]
-interest: 10
-match:
-  rules:
-    - {type: body, regex: ['<link href="/css/sonar\.css\?v=([\d.]+)', '<title>SonarQube</title>'], case_sensitive: true, weight: 0.8}
 ---
 id: nuclei-td-sizmek
 name: Sizmek

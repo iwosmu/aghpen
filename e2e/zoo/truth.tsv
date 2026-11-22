@@ -42,8 +42,8 @@
 04-java	8983	tcp	appserver	solr:9.11.0	http	Solr	9.11.0	Jetty	admin-panel		class:database	http/solr/
 04-java	13000	tcp	appserver	metabase/metabase:v0.65.6.3	http	^Metabase$	0.65.6.3		install-page		class:admin-panel	http/api/health
 05-vuln	3000	tcp	vuln	bkimminich/juice-shop:v20.4.0	http	Juice Shop	20.4.0		staging			http/
-05-vuln	8080	tcp	vuln	webgoat/webgoat:v2026.5	http	^WebGoat$			staging		class:login,class:error-page	http/WebGoat/login
-05-vuln	9090	tcp	vuln	webgoat/webgoat:v2026.5	http	^WebWolf$			staging		class:error-page	http/WebWolf/login
+05-vuln	8080	tcp	vuln	webgoat/webgoat:v2026.5	http	WebGoat			staging		class:login,class:error-page	http/WebGoat/login
+05-vuln	9090	tcp	vuln	webgoat/webgoat:v2026.5	http	WebWolf			staging		class:error-page	http/WebWolf/login
 05-vuln	36080	tcp	vuln	raesene/bwapp:latest	http	^bWAPP			staging		class:install-page	http/
 05-vuln	8000	tcp	vuln	php:8.3.37-cli-alpine	http	^PHP$	8.3.37		staging	phpinfo		http/
 05-vuln	48000	tcp	vuln	python:3.14.10-alpine	http	Python|SimpleHTTP	3.14.10		directory-listing			http/
@@ -74,7 +74,7 @@
 07-remote	53	tcp	remote	coredns/coredns:1.15.0	domain	CoreDNS	1.15.0					tcp
 07-remote	53	udp	remote	coredns/coredns:1.15.0	domain	CoreDNS	1.15.0					-
 08-proxies	8404	tcp	proxy	haproxy:3.0.31-alpine	http	^HAProxy$	3.0.31		admin-panel		class:error-page	http/stats
-08-proxies	18888	tcp	proxy	haproxy:3.0.31-alpine -> httpd:2.4.71-alpine	http	^Apache	2.4.71		default-page		tech:HAProxy	http/
+08-proxies	18888	tcp	proxy	haproxy:3.0.31-alpine -> httpd:2.4.71-alpine	http	^Apache	2.4.71		default-page		HAProxy	http/
 08-proxies	9901	tcp	proxy	envoyproxy/envoy:v1.39.6	http	^Envoy$	1.39.6		unauth-control-api		class:admin-panel	http/ready
 08-proxies	10000	tcp	proxy	envoyproxy/envoy:v1.39.6 -> httpd:2.4.71-alpine	http	^Envoy$		Apache	default-page			http/
 08-proxies	3128	tcp	proxy	ubuntu/squid:6.6-24.04_beta	http-proxy|http	^Squid$	6.6					tcp

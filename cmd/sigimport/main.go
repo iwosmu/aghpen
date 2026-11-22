@@ -379,10 +379,14 @@ var vendorWords = map[string]bool{
 // sameAsOurs: a word or a pair of words of the name is a technology the
 // hand-written library knows ("Default Nginx Page" -> nginx).
 func sameAsOurs(name string, ours map[string]string) bool {
-	// A shorter name of one of ours: "Swagger" is our "Swagger UI".
+	// A shorter name of one of ours ("Swagger" is our "Swagger UI"), or ours
+	// with a short suffix ("Sonarqubes" is our "SonarQube").
 	if k := key(name); len(k) >= 5 {
 		for o := range ours {
 			if len(o) > len(k) && strings.HasPrefix(o, k) {
+				return true
+			}
+			if len(o) >= 5 && len(k) > len(o) && len(k)-len(o) <= 2 && strings.HasPrefix(k, o) {
 				return true
 			}
 		}
@@ -791,8 +795,8 @@ func loadZooTruth(path string, truth map[string]truthSvc) {
 		names = append(names, strings.Split(f[8], ",")...)
 		if len(f) > 11 {
 			for _, o := range strings.Split(f[11], ",") {
-				if strings.HasPrefix(o, "tech:") {
-					names = append(names, strings.TrimPrefix(o, "tech:"))
+				if o != "" && !strings.HasPrefix(o, "class:") {
+					names = append(names, o) // an accepted extra technology
 				}
 			}
 		}

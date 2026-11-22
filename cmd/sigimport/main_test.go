@@ -81,7 +81,7 @@ func TestOneConvertsAndMarksSource(t *testing.T) {
 func TestNamesAndFilters(t *testing.T) {
 	ours := map[string]string{"nginx": "nginx", "swaggerui": "swagger-ui", "apache": "apache-httpd", "phpmyadmin": "phpmyadmin"}
 	for name, want := range map[string]bool{
-		"Default Nginx Page": true, "Swagger": true, "Phpmyadmin": true,
+		"Default Nginx Page": true, "Swagger": true, "Phpmyadmin": true, "Nginxs": true,
 		"Apache Airflow": false, "Gotify": false,
 	} {
 		if got := sameAsOurs(name, ours) || ours[key(name)] != ""; got != want {

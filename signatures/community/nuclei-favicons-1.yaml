@@ -4444,18 +4444,6 @@ match:
     - {type: favicon, mmh3: [538583492], weight: 0.9}
     - {type: favicon, mmh3: [538583492], weight: 0.9}
 ---
-id: nuclei-fav-bitrix24
-name: Bitrix24
-category: other
-author: 'un-fmunozs, DhiyaneshDk, idealphase, rxerium'
-source: 'projectdiscovery/nuclei-templates@1ad258956016 http/technologies/favicon-detect.yaml id=favicon-detect-bitrix24 licence=MIT'
-tags: [tech, favicon, discovery, nuclei-templates]
-interest: 10
-match:
-  rules:
-    - {type: favicon, mmh3: [-2115208104], weight: 0.9}
-    - {type: favicon, mmh3: [-2115208104], weight: 0.9}
----
 id: nuclei-fav-netsparker-enterprise
 name: Netsparker Enterprise
 category: other
@@ -5567,18 +5555,6 @@ match:
     - {type: favicon, mmh3: [-165631681], weight: 0.9}
     - {type: favicon, mmh3: [-165631681], weight: 0.9}
     - {type: favicon, mmh3: [-165631681], weight: 0.9}
----
-id: nuclei-fav-squide
-name: Squide
-category: other
-author: 'un-fmunozs, DhiyaneshDk, idealphase, rxerium'
-source: 'projectdiscovery/nuclei-templates@1ad258956016 http/technologies/favicon-detect.yaml id=favicon-detect-squide licence=MIT'
-tags: [tech, favicon, discovery, nuclei-templates]
-interest: 10
-match:
-  rules:
-    - {type: favicon, mmh3: [1099097618], weight: 0.9}
-    - {type: favicon, mmh3: [1099097618], weight: 0.9}
 ---
 id: nuclei-fav-axigen-webmail
 name: Axigen WebMail
