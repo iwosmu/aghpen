@@ -72,7 +72,7 @@ func (s *Server) Handler() http.Handler { return s.handler }
 func (s *Server) routes() http.Handler {
 	r := chi.NewRouter()
 	s.mux = r
-	r.Use(s.recoverer, s.securityHeaders)
+	r.Use(s.recoverer, s.securityHeaders, s.contentLanguage)
 	can := s.Guard()
 	session := auth.RequireSession(s.authFail)
 
@@ -210,7 +210,7 @@ type apiError struct {
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
-	b, err := encodeJSON(v)
+	b, err := encodeJSON(localizeResponse(w, v))
 	if err != nil {
 		b, status = []byte(`{"error":{"code":"internal","message":"the response could not be encoded"}}`), http.StatusInternalServerError
 	}
