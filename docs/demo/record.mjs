@@ -17,7 +17,7 @@
 //                     without it shot 1 shows the login on CZ_URL
 //   CZ_PROFILE        profile to start live in shot 2 (default "Laboratorium /16: pełny przegląd"); CZ_START_SCAN=0 shows the
 //                     latest completed run of that profile instead (for a read-only account)
-//   CZ_SCAN_SECONDS   real seconds of the live scan to record (default 96; shown at ×8, so 12 s in the film)
+//   CZ_SCAN_SECONDS   real seconds of the live scan to record (default 64; shown at ×8, so 8 s in the film)
 //   CZ_SCAN_WARM_CHUNKS  the film cuts in once this many address groups are done and a host is up (default 8; the
 //                     discovery phase before it is cut out); CZ_SCAN_WARM_MAX caps that wait in seconds (default 900)
 //   CZ_SCAN_FINISH    1 (default) waits off-camera for the live run to finish and ends the shot on its counts; 0 ends on
@@ -56,7 +56,7 @@ const SCAN_WARM_MAX = Number(env.CZ_SCAN_WARM_MAX || 900);
 const SCAN_FINISH = env.CZ_SCAN_FINISH !== "0";
 const SCAN_FINISH_MAX = Number(env.CZ_SCAN_FINISH_MAX || 1800);
 const START_SCAN = env.CZ_START_SCAN !== "0";
-const SCAN_SECONDS = Number(env.CZ_SCAN_SECONDS || 96);
+const SCAN_SECONDS = Number(env.CZ_SCAN_SECONDS || 64);
 const HOST = env.CZ_HOST || "10.66.70.20";
 const RULE = env.CZ_RULE || "Panel administracyjny poza siecią zarządzania";
 const SERVICE = env.CZ_SERVICE || "10.66.1.10:80";
@@ -231,6 +231,16 @@ async function login(url, email, password, visible) {
   else { await e.fill(email); await p.fill(password); await page.getByRole("button", { name: "Zaloguj się" }).click(); }
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
 }
+// The live-scan view: the address map when the run has one (the UI hides it for runs over a few addresses), else the
+// progress tab. Chosen before the shot so no frame shows an empty tab.
+async function runView(id) {
+  await present("/runs/" + id + "?tab=map");
+  const map = page.getByText("Mapa przestrzeni adresowej").first();
+  await map.waitFor({ timeout: 5000 }).catch(() => {});
+  if (await map.count()) return map;
+  await present("/runs/" + id + "?tab=progress");
+  return page.locator("main h1").first();
+}
 async function present(path) { await page.goto(URL0 + path + (path.includes("?") ? "&" : "?") + "present=1"); await page.waitForLoadState("networkidle").catch(() => {}); await sleep(600); }
 const settle = (ms = 1200) => sleep(ms);
 
@@ -239,6 +249,8 @@ if (!want("install")) {} else if (env.CZ_WIZARD_URL) {
   const W = env.CZ_WIZARD_URL.replace(/\/$/, "");
   await page.goto(W + "/login?present=1");
   await page.getByLabel(/^Hasło$/).first().waitFor();
+  // Start the shot on a rendered page, not on the blank frame before the login background paints.
+  await page.waitForLoadState("networkidle").catch(() => {}); await sleep(1500);
   begin("install");
   await settle(900);
   await login(W, WIZARD_EMAIL, env.CZ_WIZARD_PASSWORD, true); // the throwaway stack; its password field shows dots
@@ -251,11 +263,11 @@ if (!want("install")) {} else if (env.CZ_WIZARD_URL) {
     await click(page.getByRole("button", { name: "Zapisz hasło i dalej" }));
     await settle(900);
   }
-  await type(page.getByTestId("setup-net-name"), "Kampus AGH", 70);
-  await type(page.getByTestId("setup-ranges"), "10.66.0.0/16", 70);
-  await settle(1500);
+  await type(page.getByTestId("setup-net-name"), "Kampus AGH", 45);
+  await type(page.getByTestId("setup-ranges"), "10.66.0.0/16", 45);
+  await settle(1000);
   await click(page.getByRole("button", { name: "Zapisz zakres i dalej" }));
-  await settle(1800);
+  await settle(1300);
   await end();
 } else {
   // No wizard stack: sign in off camera (the real credentials are never typed on screen), then show the dashboard.
@@ -275,7 +287,7 @@ if (!prof) throw new Error("no profile named " + PROFILE);
 const done = ((await api("/runs?limit=50&status=completed&profile_id=" + prof.id)).items || []).filter((r) => !r.ad_hoc);
 
 // ---------- 2. live /16 scan ----------
-let liveRun = null, liveDone = false, stopExtra = null, liveOwn = false;
+let liveRun = null, liveDone = false, stopExtra = null, liveOwn = false, stopPressed = false;
 const TIME_STEPS_BACK = Number(env.CZ_TIME_STEPS || 4);
 // A run of the profile that is already running (a scheduled one) is filmed as it is: no second scan is started.
 const running = START_SCAN && want("scan") ? ((await api("/runs?limit=20&status=running&profile_id=" + prof.id)).items || []).filter((r) => !r.ad_hoc)[0] : null;
@@ -283,7 +295,7 @@ if (!want("scan")) {} else if (START_SCAN) {
   if (running) {
     liveRun = running.id;
     console.log("scan: following the running run " + liveRun + " (no scan started)");
-    await present("/runs/" + liveRun + "?tab=map");
+    await runView(liveRun);
     begin("scan");
     await settle(600);
   } else {
@@ -306,9 +318,8 @@ if (!want("scan")) {} else if (START_SCAN) {
   skipOn();
   await waitRun(liveRun, (st) => (st.stats?.chunks_done || 0) >= SCAN_WARM_CHUNKS && (st.stats?.hosts_up || 0) > 0, SCAN_WARM_MAX);
   // The run page has tabs; the address-space map is in tab "Mapa" (a running run opens on "Przebieg").
-  await present("/runs/" + liveRun + "?tab=map"); await settle(1500);
+  const map = await runView(liveRun); await settle(800);
   skipOff();
-  const map = page.getByText("Mapa przestrzeni adresowej").first();
   await point(map, 900);
   await settle(1200);
   fastOn();
@@ -328,7 +339,7 @@ if (!want("scan")) {} else if (START_SCAN) {
   await page.waitForLoadState("networkidle").catch(() => {});
   await page.evaluate(() => window.scrollTo(0, 0)); await settle(1200);
   skipOff();
-  await settle(3500);
+  await settle(2500);
   await end();
 } else {
   const last = done[0];
@@ -437,25 +448,26 @@ if (want("stop") && !STOP) {
     const r = await api("/runs", "POST", { profile_id: prof.id });
     stopRun = (r && r.id) || (r && r.details && r.details.run_id) || null;
     if (stopRun) wrote("POST /runs (a scan for the emergency-stop shot, run " + stopRun + ", cancelled afterwards)");
-    if (stopRun && !liveRun) liveRun = stopRun;
+    if (stopRun && !liveRun) { liveRun = stopRun; liveOwn = true; } // our own scan: cancelled after the stop
     if (stopRun && stopRun !== liveRun) stopExtra = stopRun;
     if (stopRun) await waitRun(stopRun, (st) => st.status === "running" && (st.stats?.packets_sent || st.stats?.addresses_done || 0) > 0, 120);
   }
   if (stopRun) await present("/runs/" + stopRun); else await present("/");
   begin("stop");
-  await settle(1500);
+  await settle(1000);
   await click(page.getByTestId("emergency-stop"), 900);
+  stopPressed = true;
   wrote("POST /emergency-stop (released after the recording)");
   await settle(900);
   const confirm = page.getByRole("dialog").getByRole("button", { name: /Stop awaryjny|Zatrzymaj|Potwierdź/ }).last();
   await click(confirm, 700);
   // The state after the stop: the run paused by the emergency stop, the top strip in its stopped state, 0 pps.
-  await settle(2500);
+  await settle(2000);
   const state = page.getByText(/wstrzymany|zatrzyman/i).first();
   if (await state.count()) await point(state, 900);
   await settle(1500);
   await moveTo(1500, 60, 900);
-  await settle(2500);
+  await settle(1500);
   await end();
 }
 
@@ -472,7 +484,7 @@ if (want("end")) {
 }
 
 // ---------- clean up what the recording changed (the emergency stop is released, the live scan cancelled) ----------
-if (marks.stop) {
+if (stopPressed) {
   await api("/emergency-stop/release", "POST"); wrote("POST /emergency-stop/release");
   // Runs that the stop paused (scheduled ones too) would block their profile's schedule: resume them, cancel our own live scan.
   const paused = ((await api("/runs?status=paused&limit=100")).items || []).filter((r) => r.pause_reason === "emergency_stop");
@@ -557,3 +569,4 @@ writeFileSync(resolve(OUT, "czujka-demo.pl.srt"), srt.join("\n"));
 const totalWords = SHOTS.reduce((n, s) => n + (marks[s.id] ? s.vo.split(/\s+/).filter(Boolean).length : 0), 0);
 writeFileSync(resolve(OUT, "lektor.txt"), "Lektor do filmu czujka-demo.mp4 (czas filmu " + mmss(tl) + ", " + totalWords + " słów ≈ " + (totalWords / 2.3).toFixed(0) + " s przy 2,3 słowa/s).\nNagraj głos na film; kody czasu to początek i koniec ujęcia. Wygenerowane przez record.mjs.\n\n" + lektor.join("\n"));
 console.log("film", mmss(tl), "(" + tl.toFixed(1) + " s),", frames.length, "frames ->", mp4);
+if (tl > 119) console.log("WARNING: the cut is " + tl.toFixed(1) + " s: over the 2:00 submission limit (shorten CZ_SCAN_SECONDS or record with CZ_STOP=0)");
