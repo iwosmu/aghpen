@@ -120,7 +120,9 @@ RUN2=$(echo "$R2" | jq .run_id)
 api GET /runs/$RUN2 | jq -c "{id, status, summary}"
 echo "-- changes of run $RUN2:"
 api GET "/changes?run_id=$RUN2&sort=id" | jq -r '.items[] | "  \(.kind) [\(.severity)] \(.summary)"'
-check "changes" "$(api GET "/changes?run_id=$RUN2&limit=500" | jq -r '[.items[].kind] | unique | join(",")')" "headers_changed,host_unstable,service_changed,service_gone,service_new,tech_version"
+# A host silent once is reported missing and unconfirmed (host_missing); a second miss confirms it (host_gone).
+check "changes" "$(api GET "/changes?run_id=$RUN2&limit=500" | jq -r '[.items[].kind] | unique | join(",")')" "headers_changed,host_missing,service_changed,service_gone,service_new,tech_version"
+check "the silent host is missing, unconfirmed" "$(api GET "/changes?run_id=$RUN2&limit=500" | jq -r '[.items[] | select(.kind == "host_missing") | .ip] | join(",")')" "172.31.250.5"
 echo "-- hosts after run $RUN2 (stability model):"
 api GET "/hosts?sort=ip" | jq -r '.items[] | "  \(.ip) status=\(.status) p_alive=\(.p_alive) misses=\(.consecutive_misses) interest=\(.interest) open_ports=\(.open_ports | map(tostring) | join(","))"'
 SILENT=$(api GET "/hosts?cidr=172.31.250.5" | jq ".items[0].id")
@@ -179,13 +181,14 @@ for fmt in json csv xml; do
   DIFF=$(api GET "/diff?from=$RUN2&to=$RN")
   SVC_CH=$(echo "$DIFF" | jq '[.changes[] | select(.kind | startswith("host_") | not)] | length')
   HOST_CH=$(echo "$DIFF" | jq -r '[.changes[] | select(.kind | startswith("host_")) | "\(.kind) \(.ip)"] | join(", ")')
-  SUMMARY=$(echo "$REP" | jq -c '{format, run_id, hosts, services, skipped, invalid: (.invalid | length)}')
+  SUMMARY=$(echo "$REP" | jq -c '{format, run_id, hosts, hosts_down, services, skipped, invalid: (.invalid | length)}')
   BYTES=$(wc -c < "$TMP/run.$fmt" | tr -d " ")
   echo "  $fmt: $BYTES bytes -> $SUMMARY"
   echo "       against run $RUN2: service changes: $SVC_CH; host status changes: ${HOST_CH:-none}"
   # The store keeps services that answered (open) and the ones it already knows; a port that the first file
   # lists as closed and that was never open is not kept. So the count to expect is the one in the exported JSON.
-  check "$fmt round trip" "$(echo "$REP" | jq -r '"hosts=\(.hosts) services=\(.services) invalid=\(.invalid | length)"') service_changes=$SVC_CH" "hosts=4 services=$EXPORTED invalid=0 service_changes=0"
+  # The export carries all four hosts of the run; the report counts the silent one apart (hosts_down).
+  check "$fmt round trip" "$(echo "$REP" | jq -r '"hosts=\(.hosts) hosts_down=\(.hosts_down) services=\(.services) invalid=\(.invalid | length)"') service_changes=$SVC_CH" "hosts=3 hosts_down=1 services=$EXPORTED invalid=0 service_changes=0"
   if [ $fmt = json ]; then RJSON=$RN; fi
 done
 # Lossless: the Czujka JSON of the re-imported run equals the JSON it came from (run ids and file time aside).
