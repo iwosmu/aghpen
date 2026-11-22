@@ -48,9 +48,9 @@ export function Glyph({ name, tone = 'neutral', size = 14, pulse }: { name: Glyp
 
 export function Mark({ glyph, tone, children, pulse, title, className }: { glyph: GlyphName; tone: Tone; children?: ReactNode; pulse?: boolean; title?: string; className?: string }) {
   return (
-    <span className={cx('inline-flex items-center gap-1.5 whitespace-nowrap', className)} title={title}>
+    <span className={cx('inline-flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap', className)} title={title}>
       <Glyph name={glyph} tone={tone} pulse={pulse} />
-      {children !== undefined ? <span>{children}</span> : null}
+      {children !== undefined ? <span className="min-w-0 truncate">{children}</span> : null}
     </span>
   );
 }

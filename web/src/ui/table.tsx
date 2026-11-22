@@ -235,9 +235,8 @@ export function SearchField({ value, onChange, placeholder, width = 220 }: { val
   }, [local]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <label className="relative block" style={{ width }}>
-      <span className="label mb-1.5 block pl-1">{t('Szukaj', 'Search')}</span>
       <Icon name="search" size={14} className="pointer-events-none absolute bottom-3 left-3 text-ink-3" />
-      <input type="search" className="field pl-8" value={local} placeholder={placeholder} onChange={(e) => setLocal(e.target.value)} />
+      <input type="search" className="field pl-8" value={local} placeholder={placeholder} aria-label={t('Szukaj', 'Search')} onChange={(e) => setLocal(e.target.value)} />
     </label>
   );
 }

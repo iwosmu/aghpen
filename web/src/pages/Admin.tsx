@@ -58,8 +58,8 @@ function UsersTab() {
   const remove = useAction((id: number) => del('/users/' + id), { invalidate: ['/users', '/roles', '/audit'], success: t('Użytkownik usunięty', 'User deleted'), onSuccess: () => setConfirm(null) });
   const me = session.user.id;
   const cols: Col<User>[] = [
-    { id: 'name', header: t('Użytkownik', 'User'), wrap: true, cell: (x) => (
-      <div className="min-w-[180px] py-1"><div className={x.disabled ? 'text-ink-3' : 'text-ink'}>{x.name || x.email.split('@')[0]}{x.id === me ? <span className="ml-1.5 text-2xs text-ink-3">{t('to Ty', 'you')}</span> : null}</div><div className="mono text-xs text-ink-3">{x.email}</div></div>
+    { id: 'name', header: t('Użytkownik', 'User'), cell: (x) => (
+      <span className="flex min-w-0 max-w-[clamp(220px,30vw,460px)] items-baseline gap-2 whitespace-nowrap"><span className={cx('truncate', x.disabled ? 'text-ink-3' : 'text-ink')}>{x.name || x.email.split('@')[0]}</span><span className="mono truncate text-xs text-ink-3">{x.email}</span>{x.id === me ? <span className="flex-none text-2xs text-ink-3">{t('to Ty', 'you')}</span> : null}</span>
     ) },
     { id: 'role', header: t('Rola', 'Role'), width: 220, cell: (x) => x.id === me ? <span>{roleLabel(x.role_slug, x.role_name)}</span> : <Select label={t('Rola użytkownika ', 'Role of ') + x.email} value={String(x.role_id)} onChange={(v) => update.mutate({ id: x.id, body: { role_id: Number(v) } })} options={(roles.data ?? []).map((r) => ({ value: String(r.id), label: roleLabel(r.slug, r.name) }))} /> },
     { id: 'login', header: t('Ostatnie logowanie', 'Last login'), hide: 'md', cell: (x) => <span className="num text-ink-2" title={fmtDateTime(x.last_login_at)}>{x.last_login_at ? fmtRelative(x.last_login_at) : t('nigdy', 'never')}</span> },
@@ -137,7 +137,7 @@ function RolesTab({ canManage }: { canManage: boolean }) {
                 <tr className="border-b border-rule bg-raised"><th colSpan={list.length + 1} className="sticky left-0 px-3 py-1 text-left text-xs font-semibold text-ink-2">{permGroupLabel(group)}</th></tr>
                 {items.map((p) => (
                   <tr key={p.permission} className="border-b border-rule last:border-b-0 hover:bg-raised">
-                    <th scope="row" className="sticky left-0 z-10 bg-panel px-3 py-1 text-left font-normal"><div className="text-sm text-ink">{en ? p.label_en : p.label_pl}</div><div className="mono text-2xs text-ink-3">{p.permission}</div></th>
+                    <th scope="row" className="sticky left-0 z-10 bg-panel px-3 py-1 text-left font-normal"><span className="block h-[30px] whitespace-nowrap text-sm leading-[30px] text-ink" title={p.permission}>{en ? p.label_en : p.label_pl}</span></th>
                     {list.map((r) => {
                       const cur = draft[r.id] ?? r.permissions;
                       const on = cur.includes(p.permission);
@@ -251,17 +251,17 @@ function SafetyTab() {
         {q.data.kernel_cap ? <KernelCapLine k={q.data.kernel_cap} /> : null}
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label={t('Dozwolone porty', 'Allowed ports')} hint={t('puste: wszystkie', 'empty: all')}><input className="field mono" disabled={!canManage} value={f.allowed_ports} onChange={(e) => setF({ ...f, allowed_ports: e.target.value })} /></Field>
-          <Field label={t('Zabronione porty', 'Denied ports')} hint={t('np. 9100 (drukarki)', 'for example 9100 (printers)')}><input className="field mono" disabled={!canManage} value={f.denied_ports} onChange={(e) => setF({ ...f, denied_ports: e.target.value })} /></Field>
+          <Field label={t('Zabronione porty', 'Denied ports')} ><input className="field mono" disabled={!canManage} value={f.denied_ports} onChange={(e) => setF({ ...f, denied_ports: e.target.value })} /></Field>
         </div>
         <div className="mt-3">
           {op.length ? (
             <div className="mb-3 border border-rule bg-sunk px-3 py-2.5" data-testid="operator-lock">
               <p className="flex items-center gap-1.5 text-sm font-medium text-ink"><Icon name="lock" size={14} className="text-ink-2" />{t('Blokada operatora', 'Operator lock')}</p>
               <p className="mt-1.5 flex flex-wrap gap-1.5">{op.map((n) => <span key={n} className="mono border border-rule-strong px-1.5 py-0.5 text-sm text-ink">{n}</span>)}</p>
-              <p className="mt-1.5 max-w-[72ch] text-xs text-ink-2">{t('Ustawia ją zmienna CZUJKA_ALLOWED_NETWORKS. W Czujce można ją tylko zawęzić.', 'Set by the CZUJKA_ALLOWED_NETWORKS variable. Czujka can only narrow it.')}</p>
+              <p className="mono mt-1.5 text-2xs text-ink-3">CZUJKA_ALLOWED_NETWORKS</p>
             </div>
           ) : null}
-          <Field label={t('Dozwolone sieci', 'Allowed networks')} hint={op.length && !nets.trim() ? t('Puste: cała sieć z blokady operatora.', 'Empty: the whole network of the operator lock.') : nets.trim() ? t('Czujka skanuje tylko adresy z tych sieci.', 'Czujka scans only addresses in these networks.') : t('Puste: bez ograniczenia. CIDR, jeden w wierszu.', 'Empty: no limit. CIDR, one per line.')}>
+          <Field label={t('Dozwolone sieci', 'Allowed networks')} hint={nets.trim() ? undefined : op.length ? t('puste: blokada operatora', 'empty: operator lock') : t('puste: bez ograniczenia', 'empty: no limit')}>
             <textarea className="field mono" rows={3} disabled={!canManage} value={nets} onChange={(e) => setNets(e.target.value)} placeholder={'10.66.0.0/16\n149.156.0.0/16'} data-testid="allowed-networks" aria-invalid={outside.length > 0 || Boolean(lockErr)} />
           </Field>
           {lockErr ? (
@@ -271,7 +271,7 @@ function SafetyTab() {
           ) : null}
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Field label={t('Wykluczenia', 'Exclusions')} hint={t('adres albo CIDR, jeden w wierszu', 'an address or a CIDR, one per line')}><textarea className="field mono" rows={5} disabled={!canManage} value={excl} onChange={(e) => setExcl(e.target.value)} /></Field>
+          <Field label={t('Wykluczenia', 'Exclusions')}><textarea className="field mono" rows={5} disabled={!canManage} value={excl} onChange={(e) => setExcl(e.target.value)} /></Field>
           <div className="space-y-3">
             <Field label="User-Agent"><input className="field mono" disabled={!canManage} value={f.user_agent} onChange={(e) => setF({ ...f, user_agent: e.target.value })} /></Field>
             <div>
@@ -284,7 +284,7 @@ function SafetyTab() {
           </div>
         </div>
         <div className="mt-3">{lockErr ? <p className="text-xs text-danger">{t('Popraw dozwolone sieci.', 'Fix the allowed networks.')}</p> : <InlineError error={save.error} />}</div>
-        <p className="mt-3 text-2xs text-ink-3">{t('Ostatnia zmiana:', 'Last change:')} <span className="num">{fmtDateTime(q.data.updated_at)}</span></p>
+        <p className="num mt-3 text-2xs text-ink-3" title={t('Ostatnia zmiana', 'Last change')}>{fmtDateTime(q.data.updated_at)}</p>
       </Panel>
 
       <Panel title={t('Stop awaryjny', 'Emergency stop')}>
@@ -292,7 +292,6 @@ function SafetyTab() {
           <Icon name={q.data.emergency_stop ? 'stop' : 'shield'} className={q.data.emergency_stop ? '' : 'text-st-new'} />
           {q.data.emergency_stop ? t('Włączony', 'On') : t('Wyłączony', 'Off')}
         </p>
-        <p className="mt-2 text-sm text-ink-2">{t('Stop wstrzymuje wszystkie trwające skany i blokuje nowe, także z harmonogramu, dopóki administrator go nie wyłączy.', 'The stop pauses all running scans and blocks new ones, scheduled ones too, until an administrator turns it off.')}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {!q.data.emergency_stop && can('safety:stop') ? <Button variant="dangerSolid" icon="stop" onClick={() => setConfirmStop(true)}>{t('Zatrzymaj wszystkie skany', 'Stop all scans')}</Button> : null}
           {q.data.emergency_stop && canManage ? <Button variant="primary" icon="play" busy={release.isPending} onClick={() => release.mutate(undefined)}>{t('Wyłącz stop', 'Turn off the stop')}</Button> : null}
@@ -335,10 +334,10 @@ function WebhookPanel() {
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label={t('Adres (URL)', 'Address (URL)')}><input className="field mono" value={f.url} onChange={(e) => { setF({ ...f, url: e.target.value }); setTest(null); }} placeholder="https://hooks.slack.com/services/…" data-testid="webhook-url" /></Field>
           <Field label={t('Minimalna waga', 'Minimum severity')}><Select value={f.min_severity} onChange={(v) => setF({ ...f, min_severity: v as WebhookSettings['min_severity'] })} options={SEV_OPTS()} /></Field>
-          <Field label={t('Sekret HMAC (opcjonalnie)', 'HMAC secret (optional)')} hint={f.secret_set && !clear ? t('Zapisany. Wpisz nowy, aby go zmienić. Podpis w nagłówku X-Czujka-Signature.', 'Stored. Type a new one to replace it. Signature in the X-Czujka-Signature header.') : undefined}>
+          <Field label={t('Sekret HMAC (opcjonalnie)', 'HMAC secret (optional)')} hint={f.secret_set && !clear ? <span className="mono">{t('zapisany', 'stored')} · X-Czujka-Signature</span> : undefined}>
             <input className="field mono" type="password" autoComplete="off" value={secret} disabled={clear} onChange={(e) => { setSecret(e.target.value); setTest(null); }} placeholder={f.secret_set ? '••••••••••••••••' : ''} data-testid="webhook-secret" />
           </Field>
-          <Field label={t('Adres Czujki w odnośnikach', 'Czujka address in the links')} hint={t('Puste: adres, z którego zapisano ustawienia.', 'Empty: the address the settings were saved from.')}><input className="field mono" value={f.ui_url} onChange={(e) => setF({ ...f, ui_url: e.target.value })} placeholder={typeof window !== 'undefined' ? window.location.origin : ''} /></Field>
+          <Field label={t('Adres Czujki w odnośnikach', 'Czujka address in the links')} hint={t('puste: adres zapisu', 'empty: the saving address')}><input className="field mono" value={f.ui_url} onChange={(e) => setF({ ...f, ui_url: e.target.value })} placeholder={typeof window !== 'undefined' ? window.location.origin : ''} /></Field>
         </div>
         {f.secret_set ? <div className="mt-2"><Check checked={clear} onChange={(v) => { setClear(v); if (v) setSecret(''); }} label={t('Usuń zapisany sekret', 'Remove stored secret')} /></div> : null}
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-rule pt-3">
@@ -385,11 +384,11 @@ function DojoTab() {
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field label={t('Adres DefectDojo', 'DefectDojo URL')}><input className="field mono" value={f.url} onChange={(e) => { setF({ ...f, url: e.target.value }); setTest(null); }} placeholder="https://defectdojo.example" /></Field>
           {'link_url' in q.data ? (
-            <Field label={t('Adres do odnośników (publiczny)', 'Link address (public)')} hint={t('Adres DefectDojo dla przeglądarki. Puste: adres wyżej.', 'The DefectDojo URL for the browser. Empty: the URL above.')}>
+            <Field label={t('Adres do odnośników (publiczny)', 'Link address (public)')} hint={t('puste: adres wyżej', 'empty: the URL above')}>
               <input className="field mono" value={f.link_url ?? ''} onChange={(e) => setF({ ...f, link_url: e.target.value })} placeholder="http://127.0.0.1:18080" data-testid="dojo-link-url" />
             </Field>
           ) : null}
-          <Field label={t('Klucz API', 'API key')} hint={f.api_key_set ? t('Zapisany. Wpisz nowy, aby go zmienić.', 'Stored. Type a new one to replace it.') : t('Brak klucza', 'No key set')}>
+          <Field label={t('Klucz API', 'API key')} hint={f.api_key_set ? t('zapisany', 'stored') : t('brak klucza', 'no key set')}>
             <input className="field mono" type="password" autoComplete="off" value={key} onChange={(e) => { setKey(e.target.value); setTest(null); }} placeholder={f.api_key_set ? '••••••••••••••••' : ''} />
           </Field>
           <Field label={t('Typ produktu', 'Product type')}><input className="field" value={f.product_type_name} onChange={(e) => setF({ ...f, product_type_name: e.target.value })} /></Field>
@@ -414,7 +413,6 @@ function DojoTab() {
 
         <div className="mt-4 border-t border-rule pt-3" data-testid="dojo-mappings">
           <p className="text-sm font-medium">{t('Produkt DefectDojo dla zakresu', 'DefectDojo product per scope')}</p>
-          <p className="mb-2 text-xs text-ink-3">{t('Puste pole przyjmuje wartość ogólną.', 'An empty field takes the general value.')}</p>
           {maps.length ? (
             <ul className="space-y-2">
               {maps.map((m, i) => (
@@ -434,7 +432,6 @@ function DojoTab() {
         <div className="mt-4 border-t border-rule pt-3">
           <p className="text-sm font-medium">{t('Synchronizacja statusów', 'Status sync')}</p>
           <Check checked={Boolean(f.status_sync)} onChange={(v) => setF({ ...f, status_sync: v })} label={t('Synchronizuj statusy z DefectDojo po każdym skanie', 'Sync statuses with DefectDojo after each scan')} />
-          <p className="mt-1 text-xs text-ink-3">{t('Przy konflikcie zostaje status z Czujki.', 'On a conflict the Czujka status stays.')}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button size="sm" icon="download" busy={pullRun.isPending && !pullRun.variables} disabled={!q.data.api_key_set} onClick={() => pullRun.mutate(false)} data-testid="dojo-pull">{t('Sprawdź statusy w DefectDojo', 'Check statuses in DefectDojo')}</Button>
             {pull && (pull.updates ?? []).length && !pull.applied ? <Button size="sm" variant="primary" icon="check" busy={pullRun.isPending && pullRun.variables === true} onClick={() => pullRun.mutate(true)}>{t('Zastosuj ' + (pull.updates ?? []).length + ' ' + plural((pull.updates ?? []).length, ['zmianę', 'zmiany', 'zmian'], ['change', 'changes']), 'Apply ' + (pull.updates ?? []).length + ' ' + plural((pull.updates ?? []).length, ['zmianę', 'zmiany', 'zmian'], ['change', 'changes']))}</Button> : null}

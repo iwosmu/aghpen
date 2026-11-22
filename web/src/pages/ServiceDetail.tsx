@@ -5,7 +5,8 @@ import { patch } from '../api/client';
 import type { HTTPFingerprint, Service, ServiceObservation, SigMatch, TLSInfo } from '../api/types';
 import { t, plural } from '../i18n';
 import { cx, fmtBytes, fmtDate, fmtDateTime, fmtRelative, shortHash } from '../lib/format';
-import { Button, Check, CopyText, ErrorState, KV, PageHeader, Panel, SkeletonRows, TagInput, Tags } from '../ui/kit';
+import { Button, Check, CopyText, ErrorState, KV, PageHeader, Panel, SkeletonRows, Tabs, TagInput, Tags } from '../ui/kit';
+import { useUrlState } from '../lib/hooks';
 import { Icon } from '../ui/Icon';
 import { ClassChips, Confidence, Glyph, InterestBreakdown, InterestScore, SERVICE_CLASSES, ServiceStateMark, categoryLabel, classLabel } from '../ui/marks';
 import { InlineText, OverrideNote } from '../ui/edit';
@@ -192,6 +193,8 @@ function ClassEditor({ s, onSave, onClose }: { s: Service; onSave: (c: string[])
 }
 
 export default function ServiceDetail() {
+  const u = useUrlState();
+  const tab = u.get('tab', 'interest');
   const id = Number(useParams().id);
   const canEdit = useCan('results:update');
   const canSuggest = useCan('signatures:read');
@@ -210,17 +213,12 @@ export default function ServiceDetail() {
       <PageHeader
         back={{ to: '/services', label: t('Usługi', 'Services') }}
         title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="mono text-[26px] font-medium tracking-[-0.01em] sm:text-[30px]">{s.ip}:{s.port}</span><span className="font-sans text-base font-normal"><ServiceStateMark state={s.state} /></span></span>}
-        sub={<><Link to={'/hosts/' + s.host_id} className="link">{t('host', 'host')} <span className="mono">{s.hostname || s.ip}</span></Link> · {serviceName(s)}{isSelf(s) ? <SelfTag /> : null}{s.tls ? ' · TLS' : ''}{s.url ? <> · <a className="link mono inline-flex items-center gap-1" href={s.url} target="_blank" rel="noreferrer noopener">{s.url}<Icon name="external" size={11} /></a></> : null}</>}
+        sub={<><Link to={'/hosts/' + s.host_id} className="link">{t('host', 'host')} <span className="mono">{s.hostname || s.ip}</span></Link> · {serviceName(s)}{isSelf(s) ? <SelfTag /> : null}{s.tls ? ' · TLS' : ''}{s.group_size > 1 ? <> · <Link to={'/services?group_key=' + encodeURIComponent(s.group_key)} className="link num" title={t('usługi o tej samej treści i technologiach', 'services with the same content and technologies')}>×{s.group_size}</Link></> : null}{s.url ? <> · <a className="link mono inline-flex items-center gap-1" href={s.url} target="_blank" rel="noreferrer noopener">{s.url}<Icon name="external" size={11} /></a></> : null}</>}
         readOnly={!canEdit}
-        actions={<span className="flex items-center gap-3 text-sm text-ink-2">{canSuggest ? <SuggestButton serviceId={s.id} /> : null}<span className="flex items-center gap-2">{t('Ciekawość', 'Interest')} <InterestScore value={s.interest} /></span></span>}
+        actions={<span className="flex items-center gap-3 text-sm">{canSuggest ? <SuggestButton serviceId={s.id} /> : null}<span title={t('Ciekawość', 'Interest')}><InterestScore value={s.interest} /></span></span>}
       />
-      <div className="grid gap-4 px-4 pb-6 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,400px)] xl:grid-rows-[auto_1fr]">
-        <div className="min-w-0 xl:col-start-2 xl:row-start-1">
-          <Panel title={t('Ocena ciekawości', 'Interest score')}><InterestBreakdown value={s.interest} reasons={s.interest_why} /></Panel>
-        </div>
-        <div className="min-w-0 space-y-4 xl:col-start-1 xl:row-span-2 xl:row-start-1">
-          <ServiceStory s={s} />
-          {r?.http || s.name === 'http' || s.name === 'https' ? <ResponseTimeChart serviceId={s.id} /> : null}
+      <div className="grid items-start gap-4 px-4 pb-6 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
+        <div className="order-2 min-w-0 xl:order-none">
           <Panel title={t('Identyfikacja', 'Identification')} actions={<span className="flex items-center gap-2 text-ink-2">{t('pewność', 'confidence')} <Confidence value={s.confidence} width={48} /></span>}>
             <dl>
               <KV k={t('Usługa', 'Service')}>
@@ -246,14 +244,29 @@ export default function ServiceDetail() {
               <KV k={t('Pierwsza obserwacja', 'First seen')}><span className="num">{fmtDateTime(s.first_seen)}</span></KV>
               <KV k={t('Ostatnia obserwacja', 'Last seen')}><span className="num">{fmtDateTime(s.last_seen)}</span> <span className="text-ink-3">{fmtRelative(s.last_seen)}</span></KV>
               {s.last_changed ? <KV k={t('Ostatnia zmiana', 'Last change')}><span className="num">{fmtDateTime(s.last_changed)}</span></KV> : null}
+                          <KV k={t('Tagi', 'Tags')}>{canEdit ? <TagInput value={s.tags ?? []} onChange={(v) => save.mutate({ tags: v })} placeholder={t('dodaj tag', 'add a tag')} /> : <Tags tags={s.tags} max={12} />}</KV>
+              <KV k={t('Notatka', 'Note')}><InlineText label={t('Notatka', 'Note')} multiline value={s.note} canEdit={canEdit} placeholder={t('brak notatki', 'no note')} onSave={(v) => save.mutate({ note: v })} /></KV>
             </dl>
           </Panel>
-
-          {r?.http ? <Panel title="HTTP"><HttpPanel h={r.http} tls={s.tls} /></Panel> : s.name === 'http' ? <Panel title="HTTP"><p className="text-sm text-ink-2">{t('Brak danych HTTP z ostatniego skanu', 'No HTTP data from the last scan')}</p></Panel> : null}
-          {r?.tls ? <Panel title={t('Certyfikat TLS', 'TLS certificate')}><TlsPanel c={r.tls} /></Panel> : null}
-
-          <ServiceHistoryPanel serviceId={s.id} />
-          <Panel title={t('Obserwacje', 'Observations')} count={obs.data?.total} flush>
+        </div>
+        <div className="min-w-0 space-y-4">
+          <Tabs value={tab} onChange={(v) => u.set({ tab: v === 'interest' ? null : v })} tabs={[
+            { id: 'interest', label: t('Ciekawość', 'Interest') },
+            { id: 'tech', label: t('Technologie', 'Technologies') },
+            ...(r?.http || r?.tls || s.name === 'http' ? [{ id: 'http', label: r?.tls ? 'HTTP · TLS' : 'HTTP' }] : []),
+            { id: 'history', label: t('Historia', 'History') },
+          ]} />
+          {tab === 'interest' ? <Panel><InterestBreakdown value={s.interest} reasons={s.interest_why} /></Panel> : null}
+          {tab === 'tech' ? <Panel><TechList s={s} matches={r?.matches ?? []} /></Panel> : null}
+          {tab === 'http' ? <>
+  {r?.http ? <Panel><HttpPanel h={r.http} tls={s.tls} /></Panel> : s.name === 'http' ? <Panel><p className="text-sm text-ink-2">{t('Brak danych HTTP z ostatniego skanu', 'No HTTP data from the last scan')}</p></Panel> : null}
+  {r?.tls ? <Panel title={t('Certyfikat TLS', 'TLS certificate')}><TlsPanel c={r.tls} /></Panel> : null}
+          </> : null}
+          {tab === 'history' ? <>
+            <ServiceStory s={s} />
+            {r?.http || s.name === 'http' || s.name === 'https' ? <ResponseTimeChart serviceId={s.id} /> : null}
+            <ServiceHistoryPanel serviceId={s.id} />
+            <Panel title={t('Obserwacje', 'Observations')} count={obs.data?.total} flush>
             {obs.error ? <ErrorState error={obs.error} retry={() => obs.refetch()} /> : !obs.data ? <SkeletonRows rows={4} /> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -281,22 +294,7 @@ export default function ServiceDetail() {
             )}
             {obs.data && obs.data.items.length > 1 ? <p className="border-t border-rule px-3 py-1.5 text-2xs text-ink-3"><span className="mr-1.5 inline-block h-[9px] w-[9px] bg-st-changed-wash align-middle" style={{ boxShadow: 'inset 0 0 0 1px var(--st-changed)' }} />{t('pole różni się od starszej obserwacji', 'the field differs from the older observation')}</p> : null}
           </Panel>
-        </div>
-
-        <div className="min-w-0 space-y-4 self-start xl:col-start-2 xl:row-start-2">
-          <Panel title={t('Technologie i dowody', 'Technologies and evidence')} count={(s.technologies ?? []).length}><TechList s={s} matches={r?.matches ?? []} /></Panel>
-          <Panel title={t('Opis analityka', 'Analyst notes')}>
-            <dl>
-              <KV k={t('Tagi', 'Tags')}>{canEdit ? <TagInput value={s.tags ?? []} onChange={(v) => save.mutate({ tags: v })} placeholder={t('dodaj tag', 'add a tag')} /> : <Tags tags={s.tags} max={12} />}</KV>
-              <KV k={t('Notatka', 'Note')}><InlineText label={t('Notatka', 'Note')} multiline value={s.note} canEdit={canEdit} placeholder={t('brak notatki', 'no note')} onSave={(v) => save.mutate({ note: v })} /></KV>
-            </dl>
-          </Panel>
-          {s.group_size > 1 ? (
-            <Panel title={t('Podobne usługi', 'Similar services')}>
-              <p className="text-sm text-ink-2">{t('Ta sama treść strony i zestaw technologii na ', 'The same page content and technology set on ')}<span className="num text-ink">{s.group_size}</span> {plural(s.group_size, ['usłudze', 'usługach', 'usługach'], ['service', 'services'])}.</p>
-              <Link to={'/services?group_key=' + encodeURIComponent(s.group_key)} className="link mt-1 inline-block text-sm">{t('Pokaż całą grupę', 'Show the group')}</Link>
-            </Panel>
-          ) : null}
+          </> : null}
         </div>
       </div>
     </div>

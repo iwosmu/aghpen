@@ -92,8 +92,8 @@ export default function Signatures() {
     { id: 'on', header: t('Włączona', 'Enabled'), width: 76, cell: (s) => canToggle
       ? <Switch checked={s.enabled} disabled={toggle.isPending} onChange={() => toggle.mutate(s)} label={(s.enabled ? t('Wyłącz sygnaturę ', 'Disable signature ') : t('Włącz sygnaturę ', 'Enable signature ')) + s.name} />
       : s.enabled ? <span className="inline-flex items-center gap-1.5 text-xs"><Glyph name="check" tone="new" size={12} />{t('tak', 'yes')}</span> : <span className="inline-flex items-center gap-1.5 text-xs text-ink-3"><Glyph name="ring" tone="expected" size={12} />{t('nie', 'no')}</span> },
-    { id: 'name', header: t('Sygnatura', 'Signature'), sort: 'name', cell: (s) => <span className="flex max-w-[420px] items-center gap-2" title={s.description}><Link to={'/signatures/' + s.id} className="link truncate">{s.name}</Link>{s.builtin ? null : <span className="chip-fact flex-none">{t('własna', 'custom')}</span>}</span> },
-    { id: 'slug', header: 'ID', hide: 'lg', cell: (s) => <span className="mono text-xs text-ink-2">{s.slug}</span> },
+    { id: 'name', header: t('Sygnatura', 'Signature'), sort: 'name', cell: (s) => <span className="flex max-w-[clamp(180px,calc(100vw-1000px),420px)] items-center gap-2" title={s.description}><Link to={'/signatures/' + s.id} className="link truncate">{s.name}</Link>{s.builtin ? null : <span className="chip-fact flex-none">{t('własna', 'custom')}</span>}</span> },
+    { id: 'slug', header: 'ID', hide: 'lg', cell: (s) => <span className="mono block max-w-[clamp(120px,14vw,240px)] truncate text-xs text-ink-2" title={s.slug}>{s.slug}</span> },
     { id: 'cat', header: t('Kategoria', 'Category'), sort: 'category', cell: (s) => <span className="text-ink-2">{categoryLabel(s.category)}</span> },
     { id: 'matches', header: t('Dopasowania', 'Matches'), sort: 'match_count', align: 'right', cell: (s) => s.match_count ? <span className="num">{fmtInt(s.match_count)}</span> : <span className="num text-ink-3">0</span> },
   ];
