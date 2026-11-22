@@ -227,6 +227,18 @@ func TestImportAnalysisDiffAndRoundTrip(t *testing.T) {
 		if err != nil || len(again) != n || len(rep.Invalid) != 0 {
 			t.Fatalf("%s: re-import gave %d hosts of %d, report %+v, err %v", format, len(again), n, rep, err)
 		}
+		// The run observed four hosts, one of them down (172.31.250.5): the
+		// export carries it with that state in every format, and the import
+		// reads it back as a down host (ImportReport.HostsDown).
+		down := ""
+		for _, h := range again {
+			if !h.Up {
+				down += h.IP
+			}
+		}
+		if n != 4 || rep.HostsDown != 1 || down != "172.31.250.5" {
+			t.Errorf("%s: exported %d hosts, re-import down hosts %d (%q); want 4 and the silent host", format, n, rep.HostsDown, down)
+		}
 		runN, err := m.Import(ctx, "export."+format, again, nil)
 		if err != nil || runN.Error != "" {
 			t.Fatalf("%s: import of the export: %+v %v", format, runN, err)
