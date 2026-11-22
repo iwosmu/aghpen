@@ -7,7 +7,7 @@ Szablon organizatorów to cztery stosy usług w Dockerze na portach jednej maszy
 Uruchom na Linuksie albo w maszynie wirtualnej (ostrzeżenie niżej).
 
 ```sh
-git clone https://github.com/iwosmu/aghpen.git czujka && cd czujka
+git clone --depth 1 https://github.com/iwosmu/aghpen.git czujka && cd czujka
 CZUJKA_PORT=9180 docker compose up -d
 docker compose logs czujka | grep -A3 "first administrator"
 cd lab/jury && ./quickstart.sh up

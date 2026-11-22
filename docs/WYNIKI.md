@@ -295,7 +295,7 @@ Pomiar na czystej maszynie (`docker:dind`, bez obrazów), zapis w `deploy/e2e/fr
 
 | Krok | Czas |
 | --- | --- |
-| `git clone` | 1-2 s |
+| `git clone --depth 1` | 10 s (pomiar 22.11, łącze domowe; wcześniejszy pomiar z lokalnej paczki: 1-2 s) |
 | `docker compose up -d` do działającego API | 51-115 s, zależnie od łącza (trzy pomiary); 80 s na maszynie z Ubuntu 24.04 |
 | Paczka offline: rozpakowanie i `sh install.sh`, bez sieci | 26-29 s |
 | Logowanie, „Ten komputer”, „Uruchom skan” | 2 kliknięcia |
