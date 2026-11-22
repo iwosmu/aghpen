@@ -148,3 +148,22 @@ func TestResolveHostGateway(t *testing.T) {
 		}
 	}
 }
+
+func TestShownHostname(t *testing.T) {
+	for _, c := range []struct{ name, ip, want string }{
+		{"localhost", "172.18.0.1", ""}, // a loopback target mapped to the docker host
+		{"LOCALHOST.", "172.18.0.1", ""},
+		{"127.0.0.1", "10.0.0.5", ""},
+		{"localhost", "127.0.0.1", "localhost"}, // Czujka outside a container
+		{"localhost", "::1", "localhost"},
+		{"shop.example.org", "172.18.0.1", "shop.example.org"},
+		{"", "172.18.0.1", ""},
+	} {
+		if got := ShownHostname(c.name, c.ip); got != c.want {
+			t.Errorf("ShownHostname(%q, %q) = %q, want %q", c.name, c.ip, got, c.want)
+		}
+	}
+	if got := ShownHostnames([]string{"localhost", "gw.lab"}, "172.18.0.1"); len(got) != 1 || got[0] != "gw.lab" {
+		t.Errorf("ShownHostnames = %v", got)
+	}
+}

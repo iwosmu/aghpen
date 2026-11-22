@@ -144,16 +144,28 @@ func (d *differ) serviceReturned(h *HostSnapshot, s *model.ServiceResult, hist S
 	d.add(h, s, model.ChangeServiceReturned, sev, "state", before, "open", false, productDetail(s))
 }
 
-func awayText(d time.Duration) string {
-	switch {
-	case d < time.Minute:
-		return fmt.Sprintf("%d s", int(d.Seconds()))
-	case d < time.Hour:
-		return fmt.Sprintf("%d min", int(d.Minutes()))
-	case d < 48*time.Hour:
-		return fmt.Sprintf("%d h", int(d.Hours()))
+// awayText is a duration as the UI writes it (web/src/lib/format.ts
+// fmtDuration): "1 min 48 s", "2 h 5 min", "3 dni 4 h". The dashboard and the
+// change summary show the same absence, so they use the same units.
+func awayText(d time.Duration) string { return durationText(d, "dni") }
+
+func durationText(d time.Duration, days string) string {
+	s := int64(d.Round(time.Second) / time.Second)
+	two := func(a int64, ua string, b int64, ub string) string {
+		if b == 0 {
+			return fmt.Sprintf("%d %s", a, ua)
+		}
+		return fmt.Sprintf("%d %s %d %s", a, ua, b, ub)
+	}
+	switch m, h := s/60, s/3600; {
+	case s < 60:
+		return fmt.Sprintf("%d s", s)
+	case m < 60:
+		return two(m, "min", s%60, "s")
+	case h < 48:
+		return two(h, "h", m%60, "min")
 	default:
-		return fmt.Sprintf("%d dniach", int(d.Hours()/24))
+		return two(h/24, days, h%24, "h")
 	}
 }
 

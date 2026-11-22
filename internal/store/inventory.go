@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/iwosmu/aghpen/internal/model"
+	"github.com/iwosmu/aghpen/internal/targets"
 	"net/netip"
 )
 
@@ -300,6 +301,7 @@ func (f ServiceFilter) where() *where {
 }
 
 func (s *Store) postService(v *model.Service) error {
+	v.Hostname = targets.ShownHostname(v.Hostname, v.IP)
 	note, err := s.kr.DecryptString(v.Note, "services|note|"+strconv.FormatInt(v.ID, 10))
 	v.Note = note
 	return err
