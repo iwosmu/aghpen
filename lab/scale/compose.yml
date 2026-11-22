@@ -1,0 +1,67 @@
+# The product for the scale lab: PostgreSQL with pg_tde and Czujka, as in
+# deploy/docker-compose.yml, but with an image built from a prebuilt binary
+# (lab/scale/scale.sh product-up) and Czujka attached to the farm network
+# czscale-net at 10.78.0.2. The UI is published on 127.0.0.1 only.
+name: czscale
+
+services:
+  db:
+    image: czujka-db:17
+    environment:
+      POSTGRES_USER: czujka
+      POSTGRES_PASSWORD: ${CZS_DB_PASSWORD:?}
+      POSTGRES_DB: czujka
+    volumes:
+      - pgdata:/data/db
+      - tdekeys:/tde-keys
+    networks:
+      internal:
+        aliases: [czscale-postgres]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U czujka -d czujka"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  czujka:
+    image: czscale-czujka:${CZS_TAG:?}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      CZUJKA_DB_URL: postgres://czujka:${CZS_DB_PASSWORD}@czscale-postgres:5432/czujka?sslmode=disable
+      CZUJKA_TDE: require
+      CZUJKA_ADMIN_EMAIL: admin@czujka.local
+      CZUJKA_ADMIN_PASSWORD: ${CZS_ADMIN_PASSWORD:?}
+      CZUJKA_MASTER_KEY_FILE: /var/lib/czujka/master.key
+      CZUJKA_ALLOWED_NETWORKS: 10.77.0.0/16
+      CZUJKA_TZ: Europe/Warsaw
+      CZUJKA_SCHED_INTERVAL: 10s
+      CZUJKA_LOG_FORMAT: json
+    ports:
+      - "127.0.0.1:${CZS_PORT:-18640}:8080"
+    volumes:
+      - keys:/var/lib/czujka
+    networks:
+      internal: {}
+      ui: {}
+      farms:
+        ipv4_address: 10.78.0.2
+    cap_drop: [ALL]
+    cap_add: [NET_RAW, NET_ADMIN]
+    read_only: true
+    tmpfs: [/tmp]
+
+networks:
+  internal:
+    internal: true
+  ui: {}
+  farms:
+    name: czscale-net
+    external: true
+
+volumes:
+  pgdata:
+  tdekeys:
+  keys:
