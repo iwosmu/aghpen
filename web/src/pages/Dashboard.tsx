@@ -6,7 +6,7 @@ import type { Change, Dashboard as Dash, Finding, Host, Page, RunMap, ScanProfil
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtDec, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtSigned } from '../lib/format';
 import { useLiveRun, useNow, useWidth } from '../lib/hooks';
-import { NetworkField, NightStrip, Ring, Spark, TickBars, networkFields } from '../viz/Night';
+import { NetworkField, NightStrip, PortField, Ring, Spark, TickBars, networkFields } from '../viz/Night';
 import { ErrorState, Panel, SkeletonRows } from '../ui/kit';
 import { useIsNarrow } from '../ui/table';
 import { Icon } from '../ui/Icon';
@@ -199,6 +199,9 @@ function Stage({ d }: { d: Dash }) {
     () => networkFields(hosts ?? [], changes ?? [], (blocks ?? []).filter((b) => b.status === 'running').map((b) => b.cidr)),
     [hosts, changes, blocks],
   );
+  // one machine in scope: its open ports are the cells
+  const oneHost = hosts && hosts.length === 1 ? hosts[0] : null;
+  const portsQ = usePage<Service>('/services', { host_id: oneHost?.id, limit: 200 }, Boolean(oneHost));
   const [ref, w] = useWidth<HTMLDivElement>();
   const main = fields[0];
   const vh = useViewportHeight();
@@ -209,17 +212,17 @@ function Stage({ d }: { d: Dash }) {
   return (
     <section className="card relative flex h-full min-h-[320px] flex-col overflow-hidden rounded-[28px] bg-[radial-gradient(60%_55%_at_50%_52%,rgb(38_97_220/0.13),transparent_75%),var(--panel)] p-5 sm:p-6" data-testid="dash-field">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="mono text-[15px] text-ink">{main?.label ?? ''}</p>
-        {unitSteps.length ? (
+        <p className="mono text-[15px] text-ink">{oneHost ? oneHost.ip : main?.label ?? ''}</p>
+        {unitSteps.length && !oneHost ? (
           <p className="flex items-center gap-3 text-2xs text-ink-2" aria-hidden="true">
             {unitSteps.map(([s, l]) => <span key={s} className="num inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: 'var(--seq-' + s + ')' }} />{l}</span>)}
           </p>
         ) : null}
       </div>
       <div ref={ref} className="flex flex-1 items-center justify-center py-4">
-        {hostsQ.isPending ? <div className="skeleton rounded-[18px]" style={{ width: size, height: size }} /> : main && w ? <NetworkField field={main} size={size} /> : null}
+        {hostsQ.isPending ? <div className="skeleton rounded-[18px]" style={{ width: size, height: size }} /> : oneHost ? (portsQ.data && w ? <PortField services={(portsQ.data.items ?? []).filter((s) => s.state === 'open')} changes={changes ?? []} size={size} /> : null) : main && w ? <NetworkField field={main} size={size} /> : null}
       </div>
-      {fields.length > 1 ? (
+      {fields.length > 1 && !oneHost ? (
         <div className="flex flex-wrap gap-5">
           {fields.slice(1, 5).map((f) => (
             <div key={f.key} className="flex items-center gap-3">

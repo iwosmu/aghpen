@@ -1,6 +1,8 @@
 import { useMemo, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
-import type { Host, ScanRun } from '../api/types';
+import { Link } from 'react-router';
+import type { Host, ScanRun, Service } from '../api/types';
+import { serviceName } from '../lib/serviceName';
 import { d2xy } from '../lib/hilbert';
 import { useWidth } from '../lib/hooks';
 import { cx, fmtDateTime, fmtInt, fmtTime } from '../lib/format';
@@ -290,5 +292,43 @@ export function NightStrip({ runs, active, currentId, now }: { runs: ScanRun[]; 
       </svg>
       {tip.node}
     </div>
+  );
+}
+
+
+/** Columns and cell size for n port cells in a square of the given size. */
+export function portGrid(n: number, size: number): { cols: number; cell: number; gap: number } {
+  // up to four ports stand in one row; more fill a square
+  const cols = n <= 4 ? Math.max(1, n) : Math.min(8, Math.ceil(Math.sqrt(n)));
+  const gap = Math.round(size / 40);
+  const cell = Math.min(150, Math.floor((size - gap * (cols - 1)) / cols));
+  return { cols, cell, gap };
+}
+
+/** One machine in scope: its open ports are the cells. A changed port carries a coral ring and its change as a tip. */
+export function PortField({ services, changes, size }: { services: Service[]; changes: { port?: number; summary: string }[]; size: number }) {
+  const tip = useTip();
+  const list = [...services].sort((a, b) => a.port - b.port);
+  const { cols, cell, gap } = portGrid(list.length, size);
+  const note = new Map<number, string>();
+  for (const c of changes) if (c.port && !note.has(c.port)) note.set(c.port, c.summary);
+  return (
+    <ul className="grid" style={{ gridTemplateColumns: 'repeat(' + cols + ', ' + cell + 'px)', gap }} data-testid="port-field">
+      {list.map((s) => {
+        const changed = note.has(s.port);
+        const body = <><span className="mono">{s.ip}:{s.port}</span><span className="block text-ink-2">{serviceName(s)}</span>{changed ? <span className="mt-1 block max-w-[260px] text-ink">{note.get(s.port)}</span> : null}</>;
+        return (
+          <li key={s.id}>
+            <Link to={'/services/' + s.id} onPointerEnter={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onFocus={(e) => tip.showAt(e.currentTarget, body)} onBlur={tip.hide}
+              className={cx('flex flex-col justify-end rounded-[18px] p-3 transition-transform duration-150 hover:-translate-y-0.5', changed && 'ring-2 ring-[var(--coral)] ring-offset-2 ring-offset-[var(--panel-solid)]')}
+              style={{ width: cell, height: cell, background: 'var(--seq-3)', boxShadow: '0 0 28px -6px var(--seq-3)' }}>
+              <span className="mono leading-none text-white" style={{ fontSize: Math.max(14, Math.min(30, cell / 4.2)) }}>{s.port}</span>
+              {cell >= 72 ? <span className="mt-1 truncate text-[12px] text-white/80">{serviceName(s)}</span> : null}
+            </Link>
+          </li>
+        );
+      })}
+      {tip.node}
+    </ul>
   );
 }
