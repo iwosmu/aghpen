@@ -1,10 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router';
 import { SETUP_DONE_KEY } from './Setup';
 import { useItem, usePage } from '../api/hooks';
-import type { Change, Dashboard as Dash, Page, RunMap, ScanProfile, ScanRun, Scope, Service } from '../api/types';
+import type { Change, Dashboard as Dash, Finding, Page, RunMap, ScanProfile, ScanRun, Scope, Service } from '../api/types';
 import { t, plural } from '../i18n';
-import { cx, fmtDateTime, fmtDec, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtSigned, titleWithoutAddress } from '../lib/format';
+import { cx, fmtDateTime, fmtDec, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtSigned } from '../lib/format';
 import { useLiveRun, useNow } from '../lib/hooks';
 import { ErrorState, Panel, SkeletonRows } from '../ui/kit';
 import { Icon } from '../ui/Icon';
@@ -17,6 +17,7 @@ import { PartialNote } from '../ui/RunPasses';
 import { useArrivalOrder } from '../ui/arrivalOrder';
 import { SMALL_RUN } from './RunDetail';
 import { serviceName } from '../lib/serviceName';
+import { findingRows, rowsByAddress, spanText } from '../lib/dashLists';
 import { ReprobePanel } from './Reprobe';
 import { ATTENTION_INTEREST, adminPanelNames, adminPanelServiceNames, isFullRun, lastFullPair, partialRunPhrase } from '../lib/headline';
 
@@ -225,37 +226,59 @@ function Row({ to, children }: { to: string; children: ReactNode }) {
   return <li><Link to={to} className="flex min-h-[48px] items-start gap-3 border-b border-rule/60 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-raised">{children}</Link></li>;
 }
 
-function RecentChanges({ changes }: { changes: Change[] }) {
-  const [showExpected, setShowExpected] = useState(false);
-  const real = changes.filter((c) => !c.expected);
-  const expected = changes.filter((c) => c.expected);
-  const list = (showExpected ? [...real.slice(0, 7), ...expected] : real.slice(0, 7));
+/** One row per finding kind (as on the findings page): count of places, worst score, newest first seen. */
+function TopFindings() {
+  // No grouped endpoint: the open findings are grouped here, as the findings page does.
+  const q = usePage<Finding>('/findings', { status: 'new,triaged', sort: '-interest', limit: 1000 });
+  const rows = findingRows(q.data?.items ?? []);
   return (
-    <Panel title={t('Najnowsze zmiany', 'Recent changes')} count={real.length} flush actions={<Link to="/changes" className="link">{t('Wszystkie', 'All')}</Link>}>
-      {real.length === 0 && expected.length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Brak zmian w ostatnim skanie.', 'No changes in the last scan.')}</p> : null}
-      <ul>
-        {list.map((c) => (
-          <Row key={c.id} to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id}>
-            <span className="mt-0.5"><Glyph name={c.expected ? 'dashring' : changeKindInfo(c.kind).glyph} tone={c.expected ? 'expected' : changeKindInfo(c.kind).tone} /></span>
-            <span className="min-w-0 flex-1">
-              <span className={cx('block truncate text-sm', c.expected ? 'text-ink-2' : 'text-ink')} title={c.summary}>{c.summary}</span>
-              <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
-                <span className="mono">{c.ip}{c.port ? ':' + c.port : ''}</span>
-                {c.expected ? <span>{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} />}
+    <Panel title={t('Najważniejsze znaleziska', 'Top findings')} flush actions={<Link to="/findings" className="link">{t('Wszystkie', 'All')}</Link>}>
+      {q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : !q.data ? <SkeletonRows rows={4} /> : rows.length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Brak otwartych znalezisk.', 'No open findings.')}</p> : null}
+      <ul data-testid="top-findings">
+        {rows.map(({ group: g, newest, to }) => {
+          const services = g.items.every((f) => f.port);
+          return (
+            <Row key={g.key} to={to}>
+              <span className="mt-0.5"><Sev level={g.severity} compact /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm text-ink">{g.title} <span className="whitespace-nowrap text-ink-2">· <span className="num">{g.places}</span> {services ? plural(g.places, ['usługa', 'usługi', 'usług'], ['service', 'services']) : plural(g.places, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}</span></span>
+                <span className="mt-0.5 block text-xs text-ink-3">{t('najnowsze', 'newest')} {fmtRelative(newest)}</span>
               </span>
-            </span>
-          </Row>
-        ))}
+              <span className="mt-0.5 flex-none"><InterestScore value={g.interest} /></span>
+            </Row>
+          );
+        })}
       </ul>
-      {expected.length > 0 ? (
-        <button type="button" onClick={() => setShowExpected((v) => !v)} aria-expanded={showExpected} className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-ink-2 hover:bg-raised hover:text-ink">
-          <Glyph name="dashring" tone="expected" />
-          {showExpected
-            ? t('Zwiń zmiany oczekiwane', 'Fold the expected changes')
-            : <>{expected.length} {plural(expected.length, ['zmiana oczekiwana', 'zmiany oczekiwane', 'zmian oczekiwanych'], ['expected change', 'expected changes'])} {t('. Pokaż', '. Show')}</>}
-          <Icon name={showExpected ? 'chevronDown' : 'chevronRight'} size={12} />
-        </button>
-      ) : null}
+    </Panel>
+  );
+}
+
+function RecentChanges({ fallback }: { fallback: Change[] }) {
+  // One row per address over the last 100 changes; the dashboard's own list while they load.
+  const q = usePage<Change>('/changes', { expected: false, sort: '-at', limit: 100 });
+  const rows = rowsByAddress(q.data?.items ?? fallback);
+  return (
+    <Panel title={t('Najnowsze zmiany', 'Recent changes')} flush actions={<Link to="/changes" className="link">{t('Wszystkie', 'All')}</Link>}>
+      {rows.length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Brak zmian w ostatnim skanie.', 'No changes in the last scan.')}</p> : null}
+      <ul data-testid="recent-changes">
+        {rows.map(({ ip, latest: c, items, spanSec }) => {
+          const many = items.length > 1;
+          const to = many ? '/changes?expected=false&q=' + encodeURIComponent(ip) : c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id;
+          return (
+            <Row key={ip} to={to}>
+              <span className="mt-0.5"><Glyph name={changeKindInfo(c.kind).glyph} tone={changeKindInfo(c.kind).tone} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm text-ink" title={c.summary}>{c.summary}</span>
+                <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
+                  <span className="mono">{many ? ip : ip + (c.port ? ':' + c.port : '')}</span>
+                  {many ? <span data-testid="change-run">· {items.length} {plural(items.length, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes'])}{spanText(spanSec) ? ' ' + spanText(spanSec) : ''}</span> : null}
+                  <Sev level={c.severity} />
+                </span>
+              </span>
+            </Row>
+          );
+        })}
+      </ul>
     </Panel>
   );
 }
@@ -392,26 +415,9 @@ export default function Dashboard() {
       {d.active_run ? <ActiveRun initial={d.active_run} d={d} /> : <IdleRun d={d} />}
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <RecentChanges changes={d.recent_changes ?? []} />
+        <RecentChanges fallback={d.recent_changes ?? []} />
         <div className="grid gap-5">
-        <Panel title={t('Najważniejsze znaleziska', 'Top findings')} flush actions={<Link to="/findings" className="link">{t('Wszystkie', 'All')}</Link>}>
-          {(d.top_findings ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Brak otwartych znalezisk.', 'No open findings.')}</p> : null}
-          <ul>
-            {(d.top_findings ?? []).slice(0, 7).map((f) => (
-              <Row key={f.id} to={'/findings?open=' + f.id}>
-                <span className="mt-0.5"><Sev level={f.severity} compact /></span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm text-ink">{titleWithoutAddress(f.title, f.ip, f.port)}</span>
-                  <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
-                    <span className="mono">{f.ip}{f.port ? ':' + f.port : ''}</span>
-                    {f.first_run_id === d.last_run?.id ? <span className="inline-flex items-center gap-1 text-ink-2"><Glyph name="plus" tone="new" size={10} />{t('od ostatniego skanu', 'since the last scan')}</span> : <span>{t('od', 'since')} {fmtRelative(f.first_seen)}</span>}
-                  </span>
-                </span>
-                <span className="mt-0.5 flex-none"><InterestScore value={f.interest} /></span>
-              </Row>
-            ))}
-          </ul>
-        </Panel>
+        <TopFindings />
 
 
         <Panel title={t('Najciekawsze usługi', 'Most interesting services')} flush actions={<Link to="/services?sort=-interest" className="link">{t('Wszystkie', 'All')}</Link>}>
