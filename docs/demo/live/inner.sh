@@ -22,7 +22,7 @@ api() { # method path [json]
 }
 
 czujka_up() {
-  ( cd /work && CZUJKA_VERSION=$TAG CZUJKA_BIND=0.0.0.0 CZUJKA_PORT=18080 CZUJKA_ADMIN_PASSWORD="$PW" CZUJKA_ALLOWED_NETWORKS="$GW/32,$HIP/32" \
+  ( cd /work && CZUJKA_VERSION=$TAG CZUJKA_BIND=0.0.0.0 CZUJKA_PORT=18080 CZUJKA_ADMIN_PASSWORD="$PW" CZUJKA_ALLOWED_NETWORKS="$GW/32,$HIP/32" CZUJKA_DEEP_PASS_HOSTS="${CZUJKA_DEEP_PASS_HOSTS:-0}" \
       docker compose -p czujka -f deploy/docker-compose.yml up -d --no-build --wait >/dev/null 2>&1 ) || { echo "Czujka did not start"; return 1; }
   docker network inspect czjury-hostnet >/dev/null 2>&1 && docker network connect czjury-hostnet czujka-czujka-1 >/dev/null 2>&1
   return 0
