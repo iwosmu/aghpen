@@ -90,14 +90,14 @@ export default function Changes() {
         readOnly={!canAck}
         actions={<><ExportButtons kind="changes" query={filters} /><LinkButton to="/changes/compare" icon="compare">{t('Porównaj dwa skany', 'Compare two scans')}</LinkButton></>}
       />
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-rule px-4 py-2 sm:px-6" role="group" aria-label={t('Szybkie filtry', 'Quick filters')} data-testid="change-quick">
+      <div className="flex flex-wrap items-center gap-2 px-4 pb-4 sm:px-6 lg:px-8" role="group" aria-label={t('Szybkie filtry', 'Quick filters')} data-testid="change-quick">
         {(['service_gone', 'host_missing', 'service_unreachable', 'service_returned', 'service_new', 'response_slower', 'response_recovered'] as const).map((k) => {
           const i = changeKindInfo(k);
           const on = u.get('kind') === k;
           return (
             <button key={k} type="button" aria-pressed={on} onClick={() => u.set({ kind: on ? null : k })}
-              className={cx('inline-flex h-[26px] items-center gap-1.5 border px-2 text-xs', on ? 'border-accent bg-accent-wash text-ink' : 'border-rule-strong text-ink-2 hover:border-accent hover:text-ink')}>
-              <Glyph name={i.glyph} tone={i.tone} size={12} />{i.label}
+              className={cx('inline-flex h-[30px] items-center gap-2 rounded-full pl-3 text-xs font-medium transition-colors duration-150', on ? 'bg-primary pr-2 text-primary-ink' : 'bg-[var(--row-hover)] pr-3.5 text-ink-2 shadow-[inset_0_0_0_1px_var(--rule-strong)] hover:text-ink')}>
+              <Glyph name={i.glyph} tone={i.tone} size={12} />{i.label}{on ? <Icon name="x" size={12} className="ml-0.5" /> : null}
             </button>
           );
         })}

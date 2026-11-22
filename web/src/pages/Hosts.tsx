@@ -61,7 +61,7 @@ export default function Hosts() {
   const [wrapRef, width] = useWidth<HTMLDivElement>();
   const scrollRef = useRef<HTMLDivElement>(null);
   const narrow = width > 0 && width < 640;
-  const rowH = narrow ? 58 : 30;
+  const rowH = narrow ? 64 : 46;
   // TanStack Virtual keeps its own mutable state; the component is not memoised by the compiler.
   const virt = useVirtualizer({ count: rows.length, getScrollElement: () => scrollRef.current, estimateSize: () => rowH, overscan: 14 });
   const items = virt.getVirtualItems();
@@ -125,7 +125,7 @@ export default function Hosts() {
         </FilterField>
       </FilterBar>
 
-      <div ref={wrapRef} className="flex min-h-0 flex-1 flex-col">
+      <div ref={wrapRef} className="card mx-3 mb-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] sm:mx-6 lg:mx-8">
         {inf.error ? <ErrorState error={inf.error} retry={() => inf.refetch()} /> : inf.isPending ? <SkeletonRows rows={14} /> : rows.length === 0 ? (
           active ? <Empty icon="hosts" title={t('Żaden host nie pasuje do filtrów', 'No hosts match the filters')} action={<Button icon="x" onClick={() => u.clear(FILTERS)}>{t('Wyczyść filtry', 'Clear filters')}</Button>} />
             : hidden > 0 ? <Empty icon="hosts" title={t('Filtr „bez nieaktywnych” ukrywa wszystkie hosty', 'The "hide down" filter hides every host')} action={<Button onClick={() => u.set({ status: 'all' })} data-testid="hosts-show-all">{t('Pokaż wszystkie', 'Show all')} ({fmtInt(hidden)})</Button>} />
@@ -133,7 +133,7 @@ export default function Hosts() {
         ) : (
           <>
             {!narrow ? (
-              <div className="grid h-[30px] flex-none items-center gap-x-3 border-b border-rule-strong bg-panel px-4 text-xs font-medium text-ink-3 sm:px-6" style={{ gridTemplateColumns: grid }} role="row">
+              <div className="grid h-[44px] flex-none items-center gap-x-3 border-b border-rule px-5 text-2xs font-medium text-ink-2 sm:px-6" style={{ gridTemplateColumns: grid }} role="row">
                 {cols.map((c) => {
                   const dir = sort === c.sort ? 'asc' : sort === '-' + c.sort ? 'desc' : null;
                   return c.sort ? (
@@ -146,7 +146,7 @@ export default function Hosts() {
                 })}
               </div>
             ) : null}
-            <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto" style={{ height: 'max(320px, calc(100dvh - 300px))' }} role="table" aria-rowcount={total} aria-label={t('Hosty', 'Hosts')} data-testid="hosts-scroll">
+            <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto" style={{ height: 'max(320px, calc(100dvh - 330px))' }} role="table" aria-rowcount={total} aria-label={t('Hosty', 'Hosts')} data-testid="hosts-scroll">
               <div style={{ height: virt.getTotalSize(), position: 'relative' }}>
                 {items.map((vi) => {
                   const h = rows[vi.index];
@@ -154,7 +154,7 @@ export default function Hosts() {
                     <Link
                       key={h.id} to={'/hosts/' + h.id} role="row" aria-rowindex={vi.index + 1}
                       onKeyDown={(e) => { if (e.key === 'Enter') navigate('/hosts/' + h.id); }}
-                      className={cx('absolute left-0 right-0 border-b border-rule px-4 text-sm outline-offset-[-2px] hover:bg-raised sm:px-6', narrow ? 'flex flex-col justify-center' : 'grid items-center gap-x-3', (h.status === 'down' || h.status === 'expected-offline') && 'text-ink-2')}
+                      className={cx('absolute left-0 right-0 border-b border-rule px-5 text-sm outline-offset-[-2px] hover:bg-[var(--row-hover)] sm:px-6', narrow ? 'flex flex-col justify-center' : 'grid items-center gap-x-3', (h.status === 'down' || h.status === 'expected-offline') && 'text-ink-2')}
                       style={{ top: vi.start, height: rowH, gridTemplateColumns: narrow ? undefined : grid }}
                     >
                       {narrow ? (
@@ -168,7 +168,7 @@ export default function Hosts() {
                 })}
               </div>
             </div>
-            <div className="flex h-[30px] flex-none items-center justify-between gap-3 border-t border-rule px-4 text-xs text-ink-3 sm:px-6">
+            <div className="flex h-[40px] flex-none items-center justify-between gap-3 border-t border-rule px-5 text-xs text-ink-2 sm:px-6">
               <span>{t('Wczytano', 'Loaded')} <span className="num text-ink-2">{fmtInt(rows.length)}</span> {t('z', 'of')} <span className="num text-ink-2">{fmtInt(total)}</span></span>
               {isFetchingNextPage ? <span className="inline-flex items-center gap-1.5"><Spinner /></span> : null}
             </div>

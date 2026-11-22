@@ -149,8 +149,10 @@ export function NetworkField({ field, size }: { field: Field; size: number }) {
 /** A line of the last values with the newest one as a dot. */
 export function Spark({ values, width = 120, height = 36, tone = 'var(--accent)' }: { values: number[]; width?: number; height?: number; tone?: string }) {
   if (values.length < 2) return null;
-  const lo = Math.min(...values), hi = Math.max(...values);
-  const y = (v: number) => (hi === lo ? height / 2 : height - 4 - ((v - lo) / (hi - lo)) * (height - 8));
+  const vmin = Math.min(...values), vmax = Math.max(...values);
+  const padv = Math.max(1, (vmax - vmin) * 0.35, vmax * 0.08);
+  const lo = vmin - padv, hi = vmax + padv;
+  const y = (v: number) => height - 2 - ((v - lo) / (hi - lo)) * (height - 4);
   const xs = (i: number) => (i / (values.length - 1)) * (width - 6) + 3;
   const d = values.map((v, i) => (i ? 'L' : 'M') + xs(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
   const last = values.length - 1;
@@ -212,8 +214,8 @@ export function NightStrip({ runs, active, currentId, now }: { runs: ScanRun[]; 
     const last = when(all[all.length - 1]);
     return all.filter((r) => when(r) >= last - 24 * 3600_000);
   }, [runs]);
-  const H = 92, base = 64;
-  if (!list.length) return <div ref={ref} className="h-[92px]" />;
+  const H = 150, base = 118;
+  if (!list.length) return <div ref={ref} className="h-[150px]" />;
   const t0 = when(list[0]);
   const lastRun = list[list.length - 1];
   const tEnd = Math.max(active ? now : new Date(lastRun.finished_at || lastRun.started_at || lastRun.created_at).getTime(), t0 + 3600_000);
@@ -268,11 +270,11 @@ export function NightStrip({ runs, active, currentId, now }: { runs: ScanRun[]; 
           const full = isFullRun(r);
           const n = runChanges(r);
           const cur = r.id === currentId;
-          const h = cur ? 40 : full ? 30 : r.trigger === 'reprobe' ? 9 : 18;
+          const h = cur ? 64 : full ? 44 : r.trigger === 'reprobe' ? 12 : 26;
           return (
             <g key={r.id}>
               <line x1={cx0} x2={cx0} y1={base} y2={base - h} stroke={cur ? 'var(--ink)' : hot === r.id ? 'var(--ink)' : 'var(--ink-3)'} strokeWidth={cur ? 2 : Math.max(0.75, Math.min(1.5, W / list.length / 3))} opacity={cur || hot === r.id ? 1 : full ? 0.6 : 0.4} strokeLinecap="round" />
-              {n ? <circle cx={cx0} cy={base - h - 6} r={1.8 + 2.6 * Math.sqrt(n / maxCh)} fill="var(--coral)" stroke="var(--panel-solid)" strokeWidth={1} /> : null}
+              {n ? <circle cx={cx0} cy={base - h - 10 - 26 * Math.sqrt(n / maxCh)} r={2.5 + 3 * Math.sqrt(n / maxCh)} fill="var(--coral)" stroke="var(--panel-solid)" strokeWidth={1.5} /> : null}
             </g>
           );
         })}
@@ -280,8 +282,8 @@ export function NightStrip({ runs, active, currentId, now }: { runs: ScanRun[]; 
           const a = x(when(active)), b = x(now);
           return (
             <g>
-              <rect x={a} y={base - 34} width={Math.max(2, b - a)} height={34} rx={2} fill="var(--accent)" opacity={0.18} />
-              <line x1={a} x2={a} y1={base} y2={base - 40} stroke="var(--accent)" strokeWidth={2} style={{ animation: 'pulse-ring 1.6s ease-in-out infinite' }} />
+              <rect x={a} y={base - 60} width={Math.max(2, b - a)} height={60} rx={2} fill="var(--accent)" opacity={0.18} />
+              <line x1={a} x2={a} y1={base} y2={base - 70} stroke="var(--accent)" strokeWidth={2} style={{ animation: 'pulse-ring 1.6s ease-in-out infinite' }} />
             </g>
           );
         })() : null}
