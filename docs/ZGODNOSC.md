@@ -10,7 +10,7 @@ Skrót dla jury. Każde wymaganie z `docs/PROBLEM_DEFINITION.md`, każdy z 12 pu
 | Nie jest źródłem | poprzednia wersja tego pliku; każdy status sprawdzono od nowa |
 | Publiczna instancja | `https://czujka.dev` z laboratorium 70 hostów; konto do odczytu dla jury: dane logowania w zgłoszeniu |
 
-Numery zrzutów (`40`, `47` …) to pliki w `web/screenshots/lab/`. „Krok N” to krok w `e2e/full/transcript.txt`.
+Numery zrzutów (`40`, `47` …) to pliki `web/screenshots/lab/` na gałęzi `archive/screenshots` (interfejs sprzed uproszczenia; gałąź główna trzyma tylko zrzuty cytowane wprost, żeby `git clone` był krótki). „Krok N” to krok w `e2e/full/transcript.txt`.
 
 ## Statusy
 
