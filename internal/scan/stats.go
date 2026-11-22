@@ -23,14 +23,16 @@ type stageRec struct {
 // last seconds: the exact packets of the stages that ended, spread over the
 // time they ran, plus the rate share of the paced stages that still run.
 type statsKeeper struct {
-	mu        sync.Mutex
-	s         model.RunStats // cumulative, earlier sessions of a resumed run included
-	started   time.Time
-	prevSec   int64
-	prevDone  int64 // addresses done before this session
-	stages    []stageRec
-	fallback  float64 // seconds per address before anything is measured
-	parallel  int
+	mu       sync.Mutex
+	s        model.RunStats // cumulative, earlier sessions of a resumed run included
+	started  time.Time
+	prevSec  int64
+	prevDone int64 // addresses done before this session
+	stages   []stageRec
+	// partial gives the addresses of the running groups that count as done
+	// so far (run.groupProgress), so progress moves inside a dense chunk.
+	// It is called with mu held and must not call back into the keeper.
+	partial   func() int64
 	now       func() time.Time
 	peakPPS   float64
 	sessionPk int64
@@ -290,14 +292,20 @@ func (k *statsKeeper) snapshot() model.RunStats {
 		s.AvgPPS = round1(float64(s.PacketsSent) / total)
 	}
 
-	// ETA from the measured address rate of this session
+	// progress: finished groups plus the finished part of the running ones
+	finished := s.AddressesDone
+	if k.partial != nil {
+		if s.AddressesDone += k.partial(); s.AddressesDone > s.AddressesTotal {
+			s.AddressesDone = max(finished, s.AddressesTotal)
+		}
+	}
+	// ETA only from finished work of this session: none until the first
+	// group of this session has finished (the UI shows no estimate at 0),
+	// then from the progress rate, the running groups' finished hosts included
 	remaining := s.AddressesTotal - s.AddressesDone
-	if remaining <= 0 {
-		s.ETASec = 0
-	} else if done := s.AddressesDone - k.prevDone; done > 0 && active > 0 {
+	s.ETASec = 0
+	if done := s.AddressesDone - k.prevDone; remaining > 0 && finished > k.prevDone && done > 0 && active > 0 {
 		s.ETASec = int64(float64(remaining) * active.Seconds() / float64(done))
-	} else {
-		s.ETASec = int64(float64(remaining) * k.fallback / float64(max(1, k.parallel)))
 	}
 	return s
 }

@@ -207,6 +207,9 @@ func (e *Engine) Prober() probe.Prober {
 
 // run is the state of one Run call.
 type run struct {
+	// active maps the groupStats of each running group to its group, for
+	// the progress inside a group (groupProgress).
+	active sync.Map
 	// portAnswered counts live hosts that answered the port scan (an open
 	// or a closed port); the end-of-run sanity check compares it with the
 	// hosts discovery found.
@@ -427,8 +430,7 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 	}
 
 	r.stats = newStatsKeeper(plan.PrevStats, e.now)
-	r.stats.parallel = lim.ParallelChunks
-	r.stats.fallback = r.packetsPerAddress() / float64(lim.PPS) * float64(lim.ParallelChunks)
+	r.stats.partial = r.groupProgress
 	r.stats.update(func(s *model.RunStats) {
 		s.AddressesTotal = s.AddressesDone + total
 		s.ChunksTotal = s.ChunksDone + len(units)
@@ -617,6 +619,9 @@ type groupStats struct {
 	packets  int64
 	hosts    []model.HostResult      // reported to the sink when the group is final
 	interim  map[string]interimCount // partial results already stored, not yet final
+	// discovery ended and found live hosts (progress inside the group)
+	discovered bool
+	live       int
 }
 
 func (r *run) runGroup(ctx context.Context, g *group, want int) {
@@ -634,6 +639,8 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 		r.emitChunk(u)
 	}
 	gs := &groupStats{}
+	r.active.Store(gs, g)
+	defer r.active.Delete(gs) // a deferred or failed group's partial progress goes away
 	rate, err := r.budget.Acquire(ctx, want)
 	if err == nil {
 		// the group's share must also fit into what all runs together may send
@@ -684,6 +691,7 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 		r.stats.update(func(s *model.RunStats) {
 			s.AddressesDone += int64(g.size)
 			s.ChunksDone += len(g.units)
+			r.active.Delete(gs) // under the keeper's lock: a snapshot never counts the group twice
 		})
 	}
 	if status != model.ChunkDeferred {
@@ -992,6 +1000,34 @@ func (r *run) sanityCheck() {
 		r.log.Warn("sanity check: most live hosts gave the port scan no answer", "hosts_up", s.HostsUp, "answered", answered)
 		r.stats.warn(fmt.Sprintf("Wykrywanie znalazło %d hostów, a na skan portów odpowiedziało tylko %d. Wynik portów jest niepełny: sprawdź limit pakietów, limit czasu i obciążenie sieci.", s.HostsUp, answered))
 	}
+}
+
+// discoveryShare is the part of a group's work that host discovery stands
+// for in its progress; the rest is spread over the live hosts it found.
+const discoveryShare = 0.2
+
+// groupProgress sums the addresses that the running groups count as done:
+// a group whose discovery ended counts discoveryShare of its size, plus the
+// rest in proportion to its live hosts with a final result (a partial
+// result counts half). A running group never counts its whole size.
+func (r *run) groupProgress() int64 {
+	var sum int64
+	r.active.Range(func(k, v any) bool {
+		gs, g := k.(*groupStats), v.(*group)
+		gs.mu.Lock()
+		discovered, live, done := gs.discovered, gs.live, float64(gs.hostsUp)+0.5*float64(len(gs.interim))
+		gs.mu.Unlock()
+		if !discovered || g.size <= 1 {
+			return true
+		}
+		f := discoveryShare
+		if live > 0 {
+			f += (1 - discoveryShare) * min(1, done/float64(live))
+		}
+		sum += min(int64(f*float64(g.size)), int64(g.size-1))
+		return true
+	})
+	return sum
 }
 
 // minHostsForSanity: below this many live hosts the ratio says little.

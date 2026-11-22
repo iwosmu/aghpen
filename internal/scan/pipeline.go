@@ -96,6 +96,9 @@ func (r *run) scanGroup(ctx context.Context, g *group, rate int, gs *groupStats)
 			return err
 		}
 	}
+	gs.mu.Lock()
+	gs.discovered, gs.live = true, len(live)
+	gs.mu.Unlock()
 	if err := r.deepScan(ctx, g, live, 1, rate, gs, found); err != nil {
 		return err
 	}
