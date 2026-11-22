@@ -313,7 +313,7 @@ export function Layout() {
           </div>
         </div>
         <StopBanner policy={safety.data} />
-        <main id="main" className="min-h-0 flex-1 overflow-y-auto" tabIndex={-1}>
+        <main id="main" className="relative min-h-0 flex-1 overflow-y-auto" tabIndex={-1}>
           <ErrorBoundary key={loc.pathname}><Outlet /></ErrorBoundary>
         </main>
       </div>
