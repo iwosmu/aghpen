@@ -369,3 +369,55 @@ func TestEstimateRangeAndARP(t *testing.T) {
 	t.Logf("lab /16, top-1000: new scope %d-%d packets, %d-%d s; known scope (67 hosts) %d packets, %d s",
 		arp.EstPacketsLow, arp.EstPackets, arp.EstDurationLowSec, arp.EstDurationSec, k.EstPackets, k.EstDurationSec)
 }
+
+// Progress moves inside a running group; the estimate needs a finished group.
+func TestProgressInsideAGroupAndNoGuessedETA(t *testing.T) {
+	now := time.Date(2026, 11, 22, 1, 0, 0, 0, time.UTC)
+	k := newStatsKeeper(nil, func() time.Time { return now })
+	k.update(func(s *model.RunStats) { s.AddressesTotal = 1024 })
+	part := int64(0)
+	k.partial = func() int64 { return part }
+	now = now.Add(time.Minute)
+	if s := k.snapshot(); s.AddressesDone != 0 || s.ETASec != 0 {
+		t.Errorf("before discovery: done %d, eta %d (no estimate without finished work)", s.AddressesDone, s.ETASec)
+	}
+	part = 300 // a dense group in its port scan
+	if s := k.snapshot(); s.AddressesDone != 300 || s.ETASec != 0 {
+		t.Errorf("inside the group: done %d, eta %d, want 300 and no estimate", s.AddressesDone, s.ETASec)
+	}
+	k.update(func(s *model.RunStats) { s.AddressesDone = 256 }) // a first group finished
+	part = 256
+	if s := k.snapshot(); s.AddressesDone != 512 || s.ETASec != 60 {
+		t.Errorf("after a finished group: done %d, eta %d, want 512 and 60 s", s.AddressesDone, s.ETASec)
+	}
+	part = 5000
+	if s := k.snapshot(); s.AddressesDone != 1024 || s.ETASec != 0 {
+		t.Errorf("partial over the total: done %d, eta %d", s.AddressesDone, s.ETASec)
+	}
+}
+
+func TestGroupProgress(t *testing.T) {
+	r := &run{}
+	g := &group{size: 256}
+	gs := &groupStats{interim: map[string]interimCount{}}
+	r.active.Store(gs, g)
+	if p := r.groupProgress(); p != 0 {
+		t.Errorf("before discovery = %d", p)
+	}
+	gs.discovered, gs.live = true, 100
+	if p := r.groupProgress(); p != 51 { // 0.2 × 256
+		t.Errorf("after discovery = %d, want 51", p)
+	}
+	gs.hostsUp, gs.interim["10.0.0.1"], gs.interim["10.0.0.2"] = 49, interimCount{hosts: 1}, interimCount{hosts: 1}
+	if p := r.groupProgress(); p != 153 { // (0.2 + 0.8 × 50/100) × 256
+		t.Errorf("half the hosts = %d, want 153", p)
+	}
+	gs.hostsUp = 120 // retries found more than discovery
+	if p := r.groupProgress(); p != 255 {
+		t.Errorf("all hosts = %d, want 255 (a running group never counts as whole)", p)
+	}
+	r.active.Delete(gs)
+	if p := r.groupProgress(); p != 0 {
+		t.Errorf("after the group = %d", p)
+	}
+}

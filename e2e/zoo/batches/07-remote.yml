@@ -1,0 +1,44 @@
+# Zoo batch 07: remote access, file sharing, mail, directory and DNS.
+services:
+  openssh:
+    image: linuxserver/openssh-server:10.3_p1-r2-ls243
+    environment: {PUID: "1000", PGID: "1000", USER_NAME: zoo, PASSWORD_ACCESS: "false"}
+    ports: ["42222:2222"]
+  dropbear:
+    image: alpine:3.22
+    command: ["sh", "-c", "apk add -q dropbear && mkdir -p /etc/dropbear && exec dropbear -F -E -R -p 22"]
+    ports: ["23022:22"]
+  proftpd:
+    image: alpine:3.22
+    hostname: zoo-ftp
+    command: ["sh", "-c", "apk add -q proftpd && mkdir -p /run/proftpd && exec proftpd -n"]
+    ports: ["2121:21"]
+  pure-ftpd:
+    image: stilliard/pure-ftpd:bookworm-1.0.50
+    environment: {PUBLICHOST: localhost}
+    ports: ["21:21"]
+  samba:
+    image: alpine:3.22
+    command: ["sh", "-c", "apk add -q samba && printf '[global]\n server role = standalone server\n map to guest = bad user\n[public]\n path = /tmp\n guest ok = yes\n read only = yes\n' > /etc/samba/smb.conf && exec smbd --foreground --no-process-group --debug-stdout"]
+    ports: ["445:445"]
+  rsync:
+    image: alpine:3.22
+    command: ["sh", "-c", "apk add -q rsync && printf '[pub]\n path = /tmp\n read only = yes\n' > /etc/rsyncd.conf && exec rsync --daemon --no-detach"]
+    ports: ["873:873"]
+  telnet:
+    image: alpine:3.22
+    command: ["sh", "-c", "apk add -q busybox-extras && exec telnetd -F -p 23 -l /bin/login"]
+    ports: ["23:23"]
+  postfix:
+    image: boky/postfix:5.2.1-alpine
+    environment: {ALLOWED_SENDER_DOMAINS: example.org, HOSTNAME: mail.example.org}
+    ports: ["25:587"]
+  dovecot:
+    image: dovecot/dovecot:2.4.5-root
+    ports: ["143:143", "40993:993"]
+  openldap:
+    image: osixia/openldap:1.5.0
+    ports: ["389:389"]
+  coredns:
+    image: coredns/coredns:1.15.0
+    ports: ["53:53/udp", "53:53/tcp"]

@@ -13,3 +13,5 @@ services:
       # empty means the default, 1h buckets over 1 week.
       CZUJKA_AVAIL_BUCKET: ${CZUJKA_AVAIL_BUCKET:-}
       CZUJKA_AVAIL_PERIOD: ${CZUJKA_AVAIL_PERIOD:-}
+      # The kernel packet cap (internal/kcap) is on in the lab gate: kernel_cap must be active, dropped 0.
+      CZUJKA_KERNEL_CAP: ${CZUJKA_KERNEL_CAP:-auto}

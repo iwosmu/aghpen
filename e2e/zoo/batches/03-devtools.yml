@@ -1,0 +1,52 @@
+# Zoo batch 03: developer tools, secrets and admin panels.
+services:
+  keycloak:
+    image: keycloak/keycloak:26.8.2
+    command: ["start-dev"]
+    environment: {KC_BOOTSTRAP_ADMIN_USERNAME: admin, KC_BOOTSTRAP_ADMIN_PASSWORD: zoo-test-only}
+    ports: ["8080:8080"]
+  vault:
+    image: hashicorp/vault:2.2.2
+    environment: {VAULT_DEV_ROOT_TOKEN_ID: zoo-test-only, VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"}
+    cap_add: [IPC_LOCK]
+    ports: ["8200:8200"]
+  consul:
+    image: hashicorp/consul:2.1.0
+    command: ["agent", "-dev", "-client=0.0.0.0"]
+    ports: ["18500:8500"]
+  registry:
+    image: registry:3.1.2
+    ports: ["5000:5000"]
+  mailpit:
+    image: axllent/mailpit:v1.34.0
+    ports: ["38025:8025", "1025:1025"]
+  swagger-ui:
+    image: swaggerapi/swagger-ui:v5.35.1
+    ports: ["47080:8080"]
+  code-server:
+    image: codercom/code-server:4.146.0
+    environment: {PASSWORD: zoo-test-only}
+    ports: ["14080:8080"]
+  jupyter:
+    image: quay.io/jupyter/base-notebook:notebook-7.6.5
+    ports: ["8888:8888"]
+  node-red:
+    image: nodered/node-red:5.0.10
+    ports: ["1880:1880"]
+  gogs:
+    image: gogs/gogs:0.14.4
+    ports: ["3300:3000"]
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment: {REDIS_HOSTS: "local:zredis:6379"}
+    ports: ["8081:8081"]
+    depends_on: [zredis]
+  zredis:
+    image: redis:7.4.12-alpine
+  mongo-express:
+    image: mongo-express:1.0.2-20-alpine3.19
+    environment: {ME_CONFIG_MONGODB_URL: "mongodb://zmongo:27017/"}
+    ports: ["28081:8081"]
+    depends_on: [zmongo]
+  zmongo:
+    image: mongo:8.0.38

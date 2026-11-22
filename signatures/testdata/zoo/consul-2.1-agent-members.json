@@ -1,0 +1,32 @@
+[
+    {
+        "Name": "32cb75af66a6",
+        "Addr": "127.0.0.1",
+        "Port": 8301,
+        "Tags": {
+            "acls": "0",
+            "build": "2.1.0:881572b4",
+            "dc": "dc1",
+            "ft_fs": "1",
+            "ft_si": "1",
+            "grpc_port": "8502",
+            "grpc_tls_port": "8503",
+            "id": "644d31e9-e42c-094a-038d-d2933089fad5",
+            "port": "8300",
+            "raft_vsn": "3",
+            "role": "consul",
+            "segment": "",
+            "vsn": "2",
+            "vsn_max": "3",
+            "vsn_min": "2",
+            "wan_join_port": "8302"
+        },
+        "Status": 1,
+        "ProtocolMin": 1,
+        "ProtocolMax": 5,
+        "ProtocolCur": 2,
+        "DelegateMin": 2,
+        "DelegateMax": 5,
+        "DelegateCur": 4
+    }
+]

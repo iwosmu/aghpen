@@ -47,6 +47,9 @@ type HostHint struct {
 	OpenPorts []int
 	Stability float64
 	LastUp    time.Time
+	// DeepAt: when a run last scanned every TCP port of the host (nil: never).
+	// The rotating deep pass picks hosts by it.
+	DeepAt *time.Time
 }
 
 // ScanPlan is the full input of one engine run.

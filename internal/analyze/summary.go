@@ -64,6 +64,14 @@ func RenderSummary(c model.Change, lang string) string {
 	if s == "" {
 		return c.Summary
 	}
+	if c.DeepPass {
+		// the rotating deep pass of the run scanned this service (scan/deeppass.go)
+		if lang == "en" {
+			s += " (deeper pass)"
+		} else {
+			s += " (głębszy przebieg)"
+		}
+	}
 	return s
 }
 

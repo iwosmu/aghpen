@@ -1,0 +1,38 @@
+# Zoo batch 06: databases and message brokers.
+services:
+  mysql:
+    image: mysql:8.4.13
+    environment: {MYSQL_ROOT_PASSWORD: zoo-test-only}
+    ports: ["3306:3306"]
+  mongo:
+    image: mongo:8.0.38
+    ports: ["37017:27017"]
+  couchdb:
+    image: couchdb:3.5.3
+    environment: {COUCHDB_USER: admin, COUCHDB_PASSWORD: zoo-test-only}
+    ports: ["5984:5984"]
+  influxdb:
+    image: influxdb:2.10.1-alpine
+    ports: ["18086:8086"]
+  cassandra:
+    image: cassandra:5.0.9
+    environment: {MAX_HEAP_SIZE: 512M, HEAP_NEWSIZE: 128M}
+    ports: ["9042:9042"]
+  kafka:
+    image: apache/kafka:4.4.0
+    ports: ["39092:9092"]
+  nats:
+    image: nats:2.15.3
+    command: ["-m", "8222"]
+    ports: ["4222:4222", "48222:8222"]
+  etcd:
+    image: quay.io/coreos/etcd:v3.6.17
+    command: ["etcd", "--listen-client-urls", "http://0.0.0.0:2379", "--advertise-client-urls", "http://localhost:2379"]
+    ports: ["2379:2379"]
+  clickhouse:
+    image: clickhouse:26.9.27.3
+    ports: ["8123:8123", "19000:9000"]
+  neo4j:
+    image: neo4j:5.26.33-community
+    environment: {NEO4J_AUTH: neo4j/zoo-test-only, NEO4J_server_memory_heap_max__size: 512m}
+    ports: ["7474:7474", "47687:7687"]

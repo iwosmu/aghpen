@@ -1,51 +1,59 @@
-[21:45:11] starting the product (project czacc, port 18520, lab address 10.66.0.30)
-{"status":"ok","version":"acc22","engine":true,"probe":{"mode":"nmap-raw","prober":"nmap","raw_sockets":true}}
+[03:04:19] starting the product (project czacc, port 18530, lab address 10.66.0.30)
+{"status":"ok","version":"acc27"}
 {"max_pps":1000,"max_http_rps":50,"max_per_host_rps":2,"exclusions":["10.66.0.1-10.66.0.49"]}
 {"saved":74,"address_count":65609,"excluded":49,"invalid":0}
-{"id":399,"slug":"lab-infokiosk","enabled":true}
-[21:45:31] profile 2: {"ports":"top-1000,1521,2379,2380,5984,6379,7474,8086,9042,9200,9300,11211,27017,28017,1883,4369,5671,5672,8883,15672,15692,25672,61613,61616,2375,2376,4243,6443,9443,10250,10255,3000,5601,9090,9093,9100,9113,9187,9216,5985,5986,18080,50000,5173","discovery":{"icmp_echo":true,"icmp_timestamp":false,"tcp_syn_ports":[22,80,443,3389,8080],"tcp_ack_ports":[80],"arp":true,"skip_discovery":false,"mode":"balanced"},"udp":{"enabled":true,"ports":""},"version_intensity":7,"rate":{"max_pps":1000,"max_parallel_chunks":4,"max_parallel_hosts":16,"http_rps":20,"per_host_concurrency":1,"per_host_delay_ms":0},"retry":{"unstable_retries":2,"backoff_ms":500,"down_after_misses":0}}
-{"addresses":65560,"chunks":257,"est_packets":4263694,"est_duration_sec":5947,"effective_pps":1000,"fits_window":true,"window_sec":0,"based_on_history":false,"expected_live_rate":0.05,"discovery_mode":"balanced","est_packets_low":1272322,"est_duration_low_sec":1690,"in_window":true,"prev_duration_sec":0,"prev_hosts_up":0,"prev_addresses":0}
-[21:45:31] before: neighbour table: 328 entries, gc_thresh3 131072, table_fulls 1489752, overflow lines 0
-[21:45:31] === state t0 (t0) ===
+{"id":2248,"slug":"lab-infokiosk","enabled":true}
+[03:04:44] profile 2: {"ports":"top-1000,1521,2379,2380,5984,6379,7474,8086,9042,9200,9300,11211,27017,28017,1883,4369,5671,5672,8883,15672,15692,25672,61613,61616,2375,2376,4243,6443,9443,10250,10255,3000,5601,9090,9093,9100,9113,9187,9216,5985,5986,18080,50000,5173","discovery":{"icmp_echo":true,"icmp_timestamp":false,"tcp_syn_ports":[22,80,443,3389,8080],"tcp_ack_ports":[80],"arp":true,"skip_discovery":false,"mode":"balanced"},"udp":{"enabled":true,"ports":""},"version_intensity":7,"rate":{"max_pps":1000,"max_parallel_chunks":4,"max_parallel_hosts":16,"http_rps":20,"per_host_concurrency":1,"per_host_delay_ms":0},"retry":{"unstable_retries":2,"backoff_ms":500,"down_after_misses":0}}
+{"addresses":65560,"chunks":257,"est_packets":5323234,"est_duration_sec":7194,"effective_pps":1000,"fits_window":true,"window_sec":0,"based_on_history":false,"expected_live_rate":0.05,"discovery_mode":"balanced","est_packets_low":2326356,"est_duration_low_sec":2930,"in_window":true,"prev_duration_sec":0,"prev_hosts_up":0,"prev_addresses":0,"deep_max_hosts":16}
+[03:04:44] before: neighbour table: 272 entries, gc_thresh3 131072, table_fulls 1489752, overflow lines 0
+[03:04:44] load average at the start: { 14.59 24.40 31.19 }
+[03:04:44] === state t0 (t0) ===
 lab is in state t0
-[21:45:37] run 1 started
-nmap raw packets per second: max 842, p99 841, avg 292.5, top5 [842 842 841 841 841]; seconds over cap 0 (over cap+5%: 0)
-all sent packets per second: max 973, p99 847; seconds over cap 0
-[21:58:22] run 1 completed in 763 s; tx packets on the lab interface: 238272, peak 883 pps; {"hosts_up":70,"services":157,"packets":230914,"avg_pps":302,"peak_pps":null,"http_requests":1366,"elapsed":762}
-[21:58:23] after t0: neighbour table: 373 entries, gc_thresh3 131072, table_fulls 1489752, overflow lines 0
+[03:04:49] run 1 started
+[03:40:39] tcpdump: longest gap without scanner packets 5.0 s (at 03:10:26), max 5 packets per second in the 3 s after it: a gap of 5 s or more without a burst after it (idle scanner, not a freeze)
+[03:40:39] kernel cap: {"mode":"auto","active":true,"pps":1100,"burst":110,"policy_pps":1000,"dropped":393}
+[03:40:39] pass wall times: general 767 s, deep 1368 s (deep pass: 16 hosts, 54 waiting, 0 new open services)
+nmap raw packets per second: max 764, p99 752, avg 582.9, top5 [764 763 763 758 756]; seconds over cap 0 (over cap+5%: 0)
+all sent packets per second: max 913, p99 752; seconds over cap 0
+[03:40:40] run 1 completed in 2137 s; tx packets on the lab interface: 1260327, peak 844 pps; {"hosts_up":70,"services":157,"packets":1254588,"avg_pps":587,"peak_pps":null,"http_requests":1369,"elapsed":2134}
+[03:40:40] after t0: neighbour table: 404 entries, gc_thresh3 131072, table_fulls 1489752, overflow lines 0
 Ground truth state t0 (hard cases excused)
 
 category                  TP    FP    FN  precision   recall       F1
 hosts                     67     0     0      1.000    1.000    1.000
 ports                    154     0     1      1.000    0.994    0.997
 service names            150     0     1      1.000    0.993    0.997
-technologies             102     1     2      0.990    0.981    0.986
-classes                   51     1     1      0.981    0.981    0.981
+technologies             103     0     1      1.000    0.990    0.995
+classes                   51     0     1      1.000    0.981    0.990
 
 check (recall only)                              right   share
-service versions                                30/32    0.938
-technology versions                             55/56    0.982
-[21:58:24] === state t0 (t0-2) ===
+service versions                                32/32    1.000
+technology versions                             55/57    0.965
+[03:40:42] === state t0 (t0-2) ===
 lab is in state t0
-[21:58:29] run 2 started
-nmap raw packets per second: max 874, p99 846, avg 219.3, top5 [874 868 865 864 854]; seconds over cap 0 (over cap+5%: 0)
-all sent packets per second: max 903, p99 853; seconds over cap 0
-[22:15:27] run 2 completed in 1016 s; tx packets on the lab interface: 238588, peak 913 pps; {"hosts_up":70,"services":157,"packets":231371,"avg_pps":228,"peak_pps":null,"http_requests":1384,"elapsed":1012}
-[22:15:28] after t0-2: neighbour table: 373 entries, gc_thresh3 131072, table_fulls 1489752, overflow lines 0
+[03:40:47] run 2 started
+[04:19:50] tcpdump: longest gap without scanner packets 39.6 s (at 03:40:47), max 211 packets per second in the 3 s after it: a gap of 5 s or more without a burst after it (idle scanner, not a freeze)
+[04:19:50] kernel cap: {"mode":"auto","active":true,"pps":1100,"burst":110,"policy_pps":1000,"dropped":415}
+[04:19:50] pass wall times: general 934 s, deep 1380 s (deep pass: 16 hosts, 54 waiting, 0 new open services)
+nmap raw packets per second: max 794, p99 753, avg 542.2, top5 [794 773 773 773 771]; seconds over cap 0 (over cap+5%: 0)
+all sent packets per second: max 937, p99 757; seconds over cap 0
+[04:19:51] run 2 completed in 2317 s; tx packets on the lab interface: 1270096, peak 913 pps; {"hosts_up":70,"services":157,"packets":1262578,"avg_pps":545,"peak_pps":null,"http_requests":1384,"elapsed":2313}
+[04:19:52] after t0-2: neighbour table: 359 entries, gc_thresh3 131072, table_fulls 1489752, overflow lines 0
 Ground truth state t0 (hard cases excused)
 
 category                  TP    FP    FN  precision   recall       F1
 hosts                     67     0     0      1.000    1.000    1.000
 ports                    154     0     1      1.000    0.994    0.997
 service names            150     0     1      1.000    0.993    0.997
-technologies             102     1     2      0.990    0.981    0.986
-classes                   51     1     1      0.981    0.981    0.981
+technologies             103     0     1      1.000    0.990    0.995
+classes                   51     0     1      1.000    0.981    0.990
 
 check (recall only)                              right   share
-service versions                                30/32    0.938
-technology versions                             55/56    0.982
-[22:15:30] memory of the Czujka container: max 99.5 MiB (540 samples)
-[22:15:30] database size: 18 MB
+service versions                                32/32    1.000
+technology versions                             55/57    0.965
+[04:19:56] memory of the Czujka container: max 984.7 MiB (1354 samples)
+[04:19:56] database size: 22 MB
+[04:19:56] load average at the end: { 40.65 32.05 28.90 }
 lab is in state t0
-[22:15:36] product stopped (LR_KEEP=1 keeps it)
-[22:15:36] output: e2e/out/gate-acc22
+[04:20:03] product stopped (LR_KEEP=1 keeps it)
+[04:20:03] output: e2e/out/gate-acc27

@@ -274,6 +274,17 @@
       - {type: cookie, name: i_like_gogs, weight: 0.95}
       - {type: meta, name: author, contains: 'Gogs', weight: 0.8}
 
+- id: gogs-installer
+  name: Gogs – niedokończona instalacja
+  category: devops
+  technology: Gogs
+  description: Strona instalatora Gogs jest dostępna. Kto ją wypełni, zostaje administratorem serwera.
+  interest: 80
+  classes: [dev-tool, admin-panel, install-page]
+  match:
+    rules:
+      - {type: title, regex: '^Installation - Gogs', weight: 0.95}
+
 - id: portainer
   name: Portainer
   category: devops
@@ -377,7 +388,20 @@
     rules:
       - {type: title, regex: '^(?:Node|Blackbox|Windows|MySQL|Postgres|Redis|SNMP|Process|Nginx|Apache|HAProxy|Elasticsearch|MongoDB|Kafka|JMX|cAdvisor)[ _]?Exporter', weight: 0.9}
       - {type: body, regex: '<a href=["'']/?metrics["'']>Metrics</a>', weight: 0.8}
-      - {type: title, equals: 'Prometheus Pushgateway', weight: 0.9}
+
+- id: pushgateway
+  name: Prometheus Pushgateway
+  category: devops
+  description: Prometheus Pushgateway. Każdy, kto go osiągnie, może dopisać albo usunąć metryki (PUT/DELETE bez logowania).
+  tags: [go, monitoring]
+  interest: 45
+  classes: [dev-tool]
+  aliases: [Pushgateway]
+  match:
+    rules:
+      - {type: title, equals: 'Prometheus Pushgateway', weight: 0.95}
+  version:
+    - {type: path, path: /api/v1/status, regex: '"build_information"\s*:\s*\{[^}]*"version"\s*:\s*"v?([0-9][0-9.]*)"'}
 
 - id: alertmanager
   name: Alertmanager
@@ -389,6 +413,9 @@
   match:
     rules:
       - {type: title, equals: Alertmanager, weight: 0.9}
+  version:
+    # /metrics, not /api/v2/status: the status API returns the whole configuration (receivers can hold secrets).
+    - {type: path, path: /metrics, regex: 'alertmanager_build_info\{[^}]*version="v?([0-9][0-9.]*)"'}
 
 - id: zabbix
   name: Zabbix
@@ -469,6 +496,20 @@
   match:
     rules:
       - {type: title, equals: 'Uptime Kuma', weight: 0.9}
+
+- id: uptime-kuma-setup
+  name: Uptime Kuma – niedokończona konfiguracja
+  category: panel
+  technology: Uptime Kuma
+  description: 'Uptime Kuma bez konta administratora: strona główna przekierowuje do kreatora (/setup-database, /setup). Kto go wypełni, zostaje administratorem.'
+  tags: [nodejs, monitoring, install]
+  interest: 75
+  classes: [admin-panel, install-page]
+  match:
+    condition: all
+    rules:
+      - {type: title, equals: 'Uptime Kuma', weight: 0.9}
+      - {type: url, regex: '/setup(?:-database)?/?$', weight: 0.6}
 
 - id: cpanel
   name: cPanel / WHM
@@ -666,7 +707,8 @@
   technology: Docker Registry
   description: Rejestr obrazów odpowiada na /v2/ kodem 200 bez logowania. Każdy może pobrać obrazy.
   interest: 85
-  classes: [dev-tool, api]
+  # Without authentication anyone can also push images: a control API open to the network.
+  classes: [dev-tool, api, unauth-control-api]
   match:
     rules:
       - {type: path, path: /v2/, status: [200], field: header, name: Docker-Distribution-Api-Version, contains: 'registry/', weight: 0.95}
@@ -819,6 +861,24 @@
       - {type: title, equals: 'Consul by HashiCorp', weight: 0.95}
       - {type: header, name_regex: '^X-Consul-', exists: true, weight: 0.95}
       - {type: body, contains: 'consul-ui/config/environment', weight: 0.9}
+  version:
+    # The UI's environment meta tag is URL-encoded JSON: ..."CONSUL_VERSION":"2.1.0\n"...
+    - {type: body, regex: 'CONSUL_VERSION%22%3A%22([0-9][0-9.]*)'}
+
+- id: consul-api-open
+  name: HashiCorp Consul – API bez ACL
+  category: devops
+  technology: HashiCorp Consul
+  description: API agenta Consul zwraca listę węzłów klastra bez tokenu (ACL wyłączone albo domyślnie „allow”). Kto osiągnie port, może też rejestrować usługi i zmieniać klucze KV.
+  tags: [go]
+  interest: 80
+  classes: [dev-tool, unauth-control-api]
+  match:
+    min_confidence: 0.9
+    rules:
+      - {type: path, path: /v1/agent/members, status: [200], regex: '"Addr"\s*:\s*"', weight: 0.85, required: true}
+      - {type: path, path: /v1/agent/members, field: header, name: X-Consul-Default-Acl-Policy, contains: allow, weight: 0.9}
+      - {type: body, contains: 'consul-ui/config/environment', weight: 0.5}
 
 - id: vault
   name: HashiCorp Vault
@@ -906,6 +966,45 @@
       - {type: title, equals: 'Solr Admin', weight: 0.95}
       - {type: body, contains: 'ng-app="solrAdminApp"', weight: 0.95}
       - {type: redirect, regex: '/solr/$', weight: 0.6}
+  version:
+    # Asset URLs of the admin UI carry the release: css/angular/common.css?_=9.11.0
+    - {type: body, regex: '\?_=([0-9]+\.[0-9]+\.[0-9]+)'}
+
+- id: metabase
+  name: Metabase
+  category: panel
+  description: Narzędzie analityczne Metabase (Java). Strona startowa podaje wersję w ustawieniach publicznych.
+  tags: [java, bi]
+  interest: 40
+  classes: [admin-panel]
+  cpe: cpe:2.3:a:metabase:metabase
+  implies: [Java]
+  match:
+    min_confidence: 0.6
+    rules:
+      - {type: title, equals: Metabase, weight: 0.6}
+      - {type: cookie, name: metabase.DEVICE, weight: 0.9}
+      - {type: body, contains: '"application-name":"Metabase"', weight: 0.9}
+  version:
+    - {type: body, regex: '"version"\s*:\s*\{[^}]*"tag"\s*:\s*"v?([0-9][0-9.]*)"'}
+
+- id: metabase-setup
+  name: Metabase – niedokończona konfiguracja
+  category: panel
+  technology: Metabase
+  description: Metabase bez konta administratora ("has-user-setup":false) i z publicznym setup-token. Kto pierwszy przejdzie kreator, zostaje administratorem; w starszych wersjach token prowadził do wykonania kodu (CVE-2023-38646).
+  tags: [java, bi, install]
+  interest: 85
+  classes: [admin-panel, install-page]
+  implies: [Java]
+  match:
+    condition: all
+    rules:
+      - {type: body, contains: '"has-user-setup":false', weight: 0.9}
+      - {type: body, regex: '"setup-token":"[0-9a-f-]{36}"', weight: 0.6}
+      - {type: title, equals: Metabase, weight: 0.5}
+  version:
+    - {type: body, regex: '"version"\s*:\s*\{[^}]*"tag"\s*:\s*"v?([0-9][0-9.]*)"'}
 
 - id: couchdb
   name: Apache CouchDB
@@ -975,16 +1074,40 @@
       - {type: body, regex: '<ListBucketResult[\s>]', weight: 0.95}
 
 - id: mailhog
-  name: MailHog / Mailpit
+  name: MailHog
   category: devops
   description: Narzędzie testowe przechwytujące pocztę. Oznacza środowisko deweloperskie i pokazuje wiadomości każdemu.
   tags: [poczta, test]
   interest: 60
   classes: [dev-tool, staging]
-  aliases: [Mailpit]
   match:
     rules:
-      - {type: title, regex: '^(?:MailHog|Mailpit)$', weight: 0.95}
+      - {type: title, equals: MailHog, weight: 0.95}
+
+- id: mailpit
+  name: Mailpit
+  category: devops
+  description: Mailpit przechwytuje pocztę wysłaną przez aplikacje testowe. Oznacza środowisko deweloperskie i pokazuje wiadomości każdemu.
+  tags: [poczta, test, go]
+  interest: 60
+  classes: [dev-tool, staging]
+  match:
+    rules:
+      - {type: title, equals: Mailpit, weight: 0.95}
+  version:
+    - {type: body, regex: '/dist/app\.css\?v([0-9][0-9.]*)'}
+
+- id: mailpit-smtp
+  name: Mailpit (SMTP)
+  category: devops
+  technology: Mailpit
+  description: 'Port SMTP Mailpit: przyjmuje każdą wiadomość bez uwierzytelniania i pokazuje ją w panelu WWW.'
+  tags: [poczta, test]
+  interest: 50
+  classes: [dev-tool, staging]
+  match:
+    rules:
+      - {type: banner, regex: '^220 \S+ Mailpit ESMTP', weight: 0.95}
 
 - id: teamcity
   name: JetBrains TeamCity

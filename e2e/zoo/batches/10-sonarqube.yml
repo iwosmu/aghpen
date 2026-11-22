@@ -1,0 +1,6 @@
+# Zoo batch 10: SonarQube alone (heavy JVM with an embedded Elasticsearch).
+services:
+  sonarqube:
+    image: sonarqube:26.11.0.134175-community
+    environment: {SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"}
+    ports: ["9000:9000"]

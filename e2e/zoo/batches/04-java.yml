@@ -1,0 +1,21 @@
+# Zoo batch 04: Java application servers and JVM apps.
+services:
+  tomcat:
+    image: tomcat:10.1.62-jre21-temurin
+    # The official image ships the manager and the examples in webapps.dist; a lab template would deploy them.
+    command: ["sh", "-c", "cp -r webapps.dist/* webapps/ && exec catalina.sh run"]
+    ports: ["8080:8080"]
+  jetty:
+    image: jetty:12.1.15-jdk21
+    ports: ["18081:8080"]
+  wildfly:
+    image: quay.io/wildfly/wildfly:42.0.0.Final-jdk21
+    command: ["/opt/jboss/wildfly/bin/standalone.sh", "-b", "0.0.0.0", "-bmanagement", "0.0.0.0"]
+    ports: ["28080:8080", "9990:9990"]
+  solr:
+    image: solr:9.11.0
+    ports: ["8983:8983"]
+  metabase:
+    image: metabase/metabase:v0.65.6.3
+    environment: {JAVA_OPTS: "-Xmx768m"}
+    ports: ["13000:3000"]

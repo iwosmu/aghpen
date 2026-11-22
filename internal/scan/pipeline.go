@@ -71,7 +71,7 @@ func (r *run) hintsIn(g *group) []model.HostHint {
 // scanGroup runs the stages of one group: discovery, port scan, service
 // detection, HTTP/TLS and signatures, then the retries for hinted hosts
 // that did not answer.
-func (r *run) scanGroup(ctx context.Context, g *group, rate int, gs *groupStats) error {
+func (r *run) scanGroup(ctx context.Context, g *group, sh *share, gs *groupStats) error {
 	tgts := g.nmapTargets()
 	if len(tgts) == 0 {
 		return nil // everything in this group is excluded now
@@ -92,11 +92,14 @@ func (r *run) scanGroup(ctx context.Context, g *group, rate int, gs *groupStats)
 		}
 	} else {
 		var err error
-		if live, err = r.discover(ctx, g, tgts, rate, gs); err != nil {
+		if live, err = r.discover(ctx, g, tgts, sh.grow(), gs); err != nil {
 			return err
 		}
 	}
-	if err := r.deepScan(ctx, g, live, 1, rate, gs, found); err != nil {
+	gs.mu.Lock()
+	gs.discovered, gs.live = true, len(live)
+	gs.mu.Unlock()
+	if err := r.deepScan(ctx, g, live, 1, sh, gs, found); err != nil {
 		return err
 	}
 
@@ -130,13 +133,13 @@ func (r *run) scanGroup(ctx context.Context, g *group, rate int, gs *groupStats)
 			return context.Cause(ctx)
 		}
 		attempts = 1 + round
-		back, err := r.retryRound(ctx, g, missing, round == rounds, rate, gs)
+		back, err := r.retryRound(ctx, g, missing, round == rounds, sh.grow(), gs)
 		if err != nil {
 			return err
 		}
 		if len(back) > 0 {
 			r.log.Info("unstable host answered on retry", "hosts", len(back), "round", round)
-			if err := r.deepScan(ctx, g, back, attempts, rate, gs, found); err != nil {
+			if err := r.deepScan(ctx, g, back, attempts, sh, gs, found); err != nil {
 				return err
 			}
 		}
@@ -252,7 +255,8 @@ func (r *run) retryRound(ctx context.Context, g *group, missing []model.HostHint
 
 // deepScan runs the port scan, the service detection and the HTTP stage for
 // hosts that answered, and reports each of them to the sink.
-func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attempts, rate int, gs *groupStats, found map[string]bool) error {
+func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attempts int, sh *share, gs *groupStats, found map[string]bool) error {
+	rate := sh.grow()
 	if len(hosts) == 0 {
 		return nil
 	}
@@ -331,7 +335,7 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 	full := len(claimed) > 0
 	if full {
 		r.stats.passState(model.PassTopPorts, model.PassDone)
-	} else if err := r.densePass(ctx, g, scanned, rate, gs); err != nil {
+	} else if err := r.densePass(ctx, g, scanned, sh.grow(), gs); err != nil {
 		return err
 	}
 	unknown := map[string]bool{}
@@ -341,6 +345,22 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 		}
 		r.stats.update(func(s *model.RunStats) { s.PortsUnknown += len(t) })
 		r.stats.warn("Skan portów nie skończył się dla części hostów (limit czasu nmap). Ich usługi w tym przebiegu są nieznane, nie zniknęły.")
+	}
+	// A host that discovery found up and that gave the port scan no answer
+	// at all, even after the retry (no open and no closed port: the probes
+	// or the answers were lost, e.g. neighbour resolution under load), has
+	// unknown ports: no port state is evidence that its services are gone.
+	lost := 0
+	for _, h := range hosts {
+		if p := scanned[h.IP]; h.Up && !unknown[h.IP] && (p == nil || (!p.Responded && len(p.Ports) == 0)) {
+			unknown[h.IP] = true
+			lost++
+		}
+	}
+	if lost > 0 {
+		r.stats.update(func(s *model.RunStats) { s.PortsUnknown += lost })
+		r.stats.warn("Skan portów nie dostał żadnej odpowiedzi od części aktywnych hostów. Ich usługi w tym przebiegu są nieznane, nie zniknęły.")
+		r.log.Warn("port scan got no answer from hosts that discovery found up", "group", g.id, "hosts", lost, "of", len(hosts))
 	}
 	var answered int64
 	for _, h := range hosts {
@@ -377,6 +397,7 @@ func (r *run) deepScan(ctx context.Context, g *group, hosts []probe.Host, attemp
 	for _, h := range up {
 		found[h.IP] = true
 	}
+	rate = sh.grow()
 	describeRate := rate
 	var wide chan fullScan
 	if full {
@@ -1403,6 +1424,7 @@ func (r *run) fullRangeFinish(ctx context.Context, g *group, up []probe.Host, re
 	if fs.rest != nil {
 		for _, ip := range finished(ps) {
 			if _, ok := byIP[ip]; ok {
+				r.fullDone.Store(ip, true)
 				r.cover(ip, fs.rest) // every port of 1-65535 the policy allows was scanned on this host
 			}
 		}

@@ -28,6 +28,9 @@ services:
       CZUJKA_LISTEN: ${CZUJKA_BIND:-127.0.0.1}:${CZUJKA_PORT:-8080}
       CZUJKA_HOST_GATEWAY: "off"
       CZUJKA_PUBLISHED_PORT: ${CZUJKA_PORT:-8080}
+      # The network namespace is the host's: the kernel packet cap (nftables)
+      # would limit other programs too, so it is not installed here.
+      CZUJKA_NETWORK_MODE: host
 
 networks:
   # A plain bridge for the published database port: the internal network has

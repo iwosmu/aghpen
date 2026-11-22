@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en-gb" dir="ltr">
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta charset="utf-8">
+	<meta name="generator" content="Joomla! - Open Source Content Management">
+	<title>Joomla Installer</title>
+	<link href="/installation/favicon.ico" rel="icon" type="image/vnd.microsoft.icon">
+
+        <link href="/media/system/css/fields/switcher.min.css?fc1523011c839c1a0e0bfda7a3aee353" rel="stylesheet">
+	<link href="/installation/template/css/template.min.css?fc1523011c839c1a0e0bfda7a3aee353" rel="stylesheet">
+	<link href="/media/vendor/joomla-custom-elements/css/joomla-alert.min.css?0.4.1" rel="stylesheet">
+	<style>:root {
+		--hue: 214;
+		--template-bg-light: #f0f4fb;
+		--template-text-dark: #495057;
+		--template-text-light: #ffffff;
+		--link-color: #2a69b8;
+		--template-special-color: #001b4c;
+	}</style>
+
+    </head>
+    <body data-basepath="">
+        <div class="j-install">
+                        <header id="header" class="header">
+                <div class="row me-0">
+                    <div class="col">
+                        <div class="logo d-none d-md-block col">
+                            <img src="/installation/template/images/Joomla-logo-monochrome-horizontal-white.svg" alt="">
+                        </div>
+                        <div class="mx-2 my-3 d-flex d-md-none">
+                            <img class="logo-small d-flex d-md-none" src="/installation/template/images/Joomla-brandmark-monochrome-white-RGB.svg" alt="">
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center col justify-content-center">
+                        <h1 class="h2 mx-1 d-flex align-items-baseline text-white">
+                            <span class="icon-cogs d-none d-md-block mx-2 align-items-center" aria-hidden="true"></span>
+                            Joomla Installer                        </h1>
+                        <span class="small mx-1">
+                            Joomla! 6.2.0                        </span>
+                    </div>
+                    <div class="m-2 d-flex align-items-center col justify-content-end">
+                        <a href="https://guide.joomla.org/user-manual/getting-started/getting-started-installing-joomla" target="_blank">
+                            <span class="icon-question" aria-hidden="true"></span>
+                            <span class="visually-hidden">Help installing Joomla</span>
+                        </a>
+                    </div>
+                </div>
+            </header>
+                        <div id="wrapper" class="d-flex wrapper flex-wrap">
+                <div class="container-fluid container-main">
+                    <div id="content" class="content h-100">
+                        <main class="d-flex justify-content-center align-items-center h-100">
+                            <div class="j-container">
+                                <div id="system-message-container" aria-live="polite"></div>
+
+                                <div id="javascript-warning">
+                                    <noscript>
+                                        Warning! JavaScript must be enabled for proper installation of Joomla.                                    </noscript>
+                                </div>
+                                <div id="container-installation" class="container-installation flex no-js hidden" data-base-url="http://localhost:8083/">
+                                    
+<div id="installer-view" data-page-name="setup">
+    <form action="index.php" method="post" id="adminForm" class="form-validate">
+        <fieldset id="installStep1" class="j-install-step active">
+            <legend class="j-install-step-header">
+                <span class="icon-cog" aria-hidden="true"></span> Setup Site Name            </legend>
+            <div class="j-install-step-form">
+                <div class="mb-3">
+                    <div class="control-group">
+            <div class="control-label"><label id="jform_site_name-lbl" for="jform_site_name" class="required">
+    Enter the name of your Joomla site.<span class="star" aria-hidden="true">&#160;*</span></label>
+</div>
+        <div class="controls">
+        
+
+    
+    <input
+        type="text"
+        name="jform[site_name]"
+        id="jform_site_name"
+        value=""
+                class="form-control form-control required"          required       >
+
+    
+
+            </div>
+</div>
+                </div>
+                <div class="mt-4 mb-3">
+                    <button id="step1" class="btn btn-primary w-100">Setup Login Data <span class="icon-chevron-right" aria-hidden="true"></span></button>
+                </div>
+            </div>
+        </fieldset>
+        <fieldset id="installStep2" class="j-install-step">
+            <legend class="j-install-step-header">
+                <span class="icon-lock" aria-hidden="true"></span> Login Data            </legend>
+            <div class="j-install-step-form">
+                <div class="mb-3">
+                    <div class="control-group">
+            <div class="control-label"><label id="jform_admin_user-lbl" for="jform_admin_user" class="required">
+    Enter the real name of your Super User.<span class="star" aria-hidden="true">&#160;*</span></label>
+</div>
+        <div class="controls">
+        
+
+    
+    <input
+        type="text"
+        name="jform[admin_user]"
+        id="jform_admin_user"
+        value=""
+                class="form-control form-control required" size="30"         required       >
+
+    
+
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group">
+            <div class="control-label"><label id="jform_admin_username-lbl" for="jform_admin_username" class="required">
+    Set the username for your Super User account.<span class="star" aria-hidden="true">&#160;*</span></label>
+</div>
+        <div class="controls">
+        
+
+    
+    <input
+        type="text"
+        name="jform[admin_username]"
+        id="jform_admin_username"
+        value=""
+                class="form-control form-control required" size="30"         required autocomplete="username"      >
+
+    
+
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group">
+            <div class="control-label"><label id="jform_admin_password-lbl" for="jform_admin_password" class="required">
+    Set the password for your Super User account.<span class="star" aria-hidden="true">&#160;*</span></label>
+</div>
+        <div class="controls">
+        
+<div class="password-group">
+    <div class="input-group">
+        <input
+            type="password"
+            name="jform[admin_password]"
+            id="jform_admin_password"
+            value=""
+             autocomplete="new-password" class="form-control js-password-strength validate-password-strength required" aria-describedby="jform_admin_password-desc"    maxlength="99" required  data-min-length="12"      >
+                <button type="button" class="btn btn-secondary input-password-toggle">
+            <span class="icon-eye icon-fw" aria-hidden="true"></span>
+            <span class="visually-hidden">Show Password</span>
+        </button>
+            </div>
+</div>                    <div id="jform_admin_password-desc" class="">
+                <small class="form-text">
+                    Enter at least 12 characters.                </small>
+            </div>
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group">
+            <div class="control-label"><label id="jform_admin_email-lbl" for="jform_admin_email" class="required">
+    Enter the email address of the website Super User.<span class="star" aria-hidden="true">&#160;*</span></label>
+</div>
+        <div class="controls">
+        <input type="email" inputmode="email" name="jform[admin_email]" class="form-control validate-email form-control required" id="jform_admin_email" value="" required>            </div>
+</div>
+                </div>
+                <div class="mt-4 mb-3">
+                    <button id="step2" class="btn btn-primary w-100">Setup Database Connection <span class="icon-chevron-right" aria-hidden="true"></span></button>
+                </div>
+            </div>
+        </fieldset>
+        <fieldset id="installStep3" class="j-install-step" >
+            <legend class="j-install-step-header">
+                <span class="icon-database" aria-hidden="true"></span> Database Configuration            </legend>
+            <div class="j-install-step-form">
+                <div class="mb-3">
+                    <div class="control-group">
+            <div class="control-label"><label id="jform_db_type-lbl" for="jform_db_type" class="required">
+    Select the database type.<span class="star" aria-hidden="true">&#160;*</span></label>
+</div>
+        <div class="controls">
+        <select id="jform_db_type" name="jform[db_type]" class="form-select form-select required" required>
+	<option value="mysql">MariaDB or MySQL (PDO)</option>
+	<option value="mysqli" selected="selected">MariaDB or MySQL (MySQLi)</option>
+	<option value="pgsql">PostgreSQL (PDO)</option>
+</select>
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group">
+            <div class="control-label"><label id="jform_db_host-lbl" for="jform_db_host" class="required">
+    Enter the host name, usually "localhost" or a name provided by your host.<span class="star" aria-hidden="true">&#160;*</span></label>
+</div>
+        <div class="controls">
+        
+
+    
+    <input
+        type="text"
+        name="jform[db_host]"
+        id="jform_db_host"
+        value="localhost"
+                class="form-control form-control required"          required       >
+
+    
+
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group">
+            <div class="control-label"><label id="jform_db_user-lbl" for="jform_db_user" class="required">
+    Enter the database username you created or a username provided by your host.<span class="star" aria-hidden="true">&#160;*</span></label>
+</div>
+        <div class="controls">
+        
+
+    
+    <input
+        type="text"
+        name="jform[db_user]"
+        id="jform_db_user"
+        value=""
+                class="form-control form-control required"          required       >
+
+    
+
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group">
+            <div class="control-label"><label id="jform_db_pass-lbl" for="jform_db_pass">
+    Enter the database password you created or a password provided by your host.</label>
+</div>
+        <div class="controls">
+        
+<div class="password-group">
+    <div class="input-group">
+        <input
+            type="password"
+            name="jform[db_pass]"
+            id="jform_db_pass"
+            value=""
+             autocomplete="off" class="form-control form-control"     maxlength="99"   data-min-length="12"      >
+                <button type="button" class="btn btn-secondary input-password-toggle">
+            <span class="icon-eye icon-fw" aria-hidden="true"></span>
+            <span class="visually-hidden">Show Password</span>
+        </button>
+            </div>
+</div>            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group">
+            <div class="control-label"><label id="jform_db_name-lbl" for="jform_db_name" class="required">
+    Enter the database name.<span class="star" aria-hidden="true">&#160;*</span></label>
+</div>
+        <div class="controls">
+        
+
+    
+    <input
+        type="text"
+        name="jform[db_name]"
+        id="jform_db_name"
+        value="joomla_db"
+                class="form-control form-control required"          required       >
+
+    
+
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group">
+            <div class="control-label"><label id="jform_db_prefix-lbl" for="jform_db_prefix" class="required">
+    Enter a table prefix or use the randomly generated one.<span class="star" aria-hidden="true">&#160;*</span></label>
+</div>
+        <div class="controls">
+        <input type="text" name="jform[db_prefix]" id="jform_db_prefix" value="c2job_" class="form-control">                    <div id="jform_db_prefix-desc" class="">
+                <small class="form-text">
+                    If you are using an existing database with tables with the same prefix, Joomla will rename those existing tables by adding the prefix "bak_".                </small>
+            </div>
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group">
+            <div class="control-label"><label id="jform_db_encryption-lbl" for="jform_db_encryption" class="required">
+    Connection Encryption<span class="star" aria-hidden="true">&#160;*</span></label>
+</div>
+        <div class="controls">
+        <select id="jform_db_encryption" name="jform[db_encryption]" class="form-select form-select required" required>
+	<option value="0" selected="selected">Default (server controlled)</option>
+	<option value="1">One-way authentication</option>
+	<option value="2">Two-way authentication</option>
+</select>
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group"  data-showon='[{"field":"jform[db_encryption]","values":["2"],"sign":"=","op":""}]'>
+            <div class="control-label"><label id="jform_db_sslkey-lbl" for="jform_db_sslkey">
+    Path to Private Key File</label>
+</div>
+        <div class="controls">
+        
+
+    
+    <input
+        type="text"
+        name="jform[db_sslkey]"
+        id="jform_db_sslkey"
+        value=""
+                class="form-control"                 >
+
+    
+
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group"  data-showon='[{"field":"jform[db_encryption]","values":["2"],"sign":"=","op":""}]'>
+            <div class="control-label"><label id="jform_db_sslcert-lbl" for="jform_db_sslcert">
+    Path to Certificate File</label>
+</div>
+        <div class="controls">
+        
+
+    
+    <input
+        type="text"
+        name="jform[db_sslcert]"
+        id="jform_db_sslcert"
+        value=""
+                class="form-control"                 >
+
+    
+
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group"  data-showon='[{"field":"jform[db_encryption]","values":["1","2"],"sign":"=","op":""}]'>
+            <div class="control-label"><label id="jform_db_sslverifyservercert-lbl" for="jform_db_sslverifyservercert">
+    Verify Server Certificate</label>
+</div>
+        <div class="controls">
+        <fieldset id="jform_db_sslverifyservercert">
+    <legend class="visually-hidden">
+        Verify Server Certificate    </legend>
+    <div class="switcher">
+                    <input type="radio" id="jform_db_sslverifyservercert0" name="jform[db_sslverifyservercert]" value="0" checked class="active ">        <label for="jform_db_sslverifyservercert0">No</label>                    <input type="radio" id="jform_db_sslverifyservercert1" name="jform[db_sslverifyservercert]" value="1" >        <label for="jform_db_sslverifyservercert1">Yes</label>        <span class="toggle-outside"><span class="toggle-inside"></span></span>
+    </div>
+</fieldset>
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group"  data-showon='[{"field":"jform[db_encryption]","values":["1","2"],"sign":"=","op":""},{"field":"jform[db_sslverifyservercert]","values":["1"],"sign":"=","op":"AND"}]'>
+            <div class="control-label"><label id="jform_db_sslca-lbl" for="jform_db_sslca">
+    Path to CA File</label>
+</div>
+        <div class="controls">
+        
+
+    
+    <input
+        type="text"
+        name="jform[db_sslca]"
+        id="jform_db_sslca"
+        value=""
+                class="form-control"                 >
+
+    
+
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                    <div class="control-group"  data-showon='[{"field":"jform[db_type]","values":["mysql","mysqli"],"sign":"=","op":""},{"field":"jform[db_encryption]","values":["2"],"sign":"=","op":"AND"}]'>
+            <div class="control-label"><label id="jform_db_sslcipher-lbl" for="jform_db_sslcipher">
+    Supported Cipher Suite (optional)</label>
+</div>
+        <div class="controls">
+        
+
+    
+    <input
+        type="text"
+        name="jform[db_sslcipher]"
+        id="jform_db_sslcipher"
+        value=""
+                class="form-control"                 >
+
+    
+
+            </div>
+</div>
+                </div>
+                <div class="mb-3">
+                                        <input
+    type="hidden"
+    name="jform[db_old]"
+    id="jform_db_old"
+    value="backup"
+    >
+                </div>
+                <div class="mt-4 mb-3">
+                    <button id="setupButton" class="btn btn-primary w-100">Install Joomla <span class="icon-chevron-right" aria-hidden="true"></span></button>
+                </div>
+            </div>
+        </fieldset>
+        <fieldset id="installStep4" class="j-install-step" >
+            <legend class="j-install-step-header">
+                <span class="icon-cogs" aria-hidden="true"></span> Installation Progress            </legend>
+            <div class="j-install-step-form" aria-live="polite" >
+                <label class="progresslabel text-center">
+                    <progress class="progressbar" id="progressbar" value="0" max="8"></progress>
+                    <span id="progress-text" role="status">Installation</span>
+                </label>
+            </div>
+        </fieldset>
+        <input type="hidden" name="admin_password2" id="jform_admin_password2">
+        <input type="hidden" name="1f349b594598f15f04a2fc3dfc51e946" value="1">    </form>
+    <form action="index.php" method="post" id="languageForm" class="lang-select">
+        <div class="d-flex align-items-center">
+            <span class="fas fa-globe me-1" aria-hidden="true"></span>
+            Current language: <span class="ms-1 fw-bold" id="languageForm-current"></span><button type="button" data-joomla-dialog="{&quot;textHeader&quot;:&quot;Select Installation Language&quot;,&quot;iconHeader&quot;:&quot;icon-language&quot;,&quot;src&quot;:&quot;#languageSelect&quot;}" aria-label="Change Installation Language" class="btn btn-primary btn-sm ms-2"><span class="fas fa-repeat fa-fw me-2" aria-hidden="true"></span>Change</button>        </div>
+        <template id="languageSelect">
+            <div class="mb-3">
+                <div class="control-group">
+            <div class="control-label"><label id="jform_language-lbl" for="jform_language" class="hidden">
+    Select Language</label>
+</div>
+        <div class="controls">
+        <select id="jform_language" name="jform[language]" class="form-select required">
+	<option value="ur-PK"> | انگریزی (برطانیہ)</option>
+	<option value="af-ZA">Afrikaans (af-ZA) | Afrikaans (Suid-Afrika)</option>
+	<option value="ar-AA">Arabic Unitag (العربية الموحدة) | Arabic (اللغة العربية)</option>
+	<option value="id-ID">Bahasa Indonesia (id-ID) | Bahasa Indonesia (id-ID)</option>
+	<option value="eu-ES">Basque (eu-ES) | Basque</option>
+	<option value="be-BY">Belarusian (be-BY) | Belarusian (be-BY)</option>
+	<option value="pt-BR">Brazilian Portuguese (pt-BR) | Portugu&ecirc;s do Brasil (pt-BR)</option>
+	<option value="ca-ES">Catalan (ca-ES) | Catalan (ca-ES)</option>
+	<option value="zh-CN">Chinese Simplified (zh-CN) | Chinese Simplified (China)</option>
+	<option value="zh-TW">Chinese Traditional (zh-TW) | 正體中文</option>
+	<option value="hr-HR">Croatian (hr-HR) | Hrvatski (Hrvatska)</option>
+	<option value="cs-CZ">Czech (Če&scaron;tina) | Czech (Če&scaron;tina)</option>
+	<option value="da-DK">Dansk (da-DK) | Danish (Danmark)</option>
+	<option value="nl-BE">Dutch (nl-BE) | Dutch (Belgium)</option>
+	<option value="nl-NL">Dutch (nl-NL) | Dutch (nl-NL)</option>
+	<option value="et-EE">Eesti (et-EE) | Estonian</option>
+	<option value="en-AU">English (en-AU) | English (Australia)</option>
+	<option value="en-CA">English (en-CA) | English (Canada)</option>
+	<option value="en-GB" selected="selected">English (en-GB) | English (United Kingdom)</option>
+	<option value="en-NZ">English (en-NZ) | English (New Zealand)</option>
+	<option value="en-US">English (en-US) | English (United States)</option>
+	<option value="fi-FI">Finnish (fi-FI) | Finnish (Finland)</option>
+	<option value="fr-CA">French (fr-CA) | French (Canada)</option>
+	<option value="fr-FR">French (fr-FR) | French (fr-FR)</option>
+	<option value="ka-GE">Georgian (ka-GE) | ქართული (საქართველო)</option>
+	<option value="de-AT">German (Austria) | Deutsch (&Ouml;sterreich)</option>
+	<option value="de-DE">German (Germany) | Deutsch (Deutschland)</option>
+	<option value="de-LI">German (Liechtenstein) | Deutsch (Liechtenstein)</option>
+	<option value="de-LU">German (Luxembourg) | Deutsch (Luxemburg)</option>
+	<option value="de-CH">German (Switzerland) | Deutsch (Schweiz)</option>
+	<option value="el-GR">Greek (el-GR) | Greek (el-GR)</option>
+	<option value="he-IL">Hebrew (Israel) | Hebrew (Israel)</option>
+	<option value="hu-HU">Hungarian (Hungary) | Hungarian (Magyar)</option>
+	<option value="ga-IE">Irish (ga-IE) | Irish (Ireland)</option>
+	<option value="it-IT">Italiano (it-IT) | Italiano (it-IT)</option>
+	<option value="ja-JP">Japanese (ja-JP) | Japanese (Japan)</option>
+	<option value="kk-KZ">Kazakh (kk-KZ) | Kazakh (Kazakhstan)</option>
+	<option value="ko-KR">Korean (ko-KR) | Korean (ko-KR)</option>
+	<option value="lv-LV">Latvian (lv-LV) | Latvian (Latvia)</option>
+	<option value="lt-LT">Lietuvių (lt-LT) | Lietuvių (lt-LT)</option>
+	<option value="mk-MK">Macedonian (mk-MK) | Macedonian (mk-MK)</option>
+	<option value="ms-MY">Malay (ms-MY) | Bahasa Melayu (Malaysia)</option>
+	<option value="nb-NO">Norwegian Bokmal (nb-NO) | Norwegian bokm&aring;l (Norway)</option>
+	<option value="fa-IR">Persian (fa-IR) | Persian (fa-IR)</option>
+	<option value="pl-PL">Polish (PL) | Polski (PL)</option>
+	<option value="pt-PT">Portugu&ecirc;s de Portugal (pt-PT) | Portugu&ecirc;s (Portugal)</option>
+	<option value="ro-RO">Rom&acirc;na (ro-RO) | Rom&acirc;nă (Rom&acirc;nia)</option>
+	<option value="ru-RU">Russian (ru-RU) | Русский (Россия)</option>
+	<option value="sk-SK">Slovak (sk-SK) | Slovak (Slovakia)</option>
+	<option value="sl-SI">Sloven&scaron;čina (sl-SI) | Sloven&scaron;čina (Slovenija)</option>
+	<option value="es-ES">Spanish (es-ES) | Spanish (es-ES)</option>
+	<option value="sr-YU">Srpski Latinica (sr-Latn-RS) | Srpski (Republika Srbija)</option>
+	<option value="sv-SE">Swedish (sv-SE) | Swedish (Sweden)</option>
+	<option value="ta-IN">Tamil (India) | தமிழ் (இந்தியா)</option>
+	<option value="th-TH">Thai (th-TH) | Thai (ภาษาไทย)</option>
+	<option value="tr-TR">Turkish (tr-TR) | Turkish (Turkey)</option>
+	<option value="uk-UA">Ukrainian (uk-UA) | Ukrainian (uk-UA)</option>
+	<option value="vi-VN">Vietnamese (vi-VN) | Vietnamese (Vietnam)</option>
+	<option value="cy-GB">Welsh (cy-GB) | Cymraeg</option>
+	<option value="bg-BG">Български (bg-BG) | Bulgarian (bg-BG)</option>
+	<option value="fa-AF">فارسی (fa-AF) | فارسی (دری)</option>
+</select>
+            </div>
+</div>
+            </div>
+        </template>
+        <input type="hidden" name="task" value="language.set">
+        <input type="hidden" name="format" value="json">
+        <input type="hidden" name="1f349b594598f15f04a2fc3dfc51e946" value="1">    </form>
+
+</div>
+
+                                </div>
+                            </div>
+                        </main>
+                        <footer class="footer text-center small w-100 p-3">
+                            <a href="https://www.joomla.org">Joomla!</a> is Free Software released under the GNU General Public License.                        </footer>
+                    </div>
+                </div>
+            </div>
+            <script type="importmap">{"imports":{"joomla.dialog":"/media/system/js/joomla-dialog.min.js?fc1523011c839c1a0e0bfda7a3aee353"}}</script>	<script type="application/json" class="joomla-script-options new">{"joomla.jtext":{"JFIELD_PASSWORD_INDICATE_INCOMPLETE":"Password doesn't meet the site's requirements.","JFIELD_PASSWORD_INDICATE_COMPLETE":"Password accepted","JFIELD_PASSWORD_SPACES_IN_PASSWORD":"Password must not have spaces at the beginning or end.","JSHOWPASSWORD":"Show Password","JHIDEPASSWORD":"Hide Password","ERROR":"Error","WARNING":"Warning","NOTICE":"Notice","MESSAGE":"Message","SUCCESS":"Success","JLIB_JS_AJAX_ERROR_CONNECTION_ABORT":"A connection error has occurred while fetching the JSON data.","JLIB_JS_AJAX_ERROR_NO_CONTENT":"No content was returned.","JLIB_JS_AJAX_ERROR_OTHER":"An error has occurred while fetching the JSON data: HTTP %d status code.","JLIB_JS_AJAX_ERROR_PARSE":"A parse error has occurred while processing the following JSON data:<br><code style=\"color:inherit;white-space:pre-wrap;padding:0;margin:0;border:0;background:inherit;\">%s<\/code>","JLIB_JS_AJAX_ERROR_TIMEOUT":"A timeout has occurred while fetching the JSON data.","INSTL_DATABASE_RESPONSE_ERROR":"The installation process failed.","INSTL":"Installation","INSTL_FINISHED":"Installation finished","INSTL_IN_PROGRESS":"Installation running","INSTL_PROCESS_BUSY":"Process is in progress. Please wait &hellip;","INSTL_REMOVE_INST_FOLDER":"Are you sure you want to delete? Confirming will permanently delete the \"%s\" folder.","INSTL_DISABLE_AUTOUPDATE":"Are you sure you want to disable automated updates?","INSTL_COMPLETE_REMOVE_FOLDER":"Remove \"%s\" folder","JCLOSE":"Close","JOK":"JOK","JOPEN":"JOPEN","JLIB_FORM_CONTAINS_INVALID_FIELDS":"The form cannot be submitted as it's missing required data. <br> Please correct the marked fields and try again.","JLIB_FORM_FIELD_REQUIRED_VALUE":"Please fill in this field.","JLIB_FORM_FIELD_REQUIRED_CHECK":"One of the options must be selected.","JLIB_FORM_FIELD_INVALID_VALUE":"This value is not valid."},"system.installation":{"url":"index.php"},"system.paths":{"root":"","rootFull":"http:\/\/localhost:8083\/","base":"\/installation","baseFull":"http:\/\/localhost:8083\/installation\/"},"csrf.token":"1f349b594598f15f04a2fc3dfc51e946","system.keepalive":{"interval":300000,"uri":"index.php"}}</script>
+	<script src="/media/system/js/core.min.js?fc1523011c839c1a0e0bfda7a3aee353"></script>
+	<script src="/media/system/js/fields/passwordview.min.js?fc1523011c839c1a0e0bfda7a3aee353" defer></script>
+	<script src="/media/system/js/joomla-dialog-autocreate.min.js?fc1523011c839c1a0e0bfda7a3aee353" type="module"></script>
+	<script src="/media/system/js/showon.min.js?fc1523011c839c1a0e0bfda7a3aee353" type="module"></script>
+	<script src="/media/system/js/keepalive.min.js?fc1523011c839c1a0e0bfda7a3aee353" type="module"></script>
+	<script src="/media/system/js/fields/validate.min.js?fc1523011c839c1a0e0bfda7a3aee353" type="module"></script>
+	<script src="/media/system/js/fields/passwordstrength.min.js?fc1523011c839c1a0e0bfda7a3aee353" defer></script>
+	<script src="/installation/template/js/template.min.js?fc1523011c839c1a0e0bfda7a3aee353" defer></script>
+	<script src="/media/system/js/messages.min.js?fc1523011c839c1a0e0bfda7a3aee353" type="module"></script>
+	<script src="/media/system/js/joomla-core-loader.min.js?fc1523011c839c1a0e0bfda7a3aee353" type="module"></script>
+
+        </div>
+    </body>
+</html>
