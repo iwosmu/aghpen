@@ -74,57 +74,57 @@
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f1f1ee;
-  --panel: #ffffff;
-  --panel-solid: #ffffff;
-  --raised: #ffffff;
-  --sunk: #f4f4f1;
-  --rule: rgb(16 22 36 / 0.08);
-  --rule-strong: rgb(16 22 36 / 0.18);
-  --ink: #11151e;
-  --ink-2: #3d4452;
-  --ink-3: #5d6472;
+  --bg: #f7f1e8;
+  --panel: #fffbf5;
+  --panel-solid: #fffbf5;
+  --raised: #fffbf5;
+  --sunk: #f3ebdf;
+  --rule: #e9dfd0;
+  --rule-strong: #d6c7b0;
+  --ink: #0f1730;
+  --ink-2: #3d4560;
+  --ink-3: #545b73;
   --accent: #1d4fb0;
   --accent-strong: #163f8f;
   --accent-ink: #ffffff;
-  --accent-wash: #e3ebfa;
+  --accent-wash: #e4eaf6;
   --coral: #c2413a;
   --rail: transparent;
-  --rail-ink: #11151e;
-  --rail-ink-2: #4a5160;
-  --rail-rule: rgb(16 22 36 / 0.08);
-  --rail-active: rgb(16 22 36 / 0.07);
-  --st-new: #0a8f7f;
-  --st-gone: #cf3f3f;
-  --st-changed: #b07f00;
-  --st-unstable: #6250d6;
-  --st-expected: #747a86;
-  --st-new-wash: #dcf1ed;
-  --st-gone-wash: #f9e2e0;
-  --st-changed-wash: #f6ecd3;
-  --st-unstable-wash: #e8e4fb;
-  --danger: #b8303a;
-  --danger-solid: #b8303a;
+  --rail-ink: #0f1730;
+  --rail-ink-2: #3d4560;
+  --rail-rule: #e2d6c4;
+  --rail-active: rgb(15 23 48 / 0.07);
+  --st-new: #1d6b45;
+  --st-gone: #b3261e;
+  --st-changed: #8a5a00;
+  --st-unstable: #5b49c9;
+  --st-expected: #6b6f80;
+  --st-new-wash: #e1efe6;
+  --st-gone-wash: #fbe5e3;
+  --st-changed-wash: #f6ead2;
+  --st-unstable-wash: #ebe7fa;
+  --danger: #b3261e;
+  --danger-solid: #b3261e;
   --danger-ink: #ffffff;
-  --seq-0: #e9e9e5;
+  --seq-0: #efe6d8;
   --seq-1: #b7d3f6;
   --seq-2: #86b6ef;
   --seq-3: #3987e5;
   --seq-4: #1c5cab;
   --seq-5: #0d366b;
-  --shadow: 0 18px 40px -18px rgb(16 22 36 / 0.3);
-  --primary: #11151e;
-  --primary-hover: #262c39;
+  --shadow: 0 18px 40px -20px rgb(60 40 10 / 0.28);
+  --primary: #0f1730;
+  --primary-hover: #1a2442;
   --primary-press: #000000;
-  --primary-ink: #f6f5f1;
-  --focus: #11151e;
-  --card-shadow: 0 0 0 1px rgb(16 22 36 / 0.06), 0 10px 30px -22px rgb(16 22 36 / 0.25);
-  --glass: rgb(255 255 255 / 0.72);
-  --glass-edge: rgb(16 22 36 / 0.08);
-  --glass-filter: blur(24px) saturate(1.4);
-  --tip: #ffffff;
-  --row-hover: rgb(16 22 36 / 0.035);
-  --row-selected: #e3ebfa;
+  --primary-ink: #fffbf5;
+  --focus: #0f1730;
+  --card-shadow: 0 0 0 1px #e2d6c4;
+  --glass: rgb(255 251 245 / 0.78);
+  --glass-edge: #e2d6c4;
+  --glass-filter: blur(24px) saturate(1.2);
+  --tip: #0f1730;
+  --row-hover: rgb(15 23 48 / 0.035);
+  --row-selected: #f3ebdf;
 }
 
 @theme inline {
@@ -224,8 +224,9 @@
   .mono { font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: -0.01em; }
   /* figures stay in the sans with tabular digits; mono is for addresses, ports and hashes */
   .num { font-variant-numeric: tabular-nums; }
-  .link { color: var(--accent); text-underline-offset: 3px; }
-  .link:hover { text-decoration: underline; }
+  /* links are ink; blue means "scanning now", coral means "changed, needs you" */
+  .link { color: var(--ink); text-decoration: underline; text-decoration-color: var(--rule-strong); text-decoration-thickness: 1px; text-underline-offset: 3px; transition: text-decoration-color 150ms; }
+  .link:hover { text-decoration-color: currentColor; }
   .label { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--ink); }
   .field {
     height: 38px; width: 100%; padding: 0 12px; background: var(--sunk); border: 1px solid var(--rule-strong);
@@ -258,6 +259,10 @@
   }
   /* section heading: label in ink, not grey */
   .eyebrow { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--ink); }
+  /* group heading over rows: small mono caps with a count */
+  /* a fact about a row: short, quiet, pill */
+  .chip-fact { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; line-height: 16px; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--rule-strong); white-space: nowrap; }
+  .caps { font-family: var(--font-mono); font-size: 11.5px; line-height: 16px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
 }
 
 /* The ground: a still, dim piece of the login's field. One fixed layer, no animation. */
@@ -271,12 +276,8 @@
     radial-gradient(36% 30% at 96% -10%, rgb(38 97 220 / 0.10), transparent 70%),
     linear-gradient(180deg, #071028, #050913 60%);
 }
-:root[data-theme="light"] .app-ground {
-  background:
-    radial-gradient(46% 38% at 6% -6%, rgb(38 97 220 / 0.10), transparent 70%),
-    radial-gradient(40% 34% at 100% 108%, rgb(229 85 106 / 0.08), transparent 70%),
-    linear-gradient(180deg, #eef0f4, #f3f3f0 60%);
-}
+:root[data-theme="light"] .app-ground { background: #f7f1e8; }
+:root[data-theme="light"] [role="tooltip"] { color: #fffbf5; }
 
 @keyframes pulse-ring { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @keyframes slide-in { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }

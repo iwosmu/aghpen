@@ -73,11 +73,10 @@ export default function Changes() {
   const cols: Col<Change>[] = [
     { id: 'kind', header: t('Rodzaj', 'Type'), cell: (c) => <ChangeMark kind={c.kind} expected={c.expected} /> },
     { id: 'what', header: t('Co się zmieniło', 'What changed'), wrap: true, cell: (c) => (
-      <div className="min-w-[220px] py-1"><div className={c.expected ? 'text-ink-2' : ''}>{c.summary}</div><BeforeAfter c={c} /><ChangeDetail c={c} /></div>
+      <div className="min-w-[220px] max-w-[560px] py-2"><div className={cx('text-[15px] leading-[21px]', c.expected ? 'text-ink-2' : 'text-ink')}>{c.summary}</div><BeforeAfter c={c} /><ChangeDetail c={c} /></div>
     ) },
     { id: 'addr', header: t('Adres', 'Address'), sort: 'ip', cell: (c) => <Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link">{c.ip}{c.port ? ':' + c.port : ''}</Link> },
     { id: 'sev', header: t('Waga', 'Severity'), sort: 'severity', hide: 'md', cell: (c) => c.expected ? <span className="text-xs text-ink-3">{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} /> },
-    { id: 'run', header: t('Skan', 'Scan'), hide: 'lg', cell: (c) => <Link to={'/runs/' + c.run_id} className="num link">#{c.run_id}</Link> },
     { id: 'at', header: t('Kiedy', 'When'), sort: 'at', hide: 'xl', cell: (c) => <span className="num text-ink-2" title={fmtDateTime(c.at)}>{fmtRelative(c.at)}</span> },
     { id: 'ack', header: t('Przejrzana', 'Reviewed'), cell: (c) => c.acked_at
       ? <span className="inline-flex items-center gap-1.5 text-xs text-ink-2" title={fmtDateTime(c.acked_at)}><Icon name="check" size={12} className="text-st-new" />{c.acked_by.split('@')[0]}</span>
@@ -90,13 +89,13 @@ export default function Changes() {
         readOnly={!canAck}
         actions={<><ExportButtons kind="changes" query={filters} /><LinkButton to="/changes/compare" icon="compare">{t('Porównaj dwa skany', 'Compare two scans')}</LinkButton></>}
       />
-      <div className="flex flex-wrap items-center gap-2 px-4 pb-4 sm:px-6 lg:px-8" role="group" aria-label={t('Szybkie filtry', 'Quick filters')} data-testid="change-quick">
+      <div className="flex items-center gap-2 overflow-x-auto px-4 pb-4 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:px-6 lg:px-8" role="group" aria-label={t('Szybkie filtry', 'Quick filters')} data-testid="change-quick">
         {(['service_gone', 'host_missing', 'service_unreachable', 'service_returned', 'service_new', 'response_slower', 'response_recovered'] as const).map((k) => {
           const i = changeKindInfo(k);
           const on = u.get('kind') === k;
           return (
             <button key={k} type="button" aria-pressed={on} onClick={() => u.set({ kind: on ? null : k })}
-              className={cx('inline-flex h-[30px] items-center gap-2 rounded-full pl-3 text-xs font-medium transition-colors duration-150', on ? 'bg-primary pr-2 text-primary-ink' : 'bg-[var(--row-hover)] pr-3.5 text-ink-2 shadow-[inset_0_0_0_1px_var(--rule-strong)] hover:text-ink')}>
+              className={cx('inline-flex h-[30px] flex-none items-center gap-2 whitespace-nowrap rounded-full pl-3 text-xs font-medium transition-colors duration-150', on ? 'bg-primary pr-2 text-primary-ink' : 'bg-[var(--row-hover)] pr-3.5 text-ink-2 shadow-[inset_0_0_0_1px_var(--rule-strong)] hover:text-ink')}>
               <Glyph name={i.glyph} tone={i.tone} size={12} />{i.label}{on ? <Icon name="x" size={12} className="ml-0.5" /> : null}
             </button>
           );
@@ -132,6 +131,7 @@ export default function Changes() {
         sort={u.get('sort', '-at')} onSort={(s) => u.set({ sort: s })}
         selected={canAck ? selected : undefined} onSelect={canAck ? setSelected : undefined}
         rowClass={(c) => cx(c.acked_at && 'opacity-70')}
+        group={u.get('sort', '-at').endsWith('at') ? (c) => ({ key: String(c.run_id), label: <><Link to={'/runs/' + c.run_id} className="link normal-case">{t('Skan', 'Scan')} #{c.run_id}</Link><span className="text-ink-3"> · </span><span className="normal-case tracking-normal">{fmtRelative(c.at)}</span></> }) : undefined}
         empty={<Empty icon="changes" title={active ? t('Żadna zmiana nie pasuje do filtrów', 'No changes match the filters') : t('Brak zmian', 'No changes yet')} hint={active ? undefined : t('Zmiany pojawią się po drugim skanie.', 'Changes appear after the second scan.')} action={active ? undefined : <NextSteps />} />}
         mobile={(c) => (
           <div>

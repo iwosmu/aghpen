@@ -312,7 +312,7 @@ function TopFindings() {
               <span className="mt-0.5"><Sev level={g.severity} compact /></span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-ink" title={g.title}>{g.title}</span>
-                <span className="mt-0.5 block text-xs text-ink-2"><span className="num text-ink">{g.places}</span> {services ? plural(g.places, ['usługa', 'usługi', 'usług'], ['service', 'services']) : plural(g.places, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])} · {t('najnowsze', 'newest')} {fmtRelative(newest)}</span>
+                <span className="mt-1 flex flex-wrap gap-1.5"><span className="chip-fact"><span className="num text-ink">{g.places}</span> {services ? plural(g.places, ['usługa', 'usługi', 'usług'], ['service', 'services']) : plural(g.places, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}</span><span className="chip-fact">{t('najnowsze', 'newest')} {fmtRelative(newest)}</span></span>
               </span>
               <span className="mt-0.5 flex-none"><InterestScore value={g.interest} /></span>
             </Row>
@@ -339,9 +339,9 @@ function RecentChanges({ fallback }: { fallback: Change[] }) {
               <span className="mt-0.5"><Glyph name={changeKindInfo(c.kind).glyph} tone={changeKindInfo(c.kind).tone} /></span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-ink" title={c.summary}>{c.summary}</span>
-                <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-2">
-                  <span className="mono text-ink">{many ? ip : ip + (c.port ? ':' + c.port : '')}</span>
-                  {many ? <span data-testid="change-run">· {items.length} {plural(items.length, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes'])}{spanText(spanSec) ? ' ' + spanText(spanSec) : ''}</span> : null}
+                <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-ink-2">
+                  <span className="chip-fact mono text-ink">{many ? ip : ip + (c.port ? ':' + c.port : '')}</span>
+                  {many ? <span className="chip-fact" data-testid="change-run">{items.length} {plural(items.length, ['zmiana', 'zmiany', 'zmian'], ['change', 'changes'])}{spanText(spanSec) ? ' ' + spanText(spanSec) : ''}</span> : null}
                   <Sev level={c.severity} />
                 </span>
               </span>

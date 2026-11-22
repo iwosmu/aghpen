@@ -51,6 +51,24 @@ export interface TableProps<T> {
   caption?: string;
   /** the table sits inside a Panel: keep the narrow cell padding instead of the page gutter */
   inPanel?: boolean;
+  /** consecutive rows with the same key sit under one small caps heading with their count */
+  group?: (row: T) => { key: string; label: ReactNode };
+}
+
+/** Runs of rows that share a group key, in the order given. */
+export function groupRuns<T>(rows: T[], group?: (row: T) => { key: string; label: ReactNode }): { key: string; label: ReactNode; rows: T[] }[] {
+  if (!group) return [{ key: '', label: null, rows }];
+  const out: { key: string; label: ReactNode; rows: T[] }[] = [];
+  for (const r of rows) {
+    const g = group(r);
+    const last = out[out.length - 1];
+    if (last && last.key === g.key) last.rows.push(r); else out.push({ key: g.key, label: g.label, rows: [r] });
+  }
+  return out;
+}
+
+export function GroupHead({ label, count, className }: { label: ReactNode; count: number; className?: string }) {
+  return <p className={cx('caps', className)}>{label} <span className="text-ink-3">· </span><span className="num">{count}</span></p>;
 }
 
 export function DataTable<T>(p: TableProps<T>) {
@@ -86,7 +104,9 @@ export function DataTable<T>(p: TableProps<T>) {
   if (narrow && p.mobile) {
     return (
       <ul className={cx('transition-opacity', !p.inPanel && 'card mx-3 overflow-hidden rounded-[22px] py-1 sm:mx-6', p.dim && 'opacity-60')}>
-        {rows.map((row) => {
+        {groupRuns(rows, p.group).flatMap((g) => [
+          ...(g.label ? [<li key={'g-' + g.key} className="px-4 pb-1.5 pt-4"><GroupHead label={g.label} count={g.rows.length} /></li>] : []),
+          ...g.rows.map((row) => {
           const k = p.rowKey(row);
           return (
             <li key={k} className={cx('flex items-start gap-2 border-b border-rule px-4 py-3 last:border-b-0', sel?.has(k) && 'bg-[var(--row-selected)]')}>
@@ -94,7 +114,7 @@ export function DataTable<T>(p: TableProps<T>) {
               <div className="min-w-0 flex-1" onClick={clickable ? () => go(row) : undefined} role={clickable ? 'link' : undefined}>{p.mobile!(row)}</div>
             </li>
           );
-        })}
+        })])}
       </ul>
     );
   }
@@ -127,7 +147,9 @@ export function DataTable<T>(p: TableProps<T>) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => {
+          {groupRuns(rows, p.group).flatMap((g) => [
+            ...(g.label ? [<tr key={'g-' + g.key} className="border-b border-rule"><td colSpan={p.cols.length + (sel ? 1 : 0)} className={cx('px-3 pb-2 pt-5', edge)}><GroupHead label={g.label} count={g.rows.length} /></td></tr>] : []),
+            ...g.rows.map((row) => {
             const k = p.rowKey(row);
             return (
               <tr
@@ -145,7 +167,7 @@ export function DataTable<T>(p: TableProps<T>) {
                 ))}
               </tr>
             );
-          })}
+          })])}
         </tbody>
       </table>
     </div>

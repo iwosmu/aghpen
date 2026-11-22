@@ -11,7 +11,7 @@ import { useUrlState } from '../lib/hooks';
 import { Button, Dialog, Empty, ErrorState, Field, InlineError, KV, PageHeader, Select, SkeletonRows, Tabs, TagInput, Tags } from '../ui/kit';
 import { groupFindings, type FindingGroup } from '../lib/findingGroups';
 import { Icon } from '../ui/Icon';
-import { DataTable, FilterBar, FilterField, Pager, SearchField, type Col } from '../ui/table';
+import { DataTable, FilterBar, FilterField, GroupHead, Pager, SearchField, type Col } from '../ui/table';
 import { FINDING_STATUSES, FindingStatusMark, Glyph, InterestScore, SEVERITIES, Sev, findingStatusInfo, severityLabel } from '../ui/marks';
 import { ExportButtons, InlineText, OverrideNote, useDraft } from '../ui/edit';
 import { useSession } from '../session';
@@ -120,35 +120,35 @@ function FindingGroupList({ q, active, onOpen }: { q: ReturnType<typeof usePage<
   const toggle = (k: string) => setOpenKeys((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const shown = q.data.items.length;
   return (
-    <div className={cx(q.isPlaceholderData && 'opacity-60')} data-testid="finding-groups">
-      <div className="hidden grid-cols-[110px_minmax(0,1fr)_minmax(0,220px)_86px] gap-x-3 border-b border-rule px-4 py-1.5 text-xs text-ink-3 sm:grid sm:px-6">
-        <span>{t('Waga', 'Severity')}</span><span>{t('Znalezisko', 'Finding')}</span><span>{t('Status', 'Status')}</span><span className="text-right">{t('Ciekawość', 'Interest')}</span>
-      </div>
-      <ul>
-        {groups.map((g: FindingGroup) => {
+    <div className={cx('px-3 sm:px-6 lg:px-8', q.isPlaceholderData && 'opacity-60')} data-testid="finding-groups">
+      {[...SEVERITIES as string[], ...new Set(groups.map((g) => g.severity).filter((s) => !(SEVERITIES as string[]).includes(s)))].map((sev) => groups.filter((g) => g.severity === sev)).filter((list) => list.length).map((list) => (
+        <section key={list[0].severity} className="mb-6">
+          <GroupHead label={severityLabel(list[0].severity)} count={list.length} className="mb-2 px-1" />
+          <ul className="card overflow-hidden rounded-[20px]">
+        {list.map((g: FindingGroup) => {
           const isOpen = openKeys.has(g.key) || groups.length === 1;
-          const statusText = STATUS_ORDER.filter((s) => g.statuses[s]).map((s) => g.statuses[s] + ' ' + findingStatusInfo(s as FindingStatus).label).join(', ');
           return (
-            <li key={g.key} className="border-b border-rule">
+            <li key={g.key} className="border-b border-rule last:border-b-0">
               <button type="button" aria-expanded={isOpen} onClick={() => toggle(g.key)} data-testid="finding-group"
-                className="grid w-full grid-cols-[110px_minmax(0,1fr)] items-center gap-x-3 px-4 py-2 text-left text-sm hover:bg-raised sm:grid-cols-[110px_minmax(0,1fr)_minmax(0,220px)_86px] sm:px-6">
-                <span><Sev level={g.severity} /></span>
-                <span className="flex min-w-0 items-baseline gap-2">
-                  <Icon name={isOpen ? 'chevronDown' : 'chevronRight'} size={12} className="flex-none self-center text-ink-3" />
-                  <span className="truncate text-ink">{g.title}</span>
-                  <span className="flex-none whitespace-nowrap text-ink-2">· <span className="num">{g.places}</span> {g.items.every((f) => f.port) ? plural(g.places, ['usługa', 'usługi', 'usług'], ['service', 'services']) : plural(g.places, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}</span>
+                className="grid min-h-[60px] w-full grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-x-3 px-5 py-2.5 text-left transition-colors duration-150 hover:bg-[var(--row-hover)]">
+                <Icon name={isOpen ? 'chevronDown' : 'chevronRight'} size={12} className="text-ink-3" />
+                <span className="min-w-0">
+                  <span className="block truncate text-[15px] text-ink">{g.title}</span>
+                  <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <span className="chip-fact"><span className="num">{g.places}</span> {g.items.every((f) => f.port) ? plural(g.places, ['usługa', 'usługi', 'usług'], ['service', 'services']) : plural(g.places, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}</span>
+                    {STATUS_ORDER.filter((s) => g.statuses[s]).map((s) => <span key={s} className="chip-fact"><span className="num">{g.statuses[s]}</span> {findingStatusInfo(s as FindingStatus).label}</span>)}
+                  </span>
                 </span>
-                <span className="col-start-2 truncate text-xs text-ink-2 sm:col-start-auto">{statusText}</span>
-                <span className="hidden justify-self-end sm:block"><InterestScore value={g.interest} /></span>
+                <span className="justify-self-end"><InterestScore value={g.interest} /></span>
               </button>
               {isOpen ? (
-                <ul className="pb-1.5" data-testid="finding-group-items">
+                <ul className="pb-2" data-testid="finding-group-items">
                   {g.items.map((f) => (
                     <li key={f.id}>
-                      <button type="button" onClick={() => onOpen(f.id)} className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-1 pl-[calc(1rem+110px+0.75rem+20px)] pr-4 text-left text-sm hover:bg-raised sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)_86px] sm:pr-6">
-                        <span className="mono truncate text-ink-2">{f.ip}{f.port ? ':' + f.port : ''}{f.manual ? <span className="ml-1.5 font-sans text-2xs text-ink-3">{t('ręczne', 'manual')}</span> : null}</span>
+                      <button type="button" onClick={() => onOpen(f.id)} className="grid min-h-[38px] w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-4 py-1 pl-[50px] pr-5 text-left text-sm transition-colors duration-150 hover:bg-[var(--row-hover)]">
+                        <span className="mono truncate text-[13px] text-ink-2">{f.ip}{f.port ? ':' + f.port : ''}{f.manual ? <span className="ml-1.5 font-sans text-2xs text-ink-3">{t('ręczne', 'manual')}</span> : null}</span>
                         <span className="text-xs"><FindingStatusMark status={f.status} /></span>
-                        <span className="hidden justify-self-end sm:block"><InterestScore value={f.interest} /></span>
+                        <span className="justify-self-end"><InterestScore value={f.interest} /></span>
                       </button>
                     </li>
                   ))}
@@ -157,8 +157,10 @@ function FindingGroupList({ q, active, onOpen }: { q: ReturnType<typeof usePage<
             </li>
           );
         })}
-      </ul>
-      <p className="px-4 py-2 text-xs text-ink-3 sm:px-6">
+          </ul>
+        </section>
+      ))}
+      <p className="px-1 pb-2 text-xs text-ink-2">
         {t(groups.length + ' ' + plural(groups.length, ['rodzaj', 'rodzaje', 'rodzajów'], ['', '']) + ', ' + shown + ' ' + plural(shown, ['znalezisko', 'znaleziska', 'znalezisk'], ['', '']), groups.length + ' ' + (groups.length === 1 ? 'type' : 'types') + ', ' + shown + ' ' + (shown === 1 ? 'finding' : 'findings'))}
         {q.data.total > shown ? t('; pokazano ' + shown + ' z ' + q.data.total, '; showing ' + shown + ' of ' + q.data.total) : ''}.
       </p>
@@ -236,7 +238,7 @@ export default function Findings() {
         readOnly={!canEdit}
         actions={<>{canExport && total > 0 ? <Button icon="upload" onClick={() => setConfirmAll(true)} disabled={Boolean(u.get('assignee'))} title={u.get('assignee') ? t('Eksport pomija filtr „przypisane”. Usuń go albo zaznacz znaleziska.', 'The export ignores the assignee filter. Clear it or select findings.') : undefined} data-testid="dojo-export-filtered">{active ? t('Pasujące do DefectDojo', 'Export matching to DefectDojo') : t('Wszystkie do DefectDojo', 'Export all to DefectDojo')}</Button> : null}<ExportButtons kind="findings" query={filters} />{can('results:create') ? <Button variant="primary" icon="plus" onClick={() => setManual(true)}>{t('Dodaj', 'Add')}</Button> : null}</>}
       />
-      <div className="px-4 pt-2 sm:px-6">
+      <div className="px-4 pb-3 sm:px-6 lg:px-8">
         <Tabs value={view} onChange={(v) => u.set({ view: v === 'groups' ? null : v })} tabs={[{ id: 'groups', label: t('Według rodzaju', 'By type') }, { id: 'list', label: t('Lista', 'List') }]} />
       </div>
       <FilterBar onClear={() => u.clear(FILTERS)} active={active}>
