@@ -40,7 +40,7 @@ export function ChangeDetail({ c }: { c: Change }) {
   if (!entries.length) return null;
   const val = (v: unknown) => (typeof v === 'object' ? JSON.stringify(v) : String(v));
   return (
-    <details className="mt-1 text-xs" data-testid="change-detail">
+    <details className="mt-0.5 text-xs open:basis-full" data-testid="change-detail">
       <summary className="cursor-pointer select-none text-ink-3 hover:text-ink-2">{t('Szczegóły', 'Details')}</summary>
       <dl className="mono mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-2xs text-ink-2">
         {entries.map(([k, v]) => <div key={k} className="contents"><dt className="text-ink-3">{k}</dt><dd className="break-all">{val(v)}</dd></div>)}
@@ -73,7 +73,7 @@ export default function Changes() {
   const cols: Col<Change>[] = [
     { id: 'kind', header: t('Rodzaj', 'Type'), cell: (c) => <ChangeMark kind={c.kind} expected={c.expected} /> },
     { id: 'what', header: t('Co się zmieniło', 'What changed'), wrap: true, cell: (c) => (
-      <div className="min-w-[220px] max-w-[560px] py-2"><div className={cx('text-[15px] leading-[21px]', c.expected ? 'text-ink-2' : 'text-ink')}>{c.summary}</div><BeforeAfter c={c} /><ChangeDetail c={c} /></div>
+      <div className="min-w-[220px] max-w-[560px] py-2"><div className={cx('text-[15px] leading-[21px]', c.expected ? 'text-ink-2' : 'text-ink')}>{c.summary}</div><div className="flex flex-wrap items-baseline gap-x-4"><BeforeAfter c={c} /><ChangeDetail c={c} /></div></div>
     ) },
     { id: 'addr', header: t('Adres', 'Address'), sort: 'ip', cell: (c) => <Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link">{c.ip}{c.port ? ':' + c.port : ''}</Link> },
     { id: 'sev', header: t('Waga', 'Severity'), sort: 'severity', hide: 'md', cell: (c) => c.expected ? <span className="text-xs text-ink-3">{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} /> },
@@ -131,6 +131,7 @@ export default function Changes() {
         sort={u.get('sort', '-at')} onSort={(s) => u.set({ sort: s })}
         selected={canAck ? selected : undefined} onSelect={canAck ? setSelected : undefined}
         rowClass={(c) => cx(c.acked_at && 'opacity-70')}
+        groupNote={(rows) => { const n = rows.filter((c) => !c.expected).length; return n < rows.length ? <span className="text-ink-3">, {t('w tym', 'of which')} <span className="num text-ink-2">{n}</span> {plural(n, ['nieoczekiwana', 'nieoczekiwane', 'nieoczekiwanych'], ['unexpected', 'unexpected'])}</span> : null; }}
         group={u.get('sort', '-at').endsWith('at') ? (c) => ({ key: String(c.run_id), label: <><Link to={'/runs/' + c.run_id} className="link">{t('Skan', 'Scan')} #{c.run_id}</Link><span className="text-ink-3"> · </span><span>{fmtRelative(c.at)}</span></> }) : undefined}
         empty={<Empty icon="changes" title={active ? t('Żadna zmiana nie pasuje do filtrów', 'No changes match the filters') : t('Brak zmian', 'No changes yet')} hint={active ? undefined : t('Zmiany pojawią się po drugim skanie', 'Changes appear after the second scan')} action={active ? undefined : <NextSteps />} />}
         mobile={(c) => (

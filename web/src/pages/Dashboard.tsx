@@ -78,7 +78,9 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
   const returned = s?.services_returned ?? 0;
   const slower = s?.responses_slower ?? 0;
   const recovered = s?.by_kind?.response_recovered ?? 0;
-  const quiet = s ? added + gone + changed + s.hosts_unstable + missing + confirmedGone + returned + slower + recovered === 0 : true;
+  // with per-kind counts, the headline counts what the changes page lists for this run: rows that were not expected
+  const listed = run && s?.by_kind ? runChanges(run) : null;
+  const quiet = listed !== null ? listed === 0 : s ? added + gone + changed + s.hosts_unstable + missing + confirmedGone + returned + slower + recovered === 0 : true;
   const open = (d.top_findings ?? []).filter((f) => f.status === 'new' || f.status === 'triaged');
   const important = open.filter((f) => f.severity === 'high' || f.interest >= ATTENTION_INTEREST);
   const panels = adminPanelNames(open);
@@ -89,19 +91,19 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
       'First picture of the network: ' + fmtInt(h.hosts_up) + ' ' + (h.hosts_up === 1 ? 'host' : 'hosts') + ' up, ' + fmtInt(h.services_open) + ' open ' + (h.services_open === 1 ? 'service' : 'services') + '.')
     : quiet
       ? t('Bez zmian od poprzedniego skanu', 'No change since the previous scan')
-      : (() => { const n = added + gone + changed + missing + s!.hosts_unstable + returned + slower + recovered + confirmedGone; return t(fmtInt(n) + ' ' + plural(n, ['zmiana', 'zmiany', 'zmian'], ['', '']) + ' od poprzedniego skanu.', fmtInt(n) + ' ' + (n === 1 ? 'change' : 'changes') + ' since the previous scan.'); })();
+      : (() => { const n = listed ?? added + gone + changed + missing + s!.hosts_unstable + returned + slower + recovered + confirmedGone; return t(fmtInt(n) + ' ' + plural(n, ['zmiana', 'zmiany', 'zmian'], ['', '']) + ' od poprzedniego skanu.', fmtInt(n) + ' ' + (n === 1 ? 'change' : 'changes') + ' since the previous scan.'); })();
   return (
     <div>
       <p className="font-display text-[28px] leading-[1.15] text-ink sm:text-[34px]" data-testid="handover">{headline.replace(/\.$/, '')}</p>
-      <p className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-ink-2" data-testid="handover-attention">
+      <p className="mt-2 text-sm leading-6 text-ink-2" data-testid="handover-attention">
         {h.admin_panels > 0 ? (
-          <Link to="/services?class=admin-panel" className="group inline-flex items-center gap-2 text-ink">
-            <span className="lamp bg-coral" aria-hidden="true" />
+          <Link to="/services?class=admin-panel" className="group mr-5 text-ink">
+            <span className="lamp mr-2 inline-block align-[0px]" style={{ background: 'var(--coral)' }} aria-hidden="true" />
             <span className="decoration-[var(--rule-strong)] underline-offset-4 group-hover:underline">{fmtInt(h.admin_panels)} {plural(h.admin_panels, ['panel administracyjny', 'panele administracyjne', 'paneli administracyjnych'], ['admin panel', 'admin panels'])}</span>
-            {named.length ? <span className="text-ink-3">{named.join(', ')}</span> : null}
+            {named.length ? <span className="text-ink-3"> {named.join(', ')}</span> : null}
           </Link>
-        ) : attention ? null : <span className="inline-flex items-center gap-2"><span className="lamp bg-ink-3" aria-hidden="true" />{t('Nic pilnego', 'Nothing urgent')}</span>}
-        <span>
+        ) : attention ? null : <span className="mr-5"><span className="lamp mr-2 inline-block bg-ink-3 align-[0px]" aria-hidden="true" />{t('Nic pilnego', 'Nothing urgent')}</span>}
+        <span className="whitespace-nowrap">
           <span className="mono text-[13px] text-ink-3">{t('Skan', 'Scan')} <Link to={'/runs/' + run.id} className="hover:text-ink hover:underline">#{run.id}</Link> · {fmtRelative(run.finished_at)}</span>
           {baseline ? <span className="text-ink-3"> · {t('punkt odniesienia', 'baseline')}</span> : null}
         </span>
@@ -158,7 +160,8 @@ function Inventory({ d, pair, runs }: { d: Dash; pair?: { full?: ScanRun; prev?:
   const deltaTitle = full && prev ? t('zmiana między pełnymi skanami #' + prev.id + ' i #' + full.id + (full.profile_name ? ' (' + full.profile_name + ')' : ''), 'change between the full scans #' + prev.id + ' and #' + full.id + (full.profile_name ? ' (' + full.profile_name + ')' : '')) : undefined;
   // the same per-scan series as the API's trend, oldest first
   void runs;
-  const lastRun = d.last_run;
+  // the same run the headline describes
+  const lastRun = full ?? d.last_run;
   const lastChanges = lastRun ? runChanges(lastRun) : 0;
   const newHighQ = usePage<Finding>('/findings', { severity: 'high', status: 'new', limit: 1 });
   const newHigh = newHighQ.data?.total;
