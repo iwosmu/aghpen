@@ -171,6 +171,23 @@ func TestFindingTextGolden(t *testing.T) {
 	checkGolden(t, "findingtext.golden", b.String())
 }
 
+// A new reason code or a new finding title lead needs its English text.
+func TestEnglishCoversEveryTypeAndReason(t *testing.T) {
+	for _, w := range InterestWeights {
+		if _, ok := reasonEN[w.Code]; !ok {
+			t.Errorf("reason %s has no English label", w.Code)
+		}
+	}
+	for _, f := range goldenFindings() {
+		if en := RenderFinding(f, "en"); en.Title == f.Title || en.Description == f.Description && !strings.Contains(f.Description, ": ") {
+			t.Errorf("%s: no English rendering: %q / %q", f.Type, en.Title, en.Description)
+		}
+	}
+	if got := RenderFinding(model.Finding{Type: "manual", Manual: true, Title: "Ręczny wpis"}, "en"); got.Title != "Ręczny wpis" {
+		t.Errorf("manual finding changed: %q", got.Title)
+	}
+}
+
 func TestReasonTextGolden(t *testing.T) {
 	var b strings.Builder
 	seen := map[string]bool{}
