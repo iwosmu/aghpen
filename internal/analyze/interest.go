@@ -158,8 +158,12 @@ func Interest(in InterestInput) (int, []model.InterestReason) {
 	classes := EffectiveClasses(s, in.Hostnames)
 	has := func(c string) bool { return hasClass(classes, c) }
 
+	webDatabase := has(model.ClassDatabase) && !isDatabaseProtocol(s)
 	if has(model.ClassAdminPanel) {
 		add(ReasonAdminPanel, "")
+		if webDatabase {
+			why[len(why)-1].Text = "Panel bazy danych dostępny z sieci"
+		}
 	}
 	if has(model.ClassLogin) {
 		if isPlainHTTP(s) {
@@ -185,7 +189,7 @@ func Interest(in InterestInput) (int, []model.InterestReason) {
 	if has(model.ClassDevTool) {
 		add(ReasonDevTool, "")
 	}
-	if has(model.ClassDatabase) {
+	if has(model.ClassDatabase) && !webDatabase {
 		add(ReasonDatabase, productVersion(s))
 	}
 	if has(model.ClassRemoteAccess) {
