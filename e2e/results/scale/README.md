@@ -24,3 +24,5 @@ Zapis pomiarów Czujki na 2 000 i 10 000 żywych adresów, serwer OMEN, 21–22.
 Prawda wzorcowa (13 MB) i eksporty JSON (20 i 96 MB) nie są w repozytorium. Prawdę odtwarza `lab/scale/scale.sh truth N`, cały pomiar `lab/scale/README.md`.
 
 Pierwsza próba serii 10 000 poszła z limitem 1 000/s, bo skrypt podnosił limit profilu metodą PUT (API odpowiada 405). Przerwaliśmy ją po 22 minutach; `measure.sh` używa teraz PATCH. Przed przebiegiem `r2-10k` mały skrypt zmienił `rate.http_rps` profilu z 20 na 50 (PATCH `/profiles/{id}`); teraz robi to `measure.sh run NAZWA 10000 50`.
+
+Przebieg 3 oceniamy względem stanu dziewięciu farm (`scale.sh truth 9`), bo farma 10 była wyłączona. Czasy API mierzyliśmy po przebiegach 1 i 3 (`api-r1-10k.txt`, `api-r3-10k.txt`), nie po przebiegu 2. Eksporty i pliki stanu (`export-*.json`, `truth-*.json`, 11–96 MB) nie są w repozytorium; odtwarza je `lab/scale/measure.sh`.

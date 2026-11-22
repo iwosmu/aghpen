@@ -1,1 +1,3 @@
 {"name":"r1-10k","run":1,"wall_s":8144,"analysis_s":20,"wire_packets":13784368,"wire_peak_pps":11415,"wire_seconds_over_cap":27,"czujka_mem_max_mib":908,"db_mem_max_mib":405,"db_bytes":175101619,"changes":0}
+{"name":"r2-10k","run":2,"wall_s":6317,"analysis_s":24,"wire_packets":13773202,"wire_peak_pps":9873,"wire_seconds_over_cap":0,"czujka_mem_max_mib":851,"db_mem_max_mib":1057,"db_bytes":313570995,"changes":8018}
+{"name":"r3-10k","run":3,"wall_s":6304,"analysis_s":12,"wire_packets":12439163,"wire_peak_pps":10114,"wire_seconds_over_cap":1,"czujka_mem_max_mib":755,"db_mem_max_mib":1031,"db_bytes":406156979,"changes":3792}

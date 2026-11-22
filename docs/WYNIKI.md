@@ -190,59 +190,63 @@ Laboratorium z importem i bez niego: precyzja technologii 0,990 w obu wariantach
 
 Laboratorium [`lab/scale/`](../lab/scale/README.md) na serwerze OMEN. Kontener „farma” obsługuje 1 000 żywych adresów: prawdziwy stos TCP/IP Linuksa, nginx, Dropbear SSH i lighttpd. Pomiar 2 000 to 2 kontenery, pomiar 10 000 to 10 kontenerów: tyle żywych adresów, nie tyle maszyn. Prawdę wzorcową pisze ten sam skrypt (`lab/scale/scale.sh truth`).
 Zakres skanu: `10.77.0.0/16` (65 536 adresów). Profil domyślny (top-1000 i porty infrastruktury, UDP, wykrywanie wersji). Wersja `736ff9a`. Wszystko przez REST API (`lab/scale/measure.sh`), pakiety liczy `tcpdump` w przestrzeni sieciowej Czujki.
-Limity: 2 000 z domyślną polityką (1 000 pakietów/s, `http_rps` 20). 10 000 z limitem podniesionym do 10 000 pakietów/s; `http_rps` 20 w przebiegu 1; przebiegi 2 (bez zmian w sieci) i 3 (farma 10 wyłączona) idą z `http_rps` 50, maksimum domyślnej polityki, i trafią tu po zakończeniu. Surowe liczby: [`e2e/results/scale/`](../e2e/results/scale/README.md).
+Limity: 2 000 z domyślną polityką (1 000 pakietów/s, `http_rps` 20). 10 000 z limitem podniesionym do 10 000 pakietów/s; `http_rps` 20 w przebiegu 1; 50 w przebiegach 2 (sieć bez zmian) i 3 (farma 10 wyłączona), maksimum domyślnej polityki. Surowe liczby: [`e2e/results/scale/`](../e2e/results/scale/README.md).
 
-| Miara | 2 000, 1 000 pakietów/s | 10 000, przebieg 1 |
-| --- | --- | --- |
-| `http_rps` | 20 | 20 |
-| Hosty | 2 000 z 2 000 | 10 000 z 10 000 |
-| Otwarte porty | 4 500 z 4 500 | 22 500 z 22 500 |
-| Fałszywe wyniki | 0 | 0 |
-| Tytuły stron | 2 700 z 2 700 | 13 500 z 13 500 |
-| Technologie WWW z wersjami | 2 700 z 2 700 | 13 500 z 13 500 |
-| Nazwy i wersje usług | 4 500 z 4 500 | 18 762 z 22 500 (uwaga 1) |
-| Czas przebiegu | 4 885 s (1 h 21 min) | 8 144 s (2 h 16 min) |
-| Analiza | 4 s | 20 s |
-| Pakiety na przewodzie | 3 067 499 | 13 784 368 |
-| Średnio / najwyższa sekunda | 628 / 1 065 pakietów/s | 1 693 / 11 415 pakietów/s |
-| Pamięć Czujki (maks.) | 914 MiB | 908 MiB |
-| Pamięć PostgreSQL (maks.) | 253 MiB | 405 MiB |
-| Rozmiar bazy | 45 MiB | 166 MiB |
-| Zgłoszone zmiany | 0 (pierwszy skan) | 0 (pierwszy skan) |
+| Miara | 2 000, 1 000 pakietów/s | 10 000, przebieg 1 | 10 000, przebieg 2 | 10 000, przebieg 3 (farma 10 wyłączona) |
+| --- | --- | --- | --- | --- |
+| `http_rps` | 20 | 20 | 50 | 50 |
+| Hosty | 2 000 z 2 000 | 10 000 z 10 000 | 10 000 z 10 000 | 9 000 z 9 000 (farma 10 wyłączona) |
+| Otwarte porty | 4 500 z 4 500 | 22 500 z 22 500 | 22 500 z 22 500 | 20 250 z 20 250 |
+| Fałszywe wyniki | 0 | 0 | 0 | 0 |
+| Tytuły stron | 2 700 z 2 700 | 13 500 z 13 500 | 13 500 z 13 500 | 12 150 z 12 150 |
+| Technologie WWW z wersjami | 2 700 z 2 700 | 13 500 z 13 500 | 13 500 z 13 500 | 12 150 z 12 150 |
+| Nazwy i wersje usług | 4 500 z 4 500 | 18 762 z 22 500 (uwaga 1) | 18 823 z 22 500 (uwaga 1) | 16 966 z 20 250 (uwaga 1) |
+| Czas przebiegu | 4 885 s (1 h 21 min) | 8 144 s (2 h 16 min) | 6 317 s (1 h 45 min) | 6 304 s (1 h 45 min) |
+| Analiza | 4 s | 20 s | 24 s | 12 s |
+| Pakiety na przewodzie | 3 067 499 | 13 784 368 | 13 773 202 | 12 439 163 |
+| Średnio / najwyższa sekunda | 628 / 1 065 pakietów/s | 1 693 / 11 415 pakietów/s | 2 180 / 9 873 pakietów/s | 1 973 / 10 114 pakietów/s |
+| Pamięć Czujki (maks.) | 914 MiB | 908 MiB | 851 MiB | 755 MiB |
+| Pamięć PostgreSQL (maks.) | 253 MiB | 405 MiB | 1 057 MiB | 1 031 MiB |
+| Rozmiar bazy | 45 MiB | 167 MiB | 299 MiB | 387 MiB |
+| Zgłoszone zmiany | 0 (pierwszy skan) | 0 (pierwszy skan) | 8 018, wszystkie na porcie 22 (uwaga 6) | 3 792: farma 10 (1 000 hostów, 2 250 usług) i 542 na porcie 22 (uwaga 6) |
 
-Czasy API (sekundy, druga z dwóch prób; strona po 50 pozycji, „daleka strona” to przesunięcie na koniec listy):
+Przebieg 3 to ten sam skan z wyłączoną farmą 10 (`10.77.36.0/22`). Zmiany dotyczą dokładnie jej 1 000 hostów (`host_missing`, niepotwierdzone) i ich 2 250 usług (`service_unreachable`); poza nią zmieniły się tylko porty 22 (uwaga 6).
 
-| Zapytanie | 2 000 | 10 000 |
-| --- | --- | --- |
-| Hosty: pierwsza / daleka strona | 0,012 / 0,023 | 0,030 / 0,113 |
-| Usługi: pierwsza / daleka strona | 0,022 / 0,77 | 0,06 / 12,9 (przed poprawką, uwaga 5) |
-| Usługi przebiegu: daleka strona | 0,85 | 13,1 (przed poprawką) |
-| Zmiany, obserwacje, pulpit | 0,002 / 0,017 / 0,027 | 0,002 / 0,017 / 0,073 |
-| Oś czasu / stan w chwili przebiegu | 0,006 / 0,165 | 0,006 / 0,77 |
-| Wyszukiwanie „nginx” | 0,038 | 0,134 |
-| Eksport przebiegu JSON | 0,87 (19,6 MB) | 3,2 (96,1 MB) |
-| Eksport przebiegu CSV / nmap XML | 0,60 (1,2 MB) / 0,66 (2,4 MB) | 2,7 (5,3 MB) / 2,9 (10,8 MB) |
-| Eksport usług CSV | 0,92 | 15,2 (przed poprawką, uwaga 5) |
-| Raport HTML / Markdown | 0,13 / 0,13 | 0,45 / 0,51 |
+Czasy API (sekundy, druga z dwóch prób; strona po 50 pozycji, „daleka strona” to przesunięcie na koniec listy). Kolumna „po przebiegu 3”: ta sama baza po trzech przebiegach:
 
-Koszt jednego żywego hosta (z różnicy 10 000 − 2 000, przy tej mieszance usług: 2,25 otwartego portu i 1,35 usługi WWW na host): około 1 340 pakietów, 14,4 żądania HTTP (GET/HEAD) i 15 KB bazy na przebieg. Martwa część /16 kosztuje około 390 000 pakietów (około 6 na adres). Pamięć Czujki nie rośnie z liczbą hostów (około 910 MiB): wyznacza ją liczba równoległych porcji, nie wielkość sieci.
+| Zapytanie | 2 000 | 10 000 | 10 000 po przebiegu 3 |
+| --- | --- | --- | --- |
+| Hosty: pierwsza / daleka strona | 0,012 / 0,023 | 0,030 / 0,113 | 0,023 / 0,102 |
+| Usługi: pierwsza / daleka strona | 0,022 / 0,77 | 0,06 / 12,9 (przed poprawką, uwaga 5) | 0,10 / 14,7 (przed poprawką) |
+| Usługi przebiegu: daleka strona | 0,85 | 13,1 (przed poprawką) | – |
+| Zmiany, obserwacje, pulpit | 0,002 / 0,017 / 0,027 | 0,002 / 0,017 / 0,073 | 0,015 / 0,056 / 0,21 |
+| Oś czasu / stan w chwili przebiegu | 0,006 / 0,165 | 0,006 / 0,77 | 0,024 / 2,0 |
+| Wyszukiwanie „nginx” | 0,038 | 0,134 | 0,18 |
+| Eksport przebiegu JSON | 0,87 (19,6 MB) | 3,2 (96,1 MB) | 4,3 (86,7 MB) |
+| Eksport przebiegu CSV / nmap XML | 0,60 (1,2 MB) / 0,66 (2,4 MB) | 2,7 (5,3 MB) / 2,9 (10,8 MB) | 3,2 (4,9 MB) / 3,3 (10,0 MB) |
+| Eksport usług CSV | 0,92 | 15,2 (przed poprawką, uwaga 5) | 17,8 (przed poprawką) |
+| Raport HTML / Markdown | 0,13 / 0,13 | 0,45 / 0,51 | 0,62 / 0,58 |
+
+Koszt jednego żywego hosta (z różnicy 10 000 − 2 000, przy tej mieszance usług: 2,25 otwartego portu i 1,35 usługi WWW na host): około 1 340 pakietów, 14,4 żądania HTTP (GET/HEAD) i 13–17 KB bazy na każdy przebieg (167 → 299 → 387 MiB po trzech przebiegach 10 000). Martwa część /16 kosztuje około 390 000 pakietów (około 6 na adres). Pamięć Czujki nie rośnie z liczbą hostów (około 910 MiB): wyznacza ją liczba równoległych porcji, nie wielkość sieci.
 
 Ekstrapolacja na pełną sieć /16 z tą samą mieszanką usług (to rachunek z dwóch pomiarów, nie pomiar):
 
 | Żywe adresy w /16 | Pakiety | Żądania HTTP | Domyślna polityka (1 000 pakietów/s, `http_rps` 20) | 10 000 pakietów/s, `http_rps` 20 | 10 000 pakietów/s, `http_rps` 50 |
 | --- | --- | --- | --- | --- | --- |
-| 5 % (3 277) | 4,8 mln | 47 000 | około 2,1 h | około 55 min | około 31 min |
-| 20 % (13 107) | 18,0 mln | 189 000 | około 7,9 h | około 2,9 h | około 1,3 h |
+| 5 % (3 277) | 4,8 mln | 47 000 | około 2,1 h | około 55 min | około 45 min |
+| 20 % (13 107) | 18,0 mln | 189 000 | około 7,9 h | około 2,9 h | około 2,2 h |
 
-Rachunek: przy 1 000 pakietów/s czas wyznaczają pakiety przy zmierzonej średniej 628 pakietów/s; przy 10 000 pakietów/s czas wyznacza etap HTTP (żądania / `http_rps`) plus około 900 s na skan portów i martwe adresy, tak jak w przebiegu 1.
+Rachunek: przy 1 000 pakietów/s czas wyznaczają pakiety przy zmierzonej średniej 628 pakietów/s; przy 10 000 pakietów/s i `http_rps` 20 czas wyznacza etap HTTP (żądania / `http_rps`) plus około 900 s na skan portów i martwe adresy, tak jak w przebiegu 1; dla `http_rps` 50 skalujemy liniowo zmierzony przebieg 2 (900 s plus 0,54 s na żywy host).
 
 Ograniczenia tego pomiaru:
 
-1. 3 738 portów SSH w przebiegu 1 dostało nazwę `tcpwrapped` zamiast `ssh` (od 348 do 508 na farmę). To cecha laboratorium: jeden proces Dropbear obsługuje 900 adresów farmy, a jego limit `MAX_UNAUTH_PER_IP` (5) liczy każde połączenie ze skanera, który ma jeden adres. Przy 10 000 pakietów/s próby wykrywania wersji przekraczają ten limit i Dropbear zamyka połączenie od razu. Pomiar 2 000 przy 1 000 pakietów/s miał 1 800 z 1 800 poprawnych. W prawdziwej sieci każdy host ma własny serwer SSH.
-2. Przebieg 1 przekroczył limit 10 000 pakietów/s przez 27 sekund, najwyższa sekunda: 11 415 pakietów. Wersja `736ff9a` nie ma limitu w jądrze. Późniejsza wersja ogranicza ruch limitem w jądrze; kontrola laboratorium mierzy to przy 1 000 pakietów/s (rozdział „Tempo i bezpieczeństwo skanowania”).
-3. Na gęstej sieci czas przebiegu wyznacza etap HTTP, nie pakiety. W przebiegu 1 sam etap HTTP to 144 276 żądań / 20 na sekundę = 7 214 s z 8 144 s. Grupa czterech gęstych porcji (1 000 hostów, 1 350 usług WWW) trwa około 13 minut niezależnie od limitu pakietów.
+1. 3 738 portów SSH w przebiegu 1 dostało nazwę `tcpwrapped` zamiast `ssh` (od 348 do 508 na farmę). To cecha laboratorium: jeden proces Dropbear obsługuje 900 adresów farmy, a jego limit `MAX_UNAUTH_PER_IP` (5) liczy każde połączenie ze skanera, który ma jeden adres. Przy 10 000 pakietów/s próby wykrywania wersji przekraczają ten limit i Dropbear zamyka połączenie od razu. W przebiegu 2 takich portów było 3 677, w przebiegu 3 (dziewięć farm) 3 284. Pomiar 2 000 przy 1 000 pakietów/s miał 1 800 z 1 800 poprawnych. W prawdziwej sieci każdy host ma własny serwer SSH.
+2. Przebieg 1 przekroczył limit 10 000 pakietów/s przez 27 sekund, najwyższa sekunda: 11 415 pakietów. Przebieg 2: 0 sekund ponad limit (najwyżej 9 873), przebieg 3: 1 sekunda (10 114). Wersja `736ff9a` nie ma limitu w jądrze. Późniejsza wersja ogranicza ruch limitem w jądrze; kontrola laboratorium mierzy to przy 1 000 pakietów/s (rozdział „Tempo i bezpieczeństwo skanowania”).
+3. Na gęstej sieci czas przebiegu wyznacza etap HTTP, nie pakiety. W przebiegu 1 sam etap HTTP to 144 276 żądań / 20 na sekundę = 7 214 s z 8 144 s. Grupa czterech gęstych porcji (1 000 hostów, 1 350 usług WWW) trwa około 13 minut niezależnie od limitu pakietów. Przy `http_rps` 50 (przebiegi 2 i 3) przebieg skrócił się tylko o 22 %: sam etap HTTP to wtedy 144 154 / 50 = 2 883 s z 6 317 s, resztę zajmują wykrywanie wersji i limity na host; tych dwóch nie rozdzieliliśmy.
 4. Szacunek planisty przed skanem (5 944 s) nie liczy etapu HTTP; przebieg 1 trwał 8 144 s.
 5. Daleka strona listy usług i eksport usług rosły szybciej niż dane (0,8 s przy 2 000, 13–38 s przy 10 000). Przyczyna: rozmiar grupy usług liczony osobno dla każdego wiersza; największa grupa ma 10 782 usługi. Poprawka `99ba021` liczy każdą grupę raz. Na bazie 10 000: zapytanie dalekiej strony 13,2 s → 0,079 s, uporządkowany przebieg pod eksportem 11,9 s → 0,032 s (pomiar zapytań SQL na tej samej bazie; tabela API pokazuje wersję `736ff9a` sprzed poprawki).
+6. Przebieg 2 (sieć bez zmian) zgłosił 8 018 zmian, wszystkie na porcie 22: 4 009 zmian klas, 2 035 nowych i 1 974 zniknięte technologie. Przyczyna: port, który raz odpowiedział banerem Dropbear, a raz `tcpwrapped` (uwaga 1), tracił technologię i klasy, a przy następnym skanie je odzyskiwał; te same przejścia rozwiązały 3 948 obserwacji zdalnego dostępu. Zmianę nazwy usługi Czujka już wtedy pomijała. Poprawki: `0f3cf4a` (odpowiedź `tcpwrapped` bez banera, produktu i strony nie zmienia technologii ani klas) i `5fa2bd0` (obserwacja na takim porcie zostaje otwarta). Wersja skanu `736ff9a` ich nie ma, więc przebieg 3 pokazuje te same przejścia (542 zmiany na porcie 22 poza farmą 10).
+7. Stan w chwili przebiegu (oś czasu) po trzech przebiegach 10 000 trwa 2,0 s (0,77 s po jednym).
 
 ## Szablon organizatorów (jedna maszyna)
 

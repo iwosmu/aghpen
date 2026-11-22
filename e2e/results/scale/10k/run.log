@@ -59,3 +59,17 @@ farm 10: 1000 addresses (10.77.36.1 .. 10.77.39.250), 900 with services, 50 clos
 {"rate":{"max_pps":10000,"max_parallel_chunks":4,"max_parallel_hosts":16,"http_rps":50,"per_host_concurrency":1,"per_host_delay_ms":0}}
 [03:06:41] r2-10k: run 2 started
 [03:06:43] r2-10k: run 2 status running at +2 s
+[04:51:34] r2-10k: run 2 status analyzing at +6293 s
+[04:51:58] r2-10k: run 2 status completed at +6317 s
+[04:52:02] r2-10k: run 2 completed in 6317 s (analysis about 24 s); wire: 13773202 packets, peak 9873 pps, 0 s over the cap; czujka max 851 MiB, db max 1057 MiB; db 299 MiB; changes 8018; {"hosts_up":10000,"services":22500,"http":13500,"packets":13610409,"peak_pps":null,"avg_pps":2163,"elapsed":6291,"passes":null}
+[04:52:05] r2-10k: export JSON 96136314 bytes in 3.427608947 s
+farm 10 stopped
+{"max_pps":10000}
+{"rate":{"max_pps":10000,"max_parallel_chunks":4,"max_parallel_hosts":16,"http_rps":50,"per_host_concurrency":1,"per_host_delay_ms":0}}
+[04:52:07] r3-10k: run 3 started
+[04:52:09] r3-10k: run 3 status running at +2 s
+[06:36:59] r3-10k: run 3 status analyzing at +6292 s
+[06:37:11] r3-10k: run 3 status completed at +6304 s
+[06:37:14] r3-10k: run 3 completed in 6304 s (analysis about 12 s); wire: 12439163 packets, peak 10114 pps, 1 s over the cap; czujka max 755 MiB, db max 1031 MiB; db 387 MiB; changes 3792; {"hosts_up":9000,"services":20250,"http":12150,"packets":12314533,"peak_pps":null,"avg_pps":1957,"elapsed":6290,"passes":null}
+[06:37:16] r3-10k: export JSON 86730101 bytes in 1.955689831 s
+CHAIN-DONE
