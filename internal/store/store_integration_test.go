@@ -483,7 +483,7 @@ func TestChangesSignaturesTags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.CreateSignature(ctx, model.Signature{Slug: "moja", YAML: "x"}); !errors.Is(err, store.ErrConflict) {
+	if _, err := st.CreateSignature(ctx, model.Signature{Slug: "moja", YAML: "x"}); !errors.Is(err, store.ErrConflict) || !strings.HasSuffix(err.Error(), ": Sygnatura o tym id już istnieje.") {
 		t.Fatalf("duplicate slug: %v", err)
 	}
 	yes := true
