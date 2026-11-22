@@ -1,26 +1,26 @@
-Lektor do filmu czujka-demo.mp4 (czas filmu 1:49, 155 słów ≈ 91 s przy 1,7 słowa/s; każdy akapit ma co najmniej 1,5 s zapasu i 0,5 s na wejście).
-Nagraj głos na film; kody czasu to początek i koniec ujęcia. Wygenerowane przez record.mjs.
+Lektor do filmu czujka-demo.mp4 (czas filmu 1:49, 168 słów).
+Kody czasu to początek i koniec ujęcia.
 
-[0:00–0:18] install (18.3 s; 22 słów ≈ 12.9 s przy 1,7 słowa/s; zapas 5.4 s)
-Uruchamiamy Czujkę jednym poleceniem. Po pierwszym logowaniu kreator pyta o zakres sieci i o limit pakietów, na który zgodził się jej właściciel.
+[0:00–0:18] install (18.3 s; 28 słów)
+Uruchamiamy Czujkę jednym poleceniem. Po pierwszym logowaniu kreator pyta o zakres sieci i o limit pakietów, na który zgodził się jej właściciel. Baza jest szyfrowana od pierwszego startu.
 
-[0:18–0:34] scan (15.9 s; 24 słów ≈ 14.1 s przy 1,7 słowa/s; zapas 1.8 s)
+[0:18–0:34] scan (15.9 s; 24 słów)
 Skanujemy sieć, która ma ponad sześćdziesiąt pięć tysięcy adresów. Kwadrat w niebieskiej ramce to blok, który skaner sprawdza teraz. Skaner trzyma się limitu pakietów.
 
-[0:34–0:44] changes (10.2 s; 15 słów ≈ 8.8 s przy 1,7 słowa/s; zapas 1.4 s)
+[0:34–0:44] changes (10.2 s; 15 słów)
 Tu porównujemy dwa skany. Widać cztery nowe hosty, pięć nowych usług i jedną, która zniknęła.
 
-[0:44–1:02] unstable (17.3 s; 27 słów ≈ 15.9 s przy 1,7 słowa/s; zapas 1.4 s)
+[0:44–1:02] unstable (17.3 s; 27 słów)
 Ten komputer bywa wyłączony. Czujka pamięta, w których godzinach tygodnia zwykle milczy, i nie zgłasza wtedy alarmu. Gdy milknie o innej porze, sprawdza ponownie tylko ten adres.
 
-[1:02–1:15] time (13.8 s; 20 słów ≈ 11.8 s przy 1,7 słowa/s; zapas 2.0 s)
+[1:02–1:15] time (13.8 s; 20 słów)
 Na osi czasu wybieramy dowolny wcześniejszy skan. Czujka pokazuje sieć z tamtej chwili i to, co się od niej zmieniło.
 
-[1:15–1:33] rules (17.9 s; 28 słów ≈ 16.5 s przy 1,7 słowa/s; zapas 1.4 s)
+[1:15–1:33] rules (17.9 s; 28 słów)
 W regułach zapisujemy, czego w sieci być nie może. Czujka sprawdza je po każdym skanie, bez nowych pakietów. Z wybranej usługi proponuje sygnaturę i testuje ją na historii.
 
-[1:33–1:42] stop (8.9 s; 13 słów ≈ 7.6 s przy 1,7 słowa/s; zapas 1.3 s)
-Naciskamy stop awaryjny. Trwający skan zatrzymuje się od razu, a nowe nie startują.
+[1:33–1:42] stop (8.9 s; 16 słów)
+Naciskamy stop awaryjny. Trwający skan zatrzymuje się od razu. Ten przycisk widzą tylko role z uprawnieniem.
 
-[1:42–1:49] end (6.2 s; 6 słów ≈ 3.5 s przy 1,7 słowa/s; zapas 2.7 s)
-Czujka działa teraz pod adresem czujka.dev.
+[1:42–1:49] end (6.2 s; 10 słów)
+Wyniki eksportujemy, także do DefectDojo. Czujka działa pod adresem czujka.dev.

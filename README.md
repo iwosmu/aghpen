@@ -89,16 +89,16 @@ Skaner wysyła tylko `GET` i `HEAD`. Walidator odrzuca sygnaturę z inną metod�
 
 Liczby pochodzą z [`docs/WYNIKI.md`](docs/WYNIKI.md). Pełna lista wymagań z dowodami jest w [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md).
 
-### Gdzie zobaczyć każde kryterium oceny
+### Co sprawdzić i gdzie
 
-| Waga | Kryterium | Ekran albo polecenie | Zmierzone | Dowód |
-| --- | --- | --- | --- | --- |
-| 30% | Discovery i identyfikacja usług w dużej sieci | przebieg /16 laboratorium; „Hosty”, „Usługi” | laboratorium: hosty 67 z 67, otwarte porty 154 ze 155, 0 fałszywych; skala: 10 000 z 10 000 żywych adresów, porty 22 500 z 22 500 | [WYNIKI](docs/WYNIKI.md#wykrywanie-w-sieci-16), `e2e/lab-gate.sh` |
-| 20% | Uruchomienie, import/eksport, DefectDojo, dokumentacja | `docker compose up -d`; „Import i eksport”; „Znaleziska”, potem „Wszystkie do DefectDojo” | start 51–115 s; test szablonu jury 160 kontroli bez błędu; e2e 26 z 26 | [WYNIKI](docs/WYNIKI.md#uruchomienie), `e2e/full/transcript.txt`, `web/REPORT-LAB.md` §11 |
-| 15% | Zmiany w czasie, niestabilne hosty, raport | szablon: `./quickstart.sh change` i drugi skan pokazują „Usługa zniknęła”; `up` pokazuje „Usługa wróciła”; zatrzymany host ma stan „nie odpowiada (niepotwierdzone)”, po około minucie „nieaktywny” | skan szablonu 49 s (`nmap -sV` na tych samych portach: 51 s) | [WYNIKI](docs/WYNIKI.md#szablon-organizatorów-jedna-maszyna), [ALGORYTMY](docs/ALGORYTMY.md) §3.4 |
-| 15% | Bezpieczeństwo, tempo skanu, czytelny pulpit | górny pasek: „Stop awaryjny”; „Pulpit”: stopka „Tylko GET i HEAD” z limitami; „Administracja”, zakładka „Bezpieczeństwo” | żadnej sekundy ponad limit + 10% na /16; drugi limit w jądrze; stop w 0,09 s | [WYNIKI](docs/WYNIKI.md#tempo-i-bezpieczeństwo-skanowania), [BEZPIECZENSTWO](docs/BEZPIECZENSTWO.md) |
-| 10% | Fingerprinting, technologie, nagłówki, ciasteczka, sygnatury | karta usługi, zakładka „Technologie”; lista „Usługi”, widok „Technologie”; „Sygnatury” | technologie: precyzja 1,000, czułość 0,990; tytuły 122 ze 122 | [WYNIKI](docs/WYNIKI.md#wykrywanie-w-sieci-16), [SIGNATURES](docs/SIGNATURES.md) |
-| 10% | Role i ochrona danych | „Administracja”; `/healthz` zwraca `"tde":true` | 4 role i własne, 22 uprawnienia; `pg_tde` i AES-256-GCM | `TestRBACMatrixCSRFAndAudit`, [BEZPIECZENSTWO](docs/BEZPIECZENSTWO.md) §2 |
+| Obszar | Ekran albo polecenie | Zmierzone | Dowód |
+| --- | --- | --- | --- |
+| Discovery i identyfikacja usług w dużej sieci | przebieg /16 laboratorium; „Hosty”, „Usługi” | laboratorium: hosty 67 z 67, otwarte porty 154 ze 155, 0 fałszywych; skala: 10 000 z 10 000 żywych adresów, porty 22 500 z 22 500 | [WYNIKI](docs/WYNIKI.md#wykrywanie-w-sieci-16), `e2e/lab-gate.sh` |
+| Uruchomienie, import/eksport, DefectDojo, dokumentacja | `docker compose up -d`; „Import i eksport”; „Znaleziska”, potem „Wszystkie do DefectDojo” | start 51–115 s; test szablonu jury 160 kontroli bez błędu; e2e 26 z 26 | [WYNIKI](docs/WYNIKI.md#uruchomienie), `e2e/full/transcript.txt`, `web/REPORT-LAB.md` §11 |
+| Zmiany w czasie, niestabilne hosty, raport | szablon: `./quickstart.sh change` i drugi skan pokazują „Usługa zniknęła”; `up` pokazuje „Usługa wróciła”; zatrzymany host ma stan „nie odpowiada (niepotwierdzone)”, po około minucie „nieaktywny” | skan szablonu 49 s (`nmap -sV` na tych samych portach: 51 s) | [WYNIKI](docs/WYNIKI.md#szablon-organizatorów-jedna-maszyna), [ALGORYTMY](docs/ALGORYTMY.md) §3.4 |
+| Bezpieczeństwo, tempo skanu, czytelny pulpit | górny pasek: „Stop awaryjny”; „Pulpit”: stopka „Tylko GET i HEAD” z limitami; „Administracja”, zakładka „Bezpieczeństwo” | żadnej sekundy ponad limit + 10% na /16; drugi limit w jądrze; stop w 0,09 s | [WYNIKI](docs/WYNIKI.md#tempo-i-bezpieczeństwo-skanowania), [BEZPIECZENSTWO](docs/BEZPIECZENSTWO.md) |
+| Fingerprinting, technologie, nagłówki, ciasteczka, sygnatury | karta usługi, zakładka „Technologie”; lista „Usługi”, widok „Technologie”; „Sygnatury” | technologie: precyzja 1,000, czułość 0,990; tytuły 122 ze 122 | [WYNIKI](docs/WYNIKI.md#wykrywanie-w-sieci-16), [SIGNATURES](docs/SIGNATURES.md) |
+| Role i ochrona danych | „Administracja”; `/healthz` zwraca `"tde":true` | 4 role i własne, 22 uprawnienia; `pg_tde` i AES-256-GCM | `TestRBACMatrixCSRFAndAudit`, [BEZPIECZENSTWO](docs/BEZPIECZENSTWO.md) §2 |
 
 Produkt działa od końca do końca. Kontrola wydania na wersji końcowej: `make e2e-core` 26 z 26 (zapis: `deploy/e2e/transcript.txt`), test na szablonie organizatorów 160 kontroli bez błędu i 1 luka platformy (baner vsftpd pod Rosettą; `docs/TEST-JURY.md`). Wcześniejszy pełny test `e2e/full/run.sh`: 100 ze 100 (zapis: `e2e/full/transcript.txt`). Interfejs sprawdzono na laboratorium /16 z 70 hostami (`web/REPORT-LAB.md`). Dokładny stan każdego wymagania: [`docs/ZGODNOSC.md`](docs/ZGODNOSC.md).
 
