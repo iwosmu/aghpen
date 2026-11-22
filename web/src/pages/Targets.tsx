@@ -9,10 +9,10 @@ import { cx, fmtInt } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
 import { isLockRefusal } from '../lib/lock';
 import { Icon } from '../ui/Icon';
-import { Button, Dialog, Empty, ErrorState, Field, IconButton, InlineError, PageHeader, Panel, Select, SkeletonRows, Spinner, Tabs, Tags, FileInput } from '../ui/kit';
+import { Button, Dialog, Empty, ErrorState, Field, IconButton, InlineError, PageHeader, Panel, Select, SkeletonRows, Spinner, Tabs, FileInput } from '../ui/kit';
 import { PassivePanel } from './Passive';
 import { DataTable, Pager, type Col } from '../ui/table';
-import { Crit, Glyph } from '../ui/marks';
+import { Glyph } from '../ui/marks';
 import { useDebounced } from '../ui/edit';
 import { useSession } from '../session';
 import { Switch } from './Signatures';
@@ -206,8 +206,6 @@ export default function Targets() {
     { id: 'kind', header: t('Rodzaj', 'Type'), cell: (x) => <span className="text-ink-2">{kindLabel(x.kind)}</span> },
     { id: 'addr', header: t('Adresy', 'Addresses'), align: 'right', cell: (x) => <span className="num">{fmtInt(x.addresses)}</span> },
     { id: 'note', header: t('Notatka', 'Note'), hide: 'md', cell: (x) => <span className="block max-w-[260px] truncate text-ink-2">{x.note || '–'}</span> },
-    { id: 'tags', header: t('Tagi', 'Tags'), hide: 'lg', cell: (x) => <Tags tags={x.tags} max={2} /> },
-    { id: 'source', header: t('Źródło', 'Source'), hide: 'lg', cell: (x) => <span className="text-ink-3">{x.source === 'manual' ? t('ręcznie', 'manual') : x.source}</span> },
     { id: 'enabled', header: t('Włączony', 'Enabled'), cell: (x) => canUpdate
       ? <Switch checked={x.enabled} disabled={toggle.isPending} onChange={() => toggle.mutate(x)} label={(x.enabled ? t('Wyłącz cel ', 'Disable target ') : t('Włącz cel ', 'Enable target ')) + x.value} />
       : <span className="text-xs text-ink-2">{x.enabled ? t('tak', 'yes') : t('nie', 'no')}</span> },
@@ -229,39 +227,41 @@ export default function Targets() {
               {list.map((s) => (
                 <li key={s.id} className="border-b border-rule last:border-b-0">
                   <button type="button" aria-current={s.id === scopeId ? 'true' : undefined} onClick={() => u.set({ scope: s.id })}
-                    className={cx('block w-full px-3 py-2 text-left outline-offset-[-2px] hover:bg-raised', s.id === scopeId && 'bg-raised')}>
-                    <span className="flex items-center justify-between gap-2"><span className={cx('text-sm', s.id === scopeId ? 'font-semibold text-ink' : 'text-ink')}>{s.name}</span><Crit value={s.criticality} /></span>
-                    <span className="mt-0.5 block text-xs text-ink-2"><span className="num">{fmtInt(s.address_count)}</span> {plural(s.address_count, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])} · <span className="num">{s.target_count}</span> {plural(s.target_count, ['cel', 'cele', 'celów'], ['target', 'targets'])}</span>
-                    {s.owner ? <span className="block truncate text-xs text-ink-3">{s.owner}</span> : null}
+                    className={cx('flex h-[44px] w-full items-center gap-3 px-3 text-left outline-offset-[-2px] hover:bg-raised', s.id === scopeId && 'bg-raised')} title={s.owner || undefined}>
+                    <span className={cx('min-w-0 flex-1 truncate text-sm', s.id === scopeId ? 'font-medium text-ink' : 'text-ink')}>{s.name}</span>
+                    <span className="num flex-none text-sm text-ink-2" title={plural(s.address_count, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])}>{fmtInt(s.address_count)}</span>
                   </button>
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-ink-3">{t('Razem', 'Total')} <span className="num text-ink-2">{fmtInt(list.reduce((a, s) => a + s.address_count, 0))}</span> {plural(list.reduce((a, s) => a + s.address_count, 0), ['adres', 'adresy', 'adresów'], ['address', 'addresses'])} {t('w', 'in')} {list.length} {plural(list.length, ['zakresie', 'zakresach', 'zakresach'], ['scope', 'scopes'])}.</p>
           </nav>
           {scope ? (
             <div className="min-w-0 space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold">{scope.name}</h2>
-                  <p className="text-sm text-ink-2">{scope.description || t('Bez opisu', 'No description')}</p>
-                  <div className="mt-1"><Tags tags={scope.tags} max={6} /></div>
+                  {scope.description ? <p className="text-sm text-ink-2">{scope.description}</p> : null}
                 </div>
                 <div className="flex gap-1.5">
                   {canUpdate ? <Button size="sm" icon="edit" onClick={() => setDialog('edit')}>{t('Edytuj zakres', 'Edit scope')}</Button> : null}
                   {canDelete ? <Button size="sm" variant="danger" icon="trash" onClick={() => setConfirm({ kind: 'scope', id: scope.id, label: scope.name })}>{t('Usuń zakres', 'Delete scope')}</Button> : null}
                 </div>
               </div>
-              {canCreate ? <AddTargets scope={scope} /> : null}
-              {canCreate ? <PassivePanel scope={scope} /> : null}
               <Panel title={t('Cele', 'Targets')} count={targets.data?.total} flush>
                 <DataTable inPanel rows={targets.data?.items} cols={cols} rowKey={(x) => x.id} loading={targets.isPending} error={targets.error} retry={() => targets.refetch()} dim={targets.isPlaceholderData}
                   empty={<p className="p-3 text-sm text-ink-2">{t('Brak celów', 'No targets yet')}</p>}
                   mobile={(x) => (
                     <div className="flex items-center justify-between gap-2"><span><span className="mono text-sm">{x.value}</span><span className="ml-2 text-xs text-ink-3">{kindLabel(x.kind)} · {fmtInt(x.addresses)}</span></span>{canDelete ? <IconButton icon="trash" label={t('Usuń cel ', 'Delete target ') + x.value} onClick={() => setConfirm({ kind: 'target', id: x.id, label: x.value })} /> : null}</div>
                   )} />
-                {targets.data ? <Pager total={targets.data.total} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}
+                {targets.data ? <Pager total={targets.data.total > limit || offset > 0 ? targets.data.total : 0} limit={limit} offset={offset} onOffset={(o) => u.set({ offset: o || null })} /> : null}
               </Panel>
+              {canCreate ? (
+                <details key={scope.id + ':' + String(targets.data?.total === 0)} open={targets.data?.total === 0} className="space-y-4" data-testid="targets-add">
+                  <summary className="caps cursor-pointer select-none py-1 hover:text-ink">{t('Dodaj cele', 'Add targets')}</summary>
+                  <AddTargets scope={scope} />
+                  <PassivePanel scope={scope} />
+                </details>
+              ) : null}
             </div>
           ) : null}
         </div>

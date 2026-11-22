@@ -97,7 +97,7 @@ export function useDraft(value: string, commit: (v: string) => void, ms = 300): 
 }
 
 /** One button that opens a short list of actions; Escape or a click outside closes it. */
-export function MenuButton({ label, icon, items, busy, testId }: { label: ReactNode; icon?: string; items: { label: ReactNode; onSelect: () => void }[]; busy?: boolean; testId?: string }) {
+export function MenuButton({ label, icon, items, busy, testId }: { label: ReactNode; icon?: string; items: { label: ReactNode; onSelect: () => void; testId?: string }[]; busy?: boolean; testId?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -114,7 +114,7 @@ export function MenuButton({ label, icon, items, busy, testId }: { label: ReactN
       {open ? (
         <span role="menu" className="absolute right-0 top-[calc(100%+4px)] z-30 flex min-w-[120px] flex-col rounded-[10px] bg-raised p-1 shadow-[inset_0_0_0_1px_var(--rule-strong),var(--shadow)]">
           {items.map((it, i) => (
-            <button key={i} type="button" role="menuitem" className="h-[30px] rounded-[6px] px-2.5 text-left text-sm text-ink hover:bg-[var(--row-hover)]" onClick={() => { setOpen(false); it.onSelect(); }}>{it.label}</button>
+            <button key={i} type="button" role="menuitem" data-testid={it.testId} className="h-[30px] rounded-[6px] px-2.5 text-left text-sm text-ink hover:bg-[var(--row-hover)]" onClick={() => { setOpen(false); it.onSelect(); }}>{it.label}</button>
           ))}
         </span>
       ) : null}
