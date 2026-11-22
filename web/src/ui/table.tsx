@@ -195,13 +195,23 @@ export function Pager({ total, limit, offset, onOffset }: { total: number; limit
 }
 
 /** A row of filters above the content they scope. */
-export function FilterBar({ children, onClear, active }: { children: ReactNode; onClear?: () => void; active?: number }) {
+export function FilterBar({ children, onClear, active, more, moreActive = 0 }: { children: ReactNode; onClear?: () => void; active?: number; more?: ReactNode; moreActive?: number }) {
+  // search and up to two controls stay visible; the rest sits behind one 'Filtry' button
+  const [open, setOpen] = useState(false);
   return (
-    <div className="flex flex-wrap items-end gap-2.5 px-4 pb-4 sm:px-6 lg:px-8">
-      {children}
-      {onClear && active ? (
-        <Button variant="ghost" size="md" icon="x" onClick={onClear}>{t('Wyczyść filtry', 'Clear filters')} ({active})</Button>
-      ) : null}
+    <div className="px-4 pb-4 sm:px-6 lg:px-8">
+      <div className="flex flex-wrap items-end gap-2.5">
+        {children}
+        {more ? (
+          <Button size="md" icon="filter" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="filters-more">
+            {t('Filtry', 'Filters')}{moreActive ? <span className="num text-ink-2"> {moreActive}</span> : null}
+          </Button>
+        ) : null}
+        {onClear && active ? (
+          <Button variant="ghost" size="md" icon="x" onClick={onClear}>{t('Wyczyść filtry', 'Clear filters')} ({active})</Button>
+        ) : null}
+      </div>
+      {more && open ? <div className="mt-3 flex flex-wrap items-end gap-2.5">{more}</div> : null}
     </div>
   );
 }

@@ -3,13 +3,12 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useAction, useItem, usePage } from '../api/hooks';
 import { del, patch, post } from '../api/client';
-import type { ExposureRule, Finding, RuleDryRun } from '../api/types';
+import type { ExposureRule, RuleDryRun } from '../api/types';
 import { plural, t } from '../i18n';
-import { cx, fmtInt, fmtRelative } from '../lib/format';
+import { cx, fmtInt } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
 import { routeMissing } from '../lib/route';
 import { Button, ErrorState, InlineError, PageHeader, Panel, SkeletonRows, Unavailable } from '../ui/kit';
-import { FindingStatusMark, Sev } from '../ui/marks';
 import { useCan } from '../session';
 import { Switch } from './Signatures';
 
@@ -41,53 +40,38 @@ function Editor({ rule, onSaved }: { rule: ExposureRule | null; onSaved: (r: Exp
     invalidate: ['/rules', '/findings'], silent: true, success: t('Reguła zapisana', 'Rule saved'), onSuccess: (r) => onSaved(r.rule),
   });
   const remove = useAction(() => del('/rules/' + rule!.id), { invalidate: ['/rules', '/findings'], success: t('Reguła usunięta', 'Rule deleted'), onSuccess: () => onSaved(null as unknown as ExposureRule) });
-  const violations = usePage<Finding>('/rules/' + rule?.id + '/violations', { limit: 20 }, Boolean(rule));
   const v = dry.data?.validation;
   const pending = dry.isFetching || d !== yaml;
   const editable = rule ? canUpdate && !rule.builtin : canCreate;
+  const list = v?.ok ? dry.data?.violations ?? [] : [];
   return (
-    <div className="space-y-4">
-      <Panel title={rule ? rule.name : t('Nowa reguła', 'New rule')} actions={editable ? (
-        <span className="flex gap-2">
-          {rule && !rule.builtin && canDelete ? <Button size="sm" variant="danger" icon="trash" busy={remove.isPending} onClick={() => remove.mutate(undefined)}>{t('Usuń', 'Delete')}</Button> : null}
-          <Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!v?.ok || pending} onClick={() => save.mutate(undefined)}>{t('Zapisz regułę', 'Save rule')}</Button>
-        </span>
-      ) : undefined}>
-        {rule?.builtin ? <p className="mb-2 text-xs text-ink-3">{t('Reguła wbudowana. Można ją tylko włączyć albo wyłączyć.', 'Built-in rule. It can only be switched on or off.')}</p> : null}
-        <textarea className="field mono min-h-[260px] text-xs leading-5" spellCheck={false} value={yaml} readOnly={!editable} onChange={(e) => setYaml(e.target.value)} data-testid="rule-yaml" aria-label={t('Treść reguły (YAML)', 'Rule text (YAML)')} />
-        <div className="mt-2 min-h-[44px]" data-testid="rule-dryrun" aria-live="polite">
-          {dry.error ? (routeMissing(dry.error) ? <Unavailable /> : <InlineError error={dry.error} />) : null}
-          {v && !v.ok ? <ul className="space-y-0.5 text-sm text-danger">{v.issues.map((x, i) => <li key={i}><span className="mono text-xs text-ink-3">{x.path}</span> {x.message}</li>)}</ul> : null}
-          {v?.ok && dry.data ? (
-            <p className={cx('text-sm', pending && 'opacity-60')}><span className="font-medium">{dry.data.message}</span>{dry.data.condition ? <span className="ml-2 text-xs text-ink-3">{dry.data.condition}</span> : null}<span className="num ml-2 text-2xs text-ink-3">{dry.data.took_ms} ms</span></p>
-          ) : null}
-          {v?.ok && (dry.data?.violations ?? []).length ? (
-            <ul className="mt-2 max-h-[220px] divide-y divide-rule overflow-auto border-t border-rule">
-              {(dry.data?.violations ?? []).slice(0, 50).map((x) => (
-                <li key={x.key} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 py-1 text-sm">
-                  <span className="min-w-0 truncate">{x.service_id ? <Link to={'/services/' + x.service_id} className="mono link">{x.ip}:{x.port}/{x.proto}</Link> : <Link to={'/hosts/' + x.host_id} className="mono link">{x.ip}</Link>} <span className="text-ink-2">{x.title}</span></span>
-                  <Sev level={x.severity} compact />
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      </Panel>
-      {rule ? (
-        <Panel title={t('Bieżące naruszenia', 'Current violations')} count={violations.data?.total} flush>
-          {violations.error ? <ErrorState error={violations.error} retry={() => violations.refetch()} /> : !violations.data ? <SkeletonRows rows={3} /> : violations.data.items.length === 0 ? <p className="px-3 py-3 text-sm text-ink-2 sm:px-4">{t('Brak naruszeń', 'No violations')}</p> : (
-            <ul className="divide-y divide-rule">
-              {violations.data.items.map((f) => (
-                <li key={f.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-1.5 text-sm sm:px-4">
-                  <Link to={'/findings?host_id=' + f.host_id + '&type=policy-violation'} className="link truncate">{f.title}</Link>
-                  <FindingStatusMark status={f.status} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-      ) : null}
-    </div>
+    <Panel title={<span className="text-base text-ink">{rule ? rule.name : t('Nowa reguła', 'New rule')}</span>} actions={editable ? (
+      <span className="flex gap-2">
+        {rule && !rule.builtin && canDelete ? <Button size="sm" variant="danger" icon="trash" busy={remove.isPending} onClick={() => remove.mutate(undefined)}>{t('Usuń', 'Delete')}</Button> : null}
+        <Button size="sm" variant="primary" icon="check" busy={save.isPending} disabled={!v?.ok || pending} onClick={() => save.mutate(undefined)}>{t('Zapisz regułę', 'Save rule')}</Button>
+      </span>
+    ) : undefined}>
+      {rule?.description ? <p className="mb-4 text-sm text-ink-2">{rule.description}</p> : null}
+      <details key={(rule?.id ?? 'new') + String(editable)} open={editable} className="group mb-4" data-testid="rule-definition">
+        <summary className="caps cursor-pointer select-none hover:text-ink">{t('Definicja', 'Definition')}</summary>
+        <textarea className="field mono mt-2 min-h-[240px] text-xs leading-5" spellCheck={false} value={yaml} readOnly={!editable} onChange={(e) => setYaml(e.target.value)} data-testid="rule-yaml" aria-label={t('Treść reguły (YAML)', 'Rule text (YAML)')} />
+        {v && !v.ok ? <ul className="mt-2 space-y-0.5 text-sm text-danger">{v.issues.map((x, i) => <li key={i}><span className="mono text-xs text-ink-3">{x.path}</span> {x.message}</li>)}</ul> : null}
+      </details>
+      <div data-testid="rule-dryrun" aria-live="polite" className={cx(pending && 'opacity-60')}>
+        <h3 className="caps mb-1">{t('Naruszenia', 'Violations')}{v?.ok && dry.data ? <span className="num"> · {fmtInt(dry.data.total)}</span> : null}</h3>
+        {dry.error ? (routeMissing(dry.error) ? <Unavailable /> : <InlineError error={dry.error} />) : null}
+        {list.length ? (
+          <ul className="divide-y divide-rule">
+            {list.slice(0, 50).map((x) => (
+              <li key={x.key} className="flex h-[34px] min-w-0 items-center gap-3 text-sm">
+                {x.service_id ? <Link to={'/services/' + x.service_id} className="mono link flex-none">{x.ip}:{x.port}</Link> : <Link to={'/hosts/' + x.host_id} className="mono link flex-none">{x.ip}</Link>}
+                <span className="min-w-0 truncate text-ink-2" title={x.title}>{x.title}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </Panel>
   );
 }
 
@@ -114,10 +98,10 @@ export default function Rules() {
         <Panel title={t('Reguły', 'Rules')} count={items.length} flush>
           <ul className="divide-y divide-rule" data-testid="rule-list">
             {items.map((r) => (
-              <li key={r.id} className={cx('grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2 sm:px-4', rule?.id === r.id && sel !== 'new' && 'bg-raised')}>
-                <button type="button" className="min-w-0 text-left" onClick={() => u.set({ rule: r.id, slug: null })}>
-                  <span className={cx('block truncate text-sm', !r.enabled && 'text-ink-3')}>{r.name}</span>
-                  <span className="flex items-center gap-2 text-xs text-ink-3"><Sev level={r.severity} compact /><span className={cx('num', r.violations > 0 && r.enabled ? 'text-ink' : '')}>{fmtInt(r.violations)} {plural(r.violations, ['naruszenie', 'naruszenia', 'naruszeń'], ['violation', 'violations'])}</span>{r.builtin ? <span>{t('wbudowana', 'built-in')}</span> : null}{r.last_eval_at ? <span>{fmtRelative(r.last_eval_at)}</span> : null}</span>
+              <li key={r.id} className={cx('grid h-[44px] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 px-3 sm:px-4', rule?.id === r.id && sel !== 'new' && 'bg-raised')}>
+                <button type="button" className="flex min-w-0 items-center gap-3 text-left" onClick={() => u.set({ rule: r.id, slug: null })}>
+                  <span className={cx('min-w-0 flex-1 truncate text-sm', !r.enabled && 'text-ink-3')}>{r.name}</span>
+                  {r.violations > 0 ? <span className={cx('num flex-none text-sm', r.enabled ? 'text-ink' : 'text-ink-3')} title={plural(r.violations, ['naruszenie', 'naruszenia', 'naruszeń'], ['violation', 'violations'])}>{fmtInt(r.violations)}</span> : null}
                 </button>
                 <Switch checked={r.enabled} disabled={!canUpdate || toggle.isPending} onChange={() => toggle.mutate(r)} label={t('Reguła włączona', 'Rule enabled')} />
               </li>

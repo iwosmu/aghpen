@@ -67,12 +67,12 @@ export function ExportButtons({ kind, query, label }: { kind: 'hosts' | 'service
     } catch (e) { toastError(e); }
     setBusy('');
   };
+  void label;
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="hidden text-xs text-ink-3 lg:inline">{label ?? t('Eksport widoku', 'Export view')}</span>
-      <Button size="sm" icon="download" busy={busy === 'csv'} onClick={() => run('csv')}>CSV</Button>
-      <Button size="sm" icon="download" busy={busy === 'json'} onClick={() => run('json')}>JSON</Button>
-    </span>
+    <MenuButton label={t('Eksport', 'Export')} icon="download" busy={Boolean(busy)} testId="export-menu" items={[
+      { label: 'CSV', onSelect: () => run('csv') },
+      { label: 'JSON', onSelect: () => run('json') },
+    ]} />
   );
 }
 
@@ -94,4 +94,30 @@ export function useDraft(value: string, commit: (v: string) => void, ms = 300): 
     return () => clearTimeout(id);
   }, [draft]); // eslint-disable-line react-hooks/exhaustive-deps
   return [draft, setDraft];
+}
+
+/** One button that opens a short list of actions; Escape or a click outside closes it. */
+export function MenuButton({ label, icon, items, busy, testId }: { label: ReactNode; icon?: string; items: { label: ReactNode; onSelect: () => void }[]; busy?: boolean; testId?: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+  return (
+    <span ref={ref} className="relative inline-flex">
+      <Button size="sm" icon={icon} busy={busy} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid={testId}>{label}</Button>
+      {open ? (
+        <span role="menu" className="absolute right-0 top-[calc(100%+4px)] z-30 flex min-w-[120px] flex-col rounded-[10px] bg-raised p-1 shadow-[inset_0_0_0_1px_var(--rule-strong),var(--shadow)]">
+          {items.map((it, i) => (
+            <button key={i} type="button" role="menuitem" className="h-[30px] rounded-[6px] px-2.5 text-left text-sm text-ink hover:bg-[var(--row-hover)]" onClick={() => { setOpen(false); it.onSelect(); }}>{it.label}</button>
+          ))}
+        </span>
+      ) : null}
+    </span>
+  );
 }
