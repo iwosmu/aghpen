@@ -73,16 +73,29 @@ for K in t0 t0-2; do
   read -r PG PD PH PW PN < "$OUT/passtimes-$K.txt"
   printf '%-44s %-22s %-22s %s\n' "wall time $K: general pass / deep pass" "$PG s / $PD s" "deep: $PH hosts" "info ($PW waiting, $PN new)"
 done
-# the kernel cap must be active and drop nothing in a normal run (both runs)
+# The kernel cap (internal/kcap): (a) active in both runs; (b) on the wire, the
+# packets it counts (SYN, UDP, ICMP echo) in every fixed 100 ms bin <= its burst
+# and in every 1 s bin <= the policy max_pps (e2e/kcap-window.sh); (c) the packets
+# it dropped in a run (its counter is per process: the difference to the run
+# before) must show in the capture as a 100 ms bin at 90 % of the burst or more
+# (a clipped catch-up); an untraced drop fails the row.
 if [ -s "$OUT/kcap-t0.json" ] && [ "$(cat "$OUT/kcap-t0.json")" != null ]; then
-  KC=""; KOK=1
+  KC=""; KOK=1; KPREV=0; KNOTES=""
   for K in t0 t0-2; do
-    [ -f "$OUT/kcap-$K.json" ] || continue
+    [ -f "$OUT/kcap-$K.json" ] && [ -f "$OUT/tcpdump-$K.txt.gz" ] || continue
     A=$(jq -r '.active' "$OUT/kcap-$K.json"); D=$(jq -r '.dropped // 0' "$OUT/kcap-$K.json")
-    KC="$KC$K $A/$D "
-    { [ "$A" = true ] && [ "$D" = 0 ]; } || KOK=0
+    KB=$(jq -r '.burst // 0' "$OUT/kcap-$K.json"); KP=$(jq -r '.policy_pps // 0' "$OUT/kcap-$K.json")
+    DR=$((D - KPREV)); KPREV=$D
+    W=$(e2e/kcap-window.sh "$OUT/tcpdump-$K.txt.gz" "${LR_IP:-10.66.0.30}" "$KB")
+    read -r _ M100 _ _ _ M1 _ _ _ NEAR <<< "$W"
+    KC="$KC$K $A/$M100/$M1/$DR "
+    KNOTES="$KNOTES  kernel cap $K: $W; dropped in this run $DR
+"
+    { [ "$A" = true ] && [ "$M100" -le "$KB" ] && [ "$M1" -le "$KP" ]; } || KOK=0
+    if [ "$DR" -gt 0 ] && [ "${NEAR:--}" = "-" ]; then KOK=0; fi
   done
-  row "kernel cap: active/dropped per run" "$KC" "true/0" "$KOK"
+  row "kernel cap: active/max 100ms/max 1s/drops" "$KC" "true/<=$KB/<=$KP/traced" "$KOK"
+  printf '%s' "$KNOTES"
 fi
 F0=$(echo "$NB0" | jq .table_fulls); F1=$(echo "$NB1" | jq .table_fulls)
 row "neighbour table: entries after, overflows" "$(echo "$NB1" | jq .entries) / +$((F1 - F0))" "+0 overflows" "$([ "$F1" = "$F0" ] && echo 1 || echo 0)"
