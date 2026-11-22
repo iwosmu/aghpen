@@ -154,6 +154,9 @@ func localizeResponse(w http.ResponseWriter, v any) any {
 	return v
 }
 
+// findingIn is analyze.RenderFinding, for handlers that do not import analyze.
+func findingIn(f model.Finding, lang string) model.Finding { return analyze.RenderFinding(f, lang) }
+
 func localizeService(s *model.Service) {
 	analyze.LocalizeReasons(s.InterestWhy, "en")
 	for i := range s.Technologies {
