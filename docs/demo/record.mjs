@@ -3,7 +3,7 @@
 //
 //   cd docs/demo && npm install && node record.mjs          (docs/demo/record.sh does the whole thing, one command)
 //
-// Output (docs/demo): czujka-demo.mp4 (1920x1080, 30 fps, no audio), czujka-demo.pl.srt (captions), lektor.txt (voice-over per
+// Output (docs/demo): czujka-demo.mp4 (1920x1080, 60 fps, no audio; the closing shot of the published film comes from endcard.mjs), czujka-demo.pl.srt (captions), lektor.txt (voice-over per
 // shot with its time code). Nothing is faked: every frame is the real UI against the stack at CZ_URL. A shot that compresses
 // a long wait (the live scan) carries a visible "×8" mark for exactly the compressed part.
 //
@@ -602,11 +602,11 @@ for (const s of SHOTS) {
   writeFileSync(lf, list);
   const clip = join(WORK, "clip-" + s.id + ".mp4");
   const inputs = ["-f", "concat", "-safe", "0", "-i", lf];
-  let filter = "[0:v]fps=30,scale=1920:1080:flags=lanczos,format=yuv420p[v0]";
+  let filter = "[0:v]fps=60,scale=1920:1080:flags=lanczos,format=yuv420p[v0]";
   let last = "v0";
   if (s.caption) { inputs.push("-loop", "1", "-i", join(WORK, "cap-" + s.id + ".png")); filter += ";[" + last + "][1:v]overlay=0:H-h-20:shortest=1[v1]"; last = "v1"; }
   if (fastFrom >= 0) { inputs.push("-loop", "1", "-i", join(WORK, "fast.png")); const idx = s.caption ? 2 : 1; filter += ";[" + last + "][" + idx + ":v]overlay=W-w-40:H-h-32:shortest=1:enable='between(t," + fastFrom.toFixed(2) + "," + fastTo.toFixed(2) + ")'[v2]"; last = "v2"; }
-  ff([...inputs, "-filter_complex", filter, "-map", "[" + last + "]", "-t", out.toFixed(3), "-r", "30", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", clip]);
+  ff([...inputs, "-filter_complex", filter, "-map", "[" + last + "]", "-t", out.toFixed(3), "-r", "60", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", clip]);
   clips.push(clip);
   if (s.caption) srt.push(srt.length + 1 + "\n" + fmt(tl) + " --> " + fmt(tl + out) + "\n" + s.caption + "\n");
   const words = s.vo.split(/\s+/).filter(Boolean).length;

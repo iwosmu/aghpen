@@ -1,4 +1,4 @@
-Lektor do filmu czujka-demo.mp4 (czas filmu 1:50, 136 słów ≈ 80 s przy 1,7 słowa/s; każdy akapit ma co najmniej 1,5 s zapasu i 0,5 s na wejście).
+Lektor do filmu czujka-demo.mp4 (czas filmu 1:51, 136 słów ≈ 80 s przy 1,7 słowa/s; każdy akapit ma co najmniej 1,5 s zapasu i 0,5 s na wejście).
 Nagraj głos na film; kody czasu to początek i koniec ujęcia. Wygenerowane przez record.mjs.
 
 [0:00–0:21] install (20.5 s; 18 słów ≈ 10.6 s przy 1,7 słowa/s; zapas 9.9 s)
@@ -22,5 +22,5 @@ Reguła mówi, czego w sieci być nie może, i sprawdza się po każdym skanie b
 [1:35–1:44] stop (9.0 s; 8 słów ≈ 4.7 s przy 1,7 słowa/s; zapas 4.3 s)
 Stop awaryjny zatrzymuje wszystkie skany w ułamku sekundy.
 
-[1:44–1:50] end (5.8 s; 4 słów ≈ 3.8 s przy 1,7 słowa/s; zapas 2.0 s)
+[1:44–1:51] end (6.2 s; 4 słów ≈ 3.8 s przy 1,7 słowa/s; zapas 2.4 s)
 Czujka. Działa na czujka.dev.
