@@ -73,7 +73,6 @@ export function MissingHostLines({ changes, names }: { changes: Change[]; names?
               {svcs.length ? <>{t(', miał ', ', it had ')}{svcs.length} {plural(svcs.length, ['usługę', 'usługi', 'usług'], ['service', 'services'])}{': '}{svcs.slice(0, 8).map((c, i) => (
                 <span key={c.id}>{i ? ', ' : ''}<Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link">:{c.port}{(names?.(c) || nameOf(c)) ? ' ' + (names?.(c) || nameOf(c)) : ''}</Link></span>
               ))}{svcs.length > 8 ? t(' i ' + (svcs.length - 8) + ' więcej', ' and ' + (svcs.length - 8) + ' more') : ''}</> : null}
-              {state === 'unconfirmed' ? <span className="block text-xs text-ink-3">{t('Czujka sprawdzi go ponownie za kilka minut.', 'Czujka checks it again within minutes.')}</span> : null}
             </span>
           </li>
         );

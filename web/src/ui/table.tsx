@@ -15,6 +15,8 @@ export interface Col<T> {
   /** hide the column under this breakpoint */
   hide?: 'md' | 'lg' | 'xl' | '2xl';
   wrap?: boolean;
+  /** the flexible column: takes the free width, its content truncates */
+  fill?: boolean;
 }
 
 const HIDE = { md: 'hidden md:table-cell', lg: 'hidden lg:table-cell', xl: 'hidden xl:table-cell', '2xl': 'hidden 2xl:table-cell' };
@@ -163,7 +165,7 @@ export function DataTable<T>(p: TableProps<T>) {
                   <td className={cx('px-3 py-0', edge)}><input type="checkbox" checked={sel.has(k)} onChange={() => toggle(k)} aria-label={t('Zaznacz wiersz', 'Select row')} /></td>
                 ) : null}
                 {p.cols.map((c) => (
-                  <td key={c.id} className={cx('h-[46px] px-3 py-1.5 align-middle', edge, c.align === 'right' && 'text-right', c.hide && HIDE[c.hide], !c.wrap && 'whitespace-nowrap')}>
+                  <td key={c.id} className={cx('h-[46px] px-3 py-1.5 align-middle', edge, c.align === 'right' && 'text-right', c.hide && HIDE[c.hide], !c.wrap && 'whitespace-nowrap', c.fill && 'w-full max-w-0')}>
                     {c.cell(row)}
                   </td>
                 ))}

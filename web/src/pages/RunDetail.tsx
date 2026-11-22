@@ -20,7 +20,7 @@ import { useCan } from '../session';
 import { RunStory } from '../ui/RunStory';
 import { PartialNote, RunPasses } from '../ui/RunPasses';
 import { useArrivalOrder } from '../ui/arrivalOrder';
-import { ResponseCell, SelfTag } from '../ui/serviceBits';
+import { SelfTag } from '../ui/serviceBits';
 import { NotScanned, notScannedHint, scannedFirst } from '../ui/NotScanned';
 import { runNoteText } from '../lib/runNotes';
 import { ProductValue } from '../ui/ProductValue';
@@ -42,7 +42,6 @@ function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: nu
   const items = scannedFirst(ordered);
   const carried = items.filter((s) => s.carried).length;
   const hosts = [...new Set(items.map((s) => s.host_id))];
-  const anyTime = items.some((s) => s.response_ms !== undefined);
   return (
     <Panel title={t('Znalezione usługi', 'Services found')} count={q.data ? q.data.total - carried : undefined} flush
       actions={hosts.length === 1 ? <Link to={'/hosts/' + hosts[0]} className="link">{t('Host', 'Host')} <span className="mono">{items[0].ip}</span></Link> : undefined}>
@@ -53,21 +52,19 @@ function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: nu
           <table className="w-full text-sm" data-testid="run-services">
             <thead><tr className="border-b border-rule-strong text-left text-xs text-ink-3">
               <th className="h-[30px] px-3 font-medium">{hosts.length > 1 ? t('Adres', 'Address') : t('Port', 'Port')}</th>
-              <th className="px-3 font-medium">{live ? t('Stan', 'Status') : t('Stan dziś', 'Status today')}</th>
-              <th className="px-3 font-medium">{t('Usługa', 'Service')}</th>
-              <th className="px-3 font-medium">{t('Produkt', 'Product')}</th>
-              <th className="hidden px-3 font-medium md:table-cell">{t('Tytuł strony', 'Page title')}</th>
-              {anyTime ? <th className="px-3 text-right font-medium">{t('Czas odpowiedzi', 'Response time')}</th> : null}
+              <th className="hidden px-3 font-medium sm:table-cell">{live ? t('Stan', 'Status') : t('Stan dziś', 'Status today')}</th>
+              <th className="hidden px-3 font-medium sm:table-cell">{t('Usługa', 'Service')}</th>
+              <th className="hidden px-3 font-medium md:table-cell">{t('Produkt', 'Product')}</th>
+              <th className="px-3 font-medium">{t('Tytuł strony', 'Page title')}</th>
             </tr></thead>
             <tbody>
               {items.map((s) => (
                 <tr key={s.id} className={cx('border-b border-rule last:border-b-0', s.carried && 'text-ink-3 [&_.link]:text-ink-2')} data-carried={s.carried ? 'true' : undefined} title={s.carried ? notScannedHint() : undefined} style={fresh.has(s.id) && !s.carried ? { animation: 'rise-in 240ms var(--ease-out-expo)' } : undefined}>
                   <td className="h-[30px] whitespace-nowrap px-3"><Link to={'/services/' + s.id} className="mono link">{hosts.length > 1 ? s.ip + ':' + s.port : s.port + '/' + s.proto}</Link></td>
-                  <td className="whitespace-nowrap px-3">{s.carried ? <NotScanned /> : <ServiceStateMark state={live ? 'open' : s.state} />}</td>
-                  <td className="whitespace-nowrap px-3">{serviceName(s)}{isSelf(s) ? <SelfTag /> : null}</td>
-                  <td className={cx('whitespace-nowrap px-3', !s.carried && 'text-ink-2')}><ProductValue s={s} /></td>
-                  <td className="hidden max-w-[320px] truncate px-3 text-ink-2 md:table-cell">{s.title || '–'}</td>
-                  {anyTime ? <td className="whitespace-nowrap px-3 text-right">{s.carried ? '–' : <ResponseCell s={s} />}</td> : null}
+                  <td className="hidden whitespace-nowrap px-3 sm:table-cell">{s.carried ? <NotScanned /> : <ServiceStateMark state={live ? 'open' : s.state} />}</td>
+                  <td className="hidden max-w-[200px] truncate whitespace-nowrap px-3 sm:table-cell">{serviceName(s)}{isSelf(s) ? <SelfTag /> : null}</td>
+                  <td className={cx('hidden max-w-[220px] truncate whitespace-nowrap px-3 md:table-cell', !s.carried && 'text-ink-2')}><ProductValue s={s} /></td>
+                  <td className="w-full max-w-0 truncate whitespace-nowrap px-3 text-ink-2" title={s.title || undefined}>{s.title || '–'}</td>
                 </tr>
               ))}
             </tbody>
@@ -243,7 +240,6 @@ export default function RunDetail() {
 
         {run.status === 'completed' && run.summary?.prev_run_id ? (
           <section className="py-1" data-testid="run-story-panel">
-            <h2 className="caps mb-3">{t('Względem skanu', 'Compared with scan')} <Link to={'/runs/' + run.summary.prev_run_id} className="num link">#{run.summary.prev_run_id}</Link> · <Link to={'/changes/compare?from=' + run.summary.prev_run_id + '&to=' + run.id} className="link">{t('porównanie', 'comparison')}</Link></h2>
             <RunStory runId={run.id} className="space-y-2 [&_.mono]:text-[0.86em] [&_li]:text-[19px] [&_li]:leading-[28px] sm:[&_li]:text-[21px]" />
             <NoStory run={run} />
           </section>
