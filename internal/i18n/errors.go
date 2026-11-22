@@ -62,6 +62,17 @@ var errorEN = []rewrite{
 	{re(`plik jest większy niż (\d+) MB`), "the file is larger than $1 MB"},
 	{re(`nie można otworzyć pliku (\S+)`), "cannot open file $1"},
 	{lit("źródło zewnętrzne jest wyłączone"), "the external source is turned off"},
+	// unique constraints (store) and conflicts
+	{lit("Zakres o tej nazwie już istnieje."), "A scope with this name already exists."},
+	{lit("Użytkownik z tym adresem e-mail już istnieje."), "A user with this e-mail address already exists."},
+	{lit("Profil o tej nazwie już istnieje."), "A profile with this name already exists."},
+	{lit("Sygnatura o tym id już istnieje."), "A signature with this id already exists."},
+	{lit("Rola o tej nazwie już istnieje."), "A role with this name already exists."},
+	{lit("Ten cel jest już w zakresie."), "This target is already in the scope."},
+	{lit("Taki wpis już istnieje."), "This entry already exists."},
+	{re(`Reguła o id „([^”]*)” już istnieje\.`), "A rule with id “$1” already exists."},
+	{lit("Reguły wbudowanej nie można edytować. Skopiuj ją jako własną regułę (inne id) i wyłącz wbudowaną."), "A built-in rule cannot be edited. Copy it as your own rule (another id) and disable the built-in one."},
+	{lit("Reguły wbudowanej nie można usunąć. Wyłącz ją."), "A built-in rule cannot be deleted. Disable it."},
 	// rules
 	{re(`reguła o id „([^”]*)” już istnieje`), "a rule with id “$1” already exists"},
 	{lit("reguły wbudowanej nie można edytować; skopiuj ją jako własną regułę (inne id) i wyłącz wbudowaną"), "a built-in rule cannot be edited; copy it as your own rule (another id) and disable the built-in one"},

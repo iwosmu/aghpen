@@ -28,7 +28,9 @@ func TestErrorMessage(t *testing.T) {
 		"Każdy cel leży poza dozwolonymi sieciami albo poza blokadą operatora (10.0.0.0/8)":        "Every target is outside the allowed networks or outside the operator lock (10.0.0.0/8)",
 		"300000 adresów to więcej niż limit 65536":                                                 "300000 addresses is more than the limit of 65536",
 		"Ta reguła zgłosiłaby dziś 7 naruszeń (sprawdzono 12 hostów i 40 usług).":                  "This rule would report 7 violation(s) today (checked 12 hosts and 40 services).",
-		"not found": "not found",
+		"not found":                         "not found",
+		"Zakres o tej nazwie już istnieje.": "A scope with this name already exists.",
+		"Reguła o id „x” już istnieje.":     "A rule with id “x” already exists.",
 	}
 	for pl, want := range cases {
 		if got := ErrorMessage(pl, "en"); got != want {
