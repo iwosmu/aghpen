@@ -19,7 +19,7 @@ Zapis pomiarów Czujki na 2 000 i 10 000 żywych adresów, serwer OMEN, 21–22.
 | `changes-*.json` | zmiany zgłoszone przez przebieg (`GET /changes?run_id=`) |
 | `api-*.txt` | czasy list, eksportów i raportów: kod HTTP, czas w sekundach, bajty; dwie próby |
 | `profile.json`, `policy.json` | profil i polityka bezpieczeństwa na starcie |
-| `10k/services-deep-page.sql` | zapytanie dalekiej strony listy usług przed poprawką `1623497` i po niej, z czasami na bazie 10 000 |
+| `10k/services-deep-page.sql` | zapytanie dalekiej strony listy usług przed poprawką `99ba021` i po niej, z czasami na bazie 10 000 |
 
 Prawda wzorcowa (13 MB) i eksporty JSON (20 i 96 MB) nie są w repozytorium. Prawdę odtwarza `lab/scale/scale.sh truth N`, cały pomiar `lab/scale/README.md`.
 

@@ -141,7 +141,7 @@ Ograniczenia tego pomiaru:
 2. Przebieg 1 przekroczył limit 10 000 pakietów/s przez 27 sekund, najwyższa sekunda: 11 415 pakietów. Wersja `736ff9a` nie ma limitu w jądrze. Późniejsza wersja ogranicza ruch limitem w jądrze; kontrola laboratorium mierzy to przy 1 000 pakietów/s (rozdział „Tempo i bezpieczeństwo skanowania”).
 3. Na gęstej sieci czas przebiegu wyznacza etap HTTP, nie pakiety. W przebiegu 1 sam etap HTTP to 144 276 żądań / 20 na sekundę = 7 214 s z 8 144 s. Grupa czterech gęstych porcji (1 000 hostów, 1 350 usług WWW) trwa około 13 minut niezależnie od limitu pakietów.
 4. Szacunek planisty przed skanem (5 944 s) nie liczy etapu HTTP; przebieg 1 trwał 8 144 s.
-5. Daleka strona listy usług i eksport usług rosły szybciej niż dane (0,8 s przy 2 000, 13–38 s przy 10 000). Przyczyna: rozmiar grupy usług liczony osobno dla każdego wiersza; największa grupa ma 10 782 usługi. Poprawka `1623497` liczy każdą grupę raz. Na bazie 10 000: zapytanie dalekiej strony 13,2 s → 0,079 s, uporządkowany przebieg pod eksportem 11,9 s → 0,032 s (pomiar zapytań SQL na tej samej bazie; tabela API pokazuje wersję `736ff9a` sprzed poprawki).
+5. Daleka strona listy usług i eksport usług rosły szybciej niż dane (0,8 s przy 2 000, 13–38 s przy 10 000). Przyczyna: rozmiar grupy usług liczony osobno dla każdego wiersza; największa grupa ma 10 782 usługi. Poprawka `99ba021` liczy każdą grupę raz. Na bazie 10 000: zapytanie dalekiej strony 13,2 s → 0,079 s, uporządkowany przebieg pod eksportem 11,9 s → 0,032 s (pomiar zapytań SQL na tej samej bazie; tabela API pokazuje wersję `736ff9a` sprzed poprawki).
 
 ## Szablon organizatorów (jedna maszyna)
 

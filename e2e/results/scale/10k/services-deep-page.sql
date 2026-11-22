@@ -1,5 +1,5 @@
 -- The services list deep page and the ordered pass behind the services export,
--- before (group size counted per row) and after (one count per group, 1623497).
+-- before (group size counted per row) and after (one count per group, 99ba021).
 -- Measured on the 10 000-host database after run 1 (psql \timing):
 --   deep page, offset 22 440:  13 211.9 ms -> 78.7 ms   (sum of group_size 186 900 both)
 --   ordered pass, all rows:    11 939.9 ms -> 31.7 ms   (sum 161 881 088 both)
