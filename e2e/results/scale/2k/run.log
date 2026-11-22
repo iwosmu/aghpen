@@ -1,0 +1,9 @@
+{"saved":1,"address_count":65536,"excluded":0}
+[22:59:13] scope 1, profile 2: {"ports":"top-1000,1521,2379,2380,5984,6379,7474,8086,9042,9200,9300,11211,27017,28017,1883,4369,5671,5672,8883,15672,15692,25672,61613,61616,2375,2376,4243,6443,9443,10250,10255,3000,5601,9090,9093,9100,9113,9187,9216,5985,5986,18080,50000,5173","rate":{"max_pps":1000,"max_parallel_chunks":4,"max_parallel_hosts":16,"http_rps":20,"per_host_concurrency":1,"per_host_delay_ms":0},"udp":true,"version_intensity":7}
+{"addresses":65536,"chunks":256,"est_packets":4262133,"est_duration_sec":5944,"effective_pps":1000,"fits_window":true,"window_sec":0,"based_on_history":false,"expected_live_rate":0.05,"discovery_mode":"balanced","est_packets_low":1271857,"est_duration_low_sec":1689,"in_window":true,"prev_duration_sec":0,"prev_hosts_up":0,"prev_addresses":0}
+[22:59:24] r1-2k: run 1 started
+[22:59:26] r1-2k: run 1 status running at +2 s
+[00:20:45] r1-2k: run 1 status analyzing at +4881 s
+[00:20:49] r1-2k: run 1 status completed at +4885 s
+[00:20:53] r1-2k: run 1 completed in 4885 s (analysis about 4 s); wire: 3067499 packets, peak 1065 pps, 1 s over the cap; czujka max 100 MiB, db max 76 MiB; db 45 MiB; changes 0; {"hosts_up":2000,"services":4500,"http":2700,"packets":3045947,"peak_pps":null,"avg_pps":624,"elapsed":4878,"passes":null}
+[00:20:53] r1-2k: export JSON 19618887 bytes in .809482139 s

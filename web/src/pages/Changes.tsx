@@ -40,7 +40,7 @@ export function ChangeDetail({ c, withSummary }: { c: Change; withSummary?: bool
   if (!entries.length && !(withSummary && c.summary)) return null;
   const val = (v: unknown) => (typeof v === 'object' ? JSON.stringify(v) : String(v));
   return (
-    <details className="mt-0.5 text-xs open:basis-full" data-testid="change-detail">
+    <details className="mt-0.5 flex-none whitespace-nowrap text-xs open:basis-full open:whitespace-normal" data-testid="change-detail">
       <summary className="cursor-pointer select-none text-ink-3 hover:text-ink-2">{t('Szczegóły', 'Details')}</summary>
       {withSummary && c.summary ? <p className="mt-1 whitespace-normal text-sm text-ink-2">{c.summary}</p> : null}
       {entries.length ? <dl className="mono mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-2xs text-ink-2">
@@ -74,10 +74,10 @@ export default function Changes() {
   // grouped by run, the group heading already says when; the column would repeat it
   const grouped = u.get('sort', '-at').endsWith('at');
   const cols: Col<Change>[] = [
-    { id: 'kind', header: t('Rodzaj', 'Type'), cell: (c) => <span className="flex max-w-[clamp(140px,14vw,230px)]" title={changeKindInfo(c.kind).label}><ChangeMark kind={c.kind} expected={c.expected} plain /></span> },
+    { id: 'kind', header: t('Rodzaj', 'Type'), cell: (c) => <span className="flex max-w-[clamp(140px,14vw,200px)] min-[1300px]:max-w-none" title={changeKindInfo(c.kind).label}><ChangeMark kind={c.kind} expected={c.expected} plain /></span> },
     { id: 'addr', header: t('Adres', 'Address'), sort: 'ip', cell: (c) => <Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link">{c.ip}{c.port ? ':' + c.port : ''}</Link> },
-    { id: 'what', header: t('Przed → po', 'Before → after'), wrap: true, cell: (c) => (
-      <div className={cx('flex min-w-0', grouped ? 'w-[clamp(170px,calc(100vw-1120px),560px)]' : 'w-[clamp(150px,calc(100vw-1250px),440px)]', 'flex-wrap items-baseline gap-x-3 py-1.5')} title={c.summary}><BeforeAfter c={c} /><ChangeDetail c={c} withSummary /></div>
+    { id: 'what', header: t('Przed → po', 'Before → after'), wrap: true, fill: true, cell: (c) => (
+      <div className="flex min-w-0 items-baseline gap-x-3 py-1.5 has-[details[open]]:flex-wrap" title={c.summary}><span className="flex min-w-0 shrink"><BeforeAfter c={c} /></span><ChangeDetail c={c} withSummary /></div>
     ) },
     { id: 'sev', header: t('Waga', 'Severity'), sort: 'severity', hide: 'md', cell: (c) => c.expected ? <span className="text-xs text-ink-3">{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} /> },
     { id: 'at', header: t('Kiedy', 'When'), sort: 'at', hide: 'xl', cell: (c) => <span className="num text-ink-2" title={fmtDateTime(c.at)}>{fmtRelative(c.at)}</span> },
@@ -141,7 +141,7 @@ export default function Changes() {
         empty={<Empty icon="changes" title={active ? t('Żadna zmiana nie pasuje do filtrów', 'No changes match the filters') : t('Brak zmian', 'No changes yet')} hint={active ? undefined : t('Zmiany pojawią się po drugim skanie', 'Changes appear after the second scan')} action={active ? undefined : <NextSteps />} />}
         mobile={(c) => (
           <div>
-            <div className="flex items-center justify-between gap-2"><ChangeMark kind={c.kind} expected={c.expected} /><span className="mono truncate text-xs text-ink-2">{c.ip}{c.port ? ':' + c.port : ''}</span></div>
+            <div className="flex items-center justify-between gap-2"><span className="flex min-w-0" title={changeKindInfo(c.kind).label}><ChangeMark kind={c.kind} expected={c.expected} /></span><span className="mono flex-none whitespace-nowrap text-xs text-ink-2">{c.ip}{c.port ? ':' + c.port : ''}</span></div>
             <div className="mt-0.5 min-w-0 overflow-hidden"><BeforeAfter c={c} /></div>
           </div>
         )}
