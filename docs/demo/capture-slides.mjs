@@ -1,4 +1,5 @@
-// Takes the deck's product screenshots from a running stack, sharp (device scale 2), in presentation mode, Polish, dark.
+// Takes the deck's product screenshots from a running stack (1440x900, device scale 1, each under 400 KB), in presentation
+// mode, Polish, dark.
 //   cd docs/demo && CZ_URL=https://... CZ_EMAIL=... CZ_PASS=... node capture-slides.mjs
 // Credentials come from the environment only; nothing prints or stores them. The account block is blurred.
 // Writes into docs/slides/img (CZ_SLIDES_OUT changes it), one file per slide:
@@ -9,7 +10,7 @@
 //   rule-dry-run.png    slide 7: an exposure rule and its current violations (CZ_RULE, default the starter admin-panel rule)
 // CZ_ONLY=scale,time takes only some of them. Read-only: GET requests and the sign-in only.
 import { chromium } from "playwright";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
@@ -27,7 +28,7 @@ const out = resolve(env.CZ_SLIDES_OUT || resolve(here, "../slides/img"));
 mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, locale: "pl-PL", timezoneId: "Europe/Warsaw", colorScheme: "dark" });
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: "pl-PL", timezoneId: "Europe/Warsaw", colorScheme: "dark" });
 await ctx.addInitScript(() => {
   localStorage.setItem("czujka.lang", "pl");
   const st = document.createElement("style"); st.textContent = "[data-testid=whoami]{filter:blur(9px)!important}";
@@ -40,13 +41,14 @@ await page.getByLabel(/^Hasło$/).first().fill(PASSWORD);
 await page.getByRole("button", { name: "Zaloguj się" }).click();
 await page.waitForURL((u) => !u.pathname.startsWith("/login"));
 const api = (path) => page.evaluate(async (p) => (await fetch("/api/v1" + p, { credentials: "same-origin" })).json(), path);
+const report = (file, from) => { const kb = Math.round(statSync(resolve(out, file)).size / 1024); console.log("wrote", file, "(" + kb + " KB) from", from + (kb >= 400 ? "  WARNING: over 400 KB, run pngquant" : "")); };
 async function shot(path, file, width = 1440, height = 900) {
   await page.setViewportSize({ width, height });
   await page.goto(URL0 + path + (path.includes("?") ? "&" : "?") + "present=1");
   await page.waitForLoadState("networkidle").catch(() => {});
   await page.waitForTimeout(2500);
   await page.screenshot({ path: resolve(out, file) });
-  console.log("wrote", file, "from", path);
+  report(file, path);
 }
 
 if (want("scale")) {
@@ -61,14 +63,14 @@ if (want("service")) {
 }
 if (want("reprobe")) {
   const h = ((await api("/hosts?q=" + encodeURIComponent(HOST) + "&limit=10")).items || []).find((x) => x.ip === HOST);
-  if (h) await shot("/hosts/" + h.id + "?tab=availability", "reprobe-host.png", 1440, 1300); else console.log("skip reprobe-host.png: no host " + HOST);
+  if (h) await shot("/hosts/" + h.id + "?tab=availability", "reprobe-host.png"); else console.log("skip reprobe-host.png: no host " + HOST);
 }
 if (want("time")) await shot("/time" + (env.CZ_TIME_RUN ? "?run=" + env.CZ_TIME_RUN : ""), "time-machine.png", Number(env.CZ_TIME_W || 960), 1300);
 if (want("rule")) {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(URL0 + "/rules?present=1"); await page.waitForLoadState("networkidle").catch(() => {});
   const item = page.getByTestId("rule-list").getByText(RULE).first();
-  if (await item.count()) { await item.click(); await page.waitForLoadState("networkidle").catch(() => {}); await page.waitForTimeout(2500); await page.screenshot({ path: resolve(out, "rule-dry-run.png") }); console.log("wrote rule-dry-run.png from /rules (" + RULE + ")"); }
+  if (await item.count()) { await item.click(); await page.waitForLoadState("networkidle").catch(() => {}); await page.waitForTimeout(2500); await page.screenshot({ path: resolve(out, "rule-dry-run.png") }); report("rule-dry-run.png", "/rules (" + RULE + ")"); }
   else console.log("skip rule-dry-run.png: no rule " + RULE);
 }
 await browser.close();
