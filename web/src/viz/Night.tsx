@@ -214,6 +214,8 @@ export function Ring({ value, max, size = 40, tone = 'var(--coral)' }: { value: 
 export function runChanges(r: ScanRun): number {
   const s = r.summary;
   if (!s || !s.prev_run_id) return 0;
+  // one count everywhere: the change rows of this run that were not expected (as the changes page lists them)
+  if (s.by_kind) return Object.entries(s.by_kind).reduce((a, [k, v]) => (k === 'expected' ? a : a + v), 0);
   return s.hosts_new + s.hosts_gone + s.services_new + s.services_gone + s.services_changed + (s.hosts_back ?? 0) + (s.services_returned ?? 0) + (s.responses_slower ?? 0);
 }
 

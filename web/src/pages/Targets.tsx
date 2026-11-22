@@ -48,7 +48,7 @@ export function LoopbackNote({ targets }: { targets: { value: string; maps_to?: 
 export function ThisComputerChip({ text, onChange }: { text: string; onChange: (next: string) => void }) {
   const has = text.split(/\r?\n/).some((l) => isLoopback(l.replace(/#.*/, '')));
   return (
-    <button type="button" className={cx('inline-flex h-[26px] items-center gap-1.5 border px-2 text-xs', has ? 'border-accent text-ink' : 'border-rule-strong text-ink-2 hover:border-accent hover:text-ink')}
+    <button type="button" className={cx('inline-flex h-[26px] items-center gap-1.5 rounded-[6px] border px-2 text-xs', has ? 'border-rule-strong bg-raised text-ink' : 'border-rule text-ink-2 hover:border-rule-strong hover:text-ink')}
       aria-pressed={has} data-testid="this-computer"
       onClick={() => onChange(has ? text : (text.trim() ? text.replace(/\s+$/, '') + '\n' : '') + THIS_COMPUTER)}>
       <Icon name={has ? 'check' : 'plus'} size={12} />{t('Ten komputer', 'This computer')} <span className="mono text-ink-3">(localhost)</span>
@@ -229,7 +229,7 @@ export default function Targets() {
               {list.map((s) => (
                 <li key={s.id} className="border-b border-rule last:border-b-0">
                   <button type="button" aria-current={s.id === scopeId ? 'true' : undefined} onClick={() => u.set({ scope: s.id })}
-                    className={cx('block w-full px-3 py-2 text-left outline-offset-[-2px] hover:bg-raised', s.id === scopeId && 'bg-accent-wash')}>
+                    className={cx('block w-full px-3 py-2 text-left outline-offset-[-2px] hover:bg-raised', s.id === scopeId && 'bg-raised')}>
                     <span className="flex items-center justify-between gap-2"><span className={cx('text-sm', s.id === scopeId ? 'font-semibold text-ink' : 'text-ink')}>{s.name}</span><Crit value={s.criticality} /></span>
                     <span className="mt-0.5 block text-xs text-ink-2"><span className="num">{fmtInt(s.address_count)}</span> {plural(s.address_count, ['adres', 'adresy', 'adresów'], ['address', 'addresses'])} · <span className="num">{s.target_count}</span> {plural(s.target_count, ['cel', 'cele', 'celów'], ['target', 'targets'])}</span>
                     {s.owner ? <span className="block truncate text-xs text-ink-3">{s.owner}</span> : null}

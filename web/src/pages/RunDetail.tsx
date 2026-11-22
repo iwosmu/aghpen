@@ -304,7 +304,7 @@ export default function RunDetail() {
                     {sortedChunks.map((c) => (
                       <tr
                         key={c.id} onPointerEnter={() => setHoverChunk(c.id)} onPointerLeave={() => setHoverChunk(null)} tabIndex={0} onFocus={() => setHoverChunk(c.id)} onBlur={() => setHoverChunk(null)}
-                        className={cx('border-b border-rule last:border-b-0 outline-offset-[-2px]', (hoverChunk === c.id || hoveredChunkId === c.id) ? 'bg-accent-wash' : hoverGroup && c.group === hoverGroup ? 'bg-accent-wash/50' : '')}
+                        className={cx('border-b border-rule last:border-b-0 outline-offset-[-2px]', (hoverChunk === c.id || hoveredChunkId === c.id) ? 'bg-raised' : hoverGroup && c.group === hoverGroup ? 'bg-accent-wash/50' : '')}
                       >
                         <td className="num h-[42px] pl-5 pr-2 text-ink-2">{c.seq}</td>
                         <td className="mono whitespace-nowrap px-2" title={c.spec.join(', ')}>{specLabel(c)}</td>

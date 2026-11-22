@@ -53,6 +53,8 @@ export interface TableProps<T> {
   inPanel?: boolean;
   /** consecutive rows with the same key sit under one small caps heading with their count */
   group?: (row: T) => { key: string; label: ReactNode };
+  /** A short addition after a group's count, from the rows in that group. */
+  groupNote?: (rows: T[]) => ReactNode;
 }
 
 /** Runs of rows that share a group key, in the order given. */
@@ -67,8 +69,8 @@ export function groupRuns<T>(rows: T[], group?: (row: T) => { key: string; label
   return out;
 }
 
-export function GroupHead({ label, count, className }: { label: ReactNode; count: number; className?: string }) {
-  return <p className={cx('caps', className)}>{label} <span className="text-ink-3">· </span><span className="num">{count}</span></p>;
+export function GroupHead({ label, count, note, className }: { label: ReactNode; count: number; note?: ReactNode; className?: string }) {
+  return <p className={cx('caps', className)}>{label} <span className="text-ink-3">· </span><span className="num">{count}</span>{note}</p>;
 }
 
 export function DataTable<T>(p: TableProps<T>) {
@@ -105,7 +107,7 @@ export function DataTable<T>(p: TableProps<T>) {
     return (
       <ul className={cx('transition-opacity', !p.inPanel && 'card mx-3 overflow-hidden rounded-[14px] py-1 sm:mx-6', p.dim && 'opacity-60')}>
         {groupRuns(rows, p.group).flatMap((g) => [
-          ...(g.label ? [<li key={'g-' + g.key} className="px-4 pb-1.5 pt-4"><GroupHead label={g.label} count={g.rows.length} /></li>] : []),
+          ...(g.label ? [<li key={'g-' + g.key} className="px-4 pb-1.5 pt-4"><GroupHead label={g.label} count={g.rows.length} note={p.groupNote?.(g.rows)} /></li>] : []),
           ...g.rows.map((row) => {
           const k = p.rowKey(row);
           return (
@@ -148,7 +150,7 @@ export function DataTable<T>(p: TableProps<T>) {
         </thead>
         <tbody>
           {groupRuns(rows, p.group).flatMap((g) => [
-            ...(g.label ? [<tr key={'g-' + g.key} className="border-b border-rule"><td colSpan={p.cols.length + (sel ? 1 : 0)} className={cx('px-3 pb-2 pt-5', edge)}><GroupHead label={g.label} count={g.rows.length} /></td></tr>] : []),
+            ...(g.label ? [<tr key={'g-' + g.key} className="border-b border-rule"><td colSpan={p.cols.length + (sel ? 1 : 0)} className={cx('px-3 pb-2 pt-5', edge)}><GroupHead label={g.label} count={g.rows.length} note={p.groupNote?.(g.rows)} /></td></tr>] : []),
             ...g.rows.map((row) => {
             const k = p.rowKey(row);
             return (

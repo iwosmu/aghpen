@@ -17,7 +17,7 @@ function RunCard({ run, side }: { run: ScanRun; side: string }) {
       <div className="text-xs text-ink-3">{side}</div>
       <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2"><Link to={'/runs/' + run.id} className="num link text-base font-medium">#{run.id}</Link><span className="truncate text-sm text-ink-2">{run.profile_name}</span></div>
       <div className="num mt-0.5 text-xs text-ink-2">{fmtDateTime(run.finished_at ?? run.started_at)} · {fmtDuration(run.stats.elapsed_sec)}</div>
-      <div className="mt-1 text-xs text-ink-2"><span className="num text-ink">{fmtInt(run.stats.hosts_up)}</span> {t('host / hosty / hostów (plural())', 'host / hosts')} · <span className="num text-ink">{fmtInt(run.stats.services_open)}</span> {t('usługa / usługi / usług (plural())', 'service / services')}</div>
+      <div className="mt-1 text-xs text-ink-2"><span className="num text-ink">{fmtInt(run.stats.hosts_up)}</span> {plural(run.stats.hosts_up, ['host', 'hosty', 'hostów'], ['host', 'hosts'])} · <span className="num text-ink">{fmtInt(run.stats.services_open)}</span> {plural(run.stats.services_open, ['usługa', 'usługi', 'usług'], ['service', 'services'])}</div>
     </div>
   );
 }
@@ -93,8 +93,8 @@ export default function Compare() {
               <RunCard run={d.from} side={t('Przed', 'Before')} />
               <div className="flex flex-none flex-col items-center px-1 text-xs text-ink-2">
                 <Icon name="arrowRight" className="hidden text-ink-3 sm:block" />
-                <span className="num">{fmtSigned(d.to.stats.hosts_up - d.from.stats.hosts_up)} {t('host / hosty / hostów (plural())', 'host / hosts')}</span>
-                <span className="num">{fmtSigned(d.to.stats.services_open - d.from.stats.services_open)} {t('usługa / usługi / usług (plural())', 'service / services')}</span>
+                <span className="num">{fmtSigned(d.to.stats.hosts_up - d.from.stats.hosts_up)} {plural(Math.abs(d.to.stats.hosts_up - d.from.stats.hosts_up), ['host', 'hosty', 'hostów'], ['host', 'hosts'])}</span>
+                <span className="num">{fmtSigned(d.to.stats.services_open - d.from.stats.services_open)} {plural(Math.abs(d.to.stats.services_open - d.from.stats.services_open), ['usługa', 'usługi', 'usług'], ['service', 'services'])}</span>
               </div>
               <RunCard run={d.to} side={t('Po', 'After')} />
             </div>

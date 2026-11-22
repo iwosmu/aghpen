@@ -18,7 +18,7 @@ export function BarList({ items, href, mono, labelWidth = 132, extra }: { items:
           <>
             <span className={cx('flex-none truncate text-sm text-ink', mono && 'num')} style={{ width: labelWidth }} title={i.name}>{i.name}{extra ? <span className="ml-1.5 font-sans text-2xs text-ink-3">{extra(i)}</span> : null}</span>
             <span className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="h-[8px] rounded-r-sm bg-[var(--seq-3)] transition-[width] duration-500 group-hover:bg-accent-strong" style={{ width: Math.max(2, (i.count / max) * 100) + '%', maxWidth: 'calc(100% - 44px)' }} />
+              <span className="h-[8px] rounded-r-sm bg-[var(--seq-3)] transition-[width] duration-500 group-hover:bg-[var(--seq-4)]" style={{ width: Math.max(2, (i.count / max) * 100) + '%', maxWidth: 'calc(100% - 44px)' }} />
               <span className="num flex-none text-xs text-ink-2">{fmtInt(i.count)}</span>
             </span>
           </>

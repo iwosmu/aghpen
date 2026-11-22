@@ -50,7 +50,7 @@ function Logo() {
     <Link to="/" className="flex h-[56px] items-center gap-2.5 px-5 text-rail-ink">
       <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
         <path d="M4 16a8 8 0 0 1 16 0" fill="none" stroke="currentColor" strokeWidth="1.8" />
-        <path d="M8 16a4 4 0 0 1 8 0" fill="none" stroke="var(--accent)" strokeWidth="1.8" />
+        <path d="M8 16a4 4 0 0 1 8 0" fill="none" stroke="currentColor" strokeWidth="1.8" />
         <rect x="10.800" y="14.800" width="2.400" height="2.400" fill="currentColor" />
         <path d="M2.500 20h19" stroke="currentColor" strokeWidth="1.400" />
       </svg>
