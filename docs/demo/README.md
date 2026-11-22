@@ -12,8 +12,8 @@ Wynik w `docs/demo/`:
 
 | Plik | Co to jest |
 | --- | --- |
-| `czujka-demo.mp4` | film 1920 × 1080, 30 kl./s, bez dźwięku, napisy wtopione |
-| `czujka-demo.pl.srt` | te same napisy jako plik |
+| `czujka-demo.mp4` | film 1920 × 1080, 60 kl./s, z głosem lektora, bez napisów na obrazie |
+| `czujka-demo.pl.srt` | tekst lektora jako plik napisów |
 | `lektor.txt` | tekst lektora z kodem czasu każdego ujęcia; głos nagrywa się na gotowy film |
 
 `record.sh` stawia na chwilę świeżą instalację `czpwiz` (port 18641) do ujęcia z kreatorem i usuwa ją po nagraniu. Bez niej (`CZ_NO_WIZARD=1`) ujęcie 1 pokazuje logowanie.
