@@ -414,7 +414,7 @@ func (d *differ) service(h *HostSnapshot, p, c *model.ServiceResult) {
 	httpComparable := p.HTTP != nil && c.HTTP != nil && c.HTTP.Error == "" && p.HTTP.Error == ""
 	httpSame := (p.HTTP == nil) == (c.HTTP == nil) && (c.HTTP == nil || c.HTTP.Error == "")
 
-	if httpSame {
+	if httpSame && !noAnswer(p) && !noAnswer(c) {
 		d.techs(h, p, c, at)
 		d.classes(h, p, c, at)
 	}
@@ -432,6 +432,15 @@ func (d *differ) service(h *HostSnapshot, p, c *model.ServiceResult) {
 		}
 		d.add(h, c, model.ChangeCert, sev, "tls.sha256", certBrief(p.TLS), certBrief(c.TLS), false, detail)
 	}
+}
+
+// noAnswer reports a service that closed the connection before it said
+// anything ("tcpwrapped": no banner, no product, no page). Its technologies
+// and classes are unknown, not gone. Measured on the 10 000-host scale lab:
+// an SSH server over its connection limit gave 8 018 changes of technology
+// and class in a second scan of an unchanged network.
+func noAnswer(s *model.ServiceResult) bool {
+	return strings.EqualFold(s.Name, "tcpwrapped") && s.HTTP == nil && s.Banner == "" && !versionMeasured(s)
 }
 
 // versionMeasured reports whether nmap version detection looked at the
