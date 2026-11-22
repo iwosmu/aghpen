@@ -882,6 +882,7 @@ func (s *Server) exportRun(w http.ResponseWriter, r *http.Request) {
 	auditSet(r, "export.run", "export", id, map[string]any{"format": format})
 	cookies := canSeeCookies(r)
 	clean := func(h *model.HostResult) {
+		h.Hostnames = targets.ShownHostnames(h.Hostnames, h.IP)
 		if !cookies {
 			for i := range h.Services {
 				redactCookies(&h.Services[i])

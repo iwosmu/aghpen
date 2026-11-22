@@ -66,14 +66,16 @@ export function fmtRelative(iso: string | null | undefined, now = Date.now()): s
 /** 4310 -> "1 h 11 min", 95 -> "1 min 35 s". */
 export function fmtDuration(sec: number | null | undefined): string {
   if (sec === null || sec === undefined || sec < 0 || !Number.isFinite(sec)) return '–';
+  // the same units as the change summaries (internal/analyze durationText)
   const s = Math.round(sec);
+  const two = (a: number, ua: string, b: number, ub: string) => a + ' ' + ua + (b ? ' ' + b + ' ' + ub : '');
   if (s < 60) return s + ' s';
   const m = Math.floor(s / 60);
-  if (m < 60) return m + ' min ' + (s % 60 ? (s % 60) + ' s' : '').trim();
+  if (m < 60) return two(m, 'min', s % 60, 's');
   const h = Math.floor(m / 60);
-  if (h < 48) return h + ' h ' + (m % 60 ? (m % 60) + ' min' : '').trim();
+  if (h < 48) return two(h, 'h', m % 60, 'min');
   const d = Math.floor(h / 24);
-  return d + ' ' + plural(d, ['dzień', 'dni', 'dni'], ['day', 'days']) + ' ' + (h % 24) + ' h';
+  return two(d, plural(d, ['dzień', 'dni', 'dni'], ['day', 'days']), h % 24, 'h');
 }
 
 /** A decimal with a fixed number of digits in the UI locale ("0,15" in Polish, "0.15" in English). */

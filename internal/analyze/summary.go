@@ -335,17 +335,7 @@ func usualTextEN(baselineMs int) string {
 	return fmt.Sprintf("usually %d ms", baselineMs)
 }
 
-func awayTextEN(d time.Duration) string {
-	switch {
-	case d < time.Minute:
-		return fmt.Sprintf("%d s", int(d.Seconds()))
-	case d < time.Hour:
-		return fmt.Sprintf("%d min", int(d.Minutes()))
-	case d < 48*time.Hour:
-		return fmt.Sprintf("%d h", int(d.Hours()))
-	}
-	return fmt.Sprintf("%d days", int(d.Hours()/24))
-}
+func awayTextEN(d time.Duration) string { return durationText(d, "days") }
 
 var classEN = map[string]string{
 	model.ClassAdminPanel: "admin panel", model.ClassLogin: "login page", model.ClassStaging: "test environment",
