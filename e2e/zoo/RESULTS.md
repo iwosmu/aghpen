@@ -18,10 +18,55 @@ Dla każdego opublikowanego portu z `truth.tsv`:
 
 Komórka tabeli: `przed → **po** (nmap -sV)`. „nmap -sV” to zwykły `nmap -sS -sV` na tych samych portach.
 
-## Zbiór strojenia (76 portów, 10 partii)
+## 1. Zbiór odłożony: 20 usług (23 porty), których Czujka nie widziała przy strojeniu
 
-Na tych usługach stroiliśmy sygnatury. „Przed” to obraz sprzed pracy nad zoo (`3a7e44b`), „po” to obraz z
-commita `047412b` (sygnatury ręczne, import nuclei-templates, samoopis).
+| Miara | przed | po | nmap -sV |
+| --- | --- | --- | --- |
+| produkt | 6 z 23 | **13 z 23** | 4 z 23 |
+| wersja | 1/3 | **1/3** | 1/3 |
+| klasy | 4/14 | **4/14** | 0/14 |
+| błędne etykiety | 9 | **11** | – |
+
+Błędnych etykiet przybyło dwie: samoopis nazwał OpenVSCode „Code” (prawda oczekuje „VS Code”), a sygnatura
+otwartego rejestru Dockera dodała klasę `unauth-control-api` na Docker Registry UI, który przekazuje `/v2/`
+do rejestru bez uwierzytelnienia.
+
+Podział na kategorie (komórka: `przed → **po** (nmap -sV)`):
+
+| kategoria | porty | produkt | wersja | technologie | klasy | błędne etykiety |
+| --- | --- | --- | --- | --- | --- | --- |
+| cms | 6 | 1 → **4** (0) | 0/0 → **0/0** (0/0) | 2/4 → **2/4** (0/4) | 1/4 → **1/4** (0/4) | 0 → **0** |
+| database | 5 | 3 → **3** (3) | 1/3 → **1/3** (1/3) | 0/0 → **0/0** (0/0) | 1/1 → **1/1** (0/1) | 1 → **1** |
+| monitoring | 1 | 0 → **1** (0) | 0/0 → **0/0** (0/0) | 0/0 → **0/0** (0/0) | 0/0 → **0/0** (0/0) | 0 → **0** |
+| panel | 11 | 2 → **5** (1) | 0/0 → **0/0** (0/0) | 1/1 → **1/1** (0/1) | 2/9 → **2/9** (0/9) | 8 → **10** |
+| **razem** | 23 | 6 → **13** (4) | 1/3 → **1/3** (1/3) | 3/5 → **3/5** (0/5) | 4/14 → **4/14** (0/14) | 9 → **11** |
+
+Skąd siedem nowych produktów (6 → 13):
+
+| Źródło | Usługi |
+| --- | --- |
+| import nuclei-templates | FreshRSS, Kanboard, Directus, Graphite |
+| samoopis strony | Etherpad (`og:site_name`), File Browser (`apple-mobile-web-app-title`), Gotify (`application-name`) |
+
+Błędne etykiety w zbiorze odłożonym (11), z oceną:
+
+| Port | Etykieta | Ocena |
+| --- | --- | --- |
+| 8070 Docker Registry UI | Docker Registry, api, dev-tool, unauth-control-api | interfejs przekazuje `/v2/` do rejestru bez uwierzytelnienia: rejestr jest otwarty, prawda tego nie przewidziała (4) |
+| 43000 AdGuard Home | admin-panel, login | kreator instalacji (tytuł „Setup AdGuard Home”), prawda: install-page; brakuje sygnatury instalatora AdGuard (2) |
+| 8384 Syncthing | login | prawda: panel bez logowania; klasa z klasyfikatora |
+| 13300 OpenVSCode | Code | samoopis: `apple-mobile-web-app-title` = „Code”; prawda oczekuje „VS Code” |
+| 18083 EMQX | Cowboy | prawdziwy serwer HTTP pod EMQX, poza listą platform |
+| 8055 Directus | admin-panel | prawda: login (aplikacja SPA, tytuł „Loading…”) |
+| 28180 ZooKeeper (Jetty) | error-page | strona główna to 404 Jetty |
+
+Na zbiorze odłożonym 9 z 11 błędnych etykiet to klasy i technologie, które dawał już silnik sprzed zmian.
+
+
+## 2. Zbiór strojenia: 76 portów, 10 partii (na tych usługach stroiliśmy sygnatury)
+
+„Przed” to obraz sprzed pracy nad zoo (`3a7e44b`), „po” to obraz z commita `047412b` (sygnatury ręczne,
+import nuclei-templates, samoopis). Komórka: `przed → **po** (nmap -sV)`.
 
 | kategoria | porty | produkt | wersja | technologie | klasy | błędne etykiety |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -39,47 +84,17 @@ Po skanie usunęliśmy jeszcze jeden import (`nuclei-td-sonarqubes`: liczba mnog
 commit `b5f08e8`). Ponowne dopasowanie tych samych eksportów obecnym silnikiem (`rematch`) daje **1** błędną
 etykietę: klasa `login` na Redis Commander. Strona zawiera ukryte okno logowania (`signinPassword`), używane tylko przy włączonym uwierzytelnieniu; domyślnie jest wyłączone, więc prawda nie przewiduje klasy `login`.
 
-## Zbiór odłożony (20 usług, 23 porty): usługi, których Czujka nigdy nie widziała
 
-Opis prawdy powstał przed pierwszym skanem (commit `96793d9`). Nie oglądaliśmy odpowiedzi tych usług przy
-strojeniu i nic po skanie nie zmieniliśmy. Skan był jeden. „Przed” to silnik i sygnatury z `3a7e44b`, uruchomione
-na danych tego samego skanu (`rematch`; ścieżki dodatkowe wybrał nowy silnik, więc to przybliżenie).
+## 3. Co nie wystartowało; jeden skan zbioru odłożonego
 
-| kategoria | porty | produkt | wersja | technologie | klasy | błędne etykiety |
-| --- | --- | --- | --- | --- | --- | --- |
-| cms | 6 | 1 → **4** (0) | 0/0 → **0/0** (0/0) | 2/4 → **2/4** (0/4) | 1/4 → **1/4** (0/4) | 0 → **0** |
-| database | 5 | 3 → **3** (3) | 1/3 → **1/3** (1/3) | 0/0 → **0/0** (0/0) | 1/1 → **1/1** (0/1) | 1 → **1** |
-| monitoring | 1 | 0 → **1** (0) | 0/0 → **0/0** (0/0) | 0/0 → **0/0** (0/0) | 0/0 → **0/0** (0/0) | 0 → **0** |
-| panel | 11 | 2 → **5** (1) | 0/0 → **0/0** (0/0) | 1/1 → **1/1** (0/1) | 2/9 → **2/9** (0/9) | 8 → **10** |
-| **razem** | 23 | 6 → **13** (4) | 1/3 → **1/3** (1/3) | 3/5 → **3/5** (0/5) | 4/14 → **4/14** (0/14) | 9 → **11** |
+- Wiki.js (23000, brak bazy danych) i Vaultwarden (8443) nie odpowiedziały w 480 s. Dlatego w zbiorze odłożonym
+  Czujka i nmap znalazły 21 z 23 portów. YOURLS (38080) miał otwarty port bez odpowiedzi HTTP.
+- W zbiorze strojenia Varnish (36081) nie odpowiedział w 480 s (75 z 76 portów).
+- Zbiór odłożony skanowaliśmy raz, na końcu, obrazem `zoo-after`. Opis prawdy powstał przed skanem (commit
+  `96793d9`). Po skanie nie zmieniliśmy niczego, co wpływa na te liczby. Kolumna „przed” to silnik i sygnatury
+  z `3a7e44b` uruchomione na danych tego samego skanu (`rematch`).
 
-Dwie usługi nie wystartowały w 480 s (Wiki.js bez bazy, Vaultwarden), więc „znaleziony” to 21 z 23 portów.
-YOURLS (38080) też nie był gotowy: port był otwarty, ale bez odpowiedzi HTTP.
-
-Skąd siedem nowych produktów (6 → 13):
-
-| Źródło | Usługi |
-| --- | --- |
-| import nuclei-templates | FreshRSS, Kanboard, Directus, Graphite |
-| samoopis strony | Etherpad (`og:site_name`), File Browser (`apple-mobile-web-app-title`), Gotify (`application-name`) |
-
-Błędne etykiety w zbiorze odłożonym (11), z oceną:
-
-| Port | Etykieta | Ocena |
-| --- | --- | --- |
-| 8070 Docker Registry UI | Docker Registry, api, dev-tool, unauth-control-api | interfejs przekazuje `/v2/` do rejestru bez uwierzytelnienia: rejestr naprawdę jest otwarty, ale prawda tego nie przewidziała (4) |
-| 43000 AdGuard Home | admin-panel, login | kreator instalacji (tytuł „Setup AdGuard Home”), prawda: install-page; brakuje sygnatury instalatora AdGuard (2) |
-| 8384 Syncthing | login | prawda: panel bez logowania; klasa z klasyfikatora |
-| 13300 OpenVSCode | Code | samoopis: `apple-mobile-web-app-title` = „Code”; prawda oczekuje „VS Code” |
-| 18083 EMQX | Cowboy | prawdziwy serwer HTTP pod EMQX, poza listą platform |
-| 8055 Directus | admin-panel | prawda: login (aplikacja SPA, tytuł „Loading…”) |
-| 28180 ZooKeeper (Jetty) | error-page | strona główna to 404 Jetty |
-
-Wniosek: import i samoopis podwajają liczbę rozpoznanych produktów na nieznanych usługach (6 → 13 z 23; nmap -sV: 4).
-Błędne etykiety na zbiorze odłożonym to głównie klasy ręcznych sygnatur i klasyfikatora, nie nazwy produktów.
-Samoopis dał jedną nazwę spornej jakości („Code”).
-
-## Import otwartego korpusu (krok 2)
+## 4. Import otwartego korpusu
 
 Źródło: projectdiscovery/nuclei-templates (MIT, licencję sprawdziliśmy w `LICENSE.md`), commit `1ad25895`.
 Szczegóły i polecenie odtworzenia: `signatures/community/LICENSES.md`, `docs/SIGNATURES.md` (14.6).
@@ -105,7 +120,7 @@ czasu na usługę. Pomiar był pod obciążeniem maszyny (load 40–60), więc c
 nieobciążonej maszynie sama biblioteka ręczna to 1,46 ms na usługę. Pierwsza wersja importu (z FingerprintHub,
 3464 sygnatury) podwajała czas, dlatego FingerprintHub jest w opt-in.
 
-## Luki po stronie silnika (poza `internal/sig` i `signatures/`)
+## 5. Luki po stronie silnika (poza `internal/sig` i `signatures/`)
 
 | Luka | Dowód | Najmniejsza poprawka |
 | --- | --- | --- |
@@ -120,7 +135,7 @@ Zmiany w `internal/sig` (dozwolone): pole `source` w DSL, ładowanie `signatures
 (`selfdesc.go`), usunięcie klasy `login` ze stron instalatora, test przepustowości odporny na obciążenie.
 `internal/model`, `internal/scan`, `internal/probe` bez zmian.
 
-## Czego nie zrobiliśmy
+## 6. Czego nie zrobiliśmy
 
 - rapid7/recog (BSD-2): reguły banerów mają sens dopiero po poprawce banera (druga luka wyżej).
 - Korpus Wappalyzera: wersje na licencji GPL pomijamy; `tech-detect.yaml` z nuclei-templates (MIT) już jest w imporcie.
