@@ -317,7 +317,7 @@
   /* a fact about a row: short, quiet, pill */
   .chip-fact { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: 4px; font-size: 12px; line-height: 16px; color: var(--ink-2); background: var(--raised); white-space: nowrap; }
   /* group and section labels: muted mono, sentence case */
-  .caps { font-family: var(--font-mono); font-size: 12px; line-height: 16px; font-weight: 400; letter-spacing: 0; color: var(--ink-3); }
+  .caps { font-family: var(--font-sans); font-size: 13px; line-height: 1.4; color: var(--ink-2); font-weight: 400; letter-spacing: 0; text-transform: none; }
   p.caps::first-letter, h2.caps::first-letter { text-transform: uppercase; }
   /* the signature: a lamp, a small square cell */
   .lamp { display: inline-block; width: 8px; height: 8px; border-radius: 2px; flex: none; }
