@@ -7,6 +7,16 @@ docker compose up -d
 
 Otwórz `http://127.0.0.1:8080` i naciśnij **„Ten komputer”**, potem **„Uruchom skan”**. Login i hasło pierwszego administratora: `docker compose logs czujka | grep -A3 "first administrator"`.
 
+**Windows** (Docker Desktop z WSL 2, PowerShell):
+
+```powershell
+git clone --depth 1 https://github.com/iwosmu/aghpen.git czujka; cd czujka
+docker compose up -d
+docker compose logs czujka | Select-String -Context 0,3 "first administrator"
+```
+
+Inny port: `$env:CZUJKA_PORT=18080; docker compose up -d`. Repozytorium wymusza końce wierszy LF (`.gitattributes`), więc domyślne `core.autocrlf=true` z Git for Windows nie psuje skryptów w obrazach. Skrypt szablonu organizatorów (`lab/jury/quickstart.sh`) wymaga Git Bash albo WSL.
+
 Wynik: usługi na portach tego komputera, także kontenery Dockera z opublikowanymi portami, z wersjami, tytułami stron i czasem odpowiedzi. Kolejny skan pokazuje, co zniknęło, co wróciło i co zwolniło.
 
 ### Kryterium oceny → gdzie to zobaczyć

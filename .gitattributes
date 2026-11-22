@@ -1,0 +1,21 @@
+# Line endings are LF on every platform. Git for Windows converts text files to
+# CRLF by default (core.autocrlf=true); a shell script with CRLF copied into an
+# image does not run, so the database init script would stop the first start.
+* text=auto eol=lf
+
+# Test fixtures stay byte-exact.
+**/testdata/** -text
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mp4 binary
+*.webm binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.pcap binary
+*.gz binary
+*.zip binary

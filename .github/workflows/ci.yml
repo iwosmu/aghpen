@@ -17,6 +17,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  windows:
+    name: windows (checkout with core.autocrlf=true, compose file)
+    runs-on: windows-latest
+    steps:
+      - name: git as Git for Windows ships it
+        run: git config --global core.autocrlf true
+      - uses: actions/checkout@v4
+      - name: no CRLF in the working tree outside test fixtures
+        shell: bash
+        run: |
+          bad=$(git ls-files --eol | grep "w/crlf" | grep -v "testdata/" || true)
+          if [ -n "$bad" ]; then echo "$bad"; exit 1; fi
+          echo "files checked: $(git ls-files | wc -l)"
+      - name: compose file parses on Windows
+        shell: bash
+        run: |
+          if docker compose version >/dev/null 2>&1; then docker compose config -q && echo "compose config ok"; else echo "docker compose is not on this runner: skipped"; fi
+
   go:
     name: go (gofmt, build, vet, unit tests)
     runs-on: ubuntu-latest
