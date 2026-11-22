@@ -215,7 +215,7 @@ export default function Findings() {
   const active = FILTERS.filter((k) => u.get(k)).length;
   const cols: Col<Finding>[] = [
     { id: 'sev', header: t('Waga', 'Severity'), sort: 'severity', width: 110, cell: (f) => <Sev level={f.severity} /> },
-    { id: 'title', header: t('Znalezisko', 'Finding'), cell: (f) => <span className="block max-w-[420px] truncate text-ink" title={f.title}>{bareTitle(f)}{f.manual ? <span className="ml-1.5 text-2xs text-ink-3">{t('ręczne', 'manual')}</span> : null}</span> },
+    { id: 'title', header: t('Znalezisko', 'Finding'), cell: (f) => <span className="block max-w-[clamp(180px,calc(100vw-1020px),420px)] truncate text-ink" title={f.title}>{bareTitle(f)}{f.manual ? <span className="ml-1.5 text-2xs text-ink-3">{t('ręczne', 'manual')}</span> : null}</span> },
     { id: 'addr', header: t('Adres', 'Address'), cell: (f) => <span className="mono text-ink-2">{f.ip}{f.port ? ':' + f.port : ''}</span> },
     { id: 'status', header: t('Status', 'Status'), sort: 'status', cell: (f) => <FindingStatusMark status={f.status} /> },
     { id: 'dojo', header: 'DefectDojo', hide: 'lg', cell: (f) => f.dojo_id ? <a className="num link inline-flex items-center gap-1" href={f.dojo_url} target="_blank" rel="noreferrer noopener" onClick={(e) => e.stopPropagation()}>#{f.dojo_id}<Icon name="external" size={11} /></a> : <span className="text-ink-3">–</span> },

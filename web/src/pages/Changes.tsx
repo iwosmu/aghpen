@@ -23,13 +23,13 @@ export function BeforeAfter({ c }: { c: Change }) {
   const b = c.field ? fieldValue(c.field, before) : show(before), a = c.field ? fieldValue(c.field, c.after) : show(c.after);
   if (!b && !a) return null;
   // never two equal values with an arrow
-  if (b && a && b === a) return <span className="flex min-w-0 items-center gap-x-1.5 whitespace-nowrap text-xs">{c.field ? <span className="text-ink-3" title={c.field}>{fieldLabel(c.field)}:</span> : null}<span className="mono text-ink">{a}</span></span>;
+  if (b && a && b === a) return <span className="flex min-w-0 max-w-full items-center gap-x-1.5 overflow-hidden whitespace-nowrap text-xs">{c.field ? <span className="min-w-0 max-w-[45%] flex-none truncate text-ink-3" title={c.field}>{fieldLabel(c.field)}:</span> : null}<span className="mono min-w-0 truncate text-ink" title={a}>{a}</span></span>;
   return (
-    <span className="flex min-w-0 items-center gap-x-1.5 whitespace-nowrap text-xs">
-      {c.field ? <span className="text-ink-3" title={c.field}>{fieldLabel(c.field)}:</span> : null}
-      {b ? <span className="mono max-w-[130px] truncate text-ink-3 line-through decoration-[var(--ink-3)]" title={b}>{b}</span> : <span className="text-ink-3">{t('brak', 'none')}</span>}
+    <span className="flex min-w-0 max-w-full items-center gap-x-1.5 overflow-hidden whitespace-nowrap text-xs">
+      {c.field ? <span className="min-w-0 max-w-[40%] flex-none truncate text-ink-3" title={c.field}>{fieldLabel(c.field)}:</span> : null}
+      {b ? <span className="mono min-w-0 max-w-[40%] truncate text-ink-3 line-through decoration-[var(--ink-3)]" title={b}>{b}</span> : <span className="text-ink-3">{t('brak', 'none')}</span>}
       <Icon name="arrowRight" size={11} className="text-ink-3" />
-      {a ? <span className="mono max-w-[130px] truncate text-ink" title={a}>{a}</span> : <span className="text-ink-3">{t('brak', 'none')}</span>}
+      {a ? <span className="mono min-w-0 truncate text-ink" title={a}>{a}</span> : <span className="text-ink-3">{t('brak', 'none')}</span>}
     </span>
   );
 }
@@ -71,11 +71,13 @@ export default function Changes() {
   const ackOne = useAction((id: number) => post('/changes/' + id + '/ack'), { invalidate: ['/changes', '/dashboard'] });
   const active = FILTERS.filter((k) => u.get(k)).length;
   const rows = q.data?.items;
+  // grouped by run, the group heading already says when; the column would repeat it
+  const grouped = u.get('sort', '-at').endsWith('at');
   const cols: Col<Change>[] = [
-    { id: 'kind', header: t('Rodzaj', 'Type'), cell: (c) => <ChangeMark kind={c.kind} expected={c.expected} plain /> },
+    { id: 'kind', header: t('Rodzaj', 'Type'), cell: (c) => <span className="flex max-w-[clamp(140px,14vw,230px)]" title={changeKindInfo(c.kind).label}><ChangeMark kind={c.kind} expected={c.expected} plain /></span> },
     { id: 'addr', header: t('Adres', 'Address'), sort: 'ip', cell: (c) => <Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link">{c.ip}{c.port ? ':' + c.port : ''}</Link> },
     { id: 'what', header: t('Przed → po', 'Before → after'), wrap: true, cell: (c) => (
-      <div className="flex min-w-[200px] max-w-[600px] flex-wrap items-baseline gap-x-3 py-1.5" title={c.summary}><BeforeAfter c={c} /><ChangeDetail c={c} withSummary /></div>
+      <div className={cx('flex min-w-0', grouped ? 'w-[clamp(170px,calc(100vw-1120px),560px)]' : 'w-[clamp(150px,calc(100vw-1250px),440px)]', 'flex-wrap items-baseline gap-x-3 py-1.5')} title={c.summary}><BeforeAfter c={c} /><ChangeDetail c={c} withSummary /></div>
     ) },
     { id: 'sev', header: t('Waga', 'Severity'), sort: 'severity', hide: 'md', cell: (c) => c.expected ? <span className="text-xs text-ink-3">{t('oczekiwana', 'expected')}</span> : <Sev level={c.severity} /> },
     { id: 'at', header: t('Kiedy', 'When'), sort: 'at', hide: 'xl', cell: (c) => <span className="num text-ink-2" title={fmtDateTime(c.at)}>{fmtRelative(c.at)}</span> },
@@ -83,8 +85,6 @@ export default function Changes() {
       ? <span className="inline-flex items-center gap-1.5 text-xs text-ink-2" title={fmtDateTime(c.acked_at)}><Icon name="check" size={12} className="text-st-new" />{c.acked_by.split('@')[0]}</span>
       : canAck ? <Button size="sm" onClick={(e) => { e.stopPropagation(); e.preventDefault(); ackOne.mutate(c.id); }}>{t('Oznacz', 'Mark')}</Button> : <span className="text-xs text-ink-3">{t('nie', 'no')}</span> },
   ];
-  // grouped by run, the group heading already says when; the column would repeat it
-  const grouped = u.get('sort', '-at').endsWith('at');
   const shown = grouped ? cols.filter((c) => c.id !== 'at') : cols;
   return (
     <div>

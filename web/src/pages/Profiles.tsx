@@ -28,11 +28,11 @@ export default function Profiles() {
   const [start, setStart] = useState<number | null>(null);
   const scopeName = (id: number) => scopes.data?.items.find((s) => s.id === id)?.name ?? '#' + id;
   const cols: Col<ScanProfile>[] = [
-    { id: 'name', header: t('Profil', 'Profile'), cell: (p) => <span className="block max-w-[320px] truncate" title={p.description}><Link to={'/profiles/' + p.id} className={cx('link', !p.enabled && 'text-ink-3')}>{p.name}</Link></span> },
-    { id: 'scopes', header: t('Zakresy', 'Scopes'), hide: 'lg', cell: (p) => <span className="block max-w-[220px] truncate text-ink-2" title={p.scope_ids.map(scopeName).join(', ')}>{p.scope_ids.map(scopeName).join(', ') || '–'}</span> },
-    { id: 'ports', header: t('Porty', 'Ports'), cell: (p) => <span className="mono" title={p.ports}>{portsShort(p.ports)}</span> },
+    { id: 'name', header: t('Profil', 'Profile'), cell: (p) => <span className="block max-w-[clamp(160px,calc(100vw-1120px),320px)] truncate" title={p.description}><Link to={'/profiles/' + p.id} className={cx('link', !p.enabled && 'text-ink-3')}>{p.name}</Link></span> },
+    { id: 'scopes', header: t('Zakresy', 'Scopes'), hide: 'lg', cell: (p) => <span className="block max-w-[clamp(120px,14vw,220px)] truncate text-ink-2" title={p.scope_ids.map(scopeName).join(', ')}>{p.scope_ids.map(scopeName).join(', ') || '–'}</span> },
+    { id: 'ports', header: t('Porty', 'Ports'), cell: (p) => <span className="mono block max-w-[clamp(90px,11vw,220px)] truncate" title={p.ports}>{portsShort(p.ports)}</span> },
     { id: 'schedule', header: t('Harmonogram', 'Schedule'), cell: (p) => (
-      <span className="whitespace-nowrap" title={t('okna: ', 'windows: ') + describeWindows(p.schedule.windows)}>
+      <span className="block max-w-[clamp(130px,17vw,300px)] truncate" title={t('okna: ', 'windows: ') + describeWindows(p.schedule.windows)}>
         <span className={p.schedule.enabled ? 'mono text-sm' : 'text-ink-3'}>{scheduleText(p)}</span>
         {p.next_run_at ? <span className="num text-ink-3" title={fmtDateTime(p.next_run_at)}> · {fmtDateTime(p.next_run_at)}</span> : null}
       </span>
