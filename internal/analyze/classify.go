@@ -140,6 +140,30 @@ func isTLS(s *model.ServiceResult) bool {
 }
 
 // isPlainHTTP reports if the service is a web service without TLS.
+// databaseProducts name database servers by product, for the ones whose
+// protocol nmap reports as http (Elasticsearch, CouchDB, InfluxDB ...).
+var databaseProducts = []string{"elasticsearch", "opensearch", "couchdb", "influxdb", "clickhouse", "neo4j", "rethinkdb", "etcd",
+	"mongodb", "redis", "mysql", "mariadb", "postgresql", "memcached", "cassandra"}
+
+// isDatabaseProtocol reports whether a service with the class database is a
+// database server (PostgreSQL, MySQL, Redis, MongoDB, memcached ...). A web
+// tool for databases (Adminer, phpMyAdmin, pgAdmin) carries the class on its
+// signature, but it is an admin panel: the database reason and finding are
+// not for it.
+func isDatabaseProtocol(s *model.ServiceResult) bool {
+	name := strings.ToLower(s.Name)
+	if databaseNames[name] {
+		return true
+	}
+	product := strings.ToLower(s.Product)
+	for _, p := range databaseProducts {
+		if strings.Contains(product, p) {
+			return true
+		}
+	}
+	return s.HTTP == nil && !strings.Contains(name, "http")
+}
+
 func isPlainHTTP(s *model.ServiceResult) bool {
 	return s.HTTP != nil && s.HTTP.Error == "" && !isTLS(s)
 }

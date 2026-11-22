@@ -158,3 +158,59 @@ func TestCompressInterestKeepsTheTopOrdered(t *testing.T) {
 		t.Errorf("150 -> %d, 105 -> %d: the larger sum must rank higher", a, b)
 	}
 }
+
+// The database reason and finding are for database servers. Adminer,
+// phpMyAdmin and pgAdmin carry the class database on their signature: they
+// get the admin-panel reason, worded for a database panel, and the
+// admin-panel finding; a real Redis gets the database reason and finding.
+func TestWebDatabaseToolIsAPanelNotADatabase(t *testing.T) {
+	tool := func(port int, product, title, sig string, classes ...string) model.ServiceResult {
+		s := httpSvc(port, title, 200)
+		s.Product = product
+		s.Matches = []model.SigMatch{{Signature: sig, Name: title, Confidence: 0.9, Classes: classes,
+			Evidence: []model.Evidence{{Matcher: "title", Where: "title", Snippet: title}}}}
+		return s
+	}
+	cases := []struct {
+		name   string
+		svc    model.ServiceResult
+		dbWant bool
+	}{
+		{"adminer", tool(8080, "nginx", "Login - Adminer", "adminer", model.ClassAdminPanel, model.ClassLogin, model.ClassDatabase), false},
+		{"phpmyadmin", tool(8081, "Apache httpd", "phpMyAdmin", "phpmyadmin", model.ClassAdminPanel, model.ClassDatabase), false},
+		{"pgadmin", tool(5050, "Werkzeug httpd", "pgAdmin 4", "pgadmin", model.ClassAdminPanel, model.ClassDatabase), false},
+		{"redis", model.ServiceResult{Port: 6379, Proto: "tcp", State: "open", Name: "redis", Product: "Redis key-value store", Version: "7.4.12"}, true},
+		{"elasticsearch over http", func() model.ServiceResult {
+			s := httpSvc(9200, "", 200)
+			s.Product = "Elasticsearch REST API"
+			s.Classes = []string{model.ClassDatabase}
+			return s
+		}(), true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, why := Interest(InterestInput{Service: c.svc})
+			var dbReason bool
+			var panelText string
+			for _, r := range why {
+				if r.Code == ReasonDatabase {
+					dbReason = true
+				}
+				if r.Code == ReasonAdminPanel {
+					panelText = r.Text
+				}
+			}
+			var dbFinding, panelFinding bool
+			for _, f := range DeriveFindings(findingInput(FindingService{Result: c.svc})) {
+				dbFinding = dbFinding || f.Type == FindingDatabase
+				panelFinding = panelFinding || f.Type == FindingAdminPanel
+			}
+			if dbReason != c.dbWant || dbFinding != c.dbWant {
+				t.Errorf("database reason %v, finding %v; want %v (%+v)", dbReason, dbFinding, c.dbWant, why)
+			}
+			if !c.dbWant && (panelText != "Panel bazy danych dostępny z sieci" || !panelFinding) {
+				t.Errorf("panel reason %q, panel finding %v", panelText, panelFinding)
+			}
+		})
+	}
+}

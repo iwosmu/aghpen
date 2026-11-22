@@ -362,7 +362,7 @@ Dlaczego krzywa, a nie obcięcie: w laboratorium pięć najciekawszych usług mi
 | --- | --- | --- |
 | `admin-panel` | 30 | Panel administracyjny dostępny z sieci |
 | `login-plain-http` | 25 | Strona logowania bez szyfrowania (HTTP) |
-| `database` | 25 | Baza danych dostępna z sieci |
+| `database` | 25 | Baza danych dostępna z sieci (tylko serwer bazy; narzędzie WWW do baz, np. Adminer, dostaje `admin-panel` z tekstem „Panel bazy danych dostępny z sieci”) |
 | `debug-page` | 25 | Strona diagnostyczna lub tryb debug |
 | `remote-access-plaintext` | 25 | Zdalny dostęp bez szyfrowania (telnet, rlogin) |
 | `staging` | 20 | Środowisko testowe lub staging |

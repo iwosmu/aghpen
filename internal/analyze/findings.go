@@ -257,7 +257,7 @@ func (b *findingBuilder) derive() {
 	// panel, and the admin-panel finding names it; "database open to the
 	// network" is for the database protocol itself. Measured on the lab: the
 	// three web tools each had both findings at the top of the list.
-	if has(model.ClassDatabase) && s.HTTP == nil {
+	if has(model.ClassDatabase) && isDatabaseProtocol(s) {
 		ev, sig, _ := b.classEvidence(model.ClassDatabase)
 		b.add(FindingDatabase, "", "Baza danych dostępna z sieci: "+firstNonEmpty(productVersion(s), "port "+fmt.Sprint(s.Port)),
 			"Port bazy danych przyjmuje połączenia z sieci, z której wykonano skan.",
