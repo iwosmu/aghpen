@@ -5,6 +5,8 @@
 //   2. the glass, at full resolution: every rib is a cylindrical lens that
 //      shows a squeezed, offset slice of the field, with a light edge, a
 //      shaded edge and a little dispersion, plus static grain.
+// The mouse leaves a faint light behind the glass and the masses part a
+// little around it (mouse only, eased, off under reduced motion).
 // No network, no dependency. Under prefers-reduced-motion it draws one still
 // frame. It stops when the tab is hidden. Without hardware WebGL it leaves
 // the CSS fallback (gradient plus rib overlay) in place.
@@ -22,6 +24,7 @@ varying vec2 vUv;
 uniform float uT;
 uniform float uAspect;
 uniform float uPortrait;
+uniform vec3 uPtr; // the pointer: x in [0, aspect], y in [0, 1] (up), strength 0..1
 
 vec2 hash2(vec2 p) {
   p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -59,6 +62,11 @@ void main() {
   // a slow flow, like ink in water
   vec2 w = vec2(fbm(p * 1.25 + vec2(0.0, t * 0.020)), fbm(p * 1.25 + vec2(5.2, -t * 0.017)));
   vec2 q = p + 0.48 * w;
+  // the pointer: the masses part a little around it, like ink around a fingertip,
+  // and a faint light follows it behind the glass
+  vec2 dp = p - uPtr.xy;
+  float dl = dot(dp, dp);
+  q += uPtr.z * 0.024 * dp / (dl + 0.05) * exp(-dl * 3.2);
   // long horizontal streaks, as if the light had moved during a long exposure
   float streak = fbm(vec2(q.x * 0.9, q.y * 7.0) + vec2(t * 0.01, 0.0));
 
@@ -97,6 +105,8 @@ void main() {
   vec2 cd = vec2(A * (0.56 + 0.04 * sin(t * 0.021 + 2.0)), y0 + yS * (0.56 + 0.04 * sin(t * 0.027)));
   vec2 qd = q; qd.x -= (q.y - cd.y) * 0.25;
   col = mix(col, dark, mass(qd, cd, vec2(0.10, 0.36) * vec2(1.0, yS), 0.6) * 0.94);
+
+  col += uPtr.z * vec3(0.26, 0.40, 0.78) * 0.12 * exp(-dl * 10.0);
 
   // keep the night: a soft fall-off to the edges
   vec2 v = vUv - 0.5;
@@ -209,10 +219,13 @@ export function FlutedField({ className }: { className?: string }) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     const fbo = gl.createFramebuffer();
 
-    const uF = { t: gl.getUniformLocation(pField, 'uT'), a: gl.getUniformLocation(pField, 'uAspect'), p: gl.getUniformLocation(pField, 'uPortrait') };
+    const uF = { t: gl.getUniformLocation(pField, 'uT'), a: gl.getUniformLocation(pField, 'uAspect'), p: gl.getUniformLocation(pField, 'uPortrait'), ptr: gl.getUniformLocation(pField, 'uPtr') };
     const uG = { tex: gl.getUniformLocation(pGlass, 'uField'), res: gl.getUniformLocation(pGlass, 'uRes'), rib: gl.getUniformLocation(pGlass, 'uRib'), dpr: gl.getUniformLocation(pGlass, 'uDpr') };
 
     let W = 0, H = 0, FW = 0, FH = 0, dpr = 1, rib = 20;
+    // The pointer, eased: target (where the mouse is) and current (what the field sees).
+    // x and y are fractions of the canvas, y up. Strength fades in on movement and out when the mouse leaves.
+    const ptr = { x: 0.5, y: 0.5, s: 0, tx: 0.5, ty: 0.5, ts: 0 };
     const resize = () => {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       const cw = canvas.clientWidth, ch = canvas.clientHeight;
@@ -235,6 +248,7 @@ export function FlutedField({ className }: { className?: string }) {
       gl.uniform1f(uF.t, t);
       gl.uniform1f(uF.a, FW / FH);
       gl.uniform1f(uF.p, FH > FW ? 1 : 0);
+      gl.uniform3f(uF.ptr, ptr.x * (FW / FH), ptr.y, ptr.s);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -254,12 +268,19 @@ export function FlutedField({ className }: { className?: string }) {
     const still = Number(new URLSearchParams(window.location.search).get('still') ?? NaN);
     let raf = 0, last = 0, elapsed = 0, prev = 0;
     const FRAME_MS = 1000 / 20; // the drift moves less than a pixel a frame; 20 frames a second look smooth
+    const FRAME_MS_POINTER = 1000 / 45; // while the light follows the mouse
+    const pointerMoving = () => Math.abs(ptr.tx - ptr.x) + Math.abs(ptr.ty - ptr.y) > 0.002 || Math.abs(ptr.ts - ptr.s) > 0.01;
 
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
-      if (now - last < FRAME_MS - 2) return;
-      elapsed += Math.min(now - (prev || now), 100);
+      if (now - last < (pointerMoving() ? FRAME_MS_POINTER : FRAME_MS) - 2) return;
+      const dt = Math.min(now - (prev || now), 100);
+      elapsed += dt;
       prev = now; last = now;
+      // slow, liquid easing: the light arrives about a third of a second after the mouse
+      const k = 1 - Math.exp(-dt / 260);
+      ptr.x += (ptr.tx - ptr.x) * k; ptr.y += (ptr.ty - ptr.y) * k;
+      ptr.s += (ptr.ts - ptr.s) * (1 - Math.exp(-dt / 500));
       draw(START_T + (SPEED * elapsed) / 1000);
     };
     const start = () => {
@@ -280,6 +301,20 @@ export function FlutedField({ className }: { className?: string }) {
     start();
 
     const onVis = () => start();
+    // Mouse only: a finger on a phone would leave the light where it last touched.
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse' || reduce.matches || Number.isFinite(still)) return;
+      const r = canvas.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) return;
+      ptr.tx = (e.clientX - r.left) / r.width;
+      ptr.ty = 1 - (e.clientY - r.top) / r.height;
+      if (ptr.s < 0.01 && ptr.ts === 0) { ptr.x = ptr.tx; ptr.y = ptr.ty; } // first move: the light fades in under the mouse, it does not fly in
+      ptr.ts = 1;
+    };
+    const onLeave = () => { ptr.ts = 0; };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    document.documentElement.addEventListener('pointerleave', onLeave);
+    window.addEventListener('blur', onLeave);
     document.addEventListener('visibilitychange', onVis);
     reduce.addEventListener('change', onVis);
     const onLost = (e: Event) => { e.preventDefault(); cancelAnimationFrame(raf); delete canvas.dataset.ready; };
@@ -289,6 +324,9 @@ export function FlutedField({ className }: { className?: string }) {
       cancelAnimationFrame(raf);
       ro.disconnect();
       document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pointermove', onMove);
+      document.documentElement.removeEventListener('pointerleave', onLeave);
+      window.removeEventListener('blur', onLeave);
       reduce.removeEventListener('change', onVis);
       canvas.removeEventListener('webglcontextlost', onLost);
       // The context stays alive: React StrictMode mounts twice, and a lost
