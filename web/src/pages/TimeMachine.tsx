@@ -89,7 +89,7 @@ function Count({ label, value, now, tone }: { label: string; value: number; now?
   return (
     <div className="flex min-w-0 flex-col-reverse">
       <dt className="mt-1.5 text-xs text-ink-3">{label}{d ? <span className="num ml-1.5 text-ink-2" title={t('zmiana do dziś', 'change to today')}>{d > 0 ? '+' : ''}{fmtInt(d)} {t('dziś', 'today')}</span> : null}</dt>
-      <dd className={cx('font-display text-[40px] leading-none tracking-[-0.01em] text-ink sm:text-[48px]', tone)}>{fmtInt(value)}</dd>
+      <dd className={cx('font-display text-[32px] leading-none text-ink sm:text-[38px]', tone)}>{fmtInt(value)}</dd>
     </div>
   );
 }
@@ -343,7 +343,7 @@ export function HostLifePanel({ hostId }: { hostId: number }) {
         ))}
       </div>
       <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-2xs text-ink-3">
-        {[['up', t('host odpowiada', 'host responds')], ['not responding', t('nie odpowiada', 'not responding')], ['down', t('nieaktywny', 'down')], ['open', t('usługa otwarta', 'service open')], ['unknown', t('stan nieznany', 'status unknown')]].map(([k, l]) => <span key={k} className="inline-flex items-center gap-1"><span className="inline-block h-2 w-3" style={{ background: laneColor[k], opacity: k === 'unknown' ? 0.5 : 1 }} />{l}</span>)}
+        {[['up', t('host odpowiada', 'host responds')], ['missing', t('nie odpowiada', 'not responding')], ['down', t('nieaktywny', 'down')], ['open', t('usługa otwarta', 'service open')], ['unknown', t('stan nieznany', 'status unknown')]].map(([k, l]) => <span key={k} className="inline-flex items-center gap-1"><span className="inline-block h-2 w-3" style={{ background: laneColor[k], opacity: k === 'unknown' ? 0.5 : 1 }} />{l}</span>)}
         <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-px bg-ink" />{t('zmiana wersji', 'version change')}</span>
       </p>
     </Panel>

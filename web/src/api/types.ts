@@ -64,7 +64,10 @@ export interface SafetyPolicy {
   allowed_networks?: string[] | null;
   /** Operator lock (CZUJKA_ALLOWED_NETWORKS), read only; empty = no lock. */
   operator_networks?: string[] | null;
+  /** The kernel packet cap (read only); absent on a build without it. */
+  kernel_cap?: KernelCap;
 }
+export interface KernelCap { mode: 'auto' | 'require' | 'off'; active: boolean; pps: number; burst: number; policy_pps: number; dropped: number; reason: string }
 
 export interface DiscoveryOpts {
   icmp_echo: boolean; icmp_timestamp: boolean; tcp_syn_ports: number[]; tcp_ack_ports: number[];

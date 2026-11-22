@@ -133,6 +133,12 @@ func (b *findingBuilder) add(typ, subject, title, desc string, ev []model.Eviden
 	if lowFindings[typ] {
 		sev = model.SevLow
 	}
+	// An unfinished installer is high wherever it is shown: the panel and
+	// dev-tool findings of the installer page get the severity of the rule
+	// finding "unfinished-install-page" (internal/rules), not their type's.
+	if (typ == FindingAdminPanel || typ == FindingDevTool) && hasClass(EffectiveClasses(s, b.in.Hostnames), model.ClassInstallPage) {
+		sev = model.SevHigh
+	}
 	if typ == FindingRemoteAccess {
 		switch strings.ToLower(s.Name) {
 		case "telnet", "rlogin", "login", "shell", "exec":

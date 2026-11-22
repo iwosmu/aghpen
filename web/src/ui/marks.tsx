@@ -264,13 +264,13 @@ export function InterestScore({ value, reasons, showTip }: { value: number; reas
 export function InterestBreakdown({ value, reasons }: { value: number; reasons: InterestReason[] | null | undefined }) {
   const list = reasons ?? [];
   // Each reason is a segment of one 0-100 bar, in list order; what goes over 100 is cut, as the score is.
-  const shade = (i: number) => Math.max(0.28, 1 - i * 0.14);
+  const shade = (i: number) => Math.max(0.42, 1 - i * 0.12);
   let used = 0;
   const segs = list.map((r, i) => { const w = Math.max(0, Math.min(r.points, 100 - used)); used += w; return { w, i }; }).filter((x) => x.w > 0);
   return (
     <div data-testid="interest-breakdown">
       <div className="flex items-baseline gap-2">
-        <span className="font-display text-[56px] leading-[0.9] tracking-[-0.01em] text-ink">{value}</span>
+        <span className="font-display text-[44px] leading-[0.95] text-ink">{value}</span>
         <span className="num text-sm text-ink-3">/ 100</span>
       </div>
       {segs.length ? (

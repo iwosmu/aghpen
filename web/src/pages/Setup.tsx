@@ -175,7 +175,7 @@ export default function Setup() {
       <div className="flex flex-wrap items-end justify-between gap-3 px-4 pb-4 pt-6 sm:px-6">
         <div>
           <p className="text-xs text-ink-3">{t('Kreator', 'Wizard')}</p>
-          <h1 className="font-display mt-1 text-[30px] font-normal leading-[1.05] tracking-[-0.01em] sm:text-[36px]">{t('Pierwszy skan', 'First scan')}</h1>
+          <h1 className="font-display mt-1 text-[24px] leading-[1.15] sm:text-[28px]">{t('Pierwszy skan', 'First scan')}</h1>
                   </div>
         <button type="button" className="link text-sm" onClick={skip}>{t('Pomiń kreator', 'Skip wizard')}</button>
       </div>
