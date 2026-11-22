@@ -10,10 +10,10 @@ import { ApiError, isUnavailable } from '../api/client';
 // ---------- Button ----------
 type BtnVariant = 'primary' | 'default' | 'ghost' | 'danger' | 'dangerSolid';
 const BTN: Record<BtnVariant, string> = {
-  primary: 'bg-primary text-primary-ink border-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-press font-semibold shadow-[0_1px_0_rgb(255_255_255/0.5)_inset,0_10px_24px_-14px_rgb(0_0_0/0.6)]',
-  default: 'bg-[var(--row-hover)] text-ink border-transparent shadow-[inset_0_0_0_1px_var(--rule-strong)] hover:bg-[color-mix(in_oklch,var(--row-hover),var(--ink)_8%)]',
+  primary: 'bg-primary text-primary-ink border-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-press',
+  default: 'bg-raised text-ink border-rule hover:bg-[color-mix(in_oklch,var(--raised),var(--ink)_6%)] shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]',
   ghost: 'bg-transparent text-ink-2 border-transparent hover:bg-[var(--row-hover)] hover:text-ink',
-  danger: 'bg-transparent text-danger border-danger/50 hover:bg-st-gone-wash',
+  danger: 'bg-raised text-danger border-rule hover:bg-st-gone-wash',
   dangerSolid: 'bg-danger-solid text-danger-ink border-danger-solid hover:brightness-110 font-semibold',
 };
 
@@ -26,9 +26,9 @@ export function Button({
       {...rest}
       disabled={rest.disabled || busy}
       className={cx(
-        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full border font-medium transition-[background-color,color,transform] duration-150',
-        'disabled:opacity-50 disabled:pointer-events-none active:scale-[0.97]',
-        size === 'sm' ? 'h-[30px] px-3 text-xs' : 'h-[38px] px-4 text-sm',
+        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] border font-medium transition-[background-color,color,transform] duration-150 ease-[var(--ease)]',
+        'disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]',
+        size === 'sm' ? 'h-[28px] rounded-[6px] px-2.5 text-xs' : 'h-[36px] px-4 text-sm',
         BTN[variant], className,
       )}
     >
@@ -43,8 +43,8 @@ export function LinkButton({ to, icon, children, variant = 'default', size = 'md
     <Link
       to={to}
       className={cx(
-        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full border font-medium transition-[background-color,color,transform] duration-150 active:scale-[0.97]',
-        size === 'sm' ? 'h-[30px] px-3 text-xs' : 'h-[38px] px-4 text-sm', BTN[variant],
+        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] border font-medium transition-[background-color,color,transform] duration-150 ease-[var(--ease)] active:scale-[0.98]',
+        size === 'sm' ? 'h-[28px] rounded-[6px] px-2.5 text-xs' : 'h-[36px] px-4 text-sm', BTN[variant],
       )}
     >
       {icon ? <Icon name={icon} size={size === 'sm' ? 14 : 16} /> : null}
@@ -57,7 +57,7 @@ export function IconButton({ icon, label, className, ...rest }: { icon: string; 
   return (
     <button
       type="button" aria-label={label} title={label} {...rest}
-      className={cx('inline-flex h-[36px] w-[36px] items-center justify-center rounded-full border border-transparent text-ink-2 hover:bg-[var(--row-hover)] hover:text-ink disabled:opacity-50', className)}
+      className={cx('inline-flex h-[32px] w-[32px] items-center justify-center rounded-[8px] border border-transparent text-ink-2 hover:bg-[var(--row-hover)] hover:text-ink disabled:opacity-50', className)}
     >
       <Icon name={icon} />
     </button>
@@ -71,14 +71,14 @@ export function Spinner() {
 // ---------- Layout pieces ----------
 export function PageHeader({ title, sub, actions, readOnly, back }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode; readOnly?: boolean; back?: { to: string; label: string } }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 pb-5 pt-3 sm:px-6 lg:px-8">
+    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 pb-6 pt-6 sm:px-6 lg:px-8">
       <div className="min-w-0">
         {back ? (
-          <Link to={back.to} className="mb-2 inline-flex h-[26px] items-center gap-1 rounded-full pr-2.5 text-xs font-medium text-ink-2 hover:text-ink">
+          <Link to={back.to} className="mb-2 inline-flex h-[24px] items-center gap-1 rounded-[6px] pr-2.5 text-xs font-medium text-ink-2 hover:text-ink">
             <Icon name="chevronLeft" size={12} />{back.label}
           </Link>
         ) : null}
-        <h1 className="font-display text-[30px] leading-[1.1] text-ink sm:text-[38px]">{title}</h1>
+        <h1 className="font-display text-[28px] leading-[1.15] text-ink sm:text-[32px]">{title}</h1>
         {sub ? <p className="mt-1.5 max-w-[80ch] text-sm text-ink-2">{sub}</p> : null}
         {readOnly ? <ReadOnlyNote /> : null}
       </div>
@@ -101,11 +101,11 @@ export function Panel({ title, count, actions, children, className, flush }: { t
     <section className={cx('card min-w-0', className)}>
       {title ? (
         <div className="flex min-h-[48px] items-center justify-between gap-3 px-5 pt-1">
-          <h2 className="flex items-baseline gap-2 text-[13px] font-medium text-ink">
+          <h2 className="caps flex items-baseline gap-2">
             {title}
             {count !== undefined ? <span className="num text-xs font-normal text-ink-3">{count}</span> : null}
           </h2>
-          {actions ? <div className="flex items-center gap-2 text-xs">{actions}</div> : null}
+          {actions ? <div className="flex items-center gap-2 text-xs text-ink-3 [&_.link]:text-ink-3 [&_.link]:no-underline [&_.link:hover]:text-ink [&_.link:hover]:underline">{actions}</div> : null}
         </div>
       ) : null}
       <div className={flush ? 'pb-2' : title ? 'px-5 pb-5 pt-1' : 'p-5'}>{children}</div>
@@ -146,13 +146,13 @@ export function KV({ k, children, mono }: { k: ReactNode; children: ReactNode; m
 
 export function Tabs({ tabs, value, onChange }: { tabs: { id: string; label: ReactNode; count?: number }[]; value: string; onChange: (id: string) => void }) {
   return (
-    <div role="tablist" className="mx-4 flex w-fit max-w-[calc(100%-32px)] gap-0.5 overflow-x-auto rounded-full bg-sunk p-[3px] shadow-[inset_0_0_0_1px_var(--rule)] sm:mx-6 lg:mx-8">
+    <div role="tablist" className="mx-4 flex w-fit max-w-[calc(100%-32px)] gap-0.5 overflow-x-auto rounded-[8px] bg-sunk p-[2px] shadow-[inset_0_0_0_1px_var(--rule)] sm:mx-6 lg:mx-8">
       {tabs.map((tab) => (
         <button
           key={tab.id} role="tab" type="button" aria-selected={value === tab.id} onClick={() => onChange(tab.id)}
           className={cx(
-            'flex h-[32px] items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm font-medium transition-colors duration-150',
-            value === tab.id ? 'bg-primary text-primary-ink [&_.num]:text-primary-ink/70' : 'text-ink-2 hover:bg-[var(--row-hover)] hover:text-ink',
+            'flex h-[30px] items-center gap-1.5 whitespace-nowrap rounded-[6px] px-3 text-sm font-medium transition-colors duration-150',
+            value === tab.id ? 'bg-raised text-ink shadow-[inset_0_0_0_1px_var(--rule-strong)]' : 'text-ink-2 hover:bg-[var(--row-hover)] hover:text-ink',
           )}
         >
           {tab.label}
@@ -165,7 +165,7 @@ export function Tabs({ tabs, value, onChange }: { tabs: { id: string; label: Rea
 
 export function Chip({ children, onRemove, tone = 'plain', title }: { children: ReactNode; onRemove?: () => void; tone?: 'plain' | 'accent'; title?: string }) {
   return (
-    <span title={title} className={cx('inline-flex h-[24px] max-w-full items-center gap-1 rounded-full border px-2.5 text-xs', tone === 'accent' ? 'border-transparent bg-accent-wash text-ink' : 'border-transparent bg-[var(--row-hover)] text-ink-2 shadow-[inset_0_0_0_1px_var(--rule)]')}>
+    <span title={title} className={cx('inline-flex h-[22px] max-w-full items-center gap-1 rounded-[4px] border px-1.5 text-xs', tone === 'accent' ? 'border-transparent bg-accent-wash text-ink' : 'border-transparent bg-[var(--row-hover)] text-ink-2 shadow-[inset_0_0_0_1px_var(--rule)]')}>
       <span className="truncate">{children}</span>
       {onRemove ? (
         <button type="button" onClick={onRemove} aria-label={t('Usuń', 'Remove')} className="-mr-0.5 text-ink-3 hover:text-ink"><Icon name="x" size={10} /></button>
@@ -228,7 +228,7 @@ export function ErrorState({ error, retry }: { error: unknown; retry?: () => voi
 export function Unavailable({ what, error }: { what?: ReactNode; error?: unknown }) {
   const msg = (error as Error | undefined)?.message;
   return (
-    <div role="status" data-testid="unavailable" className="flex items-start gap-2 rounded-[14px] bg-sunk px-3.5 py-3 text-sm">
+    <div role="status" data-testid="unavailable" className="flex items-start gap-2 rounded-[10px] bg-sunk px-3.5 py-3 text-sm">
       <Icon name="info" className="mt-0.5 flex-none text-ink-3" size={14} />
       <div className="min-w-0">
         <p className="font-medium text-ink">{t('Funkcja niedostępna w tej instalacji', 'Not available in this installation')}</p>
@@ -281,7 +281,7 @@ export function Dialog({ open, onClose, title, children, footer, width = 520 }: 
       ref={ref}
       onClose={onClose}
       onClick={(e) => { if (e.target === ref.current) onClose(); }}
-      className="glass m-auto max-h-[88dvh] w-[calc(100vw-24px)] overflow-visible rounded-[28px] border-0 p-0 text-ink shadow-[var(--shadow)] backdrop:bg-[rgb(3_6_14/0.5)]"
+      className="glass m-auto max-h-[88dvh] w-[calc(100vw-24px)] overflow-visible rounded-[14px] border-0 p-0 text-ink backdrop:bg-[rgb(0_0_0/0.5)]"
       style={{ maxWidth: width }}
     >
       <div className="flex max-h-[88dvh] flex-col">
@@ -321,7 +321,7 @@ export function Toaster() {
       {items.map((i) => (
         <div
           key={i.id}
-          className={cx('glass pointer-events-auto flex items-start gap-2.5 rounded-[18px] px-4 py-3 text-sm shadow-[var(--shadow)]', i.tone === 'error' ? 'ring-1 ring-danger/60' : '')}
+          className={cx('glass pointer-events-auto flex items-start gap-2.5 rounded-[10px] px-4 py-3 text-sm', i.tone === 'error' ? 'ring-1 ring-danger/60' : '')}
           style={{ animation: 'rise-in 200ms var(--ease-out-expo)' }}
         >
           <Icon name={i.tone === 'error' ? 'alert' : i.tone === 'info' ? 'info' : 'check'} className={i.tone === 'error' ? 'mt-0.5 text-danger' : i.tone === 'info' ? 'mt-0.5 text-ink-3' : 'mt-0.5 text-st-new'} size={14} />
@@ -345,7 +345,7 @@ export function useTip() {
     ? createPortal(
         <div
           role="tooltip"
-          className="pointer-events-none fixed z-[60] max-w-[280px] rounded-[12px] bg-[var(--tip)] px-3 py-2 text-xs text-ink shadow-[var(--shadow),inset_0_0_0_1px_var(--rule-strong)]"
+          className="pointer-events-none fixed z-[60] max-w-[280px] rounded-[8px] bg-[var(--tip)] px-3 py-2 text-xs text-ink shadow-[var(--shadow),inset_0_0_0_1px_var(--rule-strong)]"
           style={{
             left: Math.max(8, Math.min(tip.x + 12, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 292)),
             top: Math.max(8, tip.y + 14),
@@ -414,7 +414,7 @@ export function TagInput({ value, onChange, placeholder }: { value: string[]; on
     setDraft('');
   };
   return (
-    <div className="flex min-h-[34px] flex-wrap items-center gap-1 rounded-[12px] border border-rule-strong bg-sunk px-2 py-1.5 focus-within:border-transparent focus-within:outline focus-within:outline-[1.5px] focus-within:outline-offset-1 focus-within:outline-focus">
+    <div className="flex min-h-[34px] flex-wrap items-center gap-1 rounded-[8px] border border-rule bg-raised px-2 py-1.5 focus-within:border-transparent focus-within:outline focus-within:outline-[1.5px] focus-within:outline-offset-1 focus-within:outline-focus">
       {value.map((x) => <Chip key={x} onRemove={() => onChange(value.filter((y) => y !== x))}>{x}</Chip>)}
       <input
         className="h-[20px] min-w-[90px] flex-1 bg-transparent text-sm outline-none placeholder:text-ink-3"

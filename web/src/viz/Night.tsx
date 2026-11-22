@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router';
 import { Link } from 'react-router';
 import type { Host, ScanRun, Service } from '../api/types';
 import { serviceName } from '../lib/serviceName';
-import { d2xy } from '../lib/hilbert';
 import { useWidth } from '../lib/hooks';
 import { cx, fmtDateTime, fmtInt, fmtTime } from '../lib/format';
 import { isFullRun } from '../lib/headline';
@@ -83,33 +82,37 @@ export function networkFields(hosts: Pick<Host, 'ip' | 'status'>[], changes: { i
     .sort((a, b) => b.up - a.up || b.cells.length - a.cells.length);
 }
 
-export function NetworkField({ field, size }: { field: Field; size: number }) {
+/** Rows of lamps in address order: 32 columns x 8 rows, so 10.66.70.x sits at row 3, column 7. */
+export const LAMP_COLS = 32;
+export function lampPitch(width: number): number { return Math.max(6, (width - 44) / LAMP_COLS); }
+
+export function NetworkField({ field, width }: { field: Field; width: number }) {
   const nav = useNavigate();
   const tip = useTip();
   const [hot, setHot] = useState<number | null>(null);
-  const side = 16;
-  const px = size;
-  const cell = px / side;
-  const gap = Math.max(2, Math.round(cell * 0.16));
-  const r = Math.max(2, Math.round(cell * 0.22));
+  const labelW = 44, top = 18;
+  const pitch = lampPitch(width);
+  const gap = Math.max(2, Math.round(pitch * 0.2));
+  const S = pitch - gap;
+  const r = Math.min(3, Math.max(2, S * 0.18));
+  const H = top + 8 * pitch;
   const byIndex = useMemo(() => new Map(field.cells.map((c) => [c.idx, c])), [field.cells]);
   const body = (c: FieldCell) => (
     <span className="block min-w-[150px]">
       <span className="mono block text-[13px] text-ink">{c.label}</span>
       {field.unit === 'block' && c.up ? <span className="mt-0.5 block text-ink-2"><span className="num text-ink">{fmtInt(c.up)}</span> {plural(c.up, ['aktywny host', 'aktywne hosty', 'aktywnych hostów'], ['host up', 'hosts up'])}</span> : null}
-      {c.note ? <span className="mt-1 flex items-start gap-1.5 text-ink"><span className="mt-[5px] h-1.5 w-1.5 flex-none rounded-full bg-coral" aria-hidden="true" />{c.note}</span> : null}
+      {c.note ? <span className="mt-1 flex items-start gap-1.5 text-ink"><span className="lamp mt-[5px] bg-coral" aria-hidden="true" />{c.note}</span> : null}
     </span>
   );
-  const rects = [];
+  const cells = [];
   for (let i = 0; i < 256; i++) {
-    const [x, y] = d2xy(side, i);
+    const col = i % LAMP_COLS, row = Math.floor(i / LAMP_COLS);
+    const X = labelW + col * pitch + gap / 2, Y = top + row * pitch + gap / 2;
     const c = byIndex.get(i);
-    const X = x * cell + gap / 2, Y = y * cell + gap / 2, S = cell - gap;
-    if (!c) { rects.push(<rect key={i} x={X} y={Y} width={S} height={S} rx={r} fill="var(--seq-0)" />); continue; }
+    if (!c) { cells.push(<rect key={i} x={X} y={Y} width={S} height={S} rx={r} fill="var(--seq-0)" />); continue; }
     const step = upStep(c.up, field.unit);
-    const fill = step ? 'var(--seq-' + step + ')' : 'var(--seq-0)';
-    const on = hot === i;
-    rects.push(
+    const fill = c.running && !c.up ? 'var(--accent)' : step ? 'var(--seq-' + step + ')' : 'var(--seq-0)';
+    cells.push(
       <g
         key={i} role="link" tabIndex={0} aria-label={c.label + (c.up && field.unit === 'block' ? ', ' + c.up : '')}
         className="cursor-pointer outline-none"
@@ -121,30 +124,42 @@ export function NetworkField({ field, size }: { field: Field; size: number }) {
         onClick={() => nav(c.href)}
         onKeyDown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nav(c.href); } }}
       >
-        {step >= 2 ? <rect x={X - 2} y={Y - 2} width={S + 4} height={S + 4} rx={r + 2} fill={fill} opacity={0.55} filter="url(#nf-glow)" /> : null}
-        <rect x={X} y={Y} width={S} height={S} rx={r} fill={fill} />
-        {!c.up && c.other ? <rect x={X + 1.5} y={Y + 1.5} width={S - 3} height={S - 3} rx={Math.max(1, r - 1)} fill="none" stroke="var(--ink-3)" strokeWidth={1.2} strokeDasharray="2 2" /> : null}
-        {c.running ? <rect x={X - 2} y={Y - 2} width={S + 4} height={S + 4} rx={r + 2} fill="none" stroke="var(--accent)" strokeWidth={2} className="nf-pulse" /> : null}
-        {c.changed ? (
-          <g>
-            <circle cx={X + S / 2} cy={Y + S / 2} r={S * 0.95} fill="var(--coral)" opacity={0.14} />
-            <circle cx={X + S / 2} cy={Y + S / 2} r={S * 0.72} fill="none" stroke="var(--coral)" strokeWidth={1.5} opacity={0.7} />
-            <circle cx={X + S / 2} cy={Y + S / 2} r={Math.max(3, S * 0.2)} fill="var(--coral)" />
-          </g>
-        ) : null}
-        {on ? <rect x={X - 1.5} y={Y - 1.5} width={S + 3} height={S + 3} rx={r + 1.5} fill="none" stroke="var(--ink)" strokeWidth={1.5} /> : null}
+        <rect x={X} y={Y} width={S} height={S} rx={r} fill={fill} className={c.running ? 'nf-pulse' : undefined} />
+        {!c.up && c.other && !c.running ? <rect x={X + 0.75} y={Y + 0.75} width={S - 1.5} height={S - 1.5} rx={Math.max(1, r - 0.75)} fill="none" stroke="var(--ink-3)" strokeWidth={1} strokeDasharray="2 2" /> : null}
+        {c.changed ? <rect x={X - 2} y={Y - 2} width={S + 4} height={S + 4} rx={r + 1.5} fill="none" stroke="var(--coral)" strokeWidth={1.5} /> : null}
+        {hot === i ? <rect x={X - 2} y={Y - 2} width={S + 4} height={S + 4} rx={r + 1.5} fill="none" stroke="var(--ink)" strokeWidth={1.5} /> : null}
       </g>,
     );
   }
-  const pad = cell;
+  // the engraved scale: row starts at the left, a tick every eight columns above
+  const rowLabel = (row: number) => '.' + row * LAMP_COLS;
   return (
     <>
-      <svg width={px} height={px} viewBox={(-pad) + ' ' + (-pad) + ' ' + (px + 2 * pad) + ' ' + (px + 2 * pad)} style={{ width: px + 2 * pad, height: px + 2 * pad, margin: -pad }} className="block overflow-visible" role="group" aria-label={field.label}>
-        <defs><filter id="nf-glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation={Math.max(3, cell * 0.32)} /></filter></defs>
-        {rects}
+      <svg width={width} height={H} className="block overflow-visible" role="group" aria-label={field.label}>
+        {[0, 8, 16, 24].map((col) => (
+          <g key={col} aria-hidden="true">
+            <line x1={labelW + col * pitch + gap / 2} x2={labelW + col * pitch + gap / 2} y1={top - 6} y2={top - 2} stroke="var(--ink-3)" strokeWidth={1} />
+            <text x={labelW + col * pitch + gap / 2 + 3} y={top - 7} className="mono" fontSize={10} fill="var(--ink-3)">{col}</text>
+          </g>
+        ))}
+        {Array.from({ length: 8 }, (_, row) => (pitch < 14 && row % 2 ? null :
+          <text key={row} x={labelW - 10} y={top + row * pitch + gap / 2 + S / 2 + 3.5} textAnchor="end" className="mono" fontSize={pitch < 14 ? 10 : 11} fill="var(--ink-3)" aria-hidden="true">{rowLabel(row)}</text>
+        ))}
+        {cells}
       </svg>
       {tip.node}
     </>
+  );
+}
+
+/** The lamp legend: the same lamps, numbers only. */
+export function LampLegend({ unit, changedLabel }: { unit: Field['unit']; changedLabel?: string }) {
+  const steps: [number, string][] = unit === 'block' ? [[2, '1'], [3, '2–3'], [4, '4–9'], [5, '10+']] : [];
+  return (
+    <p className="mono flex items-center gap-3 text-[12px] text-ink-3" aria-hidden="true">
+      {steps.map(([s, l]) => <span key={s} className="inline-flex items-center gap-1.5"><span className="lamp" style={{ background: 'var(--seq-' + s + ')' }} />{l}</span>)}
+      {changedLabel ? <span className="inline-flex items-center gap-1.5"><span className="lamp shadow-[0_0_0_1.5px_var(--coral)]" style={{ background: 'var(--seq-3)' }} />{changedLabel}</span> : null}
+    </p>
   );
 }
 
@@ -216,8 +231,8 @@ export function NightStrip({ runs, active, currentId, now }: { runs: ScanRun[]; 
     const last = when(all[all.length - 1]);
     return all.filter((r) => when(r) >= last - 24 * 3600_000);
   }, [runs]);
-  const H = 150, base = 118;
-  if (!list.length) return <div ref={ref} className="h-[150px]" />;
+  const H = 92, base = 64;
+  if (!list.length) return <div ref={ref} className="h-[92px]" />;
   const t0 = when(list[0]);
   const lastRun = list[list.length - 1];
   const tEnd = Math.max(active ? now : new Date(lastRun.finished_at || lastRun.started_at || lastRun.created_at).getTime(), t0 + 3600_000);
@@ -264,7 +279,7 @@ export function NightStrip({ runs, active, currentId, now }: { runs: ScanRun[]; 
         {hours.map((h, i) => (
           <g key={h}>
             <line x1={x(h)} x2={x(h)} y1={base + 1} y2={base + (i % every === 0 ? 7 : 4)} stroke="var(--ink-3)" opacity={i % every === 0 ? 0.9 : 0.5} />
-            {i % every === 0 ? <text x={x(h)} y={base + 22} textAnchor="middle" className="num" fontSize={12} fill="var(--ink-3)">{fmtTime(new Date(h).toISOString())}</text> : null}
+            {i % every === 0 ? <text x={x(h)} y={base + 22} textAnchor="middle" className="mono" fontSize={11} fill="var(--ink-3)">{fmtTime(new Date(h).toISOString())}</text> : null}
           </g>
         ))}
         {list.map((r) => {
@@ -272,11 +287,13 @@ export function NightStrip({ runs, active, currentId, now }: { runs: ScanRun[]; 
           const full = isFullRun(r);
           const n = runChanges(r);
           const cur = r.id === currentId;
-          const h = cur ? 64 : full ? 44 : r.trigger === 'reprobe' ? 12 : 26;
+          // an engraved tick per scan: taller with more changes, a coral cap when the scan found any
+          const h = (full ? 16 : r.trigger === 'reprobe' ? 8 : 12) + (n ? 30 * Math.sqrt(n / maxCh) : 0);
+          const sw = cur ? 2 : Math.max(1, Math.min(1.5, W / list.length / 3));
           return (
             <g key={r.id}>
-              <line x1={cx0} x2={cx0} y1={base} y2={base - h} stroke={cur ? 'var(--ink)' : hot === r.id ? 'var(--ink)' : 'var(--ink-3)'} strokeWidth={cur ? 2 : Math.max(0.75, Math.min(1.5, W / list.length / 3))} opacity={cur || hot === r.id ? 1 : full ? 0.6 : 0.4} strokeLinecap="round" />
-              {n ? <circle cx={cx0} cy={base - h - 10 - 26 * Math.sqrt(n / maxCh)} r={2.5 + 3 * Math.sqrt(n / maxCh)} fill="var(--coral)" stroke="var(--panel-solid)" strokeWidth={1.5} /> : null}
+              <line x1={cx0} x2={cx0} y1={base} y2={base - h} stroke={cur || hot === r.id ? 'var(--ink)' : 'var(--ink-3)'} strokeWidth={sw} opacity={cur || hot === r.id ? 1 : full ? 0.7 : 0.45} />
+              {n ? <line x1={cx0} x2={cx0} y1={base - h} y2={base - h + Math.min(6, h / 2)} stroke="var(--coral)" strokeWidth={Math.max(sw, 1.5)} /> : null}
             </g>
           );
         })}
@@ -284,8 +301,8 @@ export function NightStrip({ runs, active, currentId, now }: { runs: ScanRun[]; 
           const a = x(when(active)), b = x(now);
           return (
             <g>
-              <rect x={a} y={base - 60} width={Math.max(2, b - a)} height={60} rx={2} fill="var(--accent)" opacity={0.18} />
-              <line x1={a} x2={a} y1={base} y2={base - 70} stroke="var(--accent)" strokeWidth={2} style={{ animation: 'pulse-ring 1.6s ease-in-out infinite' }} />
+              <rect x={a} y={base - 48} width={Math.max(2, b - a)} height={48} rx={2} fill="var(--accent)" opacity={0.14} />
+              <line x1={a} x2={a} y1={base} y2={base - 52} stroke="var(--accent)" strokeWidth={2} className="nf-pulse" />
             </g>
           );
         })() : null}
@@ -301,7 +318,7 @@ export function portGrid(n: number, size: number): { cols: number; cell: number;
   // up to four ports stand in one row; more fill a square
   const cols = n <= 4 ? Math.max(1, n) : Math.min(8, Math.ceil(Math.sqrt(n)));
   const gap = Math.round(size / 40);
-  const cell = Math.min(150, Math.floor((size - gap * (cols - 1)) / cols));
+  const cell = Math.min(120, Math.floor((size - gap * (cols - 1)) / cols));
   return { cols, cell, gap };
 }
 
@@ -320,10 +337,13 @@ export function PortField({ services, changes, size }: { services: Service[]; ch
         return (
           <li key={s.id}>
             <Link to={'/services/' + s.id} onPointerEnter={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onFocus={(e) => tip.showAt(e.currentTarget, body)} onBlur={tip.hide}
-              className={cx('flex flex-col justify-end rounded-[18px] p-3 transition-transform duration-150 hover:-translate-y-0.5', changed && 'ring-2 ring-[var(--coral)] ring-offset-2 ring-offset-[var(--panel-solid)]')}
-              style={{ width: cell, height: cell, background: 'var(--seq-3)', boxShadow: '0 0 28px -6px var(--seq-3)' }}>
-              <span className="mono leading-none text-white" style={{ fontSize: Math.max(14, Math.min(30, cell / 4.2)) }}>{s.port}</span>
-              {cell >= 72 ? <span className="mt-1 truncate text-[12px] text-white/80">{serviceName(s)}</span> : null}
+              className={cx('flex flex-col justify-between rounded-[10px] bg-raised p-3 shadow-[inset_0_0_0_1px_var(--rule)] transition-colors duration-150 ease-[var(--ease)] hover:bg-[color-mix(in_oklch,var(--raised),var(--ink)_6%)]', changed && 'shadow-[inset_0_0_0_1.5px_var(--coral)]')}
+              style={{ width: cell, height: cell }}>
+              <span className="lamp" style={{ background: 'var(--seq-4)' }} aria-hidden="true" />
+              <span className="block min-w-0">
+                <span className="mono block leading-none text-ink" style={{ fontSize: Math.max(14, Math.min(24, cell / 4.5)) }}>{s.port}</span>
+                {cell >= 72 ? <span className="mt-1 block truncate text-[12px] text-ink-3">{serviceName(s)}</span> : null}
+              </span>
             </Link>
           </li>
         );

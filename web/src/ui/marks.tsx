@@ -9,14 +9,15 @@ export type Tone = 'new' | 'gone' | 'changed' | 'unstable' | 'expected' | 'neutr
 export type GlyphName = 'plus' | 'minus' | 'delta' | 'wave' | 'dashring' | 'dot' | 'ring' | 'check' | 'x' | 'pause' | 'run' | 'half' | 'back' | 'hatch' | 'returned' | 'slow';
 
 const TONE_VAR: Record<Tone, string> = {
-  new: 'var(--st-new)', gone: 'var(--st-gone)', changed: 'var(--st-changed)', unstable: 'var(--st-unstable)',
-  expected: 'var(--st-expected)', neutral: 'var(--ink-2)', accent: 'var(--accent)', danger: 'var(--danger)',
+  // one accent rule: icons take the secondary text colour; coral marks "gone / needs you", blue "scanning now"
+  new: 'var(--ink-2)', gone: 'var(--coral)', changed: 'var(--ink-2)', unstable: 'var(--ink-2)',
+  expected: 'var(--ink-3)', neutral: 'var(--ink-2)', accent: 'var(--accent)', danger: 'var(--danger)',
 };
 export function toneColor(tone: Tone): string { return TONE_VAR[tone]; }
 
 export function Glyph({ name, tone = 'neutral', size = 14, pulse }: { name: GlyphName; tone?: Tone; size?: number; pulse?: boolean }) {
   const c = TONE_VAR[tone];
-  const s = { stroke: c, strokeWidth: 2, fill: 'none', strokeLinecap: 'square' as const };
+  const s = { stroke: c, strokeWidth: 1.5, fill: 'none', strokeLinecap: 'square' as const };
   let body: ReactNode;
   switch (name) {
     case 'plus': body = <path d="M7 2.5v9M2.5 7h9" {...s} />; break;
@@ -24,7 +25,7 @@ export function Glyph({ name, tone = 'neutral', size = 14, pulse }: { name: Glyp
     case 'delta': body = <path d="M7 2.2 12.2 11.5H1.8Z" fill={c} />; break;
     case 'wave': body = <path d="M1 7c1.5-3.6 3-3.6 4.500 0s3 3.600 4.500 0 2-2.400 3-1.400" {...s} strokeWidth={1.8} />; break;
     case 'dashring': body = <circle cx="7" cy="7" r="4.6" {...s} strokeWidth={1.6} strokeDasharray="2.4 2.2" strokeLinecap="butt" />; break;
-    case 'dot': body = <circle cx="7" cy="7" r="3.6" fill={c} />; break;
+    case 'dot': body = <rect x="3.5" y="3.5" width="7" height="7" rx="2" fill={c} />; break;
     case 'ring': body = <circle cx="7" cy="7" r="4.2" {...s} strokeWidth={1.6} />; break;
     case 'half': body = <><circle cx="7" cy="7" r="4.2" {...s} strokeWidth={1.6} /><path d="M7 2.800a4.200 4.200 0 0 1 0 8.400Z" fill={c} /></>; break;
     case 'check': body = <path d="M2.500 7.500 5.500 10.500 11.500 3.500" {...s} />; break;
@@ -228,7 +229,7 @@ export function ClassChips({ classes, max = 3 }: { classes: string[] | null | un
   return (
     <span className={max <= 1 ? 'inline-flex items-center gap-1 whitespace-nowrap' : 'inline-flex flex-wrap items-center gap-1'}>
       {classes.slice(0, max).map((c) => (
-        <span key={c} className="inline-flex h-[22px] items-center whitespace-nowrap rounded-full bg-[var(--rule)] px-2.5 text-[12px] text-ink">{classLabel(c)}</span>
+        <span key={c} className="inline-flex h-[20px] items-center whitespace-nowrap rounded-[4px] bg-raised px-1.5 text-[12px] text-ink-2">{classLabel(c)}</span>
       ))}
       {classes.length > max ? <span className="text-xs text-ink-3">+{classes.length - max}</span> : null}
     </span>
@@ -250,13 +251,13 @@ export const TECH_CATEGORIES = ['cms', 'framework', 'app-server', 'web-server', 
 
 // ---------- Scores: never a bare number ----------
 export function InterestScore({ value, reasons, showTip }: { value: number; reasons?: InterestReason[] | null; showTip?: (e: React.MouseEvent | React.FocusEvent, body: ReactNode) => void }) {
-  const tone = value >= 90 ? 'var(--coral)' : 'var(--ink-3)';
+  const tone = value >= 90 ? 'var(--ink-2)' : 'var(--ink-3)';
   const title = reasons && reasons.length ? reasons.map((r) => '+' + r.points + ' ' + r.text).join('\n') : undefined;
   return (
     <span className="inline-flex items-center gap-1.5" title={showTip ? undefined : title}>
       <span className="num w-[22px] text-right text-sm text-ink">{value}</span>
-      <span className="relative h-[4px] w-[34px] overflow-hidden rounded-full bg-rule" aria-hidden="true">
-        <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: Math.min(100, value) + '%', background: tone }} />
+      <span className="relative h-[3px] w-[28px] overflow-hidden rounded-[1px] bg-rule" aria-hidden="true">
+        <span className="absolute inset-y-0 left-0" style={{ width: Math.min(100, value) + '%', background: tone }} />
       </span>
     </span>
   );

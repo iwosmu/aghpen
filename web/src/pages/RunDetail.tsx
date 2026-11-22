@@ -126,11 +126,10 @@ function RunAddressField({ runId, cidr, live, fallback }: { runId: number; cidr:
   }, [q.data, cidr, live]);
   const [ref, w] = useWidth<HTMLDivElement>();
   if (q.data && !field) return <>{fallback}</>;
-  const size = Math.floor(Math.max(200, Math.min(w, 420)));
   return (
-    <div ref={ref} className="flex flex-col items-center gap-3 py-2">
-      {field && w ? <NetworkField field={field} size={size} /> : <div className="skeleton rounded-[18px]" style={{ width: size, height: size }} />}
-      <p className="mono self-start text-[13px] text-ink-2">{cidr}</p>
+    <div ref={ref} className="flex flex-col gap-3 py-2">
+      <p className="mono text-[13px] text-ink-2">{cidr}</p>
+      {field && w ? <NetworkField field={field} width={w} /> : <div className="skeleton h-[160px] rounded-[10px]" />}
     </div>
   );
 }

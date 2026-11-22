@@ -13,8 +13,66 @@
 
 
 /* ---------- Tokens: the login's night, inside. Colour is light behind glass, chrome is ink. ---------- */
+/* ---------- Tokens: a detector panel on a night shift. Graphite surfaces, one coral for "changed". ---------- */
 :root,
-:root[data-theme="dark"],
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #141415;
+  --panel: #19191b;
+  --panel-solid: #19191b;
+  --raised: #232325;
+  --sunk: #0f0f10;
+  --rule: rgb(237 237 237 / 0.08);
+  --rule-strong: rgb(237 237 237 / 0.14);
+  --ink: #ededed;
+  --ink-2: #a1a1a6;
+  --ink-3: #85858b;
+  /* "scanning now" only */
+  --accent: #8fb3e8;
+  --accent-strong: #b5cdf1;
+  --accent-ink: #0f0f10;
+  --accent-wash: rgb(143 179 232 / 0.12);
+  --coral: #ff8a7a;
+  --rail: #0f0f10;
+  --rail-ink: #ededed;
+  --rail-ink-2: #a1a1a6;
+  --rail-rule: rgb(237 237 237 / 0.08);
+  --rail-active: #232325;
+  --st-new: #4cc38a;
+  --st-gone: #ff8a7a;
+  --st-changed: #e0a84a;
+  --st-unstable: #a1a1a6;
+  --st-expected: #85858b;
+  --st-new-wash: rgb(76 195 138 / 0.10);
+  --st-gone-wash: rgb(255 138 122 / 0.10);
+  --st-changed-wash: rgb(224 168 74 / 0.10);
+  --st-unstable-wash: rgb(237 237 237 / 0.06);
+  --danger: #e5484d;
+  --danger-solid: #c9363b;
+  --danger-ink: #ffffff;
+  /* lamps: neutral steps toward off-white by count */
+  --seq-0: #232325;
+  --seq-1: #3b3b3f;
+  --seq-2: #5c5c62;
+  --seq-3: #8c8c92;
+  --seq-4: #bdbdc2;
+  --seq-5: #ededed;
+  --shadow: 0 8px 24px rgb(0 0 0 / 0.4);
+  --primary: #ededed;
+  --primary-hover: #ffffff;
+  --primary-press: #d4d4d4;
+  --primary-ink: #141415;
+  --focus: #ededed;
+  --card-shadow: inset 0 0 0 1px rgb(237 237 237 / 0.08);
+  --glass: #19191b;
+  --glass-edge: rgb(237 237 237 / 0.08);
+  --glass-filter: none;
+  --tip: #232325;
+  --row-hover: rgb(237 237 237 / 0.035);
+  --row-selected: rgb(237 237 237 / 0.06);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* the login keeps its night */
 .night {
   color-scheme: dark;
   --bg: #050913;
@@ -74,57 +132,57 @@
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f7f1e8;
-  --panel: #fffbf5;
-  --panel-solid: #fffbf5;
-  --raised: #fffbf5;
-  --sunk: #f3ebdf;
-  --rule: #e9dfd0;
-  --rule-strong: #d6c7b0;
-  --ink: #0f1730;
-  --ink-2: #3d4560;
-  --ink-3: #545b73;
+  --bg: #f7f4ee;
+  --panel: #fdfbf7;
+  --panel-solid: #fdfbf7;
+  --raised: #efe9df;
+  --sunk: #f2ede4;
+  --rule: rgb(31 27 22 / 0.08);
+  --rule-strong: rgb(31 27 22 / 0.14);
+  --ink: #1f1b16;
+  --ink-2: #5e554a;
+  --ink-3: #6f665a;
   --accent: #1d4fb0;
   --accent-strong: #163f8f;
   --accent-ink: #ffffff;
   --accent-wash: #e4eaf6;
   --coral: #c2413a;
-  --rail: transparent;
-  --rail-ink: #0f1730;
-  --rail-ink-2: #3d4560;
-  --rail-rule: #e2d6c4;
-  --rail-active: rgb(15 23 48 / 0.07);
-  --st-new: #1d6b45;
-  --st-gone: #b3261e;
+  --rail: #f2ede4;
+  --rail-ink: #1f1b16;
+  --rail-ink-2: #5e554a;
+  --rail-rule: rgb(31 27 22 / 0.08);
+  --rail-active: #e9e2d6;
+  --st-new: #16a34a;
+  --st-gone: #c2413a;
   --st-changed: #8a5a00;
-  --st-unstable: #5b49c9;
-  --st-expected: #6b6f80;
+  --st-unstable: #5e554a;
+  --st-expected: #7b7266;
   --st-new-wash: #e1efe6;
   --st-gone-wash: #fbe5e3;
   --st-changed-wash: #f6ead2;
   --st-unstable-wash: #ebe7fa;
-  --danger: #b3261e;
-  --danger-solid: #b3261e;
+  --danger: #dc2626;
+  --danger-solid: #dc2626;
   --danger-ink: #ffffff;
-  --seq-0: #efe6d8;
-  --seq-1: #b7d3f6;
-  --seq-2: #86b6ef;
-  --seq-3: #3987e5;
-  --seq-4: #1c5cab;
-  --seq-5: #0d366b;
-  --shadow: 0 18px 40px -20px rgb(60 40 10 / 0.28);
-  --primary: #0f1730;
-  --primary-hover: #1a2442;
+  --seq-0: #ebe5da;
+  --seq-1: #d6cdbf;
+  --seq-2: #b3a796;
+  --seq-3: #8a7f6e;
+  --seq-4: #5e554a;
+  --seq-5: #1f1b16;
+  --shadow: 0 8px 24px rgb(0 0 0 / 0.06);
+  --primary: #1f1b16;
+  --primary-hover: #000000;
   --primary-press: #000000;
-  --primary-ink: #fffbf5;
-  --focus: #0f1730;
-  --card-shadow: 0 0 0 1px #e2d6c4;
-  --glass: rgb(255 251 245 / 0.78);
-  --glass-edge: #e2d6c4;
-  --glass-filter: blur(24px) saturate(1.2);
-  --tip: #0f1730;
-  --row-hover: rgb(15 23 48 / 0.035);
-  --row-selected: #f3ebdf;
+  --primary-ink: #fdfbf7;
+  --focus: #1f1b16;
+  --card-shadow: 0 0 0 1px rgb(31 27 22 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
+  --glass: #fdfbf7;
+  --glass-edge: rgb(31 27 22 / 0.08);
+  --glass-filter: none;
+  --tip: #1f1b16;
+  --row-hover: rgb(31 27 22 / 0.03);
+  --row-selected: #efe9df;
 }
 
 @theme inline {
@@ -182,9 +240,9 @@
   --text-xl: 28px;
   --text-xl--line-height: 34px;
   --radius-xs: 4px;
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
@@ -206,7 +264,7 @@
   * { caret-color: var(--accent); }
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   /* the one large thing on a screen: the UI sans, 500, tight */
-  .font-display { font-weight: 500; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; text-wrap: balance; }
+  .font-display { font-weight: 500; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; text-wrap: balance; }
   [data-rail] :focus-visible { outline-color: var(--rail-ink); outline-offset: -2px; }
   a { color: inherit; text-decoration: none; }
   button { cursor: pointer; }
@@ -229,12 +287,12 @@
   .link:hover { text-decoration-color: currentColor; }
   .label { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--ink); }
   .field {
-    height: 38px; width: 100%; padding: 0 12px; background: var(--sunk); border: 1px solid var(--rule-strong);
-    border-radius: 12px; color: var(--ink); font-size: 14px; transition: border-color 150ms, background-color 150ms;
+    height: 36px; width: 100%; padding: 0 12px; background: var(--raised); border: 1px solid var(--rule);
+    border-radius: 8px; color: var(--ink); font-size: 14px; transition: border-color 150ms var(--ease), background-color 150ms var(--ease);
   }
   textarea.field { height: auto; padding: 9px 12px; line-height: 20px; }
   select.field { appearance: none; padding-right: 30px; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23959eb2' stroke-width='1.5'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; }
-  .card { background: var(--panel); border-radius: 20px; box-shadow: var(--card-shadow); }
+  .card { background: var(--panel); border-radius: 14px; box-shadow: var(--card-shadow); }
   .field::placeholder { color: var(--ink-3); }
   .field:hover { border-color: color-mix(in oklch, var(--rule-strong), var(--ink) 18%); }
   .field:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-color: transparent; }
@@ -244,16 +302,12 @@
   .hatch {
     background-image: repeating-linear-gradient(135deg, var(--st-changed) 0 1.5px, transparent 1.5px 5px);
   }
-  /* dark frost: rail, top bar, dialogs, toasts. Never on cards or rows. */
-  .glass {
-    background: linear-gradient(160deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0) 42%), var(--glass);
-    -webkit-backdrop-filter: var(--glass-filter); backdrop-filter: var(--glass-filter);
-    box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 rgb(255 255 255 / 0.1);
-  }
+  /* plain floating surface with a hairline (dialogs, toasts); no blur */
+  .glass { background: var(--panel-solid); box-shadow: inset 0 0 0 1px var(--rule-strong), var(--shadow); }
   /* small segmented control and filter pills */
-  .seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--sunk); box-shadow: inset 0 0 0 1px var(--rule); }
-  .seg > button, .seg > a { height: 28px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out); }
-  .seg > [aria-pressed="true"], .seg > [aria-selected="true"], .seg > [aria-current="page"] { background: var(--primary); color: var(--primary-ink); }
+  .seg { display: inline-flex; padding: 2px; gap: 2px; border-radius: 8px; background: var(--sunk); box-shadow: inset 0 0 0 1px var(--rule); }
+  .seg > button, .seg > a { height: 28px; padding: 0 12px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out); }
+  .seg > [aria-pressed="true"], .seg > [aria-selected="true"], .seg > [aria-current="page"] { background: var(--raised); color: var(--ink); box-shadow: inset 0 0 0 1px var(--rule-strong); }
   @media (hover: hover) and (pointer: fine) {
     .seg > button:not([aria-pressed="true"]):not([aria-selected="true"]):hover { color: var(--ink); background: var(--row-hover); }
   }
@@ -261,23 +315,17 @@
   .eyebrow { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--ink); }
   /* group heading over rows: small mono caps with a count */
   /* a fact about a row: short, quiet, pill */
-  .chip-fact { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; line-height: 16px; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--rule-strong); white-space: nowrap; }
-  .caps { font-family: var(--font-mono); font-size: 11.5px; line-height: 16px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+  .chip-fact { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: 4px; font-size: 12px; line-height: 16px; color: var(--ink-2); background: var(--raised); white-space: nowrap; }
+  /* group and section labels: muted mono, sentence case */
+  .caps { font-family: var(--font-mono); font-size: 12px; line-height: 16px; font-weight: 400; letter-spacing: 0; color: var(--ink-3); }
+  p.caps::first-letter, h2.caps::first-letter { text-transform: uppercase; }
+  /* the signature: a lamp, a small square cell */
+  .lamp { display: inline-block; width: 8px; height: 8px; border-radius: 2px; flex: none; }
 }
 
 /* The ground: a still, dim piece of the login's field. One fixed layer, no animation. */
-.app-ground {
-  position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background:
-    radial-gradient(46% 38% at 6% -6%, rgb(38 97 220 / 0.30), transparent 70%),
-    radial-gradient(22% 26% at 2% 52%, rgb(110 163 242 / 0.10), transparent 70%),
-    radial-gradient(40% 34% at 100% 108%, rgb(229 85 106 / 0.17), transparent 70%),
-    radial-gradient(30% 26% at 78% 104%, rgb(163 43 122 / 0.13), transparent 72%),
-    radial-gradient(36% 30% at 96% -10%, rgb(38 97 220 / 0.10), transparent 70%),
-    linear-gradient(180deg, #071028, #050913 60%);
-}
-:root[data-theme="light"] .app-ground { background: #f7f1e8; }
-:root[data-theme="light"] [role="tooltip"] { color: #fffbf5; }
+.app-ground { position: fixed; inset: 0; z-index: -1; pointer-events: none; background: var(--bg); }
+:root[data-theme="light"] [role="tooltip"] { color: #fdfbf7; }
 
 @keyframes pulse-ring { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @keyframes slide-in { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
