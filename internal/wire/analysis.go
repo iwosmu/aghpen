@@ -8,6 +8,7 @@ import (
 	"context"
 	"log/slog"
 	"net/netip"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -418,6 +419,7 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 	hostRows := make([]store.HostAnalysis, 0, len(hosts))
 	var findings []model.Finding
 	derived := map[string]bool{}
+	silentPorts := map[int64][]int{} // host id -> ports that answered tcpwrapped (analyze.ClosedBeforeAnswer)
 	var upHosts []int64
 	for i := range hosts {
 		h := &hosts[i]
@@ -439,6 +441,9 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 			sv := h.Services[j]
 			if sv.State != "" && sv.State != "open" {
 				continue
+			}
+			if analyze.ClosedBeforeAnswer(&sv) {
+				silentPorts[h.HostID] = append(silentPorts[h.HostID], sv.Port)
 			}
 			sid, hasID := h.ServiceIDs[store.ServiceKey(sv.Port, sv.Proto)]
 			isNew := prev != nil && newSvc[strconv.FormatInt(h.HostID, 10)+"|"+strconv.Itoa(sv.Port)]
@@ -508,6 +513,9 @@ func (a *Analysis) AnalyzeRun(ctx context.Context, runID int64) (*model.RunDiffS
 			}
 			if listedOnly && (f.Port == 0 || !listedPorts[f.HostID][f.Port]) {
 				return nil // an imported file says nothing about the ports it does not list
+			}
+			if f.Port != 0 && slices.Contains(silentPorts[f.HostID], f.Port) {
+				return nil // the port closed the connection before it said anything (analyze.ClosedBeforeAnswer)
 			}
 			stale = append(stale, f.ID)
 			return nil
