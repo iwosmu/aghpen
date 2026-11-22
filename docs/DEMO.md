@@ -5,7 +5,7 @@ Wszystko działa lokalnie na laptopie: produkt, laboratorium i DefectDojo. Inter
 
 | Część | Co zawiera |
 | --- | --- |
-| [1. Nagranie](#1-nagranie-około-2-minut) | 7 ujęć nagrywanych skryptem z prawdziwego interfejsu, napisy, tekst lektora |
+| [1. Nagranie](#1-nagranie-około-2-minut) | 7 ujęć nagrywanych skryptem z prawdziwego interfejsu, głos lektora |
 | [2. Pokaz na scenie](#2-pokaz-na-scenie-5-minut) | kto mówi co; notatki do każdego slajdu; plan na awarię sieci |
 | [3. Przygotowanie](#3-przygotowanie-stanowiska) | polecenia od zera do stanu startowego demo i reset |
 | [4. Pytania jury](#4-pytania-jury) | 19 pytań z odpowiedziami i wskazaniem pliku albo ekranu |
@@ -34,7 +34,7 @@ Skrypt nagrywa też plik napisów `docs/demo/czujka-demo.pl.srt` i tekst lektora
 | 5 | Oś czasu | „Oś czasu”: strzałka w lewo przebieg po przebiegu, potem z powrotem. | Oś czasu |
 | 6 | Reguła i sygnatura z przykładu | „Reguły ekspozycji”: reguła „Panel administracyjny poza siecią zarządzania” i jej naruszenia; potem usługa `10.66.1.10:80` → „Zaproponuj sygnaturę”. | Reguła i sygnatura z przykładu |
 | 7 | Stop awaryjny | Przycisk „Stop awaryjny” w górnym pasku, potwierdzenie; trwający skan staje. Po nagraniu skrypt zwalnia stop i anuluje ten przebieg. | Stop awaryjny |
-| 8 | Plansza końcowa | Ikona, „Czujka”, `czujka.dev`. | (bez napisu) |
+| 8 | Plansza końcowa | Tło ekranu logowania, napis „Czujka”, `czujka.dev`. | (bez napisu) |
 
 Zasady montażu, które skrypt pilnuje sam: przyspieszony jest tylko fragment skanu i tylko z widocznym „×8”; pozostałe ujęcia idą w czasie rzeczywistym; żaden ekran nie jest makietą.
 
