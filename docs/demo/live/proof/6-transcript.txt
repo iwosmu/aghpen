@@ -1,17 +1,18 @@
+Build: 93e3e23 (UI frozen at e9b850b), 2026-11-22.
 $ docs/demo/live/live.sh 6
-[23:33:05] scan: run 1 completed in 50 s (7 services)
-[23:33:05] READY in 131 s. Open http://127.0.0.1:18730, log in as admin@czujka.local (password: live.sh pass).
+[03:10:17] scan: run 1 completed in 49 s (7 services)
+[03:10:17] READY in 91 s. Open http://127.0.0.1:18730, log in as admin@czujka.local (password: live.sh pass).
 
   Next: Usługi -> a service -> 'Zaproponuj sygnaturę' -> Sprawdź -> Retro-hunt -> Zapisz (no scan)
 
 UI (Playwright, admin): Usługi -> 172.18.0.1:8888 (httpbin) -> Zaproponuj sygnaturę
   POST /signatures/suggest 200
   "Sygnatura „gunicorn” pasuje do przykładu i do żadnej innej z 6 zapisanych usług."
-  "Test wsteczny: pasuje do przykładu · 0 innych usług pasuje · sprawdzono 7 usług, wysłano 0 pakietów"
+  "Test na zapisanych wynikach: pasuje do przykładu · inne dopasowania: 0 · sprawdzone usługi: 7"
 -> Otwórz w edytorze
-  POST /signatures/validate 200   "Sygnatura jest poprawna i bezpieczna"
+  POST /signatures/validate 200   "Sygnatura jest poprawna i bezpieczna", "Bez dodatkowych ścieżek"
 -> Uruchom test
-  POST /signatures/retrohunt 200  "Dopasowano 1 zapisaną usługę, wysłano 0 pakietów. Przejrzano 7 obserwacji w 3 ms."  (172.18.0.1:8888, 100%)
+  POST /signatures/retrohunt 200  "Dopasowano 1 zapisaną usługę." "Sprawdzone obserwacje: 7."  (172.18.0.1:8888, 100%)
 -> Zapisz sygnaturę
   POST /signatures 201  -> /signatures/399
 Bez nowego skanu.
