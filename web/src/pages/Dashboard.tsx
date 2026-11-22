@@ -6,11 +6,11 @@ import type { Change, Dashboard as Dash, Finding, Host, Page, RunMap, ScanProfil
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtDec, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtSigned } from '../lib/format';
 import { useLiveRun, useNow, useWidth } from '../lib/hooks';
-import { NetworkField, NightStrip, Ring, Spark, TickBars, networkFields, runChanges } from '../viz/Night';
+import { NetworkField, NightStrip, Ring, Spark, TickBars, networkFields } from '../viz/Night';
 import { ErrorState, Panel, SkeletonRows } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, changeKindInfo, type GlyphName, type Tone } from '../ui/marks';
-import { BarList, ProgressBar, TrendRows } from '../viz/charts';
+import { BarList, ProgressBar } from '../viz/charts';
 import { useSession } from '../session';
 import { RunStory, useRunStoryShown } from '../ui/RunStory';
 import { useHostVerdicts } from '../ui/MissingHosts';
@@ -154,13 +154,6 @@ function Stat({ label, value, delta, deltaTitle, to, mono = true, pic }: { label
     : <div className={cls}>{inner}</div>;
 }
 
-/** Full runs of the widest profile, oldest first: the series behind the host and service figures. */
-function widestFullRuns(runs: ScanRun[]): ScanRun[] {
-  const full = runs.filter(isFullRun);
-  const top = Math.max(0, ...full.map((r) => r.stats.addresses_total));
-  return full.filter((r) => r.stats.addresses_total === top).sort((a, b) => a.id - b.id).slice(-30);
-}
-
 function Inventory({ d, pair, runs }: { d: Dash; pair?: { full?: ScanRun; prev?: ScanRun }; runs: ScanRun[] }) {
   const h = d.headline;
   // Deltas only between two full runs of the same profile, never across a partial run.
@@ -168,13 +161,14 @@ function Inventory({ d, pair, runs }: { d: Dash; pair?: { full?: ScanRun; prev?:
   const dHosts = full && prev ? full.stats.hosts_up - prev.stats.hosts_up : null;
   const dServices = full && prev ? full.stats.services_open - prev.stats.services_open : null;
   const deltaTitle = full && prev ? t('zmiana między pełnymi skanami #' + prev.id + ' i #' + full.id + (full.profile_name ? ' (' + full.profile_name + ')' : ''), 'change between the full scans #' + prev.id + ' and #' + full.id + (full.profile_name ? ' (' + full.profile_name + ')' : '')) : undefined;
-  const series = widestFullRuns(runs);
-  const recent = [...runs].filter((r) => r.status === 'completed').sort((a, b) => a.id - b.id).slice(-40);
+  // the same per-scan series as the API's trend, oldest first
+  const trend = d.trend ?? [];
+  void runs;
   return (
     <dl className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4" data-testid="dash-numbers">
-      <Stat label={t('Aktywne hosty', 'Hosts up')} value={fmtInt(h.hosts_up)} delta={dHosts} deltaTitle={deltaTitle} to="/hosts?status=up" pic={<Spark values={series.map((r) => r.stats.hosts_up)} width={84} height={34} />} />
-      <Stat label={t('Otwarte usługi', 'Open services')} value={fmtInt(h.services_open)} delta={dServices} deltaTitle={deltaTitle} to="/services?state=open" pic={<Spark values={series.map((r) => r.stats.services_open)} width={84} height={34} />} />
-      <Stat label={t('Nieprzejrzane zmiany', 'Unreviewed changes')} value={fmtInt(h.changes_unacked)} to="/changes?acked=false&expected=false" pic={<TickBars values={recent.map(runChanges)} width={84} height={34} />} />
+      <Stat label={t('Aktywne hosty', 'Hosts up')} value={fmtInt(h.hosts_up)} delta={dHosts} deltaTitle={deltaTitle} to="/hosts?status=up" pic={<Spark values={trend.map((p) => p.hosts)} width={96} height={34} />} />
+      <Stat label={t('Otwarte usługi', 'Open services')} value={fmtInt(h.services_open)} delta={dServices} deltaTitle={deltaTitle} to="/services?state=open" pic={<Spark values={trend.map((p) => p.services)} width={96} height={34} />} />
+      <Stat label={t('Nieprzejrzane zmiany', 'Unreviewed changes')} value={fmtInt(h.changes_unacked)} to="/changes?acked=false&expected=false" pic={<TickBars values={trend.map((p) => p.changes)} width={96} height={34} />} />
       <Stat label={t('Znaleziska wysokiej wagi', 'High-severity findings')} value={fmtInt(h.findings_high)} to="/findings?severity=high&status=new,triaged" pic={h.findings_open ? <Ring value={h.findings_high} max={h.findings_open} size={38} /> : undefined} />
     </dl>
   );
@@ -196,9 +190,8 @@ function Stage({ d }: { d: Dash }) {
     [hosts, changes, blocks],
   );
   const [ref, w] = useWidth<HTMLDivElement>();
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
   const main = fields[0];
-  const size = Math.floor(Math.max(240, Math.min(w - 40, vh - 470, 600)));
+  const size = Math.floor(Math.max(240, Math.min(w - 2 * Math.max(16, w / 32), 760)));
   const unitSteps = main?.unit === 'block' ? [['2', '1'], ['3', '2–3'], ['4', '4–9'], ['5', '10+']] : [];
   return (
     <section className="card relative flex min-h-[320px] flex-col overflow-hidden rounded-[28px] bg-[radial-gradient(60%_55%_at_50%_52%,rgb(38_97_220/0.13),transparent_75%),var(--panel)] p-5 sm:p-6" data-testid="dash-field">
@@ -499,19 +492,7 @@ export default function Dashboard() {
         <div className="min-w-0 space-y-4">
           <Stage d={d} />
           <Inventory d={d} pair={runs.data ? pair : undefined} runs={allRuns.data?.items ?? []} />
-        </div>
-        <aside className="card min-w-0 space-y-7 rounded-[28px] p-5 sm:p-6">
-          <div className="space-y-4">
-            {d.active_run ? <ActiveRun initial={d.active_run} d={d} /> : <IdleRun d={d} />}
-            <NightStrip runs={allRuns.data?.items ?? []} active={d.active_run} currentId={d.active_run ? undefined : d.last_run?.id} now={now} />
-          </div>
-          <RecentChanges fallback={d.recent_changes ?? []} />
-          <TopFindings />
-        </aside>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <Panel title={t('Najciekawsze usługi', 'Most interesting services')} flush className="xl:col-span-3" actions={<Link to="/services?sort=-interest" className="link">{t('Wszystkie', 'All')}</Link>}>
+          <Panel title={t('Najciekawsze usługi', 'Most interesting services')} flush actions={<Link to="/services?sort=-interest" className="link">{t('Wszystkie', 'All')}</Link>}>
           <ul className="grid px-5 lg:grid-cols-2 lg:gap-x-8">
             {(d.top_services ?? []).slice(0, 7).map((s) => (
               <Row key={s.id} to={'/services/' + s.id}>
@@ -528,32 +509,35 @@ export default function Dashboard() {
             ))}
           </ul>
         </Panel>
+        </div>
+        <aside className="card min-w-0 space-y-7 rounded-[28px] p-5 sm:p-6">
+          <div className="space-y-4">
+            {d.active_run ? <ActiveRun initial={d.active_run} d={d} /> : <IdleRun d={d} />}
+            <NightStrip runs={allRuns.data?.items ?? []} active={d.active_run} currentId={d.active_run ? undefined : d.last_run?.id} now={now} />
+          </div>
+          <RecentChanges fallback={d.recent_changes ?? []} />
+          <TopFindings />
+        </aside>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid items-start gap-4 xl:grid-cols-3">
         <Panel title={t('Technologie', 'Technologies')} actions={<span className="text-ink-3">{t('liczba usług', 'services')}</span>}>
           <BarList items={(d.technologies ?? []).slice(0, 10)} href={(i) => '/services?tech=' + encodeURIComponent(i.name)} labelWidth={150} />
         </Panel>
         <Panel title={t('Otwarte porty', 'Open ports')} actions={<span className="text-ink-3">{t('liczba usług', 'services')}</span>}>
           <BarList items={(d.ports ?? []).slice(0, 10)} mono href={(i) => '/services?port=' + i.name} labelWidth={150} extra={(i) => i.extra} />
         </Panel>
-        <Panel title={t('Trend w kolejnych skanach', 'Trend over scans')}>
-          <TrendRows points={d.trend ?? []} series={[
-            { key: 'hosts', label: t('aktywne hosty', 'hosts up') },
-            { key: 'services', label: t('otwarte usługi', 'open services') },
-            { key: 'changes', label: t('zmiany', 'changes') },
-          ]} />
-        </Panel>
+        <SafetyPanel st={st} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="min-w-0 space-y-4">
+      <div className="grid items-start gap-4 xl:grid-cols-3">
+        <div className="contents">
         <Panel title={t('Hosty niestabilne', 'Unstable hosts')} count={d.headline.hosts_unstable} flush actions={<Link to="/hosts?status=unstable" className="link">{t('Wszystkie', 'All')}</Link>}>
-          {(d.unstable_hosts ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Brak niestabilnych hostów.', 'No unstable hosts.')}</p> : null}
+          {(d.unstable_hosts ?? []).length === 0 ? <p className="px-5 pb-3 pt-1 text-sm text-ink-2">{t('Brak niestabilnych hostów.', 'No unstable hosts.')}</p> : null}
           <ul>
             {(d.unstable_hosts ?? []).slice(0, 6).map((h) => (
               <li key={h.id}>
-                <Link to={'/hosts/' + h.id} className="flex min-h-[30px] items-center gap-3 border-b border-rule px-3 py-1.5 hover:bg-raised">
+                <Link to={'/hosts/' + h.id} className="flex min-h-[44px] items-center gap-3 border-b border-rule px-5 py-2 last:border-b-0 hover:bg-[var(--row-hover)]">
                   <span className="mono w-[104px] flex-none text-sm">{h.ip}</span>
                   <span className="min-w-0 flex-1 truncate text-xs text-ink-2">{h.pattern}</span>
                   <span className="num flex-none text-xs text-ink-2" title={t('Prawdopodobieństwo, że host nadal istnieje', 'Probability that the host still exists')}>p {fmtDec(h.p_alive)}</span>
@@ -565,17 +549,17 @@ export default function Dashboard() {
         <ReprobePanel limit={5} />
         </div>
         <Panel title={t('Wygasające certyfikaty', 'Expiring certificates')} count={(d.certs_expiring ?? []).length} flush>
-          {(d.certs_expiring ?? []).length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Żaden certyfikat nie wygasa w ciągu 30 dni.', 'No certificates expire within 30 days.')}</p> : null}
+          {(d.certs_expiring ?? []).length === 0 ? <p className="px-5 pb-3 pt-1 text-sm text-ink-2">{t('Żaden certyfikat nie wygasa w ciągu 30 dni.', 'No certificates expire within 30 days.')}</p> : null}
           <ul>
             {(d.certs_expiring ?? []).slice(0, 6).map((s) => {
               const days = s.latest?.result.tls?.days_left ?? 0;
               return (
                 <li key={s.id}>
-                  <Link to={'/services/' + s.id} className="flex min-h-[30px] items-center gap-3 border-b border-rule px-3 py-1.5 hover:bg-raised">
-                    <span className="mono min-w-0 flex-1 truncate text-sm">{s.hostname || s.ip}:{s.port}</span>
+                  <Link to={'/services/' + s.id} className="flex min-h-[44px] items-center gap-3 border-b border-rule px-5 py-2 last:border-b-0 hover:bg-[var(--row-hover)]">
+                    <span className="mono min-w-0 flex-1 truncate text-[13px]">{s.hostname || s.ip}:{s.port}</span>
                     <span className="inline-flex flex-none items-center gap-1.5 text-xs">
                       <Glyph name={days < 0 ? 'x' : 'delta'} tone={days < 0 ? 'gone' : days <= 7 ? 'changed' : 'expected'} size={12} />
-                      <span className={days <= 7 ? 'text-ink' : 'text-ink-2'}>{days < 0 ? t('wygasł ' + Math.abs(days) + ' ' + plural(Math.abs(days), ['dzień', 'dni', 'dni'], ['day', 'days']) + ' temu', 'expired ' + Math.abs(days) + ' ' + plural(Math.abs(days), ['dzień', 'dni', 'dni'], ['day', 'days']) + ' ago') : t('za ' + days + ' ' + plural(days, ['dzień', 'dni', 'dni'], ['day', 'days']), 'in ' + days + ' ' + plural(days, ['dzień', 'dni', 'dni'], ['day', 'days']))}</span>
+                      <span className={days <= 7 ? 'text-ink' : 'text-ink-2'}>{days < 0 ? t('wygasł ' + Math.abs(days) + ' ' + plural(Math.abs(days), ['dzień', 'dni', 'dni'], ['day', 'days']) + ' temu', 'expired ' + Math.abs(days) + ' ' + plural(Math.abs(days), ['dzień', 'dni', 'dni'], ['day', 'days']) + ' ago') : days === 0 ? t('dziś', 'today') : t('za ' + days + ' ' + plural(days, ['dzień', 'dni', 'dni'], ['day', 'days']), 'in ' + days + ' ' + plural(days, ['dzień', 'dni', 'dni'], ['day', 'days']))}</span>
                     </span>
                   </Link>
                 </li>
@@ -583,7 +567,6 @@ export default function Dashboard() {
             })}
           </ul>
         </Panel>
-        <SafetyPanel st={st} />
       </div>
       <p className="pb-2 text-2xs text-ink-3">{t('Stan na', 'As of')} {fmtDateTime(d.generated_at)}</p>
     </div>

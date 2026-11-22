@@ -35,7 +35,8 @@ interface Props {
 
 function Tile({ tile, cell, p, active, setActive, tip }: { tile: MapTile<MapBlock>; cell: number; p: Props; active: string | null; setActive: (c: string | null) => void; tip: ReturnType<typeof useTip> }) {
   const px = tile.side * cell;
-  const gap = cell >= 12 ? 2 : 1;
+  const gap = cell >= 16 ? Math.round(cell * 0.14) : cell >= 12 ? 2 : 1;
+  const rx = cell >= 12 ? Math.round(cell * 0.2) : 1;
   const hatchId = 'hatch-' + tile.base;
   const occupied = useMemo(() => new Set(tile.cells.map((c) => c.x + ',' + c.y)), [tile.cells]);
   const empties: ReactNode[] = [];
@@ -50,11 +51,14 @@ function Tile({ tile, cell, p, active, setActive, tip }: { tile: MapTile<MapBloc
     const hl = p.highlight?.has(b.cidr);
     const isActive = active === b.cidr;
     let node: ReactNode;
-    if (b.status === 'done') node = <rect x={x} y={y} width={s} height={s} fill={'var(--seq-' + densityStep(b.hosts_up) + ')'} style={{ transition: 'fill 600ms var(--ease-out-expo)' }} />;
-    else if (b.status === 'running') node = <rect x={x + 0.75} y={y + 0.75} width={s - 1.5} height={s - 1.5} fill="var(--accent-wash)" stroke="var(--accent)" strokeWidth={1.5} style={{ animation: 'pulse-ring 1.4s ease-in-out infinite' }} />;
+    if (b.status === 'done') {
+      const step = densityStep(b.hosts_up);
+      node = <>{step >= 2 && cell >= 12 ? <rect x={x - 2} y={y - 2} width={s + 4} height={s + 4} rx={rx + 2} fill={'var(--seq-' + step + ')'} opacity={0.5} filter={'url(#glow-' + tile.base + ')'} /> : null}<rect x={x} y={y} width={s} height={s} rx={rx} fill={'var(--seq-' + step + ')'} style={{ transition: 'fill 600ms var(--ease-out-expo)' }} /></>;
+    }
+    else if (b.status === 'running') node = <rect x={x + 0.75} y={y + 0.75} width={s - 1.5} height={s - 1.5} rx={rx} fill="var(--accent-wash)" stroke="var(--accent)" strokeWidth={1.5} className="nf-pulse" />;
     else if (b.status === 'deferred') node = <><rect x={x} y={y} width={s} height={s} fill={'url(#' + hatchId + ')'} /><rect x={x + 0.5} y={y + 0.5} width={s - 1} height={s - 1} fill="none" stroke="var(--st-changed)" strokeWidth={1} /></>;
     else if (b.status === 'failed') node = <><rect x={x + 0.5} y={y + 0.5} width={s - 1} height={s - 1} fill="var(--st-gone-wash)" stroke="var(--danger)" strokeWidth={1} /><path d={'M' + (x + 3) + ' ' + (y + 3) + 'L' + (x + s - 3) + ' ' + (y + s - 3) + 'M' + (x + s - 3) + ' ' + (y + 3) + 'L' + (x + 3) + ' ' + (y + s - 3)} stroke="var(--danger)" strokeWidth={1.2} /></>;
-    else node = <rect x={x + 0.5} y={y + 0.5} width={s - 1} height={s - 1} fill="var(--panel)" stroke="var(--rule-strong)" strokeWidth={1} />;
+    else node = <rect x={x + 0.75} y={y + 0.75} width={s - 1.5} height={s - 1.5} rx={rx} fill="none" stroke="var(--rule-strong)" strokeWidth={1.2} />;
     return (
       <g
         key={b.cidr}
@@ -66,15 +70,16 @@ function Tile({ tile, cell, p, active, setActive, tip }: { tile: MapTile<MapBloc
       >
         <rect x={c.x * cell} y={c.y * cell} width={cell} height={cell} fill="transparent" />
         {node}
-        {hl || isActive ? <rect x={x - 0.5} y={y - 0.5} width={s + 1} height={s + 1} fill="none" stroke="var(--ink)" strokeWidth={isActive ? 2 : 1.5} pointerEvents="none" /> : null}
+        {hl || isActive ? <rect x={x - 1} y={y - 1} width={s + 2} height={s + 2} rx={rx + 1} fill="none" stroke="var(--ink)" strokeWidth={isActive ? 2 : 1.5} pointerEvents="none" /> : null}
       </g>
     );
   };
   const done = tile.cells.filter((c) => c.block.status === 'done').length;
   return (
     <figure className="m-0 flex-none">
-      <svg width={px} height={px} viewBox={'0 0 ' + px + ' ' + px} role="presentation" style={{ display: 'block' }}>
+      <svg width={px} height={px} viewBox={'0 0 ' + px + ' ' + px} role="presentation" style={{ display: 'block', overflow: 'visible' }}>
         <defs>
+          <filter id={'glow-' + tile.base} x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation={Math.max(2, cell * 0.3)} /></filter>
           <pattern id={hatchId} width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <rect width="5" height="5" fill="var(--st-changed-wash)" />
             <rect width="1.6" height="5" fill="var(--st-changed)" />
