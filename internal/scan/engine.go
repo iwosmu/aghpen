@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math"
 	"net/netip"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -57,11 +58,13 @@ type GroupEvent struct {
 
 // Engine implements model.Engine.
 type Engine struct {
-	deps   Deps
-	log    *slog.Logger
-	now    func() time.Time
-	once   sync.Once
-	prober probe.Prober
+	// deepHosts: the hosts the deep pass may take per run (CZUJKA_DEEP_PASS_HOSTS, 0 = off)
+	deepHosts int
+	deps      Deps
+	log       *slog.Logger
+	now       func() time.Time
+	once      sync.Once
+	prober    probe.Prober
 	// direct is the "second method" of the last retry round: a TCP connect
 	// to the ports a host had open before. Tests replace it.
 	direct func(ctx context.Context, ip string, ports []int, timeout time.Duration, lim *probe.Limiter) (probe.Host, int64)
@@ -183,7 +186,7 @@ var _ model.Engine = (*Engine)(nil)
 
 // New builds an engine. The prober (nmap or native) is chosen on first use.
 func New(d Deps) *Engine {
-	e := &Engine{deps: d, log: d.Logger, now: d.Now, direct: probe.ConnectProbe}
+	e := &Engine{deps: d, log: d.Logger, now: d.Now, direct: probe.ConnectProbe, deepHosts: deepHostsSetting(os.Getenv("CZUJKA_DEEP_PASS_HOSTS"))}
 	if e.log == nil {
 		e.log = slog.Default()
 	}
@@ -207,6 +210,9 @@ func (e *Engine) Prober() probe.Prober {
 
 // run is the state of one Run call.
 type run struct {
+	// active maps the groupStats of each running group to its group, for
+	// the progress inside a group (groupProgress).
+	active sync.Map
 	// portAnswered counts live hosts that answered the port scan (an open
 	// or a closed port); the end-of-run sanity check compares it with the
 	// hosts discovery found.
@@ -220,6 +226,12 @@ type run struct {
 	fullPassed  map[int]bool
 	fullWake    chan struct{}
 	fullPlanned bool
+	// the rotating deep pass (deeppass.go): the final results of live hosts
+	deepPlanned bool
+	finalMu     sync.Mutex
+	finals      map[string]model.HostResult
+	// fullDone holds the IPs whose full-range pass finished in this run
+	fullDone sync.Map
 
 	e       *Engine
 	log     *slog.Logger
@@ -348,6 +360,7 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 		hostSem:   make(chan struct{}, lim.ParallelHosts),
 		hostnames: exp.Hostnames,
 		hints:     map[string]model.HostHint{},
+		finals:    map[string]model.HostResult{},
 	}
 	r.global, r.globalHTTP = e.shared(plan.Policy)
 	r.polPerHost = EffectiveLimits(model.ScanProfile{}, plan.Policy).PerHostRPS
@@ -420,12 +433,16 @@ func (e *Engine) Run(ctx context.Context, plan model.ScanPlan, sink model.Result
 	}
 
 	r.stats = newStatsKeeper(plan.PrevStats, e.now)
-	r.stats.parallel = lim.ParallelChunks
-	r.stats.fallback = r.packetsPerAddress() / float64(lim.PPS) * float64(lim.ParallelChunks)
+	r.stats.partial = r.groupProgress
 	r.stats.update(func(s *model.RunStats) {
 		s.AddressesTotal = s.AddressesDone + total
 		s.ChunksTotal = s.ChunksDone + len(units)
 	})
+	if !r.fullRangePlanned(int64(total)) && e.deepHosts > 0 && deepFor(plan.Profile.Ports, r.ports, int64(total)) {
+		r.deepPlanned = true
+		r.stats.addPass(model.PassTopPorts)
+		r.stats.addPass(model.PassDeep)
+	}
 	if r.fullPlanned = r.fullRangePlanned(int64(total)); r.fullPlanned {
 		if r.ports.Count() >= 65535 {
 			// every port asked for: the top ports go first, so their services
@@ -520,9 +537,31 @@ loop:
 		}()
 	}
 	wg.Wait()
+	if r.deepPlanned && workCtx.Err() == nil && r.allChunksDone() {
+		// the speed the planner learns from is the general pass's: the deep
+		// pass sends at the run's whole share, one host at a time, and would
+		// make the next run's first group too large (one group, every live
+		// host, a small share)
+		gen := r.stats.snapshot().AvgPPS
+		r.stats.update(func(s *model.RunStats) { s.GeneralPPS = gen })
+		r.deepPass(workCtx)
+	}
 	close(progStop)
 	progWG.Wait()
 	return r.finish(ctx, workCtx)
+}
+
+// allChunksDone reports whether every chunk of the run is done (the
+// general pass ended without a pause, a failure or a deferred chunk).
+func (r *run) allChunksDone() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, u := range r.all {
+		if u.c.Status != model.ChunkDone {
+			return false
+		}
+	}
+	return true
 }
 
 // claim takes the next work group, or nil when nothing may start: no chunk
@@ -589,6 +628,9 @@ type groupStats struct {
 	packets  int64
 	hosts    []model.HostResult      // reported to the sink when the group is final
 	interim  map[string]interimCount // partial results already stored, not yet final
+	// discovery ended and found live hosts (progress inside the group)
+	discovered bool
+	live       int
 }
 
 func (r *run) runGroup(ctx context.Context, g *group, want int) {
@@ -606,6 +648,8 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 		r.emitChunk(u)
 	}
 	gs := &groupStats{}
+	r.active.Store(gs, g)
+	defer r.active.Delete(gs) // a deferred or failed group's partial progress goes away
 	rate, err := r.budget.Acquire(ctx, want)
 	if err == nil {
 		// the group's share must also fit into what all runs together may send
@@ -615,8 +659,10 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 				r.budget.Release(rate - got)
 				rate = got
 			}
-			err = r.scanGroup(ctx, g, rate, gs)
-			r.global.Release(rate)
+			sh := &share{r: r, rate: rate}
+			err = r.scanGroup(ctx, g, sh, gs)
+			r.global.Release(sh.rate)
+			rate = sh.rate // what the group held at the end, given back below
 		}
 		r.budget.Release(rate)
 	}
@@ -656,6 +702,7 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 		r.stats.update(func(s *model.RunStats) {
 			s.AddressesDone += int64(g.size)
 			s.ChunksDone += len(g.units)
+			r.active.Delete(gs) // under the keeper's lock: a snapshot never counts the group twice
 		})
 	}
 	if status != model.ChunkDeferred {
@@ -663,6 +710,8 @@ func (r *run) runGroup(ctx context.Context, g *group, want int) {
 		for _, h := range gs.hosts {
 			if h.Up && !h.PortsUnknown && !h.Interim {
 				h.Coverage = r.coverage(h.IP)
+				_, h.FullPorts = r.fullDone.Load(h.IP)
+				r.keepFinal(h)
 			}
 			if err := r.sink.OnHost(r.sinkCtx, h); err != nil {
 				r.log.Warn("sink OnHost failed", "ip", h.IP, "error", err.Error())
@@ -832,10 +881,17 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 	}
 
 	nPorts := 100.0
-	fullRange := false
+	fullRange, deep := false, false
 	if ports, err := probe.EffectivePorts(plan.Profile.Ports, plan.Policy.AllowedPorts, plan.Policy.DeniedPorts); err == nil {
 		nPorts = float64(ports.Count())
 		fullRange = fullRangeFor(plan.Profile.Ports, ports, est.Addresses)
+		deep = !fullRange && e.deepHosts > 0 && deepFor(plan.Profile.Ports, ports, est.Addresses)
+	}
+	if deep {
+		// the rotating deep pass: up to deepHosts live hosts get the rest of
+		// 1-65535; the known live hosts beyond that wait for later runs
+		est.DeepMaxHosts = e.deepHosts
+		est.DeepWaitingHosts = max(0, len(plan.Hints)-e.deepHosts)
 	}
 	if fullRange {
 		est.FullRangeMaxHosts = fullRangeMaxHosts
@@ -891,6 +947,9 @@ func (e *Engine) Estimate(plan model.ScanPlan) model.ScanEstimate {
 				fh = float64(est.Addresses)
 			}
 			packets += math.Min(fh, fullRangeMaxHosts) * (65535 - nPorts) * 1.02
+		}
+		if deep {
+			packets += math.Min(live, float64(e.deepHosts)) * (65535 - nPorts) * 1.02
 		}
 		if plan.Profile.ServiceDetection {
 			packets += live * 3 * 14 // about 3 open ports per host, about 14 packets per version probe
@@ -952,6 +1011,67 @@ func (r *run) sanityCheck() {
 		r.log.Warn("sanity check: most live hosts gave the port scan no answer", "hosts_up", s.HostsUp, "answered", answered)
 		r.stats.warn(fmt.Sprintf("Wykrywanie znalazło %d hostów, a na skan portów odpowiedziało tylko %d. Wynik portów jest niepełny: sprawdź limit pakietów, limit czasu i obciążenie sieci.", s.HostsUp, answered))
 	}
+}
+
+// share is the packet rate a running group holds in the run budget and in
+// the global budget. It is fixed for each nmap process; between the
+// group's stages grow adds the budget that other groups gave back.
+type share struct {
+	r    *run
+	rate int
+}
+
+// grow adds free packet budget to the group's share between its nmap
+// stages, only when no group waits to start (the tail of the run): a long
+// group that started with a small share does not run on at it while the
+// rest of the budget is idle. It never waits, never takes more than the
+// run's probe rate, and stays inside both budgets.
+func (s *share) grow() int {
+	r := s.r
+	r.mu.Lock()
+	waiting := len(r.pending) > 0 && !r.windowStop
+	r.mu.Unlock()
+	if want := r.lim.ProbePPS() - s.rate; !waiting && want > 0 {
+		if n := r.budget.TryAcquire(want); n > 0 {
+			got := r.global.TryAcquire(n)
+			if got < n {
+				r.budget.Release(n - got)
+			}
+			if got > 0 {
+				r.log.Debug("group share grew", "from", s.rate, "to", s.rate+got)
+				s.rate += got
+			}
+		}
+	}
+	return s.rate
+}
+
+// discoveryShare is the part of a group's work that host discovery stands
+// for in its progress; the rest is spread over the live hosts it found.
+const discoveryShare = 0.2
+
+// groupProgress sums the addresses that the running groups count as done:
+// a group whose discovery ended counts discoveryShare of its size, plus the
+// rest in proportion to its live hosts with a final result (a partial
+// result counts half). A running group never counts its whole size.
+func (r *run) groupProgress() int64 {
+	var sum int64
+	r.active.Range(func(k, v any) bool {
+		gs, g := k.(*groupStats), v.(*group)
+		gs.mu.Lock()
+		discovered, live, done := gs.discovered, gs.live, float64(gs.hostsUp)+0.5*float64(len(gs.interim))
+		gs.mu.Unlock()
+		if !discovered || g.size <= 1 {
+			return true
+		}
+		f := discoveryShare
+		if live > 0 {
+			f += (1 - discoveryShare) * min(1, done/float64(live))
+		}
+		sum += min(int64(f*float64(g.size)), int64(g.size-1))
+		return true
+	})
+	return sum
 }
 
 // minHostsForSanity: below this many live hosts the ratio says little.

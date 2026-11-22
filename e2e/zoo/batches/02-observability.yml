@@ -1,0 +1,31 @@
+# Zoo batch 02: monitoring and observability panels.
+services:
+  grafana:
+    image: grafana/grafana:11.6.16
+    ports: ["3000:3000"]
+  elasticsearch:
+    image: elasticsearch:8.19.25
+    environment: {discovery.type: single-node, xpack.security.enabled: "false", ES_JAVA_OPTS: "-Xms512m -Xmx512m"}
+    ports: ["9200:9200"]
+  kibana:
+    image: kibana:8.19.25
+    environment: {ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"}
+    ports: ["45601:5601"]
+  alertmanager:
+    image: prom/alertmanager:v0.35.0
+    ports: ["9093:9093"]
+  node-exporter:
+    image: prom/node-exporter:v1.13.1
+    ports: ["39100:9100"]
+  pushgateway:
+    image: prom/pushgateway:v1.11.5
+    ports: ["9091:9091"]
+  netdata:
+    image: netdata/netdata:v2.13.0
+    ports: ["29999:19999"]
+  uptime-kuma:
+    image: louislam/uptime-kuma:2.5.12
+    ports: ["3001:3001"]
+  nagios:
+    image: jasonrivers/nagios:4.5.12
+    ports: ["30080:80"]

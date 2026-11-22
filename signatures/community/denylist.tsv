@@ -1,0 +1,8 @@
+# Imported signatures dropped by the offline evaluation (go run ./cmd/sigimport ... -eval <exports>).
+# id	reason	where it fired (first three)
+nuclei-aqua-enterprise-detect	fires against the truth	zoo:03-devtools 172.18.0.1:8888/tcp (truth: base-notebook, Jupyter, Tornado)
+nuclei-basic-auth-detect	fires against the truth	zoo:02-observability 172.18.0.1:30080/tcp (truth: nagios, Nagios, Apache); zoo:03-devtools 172.18.0.1:28081/tcp (truth: mongo-express, Mongo Express)
+nuclei-fav-elastic-database	fires against the truth	zoo:02-observability 172.18.0.1:9200/tcp (truth: elasticsearch, Elasticsearch)
+nuclei-fph-qm-system	fires against the truth	zoo:05-vuln 172.18.0.1:3000/tcp (truth: juice-shop, Juice Shop)
+nuclei-fph-saltstack	fires against the truth	zoo:03-devtools 172.18.0.1:8888/tcp (truth: base-notebook, Jupyter, Tornado)
+nuclei-metatag-cms	fires against the truth	lab 10.66.1.10:80/tcp (truth: Apache httpd, WordPress 6.9.4, zainstalowany, aktualny, WordPress); lab 10.66.1.11:80/tcp (truth: Apache httpd, WordPress 5.8.3 (przestarzały) w t0; w t1 zastąpiony przez 6.9.4 na tym samym adresie, WordPress); lab 10.66.1.20:80/tcp (truth: Apache httpd, Joomla 5.4.10, zainstalowana, Joomla)

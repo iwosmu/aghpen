@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -817,8 +818,10 @@ func TestSanityCheckWarnsWhenPortsAreLost(t *testing.T) {
 	}
 	net := &fakeNet{hosts: hosts, portMiss: miss}
 	out := New(Deps{Prober: net, Logger: quiet}).Run(context.Background(), basePlan("10.0.0.0/24"), newSink())
-	if out.Stats.HostsUp != 12 || len(out.Stats.Warnings) != 1 || !strings.Contains(out.Stats.Warnings[0], "tylko 2") {
-		t.Errorf("hosts up %d, warnings %q", out.Stats.HostsUp, out.Stats.Warnings)
+	// the ratio warning, and the 10 silent hosts have unknown ports (their services are not gone)
+	if out.Stats.HostsUp != 12 || out.Stats.PortsUnknown != 10 || len(out.Stats.Warnings) != 2 ||
+		!slices.ContainsFunc(out.Stats.Warnings, func(w string) bool { return strings.Contains(w, "tylko 2") }) {
+		t.Errorf("hosts up %d, ports unknown %d, warnings %q", out.Stats.HostsUp, out.Stats.PortsUnknown, out.Stats.Warnings)
 	}
 	net = &fakeNet{hosts: hosts}
 	if out = New(Deps{Prober: net, Logger: quiet}).Run(context.Background(), basePlan("10.0.0.0/24"), newSink()); len(out.Stats.Warnings) != 0 {
@@ -1513,5 +1516,276 @@ func TestEngineKeepsToTheAllowedNetworks(t *testing.T) {
 
 	if _, _, err := allowedScope(model.SafetyPolicy{AllowedNetworks: []string{"not-a-net"}}); err == nil {
 		t.Error("a bad allowed network must fail the run, not open it")
+	}
+}
+
+// The rotating deep pass of a larger scope: after the general pass, at most
+// 16 live hosts get the rest of 1-65535, by priority; each gets a second,
+// later result with the new services marked and full coverage.
+func TestDeepPassRotates(t *testing.T) {
+	hosts := map[string][]int{}
+	for i := 1; i <= 20; i++ {
+		hosts[fmt.Sprintf("10.8.0.%d", i)] = []int{80, 40000}
+	}
+	hosts["10.8.1.200"] = []int{80, 52345, 40000} // 52345: an open port outside the top 1000
+	run := func(hints []model.HostHint) (*memSink, model.RunOutcome) {
+		e := New(Deps{Prober: &fakeNet{hosts: hosts}, Logger: quiet})
+		plan := basePlan("10.8.0.0/23") // 512 addresses: no full-range pass
+		plan.Profile.Ports = "top-100,52345"
+		plan.Hints = hints
+		sink := newSink()
+		out := e.Run(context.Background(), plan, sink)
+		if out.Status != model.RunCompleted {
+			t.Fatalf("outcome = %+v", out)
+		}
+		return sink, out
+	}
+	deep := func(sink *memSink, ip string) bool {
+		h := sink.host(ip)
+		if h == nil {
+			t.Fatalf("%s missing", ip)
+		}
+		has := false
+		for _, s := range h.Services {
+			if s.Port == 40000 {
+				has = true
+				if !s.DeepPass {
+					t.Errorf("%s:40000 not marked as found by the deep pass", ip)
+				}
+			} else if s.DeepPass {
+				t.Errorf("%s:%d marked deep, but the general pass found it", ip, s.Port)
+			}
+		}
+		if has != (h.FullPorts && h.Coverage.Has("tcp", 40000)) {
+			t.Errorf("%s: 40000 found %v, full ports %v, coverage %+v", ip, has, h.FullPorts, h.Coverage)
+		}
+		return has
+	}
+
+	// first run, nothing known: the unusual port first, then by address
+	sink, out := run(nil)
+	if !deep(sink, "10.8.1.200") {
+		t.Error("the host with an unusual open port must come first")
+	}
+	for i := 1; i <= 20; i++ {
+		if got, want := deep(sink, fmt.Sprintf("10.8.0.%d", i)), i <= 15; got != want {
+			t.Errorf("10.8.0.%d: deep %v, want %v", i, got, want)
+		}
+	}
+	var p *model.PassStat
+	for i := range out.Stats.Passes {
+		if out.Stats.Passes[i].Name == model.PassDeep {
+			p = &out.Stats.Passes[i]
+		}
+	}
+	if p == nil || p.State != model.PassDone || p.Hosts != 16 || p.HostsSkipped != 5 {
+		t.Fatalf("deep pass = %+v", p)
+	}
+	if !slices.ContainsFunc(out.Stats.Notes, func(n string) bool { return strings.Contains(n, "objęła 16 hostów; czeka jeszcze 5") }) {
+		t.Errorf("notes = %q", out.Stats.Notes)
+	}
+	// the deep result of a host comes after its general result
+	var first, second time.Time
+	for _, h := range sink.hosts {
+		if h.IP == "10.8.0.1" {
+			if first.IsZero() {
+				first = h.ObservedAt
+			} else {
+				second = h.ObservedAt
+			}
+		}
+	}
+	if !second.After(first) {
+		t.Errorf("deep result at %v, general at %v", second, first)
+	}
+
+	// second run: the 16 covered hosts are known; the 5 never fully scanned
+	// come first, then the host with the unusual port, then the oldest
+	var hints []model.HostHint
+	base := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	for i := 1; i <= 15; i++ {
+		at := base.Add(time.Duration(i) * time.Minute) // 10.8.0.1 oldest
+		hints = append(hints, model.HostHint{IP: fmt.Sprintf("10.8.0.%d", i), OpenPorts: []int{80}, Stability: 1, LastUp: base, DeepAt: &at})
+	}
+	at := base.Add(time.Hour)
+	hints = append(hints, model.HostHint{IP: "10.8.1.200", OpenPorts: []int{80, 52345}, Stability: 1, LastUp: base, DeepAt: &at})
+	sink, _ = run(hints)
+	for i := 16; i <= 20; i++ {
+		if !deep(sink, fmt.Sprintf("10.8.0.%d", i)) {
+			t.Errorf("10.8.0.%d was never fully scanned: it must come first", i)
+		}
+	}
+	for i := 1; i <= 15; i++ {
+		if got, want := deep(sink, fmt.Sprintf("10.8.0.%d", i)), i <= 10; got != want {
+			t.Errorf("second run 10.8.0.%d: deep %v, want %v (the oldest first)", i, got, want)
+		}
+	}
+	if !deep(sink, "10.8.1.200") {
+		t.Error("10.8.1.200 has an unusual open port: it comes before the oldest hosts")
+	}
+}
+
+// A small scope keeps the full-range pass and gets no deep pass; an explicit
+// port list gets neither.
+func TestDeepPassOnlyForLargerRankedScopes(t *testing.T) {
+	ports, _ := probe.EffectivePorts("top-100", "", "")
+	if deepFor("top-100", ports, 256) || !deepFor("top-100", ports, 257) {
+		t.Error("the deep pass starts above 256 addresses")
+	}
+	list, _ := probe.EffectivePorts("80,443", "", "")
+	if deepFor("80,443", list, 65536) {
+		t.Error("an explicit port list is scanned as written")
+	}
+	all, _ := probe.EffectivePorts("1-65535", "", "")
+	if deepFor("1-65535", all, 65536) {
+		t.Error("1-65535 needs no deep pass")
+	}
+	e := New(Deps{Logger: quiet, Prober: &fakeNet{}})
+	plan := basePlan("10.8.0.0/16")
+	plan.Profile.Ports = "top-100"
+	for i := 0; i < 20; i++ {
+		plan.Hints = append(plan.Hints, model.HostHint{IP: fmt.Sprintf("10.8.0.%d", i+1)})
+	}
+	est := e.Estimate(plan)
+	if est.DeepMaxHosts != 16 || est.DeepWaitingHosts != 4 {
+		t.Errorf("estimate: deep %d, waiting %d", est.DeepMaxHosts, est.DeepWaitingHosts)
+	}
+	plan.Profile.Ports = "80,443"
+	if est2 := e.Estimate(plan); est2.DeepMaxHosts != 0 || est2.EstPackets >= est.EstPackets {
+		t.Errorf("explicit list: deep %d, packets %d vs %d", est2.DeepMaxHosts, est2.EstPackets, est.EstPackets)
+	}
+}
+
+// A host that discovery found up but that gives the port scan no answer at
+// all, also on the retry, is reported with unknown ports and a run warning:
+// never as a host whose ports are all closed (the store would mark its
+// services gone).
+func TestSilentPortScanIsUnknownNotClosed(t *testing.T) {
+	netw := &fakeNet{hosts: map[string][]int{"10.7.0.5": {80, 443}, "10.7.0.6": {80}}, portMiss: map[string]int{"10.7.0.5": 9}}
+	e := New(Deps{Prober: netw, Logger: quiet})
+	sink := newSink()
+	out := e.Run(context.Background(), basePlan("10.7.0.0/28"), sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	h := sink.host("10.7.0.5")
+	if h == nil || !h.Up || !h.PortsUnknown || h.Coverage != nil || len(h.Services) != 0 {
+		t.Fatalf("silent host = %+v", h)
+	}
+	if ok := sink.host("10.7.0.6"); ok == nil || ok.PortsUnknown || ok.Coverage == nil || len(ok.Services) != 1 {
+		t.Errorf("answering host = %+v", ok)
+	}
+	if out.Stats.PortsUnknown != 1 || !slices.ContainsFunc(out.Stats.Warnings, func(w string) bool { return strings.Contains(w, "żadnej odpowiedzi") }) {
+		t.Errorf("stats: ports_unknown %d, warnings %q", out.Stats.PortsUnknown, out.Stats.Warnings)
+	}
+}
+
+// A dense host's wide pass (1-10000) already found its high ports: the deep
+// pass scans only the ports left, adds no port twice and counts each once.
+func TestDeepPassSkipsPortsTheWidePassFound(t *testing.T) {
+	dense := []int{21, 22, 23, 25, 53, 80, 110, 139, 143, 443, 445, 993, 995}
+	dense = append(dense, 7004, 9001, 40000) // 7004, 9001: wide pass; 40000: deep pass
+	net := &fakeNet{hosts: map[string][]int{"10.9.0.5": dense, "10.9.0.6": {80}}}
+	plan := basePlan("10.9.0.0/23")
+	plan.Profile.Ports = "top-100"
+	sink := newSink()
+	out := New(Deps{Prober: net, Logger: quiet}).Run(context.Background(), plan, sink)
+	if out.Status != model.RunCompleted {
+		t.Fatalf("outcome = %+v", out)
+	}
+	h := sink.host("10.9.0.5")
+	if h == nil || !h.FullPorts {
+		t.Fatalf("10.9.0.5 = %+v, want the deep pass done", h)
+	}
+	seen := map[int]int{}
+	for _, s := range h.Services {
+		seen[s.Port]++
+		if s.DeepPass != (s.Port == 40000) {
+			t.Errorf("port %d deep_pass %v", s.Port, s.DeepPass)
+		}
+	}
+	for p, n := range seen {
+		if n != 1 {
+			t.Errorf("port %d reported %d times", p, n)
+		}
+	}
+	if len(seen) != len(dense) {
+		t.Errorf("ports %v, want %v", seen, dense)
+	}
+	if want := len(dense) + 1; out.Stats.ServicesOpen != want {
+		t.Errorf("services open %d, want %d (each service once)", out.Stats.ServicesOpen, want)
+	}
+}
+
+func TestDeepHostsSetting(t *testing.T) {
+	for v, want := range map[string]int{"": 16, "abc": 16, "-3": 16, "0": 0, "40": 40, " 8 ": 8, "500": 64} {
+		if got := deepHostsSetting(v); got != want {
+			t.Errorf("CZUJKA_DEEP_PASS_HOSTS=%q: %d, want %d", v, got, want)
+		}
+	}
+}
+
+// CZUJKA_DEEP_PASS_HOSTS=0 switches the deep pass off; a custom value bounds
+// its hosts. The planner learns the general pass speed, not the deep pass's.
+func TestDeepPassHostsFromTheEnvironment(t *testing.T) {
+	hosts := map[string][]int{}
+	for i := 1; i <= 6; i++ {
+		hosts[fmt.Sprintf("10.8.0.%d", i)] = []int{80, 40000}
+	}
+	run := func(env string) (model.ScanEstimate, model.RunOutcome, *memSink) {
+		t.Setenv("CZUJKA_DEEP_PASS_HOSTS", env)
+		e := New(Deps{Prober: &fakeNet{hosts: hosts}, Logger: quiet})
+		plan := basePlan("10.8.0.0/23")
+		plan.Profile.Ports = "top-100"
+		sink := newSink()
+		est := e.Estimate(plan)
+		out := e.Run(context.Background(), plan, sink)
+		if out.Status != model.RunCompleted {
+			t.Fatalf("outcome = %+v", out)
+		}
+		return est, out, sink
+	}
+	deepHosts := func(out model.RunOutcome) int {
+		for _, p := range out.Stats.Passes {
+			if p.Name == model.PassDeep {
+				return p.Hosts
+			}
+		}
+		return -1
+	}
+	est, out, sink := run("0")
+	if deepHosts(out) != -1 || est.DeepMaxHosts != 0 || out.Stats.GeneralPPS != 0 {
+		t.Errorf("off: deep hosts %d, estimate %d, general pps %v", deepHosts(out), est.DeepMaxHosts, out.Stats.GeneralPPS)
+	}
+	if h := sink.host("10.8.0.1"); h == nil || h.FullPorts || len(h.Services) != 1 {
+		t.Errorf("off: 10.8.0.1 = %+v", h)
+	}
+	est, out, _ = run("2")
+	if deepHosts(out) != 2 || est.DeepMaxHosts != 2 {
+		t.Errorf("2: deep hosts %d, estimate %d", deepHosts(out), est.DeepMaxHosts)
+	}
+	if out.Stats.GeneralPPS <= 0 {
+		t.Errorf("general pps %v: the planner must learn the general pass speed", out.Stats.GeneralPPS)
+	}
+}
+
+// A running group takes the budget other groups gave back, between its
+// stages, only when no group waits to start, and within both budgets.
+func TestGroupShareGrowsAtTheTail(t *testing.T) {
+	r := &run{budget: NewBudget(1000), global: NewBudget(1000), lim: Limits{PPS: 1000}, log: quiet}
+	r.budget.inUse, r.global.inUse = 120, 120 // the group's own share
+	r.pending = []*unit{{}}
+	sh := &share{r: r, rate: 120}
+	if got := sh.grow(); got != 120 {
+		t.Errorf("a group waits to start: share %d, want 120", got)
+	}
+	r.pending = nil
+	r.global.inUse += 500 // another run holds 500 of the global budget
+	want := min(r.lim.ProbePPS(), 120+380)
+	if got := sh.grow(); got != want || r.budget.InUse() != want || r.global.InUse() != 1000 {
+		t.Errorf("tail: share %d (want %d), run budget in use %d, global %d", got, want, r.budget.InUse(), r.global.InUse())
+	}
+	if got := sh.grow(); got != want {
+		t.Errorf("nothing free: share %d", got)
 	}
 }

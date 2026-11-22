@@ -333,6 +333,13 @@ type ScanEstimate struct {
 	FullRangeMaxAddresses  int     `json:"full_range_max_addresses,omitempty"`
 	FullRangePorts         int     `json:"full_range_ports,omitempty"`
 	EstFullRangeSecPerHost float64 `json:"est_full_range_sec_per_host,omitempty"`
+	// DeepMaxHosts > 0: a larger scope with a top-N port list; after the
+	// general pass, up to this many live hosts get the rest of 1-65535 (the
+	// rotating deep pass, counted in the packets and the duration).
+	// DeepWaitingHosts: known live hosts of the scope that this run's deep
+	// pass will not reach (never fully scanned first, then the oldest).
+	DeepMaxHosts     int `json:"deep_max_hosts,omitempty"`
+	DeepWaitingHosts int `json:"deep_waiting_hosts,omitempty"`
 }
 
 // ---------- Scan runs ----------
@@ -375,10 +382,14 @@ type RunStats struct {
 	// or estimated counts). The UI must not present "pace" as a measurement.
 	CurrentPPSBasis string  `json:"current_pps_basis,omitempty"`
 	AvgPPS          float64 `json:"avg_pps"`
-	ElapsedSec      int64   `json:"elapsed_sec"` // active time only, pauses excluded
-	ETASec          int64   `json:"eta_sec"`
-	Retried         int     `json:"retried"` // unstable hosts probed again
-	Errors          int     `json:"errors"`
+	// GeneralPPS is the average speed of the general pass (every chunk),
+	// set when a deep pass follows it; the profile's measured speed is
+	// learned from it, not from AvgPPS. 0: AvgPPS is that speed.
+	GeneralPPS float64 `json:"general_pps,omitempty"`
+	ElapsedSec int64   `json:"elapsed_sec"` // active time only, pauses excluded
+	ETASec     int64   `json:"eta_sec"`
+	Retried    int     `json:"retried"` // unstable hosts probed again
+	Errors     int     `json:"errors"`
 	// PortsUnknown counts live hosts whose port scan did not finish (nmap
 	// --host-timeout, even after one more try): their services are not
 	// measured in this run, not gone.
@@ -491,6 +502,10 @@ type HostResult struct {
 	// gone. Nil: unknown (imports, older engines): every unlisted service of
 	// an answering host counts as gone. Engine to store only, not serialized.
 	Coverage *PortCoverage `json:"-"`
+	// FullPorts: this run scanned every TCP port 1-65535 the policy allows
+	// on the host (the full-range pass of a small scope or the deep pass).
+	// The store records the time (hosts.deep_scan_at, HostHint.DeepAt).
+	FullPorts bool `json:"-"`
 }
 
 // PortRange is an inclusive range of ports.
@@ -557,6 +572,7 @@ const (
 	PassTopPorts  = "top_ports"
 	PassFullRange = "full_range"
 	PassDense     = "dense"
+	PassDeep      = "deep_range" // the rotating deep pass of a larger scope
 
 	PassPending = "pending"
 	PassRunning = "running"
@@ -586,7 +602,10 @@ type ScriptResult struct {
 type ServiceResult struct {
 	// Carried: not scanned in this run (outside the run's coverage of the
 	// host); the store copied the last observation and kept the state.
-	Carried      bool             `json:"carried,omitempty"`
+	Carried bool `json:"carried,omitempty"`
+	// DeepPass: the rotating deep pass (the rest of 1-65535 after the
+	// general pass of a larger scope) found this port in this run.
+	DeepPass     bool             `json:"deep_pass,omitempty"`
 	Port         int              `json:"port"`
 	Proto        string           `json:"proto"` // tcp | udp
 	State        string           `json:"state"` // open | closed | filtered
@@ -967,6 +986,9 @@ type Change struct {
 	Detail  map[string]any `json:"detail,omitempty"`
 	AckedBy string         `json:"acked_by"`
 	AckedAt *time.Time     `json:"acked_at"`
+	// DeepPass: the change concerns a service that the rotating deep pass
+	// of this run scanned ("found by the deeper pass").
+	DeepPass bool `json:"deep_pass"`
 }
 
 type RunDiffSummary struct {

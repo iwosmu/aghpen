@@ -92,6 +92,14 @@ func loadFS(fsys fs.FS) ([]model.Signature, error) {
 		return nil, err
 	}
 	sort.Strings(files)
+	// Imported corpora come after the hand-written library (cmd/sigimport
+	// already dropped every import that names one of our technologies).
+	community, err := fs.Glob(fsys, "community/*.yaml")
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(community)
+	files = append(files, community...)
 	var out []model.Signature
 	seen := map[string]string{}
 	for _, name := range files {
@@ -467,6 +475,7 @@ func (e *Engine) MatchHost(svc *model.ServiceResult, hostnames ...string) ([]mod
 		}
 	}
 	techs = mergeTechnologies(st, svc, matches, hit)
+	techs = addSelfDescribed(svc, techs)
 	classSet := map[string]bool{}
 	for _, m := range matches {
 		for _, c := range m.Classes {
@@ -475,6 +484,11 @@ func (e *Engine) MatchHost(svc *model.ServiceResult, hostnames ...string) ([]mod
 	}
 	for _, c := range classify(v) {
 		classSet[c] = true
+	}
+	// An unfinished installer asks for the new administrator's password (Nextcloud, Matomo, Joomla, WordPress):
+	// that form makes it an install page, not a login page.
+	if classSet[model.ClassInstallPage] {
+		delete(classSet, model.ClassLogin)
 	}
 	classes = sortedKeys(classSet)
 	sort.SliceStable(matches, func(i, j int) bool {

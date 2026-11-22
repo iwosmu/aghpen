@@ -242,3 +242,19 @@ func TestDurationTextMatchesTheUI(t *testing.T) {
 		t.Errorf("awayTextEN = %q", got)
 	}
 }
+
+// A change of a service that the deep pass scanned says so in one short addition.
+func TestSummaryNamesTheDeepPass(t *testing.T) {
+	c := model.Change{Kind: model.ChangeServiceNew, IP: "10.0.0.5", Port: 40000, Field: "state", After: "open", DeepPass: true,
+		Detail: map[string]any{DetailProduct: "nginx"}}
+	if got := RenderSummary(c, "pl"); got != "Nowa usługa 10.0.0.5:40000 (nginx) (głębszy przebieg)" {
+		t.Errorf("pl = %q", got)
+	}
+	if got := RenderSummary(c, "en"); !strings.HasSuffix(got, " (deeper pass)") {
+		t.Errorf("en = %q", got)
+	}
+	c.DeepPass = false
+	if got := RenderSummary(c, "pl"); strings.Contains(got, "głębszy") {
+		t.Errorf("without the flag: %q", got)
+	}
+}

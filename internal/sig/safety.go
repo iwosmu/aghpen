@@ -49,9 +49,20 @@ var denyExtensions = []string{
 	".log", ".inc", ".csv", ".xls", ".xlsx", ".dat", ".cer", ".der", ".asc", ".gpg", ".pgp",
 }
 
+// landingWords are the common landing paths of web applications (start,
+// home, index, main, welcome, portal, app, web, ui, login, dashboard) that
+// are also deny tokens. A same-origin redirect path may contain them: the
+// server itself sends every browser there with a GET (/ -> /start -> /pl/).
+// Today only "start" is both; the other landing words are not deny tokens.
+// A signature path and every query keep the full deny words.
+var landingWords = map[string]bool{"start": true}
+
 // CheckPath validates one extra request path against the safe-mode rules.
 // It returns "" when the path is allowed, or the reason in Polish.
-func CheckPath(path string) string {
+func CheckPath(path string) string { return checkPath(path, nil) }
+
+// checkPath is CheckPath with deny tokens that the caller allows (allow).
+func checkPath(path string, allow map[string]bool) string {
 	switch {
 	case path == "":
 		return "pusta ścieżka"
@@ -102,7 +113,7 @@ func CheckPath(path string) string {
 			return fmt.Sprintf("ukryte pliki i katalogi („%s”) są zabronione: mogą zawierać sekrety (.env, .git, .htpasswd)", seg)
 		}
 	}
-	if reason := deniedWords(path); reason != "" {
+	if reason := deniedWords(path, allow); reason != "" {
 		return reason
 	}
 	last := lowPath[strings.LastIndexByte(lowPath, '/')+1:]
@@ -122,7 +133,7 @@ func CheckPath(path string) string {
 // split on every character that is not a letter or a digit and also at the
 // parts of camelCase words (security review L3): /api/resetPassword has the
 // word "reset", /cache/flushAll the word "flush".
-func deniedWords(s string) string {
+func deniedWords(s string, allow map[string]bool) string {
 	low := strings.ToLower(s)
 	for _, d := range denySubstrings {
 		if strings.Contains(low, d) {
@@ -130,7 +141,7 @@ func deniedWords(s string) string {
 		}
 	}
 	for _, w := range words(s) {
-		if denyTokens[w] {
+		if denyTokens[w] && !allow[w] {
 			return fmt.Sprintf("ścieżka zawiera słowo „%s”: żądania zmieniające stan albo pobierające sekrety są zabronione", w)
 		}
 	}
@@ -164,15 +175,15 @@ func words(s string) []string {
 }
 
 // CheckRedirect validates the target of a same-origin redirect before the
-// collector follows it. The path takes the full CheckPath; the query (a
-// redirect often carries an encoded return address) takes the deny words
-// only, on its decoded text. It returns "" when the target may be fetched.
+// collector follows it. The path takes the full CheckPath, except that it may
+// contain a landing word (landingWords); the query (a redirect often carries
+// an encoded return address) takes the full deny words, on its decoded text. It returns "" when the target may be fetched.
 func CheckRedirect(u *url.URL) string {
 	p := u.EscapedPath()
 	if p == "" {
 		p = "/"
 	}
-	if reason := CheckPath(p); reason != "" {
+	if reason := checkPath(p, landingWords); reason != "" {
 		return reason
 	}
 	if u.RawQuery != "" {
@@ -183,7 +194,7 @@ func CheckRedirect(u *url.URL) string {
 		if len(q) > 2*MaxPathLen {
 			return "parametry zapytania przekierowania są za długie"
 		}
-		return deniedWords(q)
+		return deniedWords(q, nil)
 	}
 	return ""
 }

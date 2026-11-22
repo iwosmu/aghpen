@@ -145,6 +145,7 @@ for st in $STATES; do
   RUN=$(api POST /runs "{\"profile_id\":$PROFILE}" | jq -r .id)
   log "run $RUN started"
   rm -f "$OUT/.second-run"
+  SECOND_PID=""
   if [ -n "${LR_SECOND:-}" ]; then
     (
       sleep "${LR_SECOND_AFTER:-60}"
@@ -155,6 +156,7 @@ for st in $STATES; do
       log "second run $R2 started on $LR_SECOND, $(( $(date +%s) - T0 )) s after run $RUN"
       echo "$R2" >"$OUT/.second-run"
     ) &
+    SECOND_PID=$!
   fi
   PEAK=0; LP=$P0; LT=$(date +%s)
   while :; do
@@ -167,7 +169,7 @@ for st in $STATES; do
     LP=$NP; LT=$NT
   done
   WALL=$(( $(date +%s) - T0 ))
-  wait
+  [ -n "$SECOND_PID" ] && wait "$SECOND_PID" # only the second run's starter (the memory sampler runs on)
   if [ -f "$OUT/.second-run" ]; then
     R2=$(cat "$OUT/.second-run")
     while :; do
@@ -182,9 +184,27 @@ for st in $STATES; do
   CAPPPS=$(echo "$PJSON" | jq '.rate.max_pps')
   go run ./e2e/ppsbins -src "$LR_IP" -cap "$CAPPPS" "$OUT/tcpdump-$K.txt" > "$OUT/pps-$K.txt"
   go run ./e2e/ppsbins -src "$LR_IP" -cap "$CAPPPS" -json "$OUT/tcpdump-$K.txt" > "$OUT/pps-$K.json"
-  # a gap of 5 s or more with no packet from the scanner is a frozen VM (overloaded host), not a quiet scan
-  GAP=$(awk -v ip="$LR_IP" '$3 ~ "^"ip"\\." {t=$1; if (p && t-p > g) {g=t-p; at=p}; p=t} END {printf "%.1f %d", g, at}' "$OUT/tcpdump-$K.txt")
-  log "tcpdump: longest gap without scanner packets ${GAP% *} s (at $(date -r "${GAP#* }" +%H:%M:%S 2>/dev/null || echo "${GAP#* }"))$(awk -v g="${GAP% *}" 'BEGIN { if (g >= 5) print "; INVALID for the wire measurement: a gap of 5 s or more (VM freeze); rerun" }')"
+  # A gap of 5 s or more with no packet from the scanner, followed by a burst
+  # over the cap, is a frozen VM (overloaded host: nmap sends its backlog);
+  # a gap without a burst is an idle scanner (run start: DNS and planning).
+  GAP=$(awk -v ip="$LR_IP" '$3 ~ "^"ip"\\." {t=$1; if (p && t-p > g) {g=t-p; at=p; nx=t}; p=t} END {printf "%.1f %d %d", g, at, nx}' "$OUT/tcpdump-$K.txt")
+  read -r GAPS GAPAT GAPNX <<< "$GAP"
+  AFTER=$(awk -v ip="$LR_IP" -v s="$GAPNX" '$3 ~ "^"ip"\\." && int($1) >= s && int($1) < s + 3 {n[int($1)]++} END {m=0; for (k in n) if (n[k] > m) m = n[k]; print m}' "$OUT/tcpdump-$K.txt")
+  VERDICT=$(awk -v g="$GAPS" -v a="$AFTER" -v c="$CAPPPS" 'BEGIN { if (g < 5) print "ok"; else if (a > c * 1.1) print "INVALID for the wire measurement: a gap of 5 s or more followed by a burst over the cap (VM freeze); rerun"; else print "a gap of 5 s or more without a burst after it (idle scanner, not a freeze)" }')
+  log "tcpdump: longest gap without scanner packets $GAPS s (at $(date -r "$GAPAT" +%H:%M:%S 2>/dev/null || echo "$GAPAT")), max $AFTER packets per second in the 3 s after it: $VERDICT"
+  # wall time of the general pass and of the deep pass (product log)
+  docker logs "$CZ" 2>&1 | jq -Rc --argjson r "$RUN" 'fromjson? | select(.run? == $r and (.msg == "scan plan ready" or .msg == "deep pass" or .msg == "deep pass finished" or .msg == "run finished"))' > "$OUT/passlog-$K.jsonl" 2>/dev/null
+  PT=$(jq -rs 'map({(.msg): .}) | add // {} | . as $m | def t(k): ($m[k].time // empty) | sub("\\.[0-9]+Z$"; "Z") | fromdate;
+      ([t("deep pass")] + [t("run finished")])[0] as $gEnd | (t("scan plan ready")) as $s | ([t("deep pass finished")][0] // null) as $dEnd |
+      "\(($gEnd - $s) | floor) \(if $dEnd then (($dEnd - t("deep pass")) | floor) else "-" end) \($m["deep pass"].hosts // "-") \($m["deep pass"].waiting // "-") \($m["deep pass finished"].new_open // "-")"' "$OUT/passlog-$K.jsonl" 2>/dev/null)
+  # the kernel packet cap (internal/kcap): active, its rate and the packets it dropped so far
+  api GET /settings/safety | jq -c '.kernel_cap // null' > "$OUT/kcap-$K.json" 2>/dev/null
+  log "kernel cap: $(cat "$OUT/kcap-$K.json")"
+  if [ -n "$PT" ]; then
+    echo "$PT" > "$OUT/passtimes-$K.txt"
+    read -r PG PD PH PW PN <<< "$PT"
+    log "pass wall times: general $PG s, deep $PD s (deep pass: $PH hosts, $PW waiting, $PN new open services)"
+  fi
   gzip -f "$OUT/tcpdump-$K.txt"
   sed -n 2,3p "$OUT/pps-$K.txt" | tee -a "$OUT/run.log"
   echo "$R" | jq . > "$OUT/run-$K.json"

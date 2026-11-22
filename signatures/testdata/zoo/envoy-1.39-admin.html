@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+
+  <title>Envoy Admin</title>
+  <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAH9SURBVEhL7ZRdTttAFIUrUFaAX5w9gIhgUfzshFRK+gIbaVbAzwaqCly1dSpKk5A485/YCdXpHTB4BsdgVe0bD0cZ3Xsm38yZ8byTUuJ/6g3wqqoBrBhPTzmmLfptMbAzttJTpTKAF2MWC7ADCdNIwXZpvMMwayiIwwS874CcOc9VuQPR1dBBChPMITpFXXU45hukIIH6kHhzVqkEYB8F5HYGvZ5B7EvwmHt9K/59CrU3QbY2RNYaQPYmJc+jPIBICNCcg20ZsAsCPfbcrFlRF+cJZpvXSJt9yMTxO/IAzJrCOfhJXiOgFEX/SbZmezTWxyNk4Q9anHMmjnzAhEyhAW8LCE6wl26J7ZFHH1FMYQxh567weQBOO1AW8D7P/UXAQySq/QvL8Fu9HfCEw4SKALm5BkC3bwjwhSKrA5hYAMXTJnPNiMyRBVzVjcgCyHiSm+8P+WGlnmwtP2RzbCMiQJ0d2KtmmmPorRHEhfMROVfTG5/fYrF5iWXzE80tfy9WPsCqx5Buj7FYH0LvDyHiqd+3otpsr4/fa5+xbEVQPfrYnntylQG5VGeMLBhgEfyE7o6e6qYzwHIjwl0QwXSvvTmrVAY4D5ddvT64wV0jRrr7FekO/XEjwuwwhuw7Ef7NY+dlfXpLb06EtHUJdVbsxvNUqBrwj/QGeEUSfwBAkmWHn5Bb/gAAAABJRU5" />
+<style>
+
+.home-table {
+  font-family: sans-serif;
+  font-size: medium;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.home-data {
+  text-align: left;
+  padding: 4px;
+}
+
+.home-form {
+  margin-bottom: 0;
+}
+
+.button-as-link {
+  background: none!important;
+  border: none;
+  padding: 0!important;
+  font-family: sans-serif;
+  font-size: medium;
+  color: #069;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.gray {
+  background-color: #dddddd;
+}
+
+.vert-space {
+  height: 4px;
+}
+
+.option {
+  padding-bottom: 4px;
+  padding-top: 4px;
+  padding-right: 4px;
+  padding-left: 20px;
+  text-align: right;
+}
+
+.error-status-line {
+  font-family: sans-serif;
+  font-size: medium;
+  color: #c00;
+}
+
+.histogram-graphics {
+  height: 40px;
+  position: relative;
+  margin-top: 15px;
+  /*
+   * TODO(jmarantz): enable resizing; to finish this we need to add a ResizeObserver
+   * to keep a map of the resized histograms for use when refreshing them.
+   *
+   *   resize: vertical;
+   *   overflow: auto;
+   */
+}
+
+.histogram-annotations {
+  height: 40px;
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.histogram-labels {
+  background-color: #ddd;
+  position: relative;
+  height: 15px;
+}
+
+.histogram-name {
+  font-family: sans-serif;
+  font-size: 14px;
+  font-weight: bold;
+  margin-top: 10px;
+  margin-bottom: 8px;
+}
+
+.histogram-no-data {
+  font-family: sans-serif;
+  font-size: 14px;
+  font-style: italic;
+  margin-top: 10px;
+  margin-bottom: 8px;
+  margin-left: 10px;
+}
+
+.histogram-bucket {
+  bottom: 0;
+  background-color: #e6d7ff;
+  position: absolute;
+  border-color: purple;
+  border-width: 1px;
+  border-style: solid;
+  width: 2%;
+  z-index: 1;
+}
+
+.histogram-popup {
+  position: absolute;
+  background-color: yellow;
+  border-width: 1px;
+  border-style: solid;
+  border-color: black;
+  visibility: hidden;
+  z-index: 3;
+  top: 70px;
+  padding: 3px;
+  /*Imargin-left: -1%;*/
+}
+
+.histogram-popup div {
+  font-family: sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+  text-align: center;
+}
+
+.histogram-percentile {
+  width: 5px;
+  background-color: #306844;
+  height: 30%;
+  width: 4px;
+  top: 0;
+  position: absolute;
+}
+
+.histogram-interval {
+  width: 5px;
+  background-color: #e06844;
+  height: 30%;
+  width: 4px;
+  margin-left: 0.5%;
+  top: 0;
+  position: absolute;
+}
+
+.bucket-label {
+  position: absolute;
+  bottom: 1%;
+  font-family: sans-serif;
+  font-size: 12px;
+  margin-bottom: 1px;
+  text-align: center;
+}
+
+.percentile-label {
+  position: absolute;
+  font-family: sans-serif;
+  font-size: 12px;
+  z-index: 2;
+}
+
+.histogram-labels span {
+  position: absolute;
+  bottom: 0;
+  font-family: sans-serif;
+  font-size: 12px;
+  overflow-x: visible;
+}
+</style>
+</head>
+<body>
+
+  <table class='home-table'>
+    <thead>
+      <tr>
+        <th class='home-data'>Command</th>
+        <th class='home-data'>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><form action='allocprofiler' method='post' id='allocprofiler' class='home-form'>
+    <button>allocprofiler</button>
+  </form></td>
+  <td class='home-data'>enable/disable the allocation profiler (if supported)</td>
+</tr>
+<tr>
+  <td class='option'>
+    <select name='enable' id='param-2-allocprofiler-enable' form='allocprofiler'>
+      <option value='y'>y</option>
+      <option value='n'>n</option>
+    </select>
+  </td>
+  <td class='home-data'><label for='param-2-allocprofiler-enable'>enable/disable the allocation profiler</label></td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><a href='certs'>certs</a></td>
+  <td class='home-data'>print certs on machine</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><form action='clusters' method='get' id='clusters' class='home-form'>
+    <button class='button-as-link'>clusters</button>
+  </form></td>
+  <td class='home-data'>upstream cluster status</td>
+</tr>
+<tr>
+  <td class='option'><input type='text' name='filter' id='param-4-clusters-filter' form='clusters' /></td>
+  <td class='home-data'><label for='param-4-clusters-filter'>Regular expression (Google re2) for filtering clusters by name</label></td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><form action='config_dump' method='get' id='config_dump' class='home-form'>
+    <button class='button-as-link'>config_dump</button>
+  </form></td>
+  <td class='home-data'>dump current Envoy configs</td>
+</tr>
+<tr class='gray'>
+  <td class='option'><input type='text' name='resource' id='param-5-config_dump-resource' form='config_dump' /></td>
+  <td class='home-data'><label for='param-5-config_dump-resource'>The resource to dump</label></td>
+</tr>
+<tr class='gray'>
+  <td class='option'><input type='text' name='mask' id='param-5-config_dump-mask' form='config_dump' /></td>
+  <td class='home-data'><label for='param-5-config_dump-mask'>The mask to apply. When both resource and mask are specified, the mask is applied to every element in the desired repeated field so that only a subset of fields are returned. The mask is parsed as a Protobuf::FieldMask</label></td>
+</tr>
+<tr class='gray'>
+  <td class='option'><input type='text' name='name_regex' id='param-5-config_dump-name_regex' form='config_dump' /></td>
+  <td class='home-data'><label for='param-5-config_dump-name_regex'>Dump only the currently loaded configurations whose names match the specified regex. Can be used with both resource and mask query parameters.</label></td>
+</tr>
+<tr class='gray'>
+  <td class='option'><input type='checkbox' name='include_eds' id='param-5-config_dump-include_eds' form='config_dump'></td>
+  <td class='home-data'><label for='param-5-config_dump-include_eds'>Dump currently loaded configuration including EDS. See the response definition for more information</label></td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><a href='contention'>contention</a></td>
+  <td class='home-data'>dump current Envoy mutex contention stats (if enabled)</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><form action='cpuprofiler' method='post' id='cpuprofiler' class='home-form'>
+    <button>cpuprofiler</button>
+  </form></td>
+  <td class='home-data'>enable/disable the CPU profiler</td>
+</tr>
+<tr class='gray'>
+  <td class='option'>
+    <select name='enable' id='param-7-cpuprofiler-enable' form='cpuprofiler'>
+      <option value='y'>y</option>
+      <option value='n'>n</option>
+    </select>
+  </td>
+  <td class='home-data'><label for='param-7-cpuprofiler-enable'>enables the CPU profiler</label></td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><form action='drain_listeners' method='post' id='drain_listeners' class='home-form'>
+    <button>drain_listeners</button>
+  </form></td>
+  <td class='home-data'>drain listeners</td>
+</tr>
+<tr>
+  <td class='option'><input type='checkbox' name='graceful' id='param-8-drain_listeners-graceful' form='drain_listeners'></td>
+  <td class='home-data'><label for='param-8-drain_listeners-graceful'>When draining listeners, enter a graceful drain period prior to closing listeners. This behaviour and duration is configurable via server options or CLI</label></td>
+</tr>
+<tr>
+  <td class='option'><input type='checkbox' name='skip_exit' id='param-8-drain_listeners-skip_exit' form='drain_listeners'></td>
+  <td class='home-data'><label for='param-8-drain_listeners-skip_exit'>When draining listeners, do not exit after the drain period. This must be used with graceful</label></td>
+</tr>
+<tr>
+  <td class='option'><input type='checkbox' name='inboundonly' id='param-8-drain_listeners-inboundonly' form='drain_listeners'></td>
+  <td class='home-data'><label for='param-8-drain_listeners-inboundonly'>Drains all inbound listeners. traffic_direction field in envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a listener is inbound or outbound.</label></td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><form action='healthcheck/fail' method='post' id='healthcheck/fail' class='home-form'>
+    <button>healthcheck/fail</button>
+  </form></td>
+  <td class='home-data'>cause the server to fail health checks</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><form action='healthcheck/ok' method='post' id='healthcheck/ok' class='home-form'>
+    <button>healthcheck/ok</button>
+  </form></td>
+  <td class='home-data'>cause the server to pass health checks</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><a href='heap_dump'>heap_dump</a></td>
+  <td class='home-data'>dump current Envoy heap (if supported)</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><form action='heapprofiler' method='post' id='heapprofiler' class='home-form'>
+    <button>heapprofiler</button>
+  </form></td>
+  <td class='home-data'>enable/disable the heap profiler</td>
+</tr>
+<tr>
+  <td class='option'>
+    <select name='enable' id='param-12-heapprofiler-enable' form='heapprofiler'>
+      <option value='y'>y</option>
+      <option value='n'>n</option>
+    </select>
+  </td>
+  <td class='home-data'><label for='param-12-heapprofiler-enable'>enable/disable the heap profiler</label></td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><a href='help'>help</a></td>
+  <td class='home-data'>print out list of admin commands</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><a href='hot_restart_version'>hot_restart_version</a></td>
+  <td class='home-data'>print the hot restart compatibility version</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><form action='init_dump' method='get' id='init_dump' class='home-form'>
+    <button class='button-as-link'>init_dump</button>
+  </form></td>
+  <td class='home-data'>dump current Envoy init manager information (experimental)</td>
+</tr>
+<tr class='gray'>
+  <td class='option'><input type='text' name='mask' id='param-15-init_dump-mask' form='init_dump' /></td>
+  <td class='home-data'><label for='param-15-init_dump-mask'>The desired component to dump unready targets. The mask is parsed as a Protobuf::FieldMask. For example, get the unready targets of all listeners with /init_dump?mask=listener`</label></td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><form action='listeners' method='get' id='listeners' class='home-form'>
+    <button class='button-as-link'>listeners</button>
+  </form></td>
+  <td class='home-data'>print listener info</td>
+</tr>
+<tr>
+  <td class='option'>
+    <select name='format' id='param-16-listeners-format' form='listeners'>
+      <option value='text'>text</option>
+      <option value='json'>json</option>
+    </select>
+  </td>
+  <td class='home-data'><label for='param-16-listeners-format'>File format to use</label></td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><form action='logging' method='post' id='logging' class='home-form'>
+    <button>logging</button>
+  </form></td>
+  <td class='home-data'>query/change logging levels</td>
+</tr>
+<tr class='gray'>
+  <td class='option'><input type='text' name='paths' id='param-17-logging-paths' form='logging' /></td>
+  <td class='home-data'><label for='param-17-logging-paths'>Change multiple logging levels by setting to &lt;logger_name1&gt;:&lt;desired_level1&gt;,&lt;logger_name2&gt;:&lt;desired_level2&gt;. If fine grain logging is enabled, use __FILE__ or a glob experision as the logger name. For example, source/common*:warning</label></td>
+</tr>
+<tr class='gray'>
+  <td class='option'><input type='text' name='group' id='param-17-logging-group' form='logging' /></td>
+  <td class='home-data'><label for='param-17-logging-group'>Change given logger group to desired level, set to &lt;logger_group_name&gt;:&lt;desired_level&gt;. logger_group_name must be a logger name.</label></td>
+</tr>
+<tr class='gray'>
+  <td class='option'>
+    <select name='level' id='param-17-logging-level' form='logging'>
+      <option value='' selected></option>
+      <option value='trace'>trace</option>
+      <option value='debug'>debug</option>
+      <option value='info'>info</option>
+      <option value='warning'>warning</option>
+      <option value='error'>error</option>
+      <option value='critical'>critical</option>
+      <option value='off'>off</option>
+    </select>
+  </td>
+  <td class='home-data'><label for='param-17-logging-level'>desired logging level, this will change all loggers&#39;s level</label></td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><a href='memory'>memory</a></td>
+  <td class='home-data'>print current allocation/heap usage</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><a href='memory/tcmalloc'>memory/tcmalloc</a></td>
+  <td class='home-data'>print TCMalloc stats</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><a href='peak_heap_dump'>peak_heap_dump</a></td>
+  <td class='home-data'>dump peak Envoy heap (if supported)</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><form action='quitquitquit' method='post' id='quitquitquit' class='home-form'>
+    <button>quitquitquit</button>
+  </form></td>
+  <td class='home-data'>exit the server</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><a href='ready'>ready</a></td>
+  <td class='home-data'>print server state, return 200 if LIVE, otherwise return 503</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><form action='reopen_logs' method='post' id='reopen_logs' class='home-form'>
+    <button>reopen_logs</button>
+  </form></td>
+  <td class='home-data'>reopen access logs</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><form action='reset_counters' method='post' id='reset_counters' class='home-form'>
+    <button>reset_counters</button>
+  </form></td>
+  <td class='home-data'>reset all counters to zero</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><a href='runtime'>runtime</a></td>
+  <td class='home-data'>print runtime values</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><form action='runtime_modify' method='post' id='runtime_modify' class='home-form'>
+    <button>runtime_modify</button>
+  </form></td>
+  <td class='home-data'>Adds or modifies runtime values as passed in query parameters. To delete a previously added key, use an empty string as the value. Note that deletion only applies to overrides added via this endpoint; values loaded from disk can be modified via override but not deleted. E.g. ?key1=value1&amp;key2=value2...</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><a href='server_info'>server_info</a></td>
+  <td class='home-data'>print server version/status information</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><form action='stats' method='get' id='stats' class='home-form'>
+    <button class='button-as-link'>stats</button>
+  </form></td>
+  <td class='home-data'>print server stats</td>
+</tr>
+<tr>
+  <td class='option'><input type='checkbox' name='usedonly' id='param-28-stats-usedonly' form='stats'></td>
+  <td class='home-data'><label for='param-28-stats-usedonly'>Only include stats that have been written by system since restart</label></td>
+</tr>
+<tr>
+  <td class='option'><input type='text' name='filter' id='param-28-stats-filter' form='stats' /></td>
+  <td class='home-data'><label for='param-28-stats-filter'>Regular expression (Google re2) for filtering stats</label></td>
+</tr>
+<tr>
+  <td class='option'>
+    <select name='format' id='param-28-stats-format' form='stats'>
+      <option value='html'>html</option>
+      <option value='active-html'>active-html</option>
+      <option value='text'>text</option>
+      <option value='json'>json</option>
+    </select>
+  </td>
+  <td class='home-data'><label for='param-28-stats-format'>Format to use</label></td>
+</tr>
+<tr>
+  <td class='option'>
+    <select name='type' id='param-28-stats-type' form='stats'>
+      <option value='All'>All</option>
+      <option value='Counters'>Counters</option>
+      <option value='Histograms'>Histograms</option>
+      <option value='Gauges'>Gauges</option>
+      <option value='TextReadouts'>TextReadouts</option>
+    </select>
+  </td>
+  <td class='home-data'><label for='param-28-stats-type'>Stat types to include.</label></td>
+</tr>
+<tr>
+  <td class='option'>
+    <select name='histogram_buckets' id='param-28-stats-histogram_buckets' form='stats'>
+      <option value='cumulative'>cumulative</option>
+      <option value='disjoint'>disjoint</option>
+      <option value='detailed'>detailed</option>
+      <option value='summary'>summary</option>
+    </select>
+  </td>
+  <td class='home-data'><label for='param-28-stats-histogram_buckets'>Histogram bucket display mode</label></td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><form action='stats/prometheus' method='get' id='stats/prometheus' class='home-form'>
+    <button class='button-as-link'>stats/prometheus</button>
+  </form></td>
+  <td class='home-data'>print server stats in prometheus format</td>
+</tr>
+<tr class='gray'>
+  <td class='option'><input type='checkbox' name='usedonly' id='param-29-stats-prometheus-usedonly' form='stats/prometheus'></td>
+  <td class='home-data'><label for='param-29-stats-prometheus-usedonly'>Only include stats that have been written by system since restart</label></td>
+</tr>
+<tr class='gray'>
+  <td class='option'><input type='checkbox' name='text_readouts' id='param-29-stats-prometheus-text_readouts' form='stats/prometheus'></td>
+  <td class='home-data'><label for='param-29-stats-prometheus-text_readouts'>Render text_readouts as new gaugues with value 0 (increases Prometheus data size)</label></td>
+</tr>
+<tr class='gray'>
+  <td class='option'><input type='text' name='filter' id='param-29-stats-prometheus-filter' form='stats/prometheus' /></td>
+  <td class='home-data'><label for='param-29-stats-prometheus-filter'>Regular expression (Google re2) for filtering stats</label></td>
+</tr>
+<tr class='gray'>
+  <td class='option'>
+    <select name='histogram_buckets' id='param-29-stats-prometheus-histogram_buckets' form='stats/prometheus'>
+      <option value='cumulative'>cumulative</option>
+      <option value='summary'>summary</option>
+    </select>
+  </td>
+  <td class='home-data'><label for='param-29-stats-prometheus-histogram_buckets'>Histogram bucket display mode</label></td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><a href='stats/recentlookups'>stats/recentlookups</a></td>
+  <td class='home-data'>Show recent stat-name lookups</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><form action='stats/recentlookups/clear' method='post' id='stats/recentlookups/clear' class='home-form'>
+    <button>stats/recentlookups/clear</button>
+  </form></td>
+  <td class='home-data'>clear list of stat-name lookups and counter</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr>
+  <td class='home-data'><form action='stats/recentlookups/disable' method='post' id='stats/recentlookups/disable' class='home-form'>
+    <button>stats/recentlookups/disable</button>
+  </form></td>
+  <td class='home-data'>disable recording of reset stat-name lookup names</td>
+</tr>
+
+<tr class='vert-space'><td></td><td></td></tr>
+<tr class='gray'>
+  <td class='home-data'><form action='stats/recentlookups/enable' method='post' id='stats/recentlookups/enable' class='home-form'>
+    <button>stats/recentlookups/enable</button>
+  </form></td>
+  <td class='home-data'>enable recording of reset stat-name lookup names</td>
+</tr>
+
+    </tbody>
+  </table>
+</body>
+</html>

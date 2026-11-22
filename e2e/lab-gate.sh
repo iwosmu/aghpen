@@ -68,6 +68,44 @@ ALLOVER=$(go run ./e2e/ppsbins -src "${LR_IP:-10.66.0.30}" -cap "$ALLLIM" -json 
 ALLMAX=$(jq .all_max_per_s "$OUT/pps-t0.json"); ALLP99=$(jq .all_p99_per_s "$OUT/pps-t0.json"); SECS=$(jq .seconds "$OUT/pps-t0.json")
 row "all packets: seconds over $ALLLIM" "$ALLOVER of $SECS (max $ALLMAX)" "<= $AS" "$([ "$ALLOVER" -le "$AS" ] && echo 1 || echo 0)"
 row "all packets: p99 per second" "$ALLP99" "<= $CAP" "$([ "$ALLP99" -le "$CAP" ] && echo 1 || echo 0)"
+for K in t0 t0-2; do
+  [ -f "$OUT/passtimes-$K.txt" ] || continue
+  read -r PG PD PH PW PN < "$OUT/passtimes-$K.txt"
+  printf '%-44s %-22s %-22s %s\n' "wall time $K: general pass / deep pass" "$PG s / $PD s" "deep: $PH hosts" "info ($PW waiting, $PN new)"
+done
+# The second run must not be slower: its general pass <= 1.15 x run 1's.
+if [ -f "$OUT/passtimes-t0.txt" ] && [ -f "$OUT/passtimes-t0-2.txt" ]; then
+  read -r G1 _ < "$OUT/passtimes-t0.txt"; read -r G2 _ < "$OUT/passtimes-t0-2.txt"
+  row "general pass: run 2 vs run 1" "$G2 s vs $G1 s" "<= 1.15 x run 1" "$(awk -v a="$G2" -v b="$G1" 'BEGIN { print (a <= 1.15 * b) ? 1 : 0 }')"
+fi
+# The kernel cap (internal/kcap): (a) active in both runs; (b) on the wire, the
+# packets it counts (SYN, UDP, ICMP echo) in every fixed 100 ms bin <= burst +
+# kernel_pps x 0.1 (what a token bucket guarantees: 220 at policy 1000); (c) in
+# every 1 s bin <= the policy max_pps (the engine's own pacing;
+# e2e/kcap-window.sh); (d) the packets it dropped in a run (its counter is per
+# process: the difference to the run before) must show in the capture as a
+# 100 ms bin at 90 % of the burst or more (a clipped catch-up); an untraced drop
+# fails the row. History: "dropped = 0" failed on gate 2 run 1 (24 drops after a
+# 60 ms VM stall at host load 60); "<= burst" was arithmetically wrong.
+if [ -s "$OUT/kcap-t0.json" ] && [ "$(cat "$OUT/kcap-t0.json")" != null ]; then
+  KC=""; KOK=1; KPREV=0; KNOTES=""
+  for K in t0 t0-2; do
+    [ -f "$OUT/kcap-$K.json" ] && [ -f "$OUT/tcpdump-$K.txt.gz" ] || continue
+    A=$(jq -r '.active' "$OUT/kcap-$K.json"); D=$(jq -r '.dropped // 0' "$OUT/kcap-$K.json")
+    KB=$(jq -r '.burst // 0' "$OUT/kcap-$K.json"); KP=$(jq -r '.policy_pps // 0' "$OUT/kcap-$K.json")
+    KBIN=$(( KB + $(jq -r '.pps // 0' "$OUT/kcap-$K.json") / 10 ))
+    DR=$((D - KPREV)); KPREV=$D
+    W=$(e2e/kcap-window.sh "$OUT/tcpdump-$K.txt.gz" "${LR_IP:-10.66.0.30}" "$KB")
+    read -r _ M100 _ _ _ M1 _ _ _ NEAR <<< "$W"
+    KC="$KC$K $A/$M100/$M1/$DR "
+    KNOTES="$KNOTES  kernel cap $K: $W; dropped in this run $DR
+"
+    { [ "$A" = true ] && [ "$M100" -le "$KBIN" ] && [ "$M1" -le "$KP" ]; } || KOK=0
+    if [ "$DR" -gt 0 ] && [ "${NEAR:--}" = "-" ]; then KOK=0; fi
+  done
+  row "kernel cap: active/max 100ms/max 1s/drops" "$KC" "true/<=$KBIN/<=$KP/traced" "$KOK"
+  printf '%s' "$KNOTES"
+fi
 F0=$(echo "$NB0" | jq .table_fulls); F1=$(echo "$NB1" | jq .table_fulls)
 row "neighbour table: entries after, overflows" "$(echo "$NB1" | jq .entries) / +$((F1 - F0))" "+0 overflows" "$([ "$F1" = "$F0" ] && echo 1 || echo 0)"
 printf 'run %s s, %s hosts up, %s open services, %s packets; output %s\n' "$(jq .stats.elapsed_sec "$OUT/run-t0.json")" "$(jq .stats.hosts_up "$OUT/run-t0.json")" \

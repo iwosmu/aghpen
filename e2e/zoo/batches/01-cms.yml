@@ -1,0 +1,35 @@
+# Zoo batch 01: CMS and web applications (installers and first-run pages, as a fresh template would show them).
+services:
+  ghost:
+    image: ghost:6.78.0-alpine
+    environment: {NODE_ENV: development, url: "http://localhost:2368"}
+    ports: ["2368:2368"]
+  mediawiki:
+    image: mediawiki:1.46.2
+    ports: ["33080:80"]
+  nextcloud:
+    image: nextcloud:35.0.3-apache
+    ports: ["80:80"]
+  matomo:
+    image: matomo:5.14.3-apache
+    ports: ["41080:80"]
+  roundcube:
+    image: roundcube/roundcubemail:1.7.6-apache
+    environment: {ROUNDCUBEMAIL_DEFAULT_HOST: imap.example.org, ROUNDCUBEMAIL_DB_TYPE: sqlite}
+    ports: ["27080:80"]
+  joomla3:
+    image: joomla:3.10.12-php8.0-apache
+    environment: {JOOMLA_DB_HOST: zdb, JOOMLA_DB_USER: root, JOOMLA_DB_PASSWORD: zoo-test-only, JOOMLA_DB_NAME: joomla}
+    ports: ["8082:80"]
+    depends_on: [zdb]
+  drupal7:
+    image: drupal:7.103-apache
+    ports: ["19080:80"]
+  joomla6:
+    image: joomla:6.2.0-php8.4-apache
+    environment: {JOOMLA_DB_HOST: zdb, JOOMLA_DB_USER: root, JOOMLA_DB_PASSWORD: zoo-test-only, JOOMLA_DB_NAME: joomla6}
+    ports: ["8083:80"]
+    depends_on: [zdb]
+  zdb:
+    image: mariadb:11.4.13
+    environment: {MARIADB_ROOT_PASSWORD: zoo-test-only}

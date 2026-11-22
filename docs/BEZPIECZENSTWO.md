@@ -36,7 +36,7 @@ Limit skuteczny to mniejsza z wartości profilu skanu i polityki bezpieczeństwa
 
 | Limit | Profil (domyślnie) | Polityka (domyślnie) | Gdzie egzekwowany |
 | --- | --- | --- | --- |
-| Pakiety sond na sekundę, wszystkie procesy razem | `rate.max_pps` (500) | `max_pps` (1000) | Dwa budżety (`scan.Budget`). Budżet globalny jest jeden dla całego procesu Czujki i dla wszystkich równoległych przebiegów (zaplanowanych, ręcznych, doraźnych, ponownych sond); jego wielkość to `max_pps` polityki. Budżet przebiegu to limit profilu wewnątrz niego. Grupa adresów bierze udział z obu i oddaje oba po skanie. Każdy proces nmap dostaje swój udział jako `--min-rate` i `--max-rate`. Test: `TestConcurrentRunsShareThePolicyBudget` (trzy równoległe przebiegi, suma tempa nmap nie przekracza budżetu polityki). |
+| Pakiety sond na sekundę, wszystkie procesy razem | `rate.max_pps` (500) | `max_pps` (1000) | Dwa budżety (`scan.Budget`). Budżet globalny jest jeden dla całego procesu Czujki i dla wszystkich równoległych przebiegów (zaplanowanych, ręcznych, doraźnych, ponownych sond); jego wielkość to `max_pps` polityki. Budżet przebiegu to limit profilu wewnątrz niego. Grupa adresów bierze udział z obu i oddaje oba po skanie. Każdy proces nmap dostaje swój udział jako `--min-rate` i `--max-rate`. Pod spodem limit w jądrze, wspólny dla wszystkich przebiegów: `max_pps` × 1,1 (rozdz. 1.2.1). Test: `TestConcurrentRunsShareThePolicyBudget` (trzy równoległe przebiegi, suma tempa nmap nie przekracza budżetu polityki). |
 | Żądania HTTP na sekundę, wszystkie hosty razem | `rate.http_rps` (20) | `max_http_rps` (50) | Kubełki żetonów w silniku (`probe.Limiter`): jeden na przebieg (limit profilu) i jeden wspólny dla wszystkich przebiegów (limit polityki). Przed wywołaniem kolektora silnik pobiera tyle żetonów, ile żądań planuje (strona + ścieżki + ikona). |
 | Żądania HTTP na sekundę do jednego hosta | – | `max_per_host_rps` (2) | Limiter na host w przebiegu i limiter na host wspólny dla wszystkich przebiegów. |
 | Równoległe usługi HTTP na jednym hoście | `rate.per_host_concurrency` (1) | – | Semafor na host. |
@@ -46,13 +46,62 @@ Limit skuteczny to mniejsza z wartości profilu skanu i polityki bezpieczeństwa
 | Czas jednego żądania | `http.timeout_ms` (5000) | – | `httpfp` (test `TestSlowServers`) |
 | Ikona strony | – | 1 MiB | `httpfp` |
 
-Pomiar z laboratorium silnika (`e2e/engine/REPORT.md`, licznik pakietów interfejsu): przy limicie 500 pakietów na sekundę zmierzono 498–504 w każdej sekundzie. Samo `--max-rate` pilnuje tylko średniej, dlatego silnik ustawia też `--min-rate`. Skutek uboczny: nmap nie zwalnia sam przy utracie pakietów. Tempo trzeba dobrać do sieci.
+Pomiar z laboratorium silnika (`e2e/engine/REPORT.md`, licznik pakietów interfejsu): przy limicie 500 pakietów na sekundę zmierzono 498–504 w każdej sekundzie. Samo `--max-rate` pilnuje tylko średniej, dlatego silnik ustawia też `--min-rate`. Skutek uboczny: nmap nie zwalnia sam przy utracie pakietów. Tempo trzeba dobrać do sieci. Po zamrożeniu procesu żadna z tych opcji nie wystarcza; pilnuje wtedy limit w jądrze (rozdz. 1.2.1).
 
 Znane ograniczenia limitów:
 
 - Sondy wykrywania wersji (`-sV`) idą zwykłymi gniazdami. `--max-rate` ich nie obejmuje; licznik pakietów jest dla nich szacunkiem.
 - Limiter HTTP pobiera z góry koszt całego wywołania kolektora (strona, ikona, ścieżki). Żądania wewnątrz jednego wywołania idą bez odstępu między sobą, a przekierowania nie są wliczane.
 - Budżet pakietów, limiter HTTP i limiter na host są wspólne dla wszystkich przebiegów silnika. Kilka przebiegów naraz nie przekracza razem `max_pps` polityki (przegląd H2, naprawione).
+### 1.2.1 Dwa limity: nmap odmierza tempo, jądro pilnuje
+
+Opcje tempa nmap (`--min-rate`, `--max-rate`, `--scan-delay`) pilnują średniej. Gdy proces nmap stoi (zamrożona maszyna wirtualna, uśpiony laptop, brak czasu procesora), po wznowieniu nmap wysyła zaległe pakiety naraz. Odmierzanie w przestrzeni użytkownika tego nie zatrzyma, bo zamrożony był sam skaner.
+
+Dlatego Czujka ma drugi, niezależny limit w jądrze (`internal/kcap`). Przy starcie, przed każdym przebiegiem i po każdej zmianie `max_pps` w polityce Czujka instaluje regułę nftables w haku `output` przestrzeni sieciowej swojego kontenera.
+
+| | |
+| --- | --- |
+| Tabela | tylko `inet czujka_kcap`. Zamiana atomowa: jeden plik dla `nft -f` (utwórz tabelę, usuń ją, zdefiniuj na nowo) w jednej transakcji. Innych tabel Czujka nie dotyka. |
+| Co liczy | TCP SYN bez ACK; samotny TCP ACK spoza śledzonego połączenia (ping ACK nmap); ICMP echo i timestamp request; ICMPv6 echo request; UDP |
+| Czego nie liczy | pakietów nawiązanych połączeń (kolektor HTTP, odpowiedzi API), interfejsu `lo`, adresów bazy danych i resolwerów DNS (z `CZUJKA_DB_URL` i `/etc/resolv.conf`) |
+| Tempo | `max_pps` × 1,1 na sekundę, kubełek około 0,1 s tego tempa (przy `max_pps` 500: 550/s, 55 pakietów). Zwykłe tempo nmap mieści się pod limitem. Jądro obcina tylko wybuch. |
+| Licznik | nazwany licznik `dropped`: pakiety odrzucone przez jądro |
+
+Pomiar: `e2e/kcap/run.sh`, nmap `-sS` na 20 000 portów kontenera z 30 otwartymi portami, limit 500 pakietów na sekundę, nmap zatrzymany na 15 s (`SIGSTOP`, `SIGCONT`). Liczba to pakiety SYN w najwyższej sekundzie według tcpdump na interfejsie skanera. Pełne zapisy: `e2e/kcap/results/`.
+
+| Maszyna | Bez limitu w jądrze | Z limitem w jądrze | Odrzucone przez jądro | Skan bez zamrożenia, z limitem |
+| --- | --- | --- | --- | --- |
+| Linux (Ubuntu 24.04, jądro 6.8, nft 1.0.9) | 6820 (zaległość rozłożona na dwie sekundy: 1235 i 6820) | 505 | 7481 | najwyżej 501/s, 0 odrzuconych, 30 z 30 portów |
+| Docker Desktop na macOS (jądro 6.12 linuxkit) | 8113 | 503 | 7564 | najwyżej 502/s, 0 odrzuconych, 30 z 30 portów |
+
+Wcześniejszy przebieg na tym samym Linuksie dał 7598 pakietów w jednej sekundzie bez limitu i najwyżej 501 z limitem (7484 odrzucone). Pakiety odrzucone przez jądro nmap wysłał ponownie w swoim tempie. Z limitem skan po zamrożeniu znalazł te same 30 portów, a nmap zgłosił 20 002 wysłane pakiety. Bez limitu było ich 21 379 (ponowienia po wybuchu).
+
+Pomiar w produkcie (`e2e/kcap/product.sh`, Linux): przebieg skanu, w którym nmap stał 15 s, dostał notatkę „jądro odrzuciło 5604 pakietów ponad limit” i znalazł 30 z 30 usług. Najwyższa sekunda: 376 SYN (silnik dał procesowi nmap 375 z limitu profilu 500). Przebieg bez zamrożenia: 0 odrzuconych, 30 z 30 usług.
+
+| `CZUJKA_KERNEL_CAP` | Działanie |
+| --- | --- |
+| `auto` (domyślnie) | instaluje limit, gdy się da; gdy się nie da, skanuje i podaje powód w `kernel_cap.reason` i w logu |
+| `require` | nie uruchamia przebiegu bez zainstalowanego limitu (409, kod `kernel_cap`), jak `CZUJKA_TDE=require` |
+| `off` | nie instaluje; usuwa własną tabelę, jeśli została |
+
+Stan: `GET /settings/safety` zwraca `kernel_cap: {mode, active, pps, burst, policy_pps, dropped, reason}`. To samo pole jest w `/healthz` dla zalogowanego użytkownika z uprawnieniem `safety:manage`. `dropped` liczy od startu procesu: przy wymianie reguły Czujka dolicza wartość starego licznika. Zapis polityki ponawia nieudaną instalację.
+
+| Tryb sieci | Limit w jądrze |
+| --- | --- |
+| sieć mostkowa (domyślny `docker-compose.yml`) | działa: przestrzeń sieciowa należy tylko do kontenera Czujki |
+| nakładka `docker-compose.scan-network.yml` | działa: kontener dostaje kolejny interfejs w swojej przestrzeni; reguła obejmuje wszystkie interfejsy (sprawdzone: `eth0`–`eth2`) |
+| `docker-compose.host-network.yml` | nie instaluje: `unavailable: host network`. Przestrzeń sieciowa jest hosta, więc reguła ograniczyłaby też inne programy. Zawężenia do pakietów Czujki (`meta skuid`, `socket cgroupv2`) nie sprawdziliśmy. Z `require` przebieg nie startuje. Sprawdzone: w przestrzeni hosta nie powstaje żadna tabela `czujka_kcap`. |
+| binarka poza kontenerem (systemd) | nie instaluje: `unavailable: host network` |
+
+Czujka uznaje przestrzeń za przestrzeń hosta, gdy: `CZUJKA_NETWORK_MODE=host` (ustawia ją plik host-network), brak znacznika kontenera (`/.dockerenv`, `/run/.containerenv`) albo w przestrzeni są interfejsy hosta Dockera (`docker0`, `br-*`, `veth*`).
+
+Uprawnienia i obraz: `nft` ma `cap_net_admin` jako uprawnienie pliku, a uruchomić go może tylko grupa `czujka`. `NET_ADMIN` z `cap_add` służy więc też instalacji tej reguły. Obraz zyskał pakiety `nftables`, `libnftnl`, `libmnl`, `jansson`, `gmp` (licencje GPL-2.0, LGPL-2.1, MIT, LGPL-3.0): 1,5 MiB po instalacji, obraz ma 123,6 MB.
+
+Ograniczenia:
+
+- Zapytania ARP nmap idą przez gniazdo pakietowe, które omija hak `output`. Limit w jądrze ich nie obejmuje.
+- SYN wykrywania wersji (`-sV`) i kolektora HTTP liczą się do tego samego limitu. W pomiarze bez zamrożenia jądro nie odrzuciło żadnego pakietu.
+- Licznik jest wspólny dla procesu. Notatka przebiegu obejmuje też pakiety odrzucone w tym czasie innemu, równoległemu przebiegowi.
 
 ### 1.3 Polityka bezpieczeństwa
 
@@ -109,7 +158,7 @@ Sygnatura może tylko czytać odpowiedź i poprosić o `GET` dodatkowej ścieżk
 
 Lista zakazów jest w `internal/sig/safety.go`: 55 fragmentów, 69 słów, 46 rozszerzeń plików. Wyrażenia regularne kompiluje silnik RE2 (czas liniowy, bez odwołań wstecznych), więc wzorzec nie zawiesi silnika.
 
-Kolektor sprawdza ścieżkę drugi raz przed wysłaniem (`TestSafePath`). Dla ścieżek dodatkowych nie podąża za przekierowaniami i kończy po 2 kolejnych błędach. Za przekierowaniem w obrębie tego samego hosta (na przykład ze strony głównej) kolektor idzie tylko wtedy, gdy cel przechodzi `sig.CheckRedirect`: ścieżka przez `CheckPath`, zapytanie przez listę zakazanych słów (`TestSameOriginRedirectToAnUnsafePathNotFollowed`).
+Kolektor sprawdza ścieżkę drugi raz przed wysłaniem (`TestSafePath`). Dla ścieżek dodatkowych nie podąża za przekierowaniami i kończy po 2 kolejnych błędach. Za przekierowaniem w obrębie tego samego hosta (na przykład ze strony głównej) kolektor idzie tylko wtedy, gdy cel przechodzi `sig.CheckRedirect`: ścieżka przez `CheckPath`, zapytanie przez listę zakazanych słów (`TestSameOriginRedirectToAnUnsafePathNotFollowed`). Jeden wyjątek dotyczy tylko ścieżki przekierowania: może zawierać typowe słowo strony startowej aplikacji, które jest też na liście zakazanych słów (`landingWords`; dziś tylko `start`). Serwer sam kieruje tam każdą przeglądarkę żądaniem GET, np. `/` → `/start` → `/pl/`. Inne zakazane słowa (`run`, `send`, `trigger`, `set`, `edit`, `exec`, `delete` …) w przekierowaniu nadal blokują, zapytanie dostaje pełną listę, a ścieżka sygnatury `/start` jest nadal odrzucana (`TestRedirectToALandingPath`).
 
 Retro-hunt dopasowuje sygnaturę do zapisanych obserwacji. Nie wysyła żadnego pakietu (`TestRetroHuntDoesNotChangeObservations`). Użytkownik bez `results:update` dostaje w retro-hunt ciasteczka z pustą wartością, więc wynik dopasowania nie zdradza ukrytej wartości (`TestRetroHuntIsNoCookieValueOracle`).
 
@@ -132,9 +181,7 @@ Testy: `TestValidatorRejectsUnsafeSignatures`, `TestCheckPath`, `TestRetroHuntRe
 | Edycja celu | `PATCH /targets/{id}` ze zmianą wartości albo włączeniem celu przechodzi te same sprawdzenia co nowy cel. | `TestTargetUpdateRunsTheAllowedNetworksCheck` |
 | Import do zakresu | Import wyników z `scope_id` dodaje cele, więc wymaga też `targets:create`. | `TestImportIntoScopeNeedsTargetsCreate` |
 
-Zakres wyznaczają cele wpisane przez użytkownika z uprawnieniem `targets:create`, ograniczone blokadą operatora i dozwolonymi sieciami, minus wyłączenia.
-
-Naprawione (przegląd M2): silnik sam trzyma się dozwolonych sieci. Adres z ponownie rozwiązanej nazwy domenowej i części planu wznowione po przerwie przechodzą to samo sprawdzenie co przy starcie; adres spoza dozwolonych sieci nie jest skanowany. Test: `TestEngineKeepsToTheAllowedNetworks`.
+Dozwolone sieci: blokada operatora (`CZUJKA_ALLOWED_NETWORKS`, pole `operator_networks`) i lista `allowed_networks` polityki (docs/WDROZENIE.md). Cel poza nimi jest odrzucany przy wpisie i przy planowaniu przebiegu. Silnik sprawdza je jeszcze raz: adresy po rozwinięciu celów (nazwa domenowa jest rozwiązywana ponownie i może teraz wskazywać inny adres) i części wznowionego przebiegu (blokada mogła się zawęzić w czasie pauzy). Adres poza którąkolwiek z list jest pomijany i trafia do logu. Test: `TestEngineKeepsToTheAllowedNetworks`.
 
 ### 1.7 Kontener skanera
 
@@ -143,7 +190,7 @@ Sprawdzone na działającym stosie:
 | Cecha | Wartość |
 | --- | --- |
 | Użytkownik procesu | `czujka` (uid 10001), nie root |
-| Uprawnienia jądra | `cap_drop: ALL`, `cap_add: NET_RAW, NET_ADMIN`; nmap dostaje surowe gniazda przez `setcap` na pliku. `NET_ADMIN` zostaje celowo (decyzja po przeglądzie, L5). W trybie sieci hosta (`docker-compose.host-network.yml`) dotyczy przestrzeni nazw sieci hosta |
+| Uprawnienia jądra | `cap_drop: ALL`, `cap_add: NET_RAW, NET_ADMIN`; nmap dostaje surowe gniazda przez `setcap` na pliku, `nft` dostaje `cap_net_admin` na pliku do limitu w jądrze (rozdz. 1.2.1). `NET_ADMIN` zostaje celowo (decyzja po przeglądzie, L5). W trybie sieci hosta (`docker-compose.host-network.yml`) dotyczy przestrzeni nazw sieci hosta |
 | System plików | tylko do odczytu (`touch /x` → „Read-only file system”); `/tmp` jako tmpfs |
 | Baza danych | sieć wewnętrzna bez trasy na zewnątrz, bez opublikowanego portu |
 | Interfejs WWW | domyślnie tylko `127.0.0.1:8080` |
@@ -306,7 +353,7 @@ Sprawdzone na działającym stosie jako `viewer`: dodanie celu → 403, awaryjne
 
 | Obszar | Ograniczenie |
 | --- | --- |
-| Tempo | `--min-rate` = `--max-rate`: stałe tempo, bez samoczynnego zwalniania nmap. Sondy `-sV` poza limitem pakietów. |
+| Tempo | `--min-rate` = `--max-rate`: stałe tempo, bez samoczynnego zwalniania nmap. Sondy `-sV` poza limitem pakietów nmap (limit w jądrze liczy ich SYN). Limit w jądrze nie obejmuje ARP i nie działa w trybie sieci hosta (rozdz. 1.2.1). |
 | Kontener | `NET_ADMIN` zostaje obok `NET_RAW` (decyzja po przeglądzie, L5). |
 | Kopie | Zrzut `pg_dump` jest jawny poza kolumnami warstwy 2. Trzeba go szyfrować. |
 | Klucze | Klucz `pg_tde` w pliku na wolumenie. `rotate-key` opakowuje na nowo tylko klucze danych; stara kopia bazy ze starym kluczem pozostaje czytelna. |
@@ -337,15 +384,16 @@ Przegląd kodu z 2026-11-21 (wewnętrzny, jeden recenzent) znalazł 2 problemy w
 | Nr | Problem | Poprawka | Commit | Test |
 | --- | --- | --- | --- | --- |
 | H1 | `scans:run` mógł zeskanować dowolny adres skanem doraźnym; edycja celu omijała sprawdzenie dozwolonych sieci | adres skanu doraźnego musi leżeć we włączonym celu (także przy wznowieniu i ponownym sondowaniu); edycja celu przechodzi sprawdzenie; import do zakresu wymaga `targets:create` | `b90c5de` | `TestAdHocRunStaysInsideEnabledTargets`, `TestTargetUpdateRunsTheAllowedNetworksCheck`, `TestImportIntoScopeNeedsTargetsCreate` |
-| H2 | limit pakietów na przebieg, nie globalny | jeden budżet pakietów, limiter HTTP i limiter na host dla wszystkich przebiegów silnika; limity polityki obowiązują sumę równoległych przebiegów | `abae8e3` | `TestConcurrentRunsShareThePolicyBudget` |
+| H2 | limit pakietów na przebieg, nie globalny | jeden budżet pakietów, limiter HTTP i limiter na host dla wszystkich przebiegów silnika; `max_pps` polityki to sufit globalny, limit profilu działa wewnątrz niego | `abae8e3` | `TestConcurrentRunsShareThePolicyBudget` |
 | M1 | retro-hunt jako wyrocznia ukrytych wartości ciasteczek | puste wartości ciasteczek dla użytkownika bez `results:update` | `03dd94b` | `TestRetroHuntIsNoCookieValueOracle` |
-| M2 | DNS rozwiązywany osobno przy sprawdzeniu i przy skanie | silnik sprawdza dozwolone sieci także dla ponownie rozwiązanych nazw i wznowionych części planu | `abae8e3` | `TestEngineKeepsToTheAllowedNetworks` |
+| M2 | DNS rozwiązywany osobno przy sprawdzeniu i przy skanie | silnik przecina adresy po rozwinięciu celów i części wznowionego przebiegu z blokadą operatora i dozwolonymi sieciami | `abae8e3` | `TestEngineKeepsToTheAllowedNetworks` |
 | M3 | wyścig mógł skasować awaryjne zatrzymanie | atomowy `jsonb_set`; zapis polityki nie zmienia flagi | `7aab986` | `TestSafetyEditKeepsTheEmergencyStop`, `TestSafetyPutNeverClearsTheEmergencyStop` |
 | M4 | blokada kont i zalew dziennika bez logowania; odpowiedź zdradzała istnienie konta | reset licznika po blokadzie, jedna odpowiedź 401, fikcyjna weryfikacja hasła, limit treści, budżet wpisów bez sesji, `czujka user unlock` | `6899d6c` | `TestLoginGivesNoAccountOracle`, `TestLoginAuditIsBounded`, `TestLockExpiryResetsTheFailureCounter` |
 | L1 | test DefectDojo wysyłał zapisany klucz na adres z żądania | klucz idzie tylko do zapisanego hosta | `bcf9f69` | `TestDojoStoredKeyStaysWithItsHost` |
 | L2 | integracje podążały za przekierowaniem i zwracały treść odpowiedzi | bez przekierowań, błąd tylko z kodem odpowiedzi | `f78c305` | `TestClientFollowsNoRedirectAndEchoesNoBody`, `TestPostFollowsNoRedirectAndEchoesNoBody` |
-| L3 | lista zakazanych ścieżek tylko na całe słowa; przekierowanie w obrębie hosta bez sprawdzenia ścieżki | słowa z notacji camelCase; `sig.CheckRedirect` przed przekierowaniem | `bc0cbff` | `TestCheckPath`, `TestSameOriginRedirectToAnUnsafePathNotFollowed` |
+| L3 | lista zakazanych ścieżek tylko na całe słowa; przekierowanie w obrębie hosta bez sprawdzenia ścieżki | słowa z notacji camelCase; `sig.CheckRedirect` przed przekierowaniem (ścieżka przekierowania może zawierać słowo strony startowej, `landingWords`) | `bc0cbff` | `TestCheckPath`, `TestSameOriginRedirectToAnUnsafePathNotFollowed`, `TestRedirectToALandingPath` |
 | L4 | `findings.dojo.csv` bez ochrony przed formułami | ochrona każdej komórki | `dbbf298` | `TestDojoGenericCSVFormulaGuard` |
 | L5 | stałe hasło bazy dla instalacji ze starszej wersji; `NET_ADMIN` | nowe losowe hasło, Czujka przenosi na nie rolę bazy; `NET_ADMIN` zostaje celowo | `0e53e15` | `TestAdoptLegacyDBPassword` |
 | L6 | brak zmiany własnego hasła; `/healthz` bez sesji zdradzał szczegóły | `POST /auth/password`; `/healthz` bez sesji: tylko `{status, version}` | `6345589` | `TestSelfServicePasswordChange`, `TestHealthzWithoutSessionIsMinimal` |
+| K1 | nmap pilnuje tylko średniej: po zamrożeniu procesu (maszyna wirtualna, uśpienie, brak procesora) wysyła zaległość naraz; zmierzone 6820–8113 SYN w jednej sekundzie przy limicie 500 | drugi limit w jądrze: reguła nftables w przestrzeni sieciowej kontenera odrzuca sondy ponad `max_pps` × 1,1 (rozdz. 1.2.1); po zamrożeniu najwyżej 505 SYN/s, jądro odrzuciło 7481 (Linux) i 7564 (Docker Desktop); bez zamrożenia 0 odrzuconych i te same 30 portów; w produkcie notatka przebiegu z 5604 odrzuconymi. Bramka laboratorium (`e2e/lab-gate.sh`, 2 przebiegi /16 przy limicie 1000): pierwsza wersja wiersza bramki, „odrzucone = 0”, nie przeszła w przebiegu 1: 24 odrzucone po 60 ms zamrożenia maszyny wirtualnej przy obciążeniu hosta 60 (w przedziale 100 ms 24, w następnym 108 pakietów). Druga wersja, „w każdym przedziale 100 ms najwyżej `burst`”, była błędna arytmetycznie: kubełek o tempie r i pojemności b przepuszcza w stałym przedziale 100 ms do b + r × 0,1. Wiersz sprawdza teraz gwarancję jądra: w każdym przedziale 100 ms najwyżej 220 sond, w każdej sekundzie najwyżej 1000 (tempo silnika), każde odrzucenie przypisane do przedziału w zapisie tcpdump. Zmierzone: 108 i 153 sondy na 100 ms, 756 i 775 na sekundę, 24 i 0 odrzuconych | `c06edae` | `e2e/kcap/run.sh`, `e2e/kcap/product.sh` (zapisy w `e2e/kcap/results/`), `TestKernelCapRefusesAndNotes`, `TestRender`, `TestHostNetworkIsNeverTouched`, `e2e/kcap-window.sh` |
 | L7 | ten dokument był nieaktualny | rozdziały 1–3 zgodne z kodem, ten rozdział | ten commit | – |

@@ -9,6 +9,7 @@
 //	czujka doctor [--json]       check the database, pg_tde, the key, nmap, raw sockets, DNS, disk, routes
 //	czujka backup [-o FILE]      write one encrypted archive (pg_dump, key derived from the master key)
 //	czujka restore -i FILE       restore an archive into an empty database (--force drops the current data)
+//	czujka kcap apply|status|show|remove  the kernel packet cap of this network namespace (internal/kcap)
 //	czujka version
 package main
 
@@ -57,6 +58,8 @@ Usage:
   czujka doctor [--json]       check the installation; prints a fix for every failure
   czujka backup [-o FILE]      one encrypted archive of the database (key derived from the master key)
   czujka restore -i FILE [--force]  restore an archive into an empty database (--force drops the current data)
+  czujka kcap apply --pps N | status | show --pps N | remove
+                               the kernel packet cap (nftables) of this network namespace
   czujka version
 
 Configuration comes from CZUJKA_* environment variables; see deploy/.env.example.
@@ -94,6 +97,8 @@ func main() {
 		err = backupCmd(os.Args[2:])
 	case "restore":
 		err = restoreCmd(os.Args[2:])
+	case "kcap":
+		err = kcapCmd(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "czujka: unknown command %q\n\n%s", os.Args[1], usage)
 		os.Exit(2)
@@ -233,9 +238,18 @@ func serve() error {
 
 	startHostGateway(ctx, cfg.HostGateway, log)
 
+	// The kernel packet cap: a second limit under nmap's pacing (internal/kcap).
+	kc, err := newKernelCap(cfg.DBURL, log)
+	if err != nil {
+		return err
+	}
+	if p, err := st.GetSafetyPolicy(ctx); err == nil {
+		kc.Sync(ctx, p.MaxPPS)
+	}
+
 	bus := runner.NewBus()
 	w := wire2(cfg, st, log)
-	mgr := runner.New(st, runner.Options{Engine: w.Engine, Analyzer: w.RunAnalyzer, Window: w.Window, PauseCause: w.PauseCause, Bus: bus, IngestBatch: cfg.IngestBatch, Logger: log})
+	mgr := runner.New(st, runner.Options{Engine: w.Engine, Analyzer: w.RunAnalyzer, Window: w.Window, PauseCause: w.PauseCause, Bus: bus, IngestBatch: cfg.IngestBatch, Logger: log, KernelCap: kc})
 	// Seed and load the signatures before a recovered run resumes; start the scheduler loop.
 	if err := w.Start(ctx, mgr); err != nil {
 		return err
@@ -262,6 +276,7 @@ func serve() error {
 	}
 	deps.Store, deps.Auth, deps.Runner, deps.Bus, deps.Logger, deps.Version = st, authSvc, mgr, bus, log, version
 	deps.CookieSecure, deps.TrustProxy, deps.WebDir = cfg.CookieSecure, cfg.TrustProxy, cfg.WebDir
+	deps.KernelCap = kc
 	srv := &http.Server{
 		Addr:              cfg.Listen,
 		Handler:           api.New(deps).Handler(),

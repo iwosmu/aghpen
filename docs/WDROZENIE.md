@@ -13,7 +13,7 @@ Instrukcja dla administratora. Polecenia z tego dokumentu zostały wykonane 2026
 | Sieć podczas budowania | Docker Hub, `proxy.golang.org`, rejestr npm, repozytorium pakietów Alpine |
 | Dysk | obraz `czujka` 72 MB, obraz bazy `czujka-db:17` 1,37 GB, plus dane |
 | Pamięć w spoczynku | `czujka` 42 MiB, baza 27 MiB (pomiar `docker stats` na pustej instalacji) |
-| Uprawnienia kontenera | `NET_RAW` i `NET_ADMIN` dla nmap; bez nich skan przechodzi na tryb połączeniowy |
+| Uprawnienia kontenera | `NET_RAW` i `NET_ADMIN` dla nmap; bez nich skan przechodzi na tryb połączeniowy. `NET_ADMIN` pozwala też zainstalować limit pakietów w jądrze (nftables) |
 
 ## 2. Start
 
@@ -153,6 +153,8 @@ Czas odpowiedzi to czas pierwszego żądania `GET` do usługi (`http.response_ms
 | `CZUJKA_MASTER_KEY` | puste | klucz główny szyfrowania pól: 32 bajty jako base64 albo hex; puste = klucz w pliku w wolumenie |
 | `CZUJKA_MASTER_KEY_OLD` | puste | poprzednie klucze po przecinku; tylko na czas rotacji |
 | `CZUJKA_TDE` | `require` | `require`: nie startuj bez `pg_tde`; `auto`: startuj i ostrzeż; `off` |
+| `CZUJKA_KERNEL_CAP` | `auto` | limit pakietów sond w jądrze (nftables, `docs/BEZPIECZENSTWO.md` rozdz. 1.2.1). `auto`: zainstaluj, gdy się da; `require`: nie skanuj bez niego; `off`. W trybie sieci hosta niedostępny |
+| `CZUJKA_DEEP_PASS_HOSTS` | `16` | ile hostów na przebieg dostaje rotacyjny głębszy przebieg (reszta portów 1-65535) w zakresie ponad 256 adresów z listą `top-N` (`docs/ALGORYTMY.md`). `0` wyłącza go, najwyżej `64`. Koszt: około 86 s na host przy 1000 pakietów/s (16 hostów: około 23 min na przebieg) |
 | `CZUJKA_BIND` | `127.0.0.1` | adres hosta, na którym słucha interfejs |
 | `CZUJKA_PORT` | `8080` | port na hoście |
 | `CZUJKA_COOKIE_SECURE` | `auto` | flaga `Secure` ciasteczka sesji: `auto` (przy TLS), `true`, `false` |

@@ -113,6 +113,7 @@ type hostIn struct {
 	Vendor    string    `json:"vendor"`
 	Source    string    `json:"source"`
 	RunID     int64     `json:"run_id"`
+	FullPorts bool      `json:"full_ports"`
 }
 
 type hostObsIn struct {
@@ -151,6 +152,7 @@ type serviceIn struct {
 	ObsHash      string             `json:"obs_hash"`
 	RunID        int64              `json:"run_id"`
 	CertNotAfter *time.Time         `json:"cert_not_after"`
+	Deep         bool               `json:"deep"`
 }
 
 type obsIn struct {
@@ -201,12 +203,12 @@ func obsHash(sv *model.ServiceResult, title string, status int, tls bool, techs 
 }
 
 const hostUpsert = `INSERT INTO hosts AS h (ip, hostnames, scope_ids, status, first_seen, last_seen, last_up, os_guess, mac, vendor, source,
-	consecutive_misses, obs_total, obs_up, stability, last_run_id)
+	consecutive_misses, obs_total, obs_up, stability, last_run_id, deep_scan_at)
 SELECT d.ip, d.hostnames, d.scope_ids, CASE WHEN d.up THEN 'up' ELSE 'unknown' END, d.at, d.at, CASE WHEN d.up THEN d.at END,
 	d.os_guess, d.mac, d.vendor, d.source, CASE WHEN d.up THEN 0 ELSE 1 END, 1, CASE WHEN d.up THEN 1 ELSE 0 END,
-	CASE WHEN d.up THEN 1 ELSE 0 END, d.run_id
+	CASE WHEN d.up THEN 1 ELSE 0 END, d.run_id, CASE WHEN d.full_ports THEN d.at END
 FROM jsonb_to_recordset($1::jsonb) AS d(ip inet, hostnames text[], scope_ids bigint[], up boolean, at timestamptz, os_guess text, mac text,
-	vendor text, source text, run_id bigint)
+	vendor text, source text, run_id bigint, full_ports boolean)
 ON CONFLICT (ip) DO UPDATE SET
 	-- observed fields: an analyst override wins, the new observed value is recorded beside it
 	hostnames = CASE WHEN h.overrides ? 'hostnames' OR cardinality(EXCLUDED.hostnames) = 0 THEN h.hostnames ELSE EXCLUDED.hostnames END,
@@ -223,18 +225,20 @@ ON CONFLICT (ip) DO UPDATE SET
 	obs_total = h.obs_total + 1,
 	obs_up = h.obs_up + EXCLUDED.obs_up,
 	stability = (h.obs_up + EXCLUDED.obs_up)::float8 / (h.obs_total + 1),
-	last_run_id = EXCLUDED.last_run_id
+	last_run_id = EXCLUDED.last_run_id,
+	deep_scan_at = COALESCE(GREATEST(h.deep_scan_at, EXCLUDED.deep_scan_at), h.deep_scan_at, EXCLUDED.deep_scan_at)
 	-- label, owner, criticality, note, tags are analyst-owned: never written here
 RETURNING h.id, host(h.ip)`
 
 const serviceUpsert = `INSERT INTO services AS s (host_id, ip, hostname, port, proto, state, name, product, version, banner, confidence, tls, title,
-	http_status, url, technologies, tech_names, classes, first_seen, last_seen, obs_hash, last_run_id, cert_not_after)
+	http_status, url, technologies, tech_names, classes, first_seen, last_seen, obs_hash, last_run_id, cert_not_after, deep_run_id)
 SELECT d.host_id, d.ip, d.hostname, d.port, d.proto, d.state, d.name, d.product, d.version, d.banner, d.confidence, d.tls, d.title,
-	d.http_status, d.url, d.technologies, d.tech_names, d.classes, d.at, d.at, d.obs_hash, d.run_id, d.cert_not_after
+	d.http_status, d.url, d.technologies, d.tech_names, d.classes, d.at, d.at, d.obs_hash, d.run_id, d.cert_not_after, CASE WHEN d.deep THEN d.run_id END
 FROM jsonb_to_recordset($1::jsonb) AS d(host_id bigint, ip inet, hostname text, port int, proto text, state text, name text, product text,
 	version text, banner text, confidence float8, tls boolean, title text, http_status int, url text, technologies jsonb, tech_names text[],
-	classes text[], at timestamptz, obs_hash text, run_id bigint, cert_not_after timestamptz)
+	classes text[], at timestamptz, obs_hash text, run_id bigint, cert_not_after timestamptz, deep boolean)
 ON CONFLICT (host_id, port, proto) DO UPDATE SET
+	deep_run_id = COALESCE(EXCLUDED.deep_run_id, s.deep_run_id),
 	ip = EXCLUDED.ip,
 	hostname = CASE WHEN EXCLUDED.hostname <> '' THEN EXCLUDED.hostname ELSE s.hostname END,
 	state = EXCLUDED.state,
@@ -376,7 +380,8 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 		}
 		addr, _ := netip.ParseAddr(ip)
 		hostsIn = append(hostsIn, hostIn{IP: ip, Hostnames: nonNil(r.Hostnames), ScopeIDs: scopes.match(addr, r.Hostnames), Up: r.Up,
-			At: r.ObservedAt.UTC(), OSGuess: r.OSGuess, MAC: r.MAC, Vendor: model.VendorForMAC(r.MAC, r.Vendor), Source: opt.Source, RunID: r.RunID})
+			At: r.ObservedAt.UTC(), OSGuess: r.OSGuess, MAC: r.MAC, Vendor: model.VendorForMAC(r.MAC, r.Vendor), Source: opt.Source, RunID: r.RunID,
+			FullPorts: r.Up && r.FullPorts && !r.Interim && !r.HasUnknownPorts()})
 	}
 
 	{
@@ -497,7 +502,7 @@ func (tx *Store) ingest(ctx context.Context, byIP map[string]*model.HostResult, 
 				}
 				in := serviceIn{HostID: id, IP: ip, Port: sv.Port, Proto: proto, State: state, Name: sv.Name, Product: sv.Product, Version: sv.Version,
 					Banner: sv.Banner, Confidence: sv.Confidence, TLS: sv.Tunnel == "ssl" || sv.TLS != nil, Technologies: nonNil(sv.Technologies),
-					TechNames: []string{}, Classes: nonNil(sv.Classes), At: r.ObservedAt.UTC(), RunID: r.RunID}
+					TechNames: []string{}, Classes: nonNil(sv.Classes), At: r.ObservedAt.UTC(), RunID: r.RunID, Deep: sv.DeepPass}
 				if len(r.Hostnames) > 0 {
 					in.Hostname = r.Hostnames[0]
 				}
