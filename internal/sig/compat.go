@@ -346,6 +346,7 @@ func (d *Def) YAML() string {
 	b.str("category", d.Category)
 	b.str("description", d.Description)
 	b.str("author", d.Author)
+	b.str("source", d.Source)
 	b.str("cpe", d.CPE)
 	b.list("tags", d.Tags)
 	b.list("implies", d.Implies)

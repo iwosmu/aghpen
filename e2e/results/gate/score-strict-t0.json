@@ -42,55 +42,48 @@
     },
     {
       "name": "technologies",
-      "tp": 102,
-      "fp": 1,
-      "fn": 2,
-      "precision": 0.9902912621359223,
-      "recall": 0.9807692307692307,
-      "f1": 0.9855072463768114,
+      "tp": 103,
+      "fp": 0,
+      "fn": 1,
+      "precision": 1,
+      "recall": 0.9903846153846154,
+      "f1": 0.9951690821256038,
       "missed": [
-        "10.66.0.53:53/udp dnsmasq",
         "10.66.70.11:18443/tcp nginx"
       ],
-      "false_positives": [
-        "10.66.10.40:8000/tcp Nagios NSCA"
-      ]
+      "false_positives": []
     },
     {
       "name": "classes",
       "tp": 51,
-      "fp": 1,
+      "fp": 0,
       "fn": 1,
-      "precision": 0.9807692307692307,
+      "precision": 1,
       "recall": 0.9807692307692307,
-      "f1": 0.9807692307692307,
+      "f1": 0.9902912621359222,
       "missed": [
         "10.66.70.11:18443/tcp login"
       ],
-      "false_positives": [
-        "10.66.60.10:80/tcp staging"
-      ]
+      "false_positives": []
     }
   ],
   "accuracies": [
     {
       "name": "service versions",
-      "right": 30,
+      "right": 32,
       "total": 32,
-      "share": 0.9375,
-      "wrong": [
-        "10.66.0.53:53/udp dnsmasq: want 2.92rel2, got \"\"",
-        "10.66.20.41:123/udp NTP: want v4, got \"\""
-      ],
+      "share": 1,
+      "wrong": [],
       "comment": "product version where the truth knows it"
     },
     {
       "name": "technology versions",
       "right": 55,
-      "total": 56,
-      "share": 0.9821428571428571,
+      "total": 57,
+      "share": 0.9649122807017544,
       "wrong": [
-        "10.66.0.53:53/tcp dnsmasq: want 2.92, got \"2.92rel2\""
+        "10.66.0.53:53/tcp dnsmasq: want 2.92, got \"2.92rel2\"",
+        "10.66.0.53:53/udp dnsmasq: want 2.92, got \"2.92rel2\""
       ]
     },
     {
@@ -152,22 +145,22 @@
       "ip": "10.66.70.20",
       "name": "flapper",
       "seen_up": true,
-      "expected_up": true,
-      "observed_at": "2026-11-21T20:52:58Z"
+      "expected_up": false,
+      "observed_at": "2026-11-22T02:12:15Z"
     },
     {
       "ip": "10.66.70.21",
       "name": "tod-office",
       "seen_up": true,
-      "expected_up": false,
-      "observed_at": "2026-11-21T20:52:58Z"
+      "expected_up": true,
+      "observed_at": "2026-11-22T02:12:15Z"
     },
     {
       "ip": "10.66.70.22",
       "name": "tod-night",
       "seen_up": true,
       "expected_up": false,
-      "observed_at": "2026-11-21T20:52:58Z"
+      "observed_at": "2026-11-22T02:12:15Z"
     }
   ]
 }

@@ -117,3 +117,80 @@
     rules:
       - {type: service, field: product, regex: '^Redis', weight: 0.5}
       - {type: service, field: version, regex: '^[0-9]', weight: 0.5}
+
+# Deliberately vulnerable trainers next to DVWA (zoo, e2e/zoo): a lab template may hold any of them.
+- id: juice-shop
+  name: OWASP Juice Shop
+  category: framework
+  description: Celowo podatny sklep OWASP Juice Shop (aplikacja szkoleniowa). Nie powinien być osiągalny poza laboratorium.
+  tags: [nodejs, podatna-aplikacja, szkolenie]
+  interest: 80
+  classes: [staging]
+  implies: [Node.js]
+  match:
+    min_confidence: 0.6
+    rules:
+      - {type: title, equals: 'OWASP Juice Shop', weight: 0.9}
+      - {type: header, name: X-Recruiting, contains: '/#/jobs', weight: 0.8}
+  version:
+    - {type: path, path: /rest/admin/application-version, regex: '"version"\s*:\s*"v?([0-9]+\.[0-9]+\.[0-9]+)'}
+
+- id: webgoat
+  name: OWASP WebGoat
+  category: framework
+  description: Celowo podatna aplikacja szkoleniowa OWASP WebGoat (Spring Boot, ścieżka /WebGoat). Rejestracja konta jest otwarta.
+  tags: [java, podatna-aplikacja, szkolenie]
+  interest: 80
+  classes: [staging, login]
+  aliases: [WebGoat]
+  implies: [Java]
+  match:
+    min_confidence: 0.6
+    rules:
+      - {type: path, path: /WebGoat/login, status: [200], contains_all: ['<span>Web</span>Goat', '/WebGoat/css/'], weight: 0.95, required: true}
+      # Support from the root page (embedded Tomcat's 404) so that the path above is fetched; not enough alone.
+      - {type: body, contains: 'Apache Tomcat', weight: 0.2}
+
+- id: webwolf
+  name: OWASP WebWolf
+  category: framework
+  description: WebWolf, pomocnik WebGoat do ćwiczeń (przechwytuje pliki, żądania i JWT). Oznacza laboratorium szkoleniowe.
+  tags: [java, podatna-aplikacja, szkolenie]
+  interest: 70
+  classes: [staging]
+  aliases: [WebWolf]
+  implies: [Java]
+  match:
+    min_confidence: 0.6
+    rules:
+      - {type: path, path: /WebWolf/login, status: [200], contains_all: ['<title>WebWolf</title>', '/WebWolf/css/'], weight: 0.95, required: true}
+      - {type: body, contains: 'Apache Tomcat', weight: 0.2}
+
+- id: bwapp
+  name: bWAPP
+  category: framework
+  description: Celowo podatna aplikacja szkoleniowa bWAPP (PHP, MySQL).
+  tags: [php, podatna-aplikacja, szkolenie]
+  interest: 80
+  classes: [staging]
+  implies: [PHP]
+  match:
+    min_confidence: 0.6
+    rules:
+      - {type: title, regex: '^bWAPP', weight: 0.9}
+      - {type: body, regex: 'an extremely buggy web app|Unknown database .bWAPP.', weight: 0.9}
+      - {type: path, path: /install.php, status: [200], contains: 'bWAPP - Installation', weight: 0.9}
+
+- id: bwapp-installer
+  name: bWAPP – niezainstalowany
+  category: framework
+  technology: bWAPP
+  description: bWAPP bez bazy danych. Jedno kliknięcie w /install.php ją tworzy z domyślnym kontem bee/bug.
+  tags: [php, podatna-aplikacja, install]
+  interest: 85
+  classes: [staging, install-page]
+  match:
+    min_confidence: 0.85
+    rules:
+      - {type: body, contains: "Unknown database 'bWAPP'", weight: 0.9}
+      - {type: path, path: /install.php, status: [200], contains: 'install.php?install=yes', weight: 0.9}

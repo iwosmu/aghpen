@@ -105,6 +105,7 @@ type Def struct {
 	NameEN        string // optional English display name (name_en)
 	DescriptionEN string // optional English description (description_en)
 	Author        string
+	Source        string // where an imported signature comes from: corpus, commit, upstream id, licence
 	CPE           string
 	Technology    string // technology name this signature supports; default Name
 	NoTech        bool   // true: a finding, not a technology
@@ -478,6 +479,9 @@ func (p *parser) parseDef(n *yaml.Node, prefix string) *Def {
 	}
 	if v, k := m.get("author", "authors"); v != nil {
 		d.Author = strings.Join(cleanList(p.strList(v, at(k))), ", ")
+	}
+	if v, k := m.get("source"); v != nil {
+		d.Source = strings.TrimSpace(p.str(v, at(k)))
 	}
 	if v, k := m.get("cpe"); v != nil {
 		d.CPE = strings.TrimSpace(p.str(v, at(k)))

@@ -1,14 +1,14 @@
 {
   "id": 1,
   "profile_id": 2,
-  "profile_name": "lab-run: gate 214531",
+  "profile_name": "lab-run: gate 030444",
   "status": "completed",
   "pause_reason": "",
   "trigger": "manual",
   "created_by": 1,
-  "created_at": "2026-11-21T20:45:37.207401Z",
-  "started_at": "2026-11-21T20:45:37.213783Z",
-  "finished_at": "2026-11-21T20:58:19.668021Z",
+  "created_at": "2026-11-22T02:04:49.895579Z",
+  "started_at": "2026-11-22T02:04:49.901071Z",
+  "finished_at": "2026-11-22T02:40:24.664415Z",
   "window_end": null,
   "resume_at": null,
   "stats": {
@@ -19,17 +19,22 @@
     "hosts_up": 70,
     "services_open": 157,
     "http_services": 135,
-    "packets_sent": 230914,
-    "http_requests": 1366,
-    "current_pps": 0,
-    "packets_estimated": 7106,
+    "packets_sent": 1254588,
+    "http_requests": 1369,
+    "current_pps": 743.5,
+    "packets_estimated": 7061,
     "current_pps_basis": "measured",
-    "avg_pps": 302.9,
-    "elapsed_sec": 762,
+    "avg_pps": 587.8,
+    "general_pps": 302.2,
+    "elapsed_sec": 2134,
     "eta_sec": 0,
     "retried": 0,
     "errors": 0,
     "ports_unknown": 0,
+    "notes": [
+      "głębszy przebieg: reszta portów 1-65535 objęła 16 hostów; czeka jeszcze 54 (następne przebiegi biorą najpierw hosty nigdy nie skanowane w pełni, potem najdawniej skanowane)",
+      "jądro odrzuciło 393 pakietów ponad limit"
+    ],
     "passes": [
       {
         "name": "top_ports",
@@ -37,6 +42,14 @@
         "hosts": 70,
         "ports_total": 72380,
         "ports_done": 72380
+      },
+      {
+        "name": "deep_range",
+        "state": "done",
+        "hosts": 16,
+        "ports_total": 1022860,
+        "ports_done": 1022860,
+        "hosts_skipped": 54
       },
       {
         "name": "dense",
@@ -61,7 +74,7 @@
     "hosts_missing": 0,
     "services_unreachable": 0,
     "by_kind": {},
-    "findings_new": 282
+    "findings_new": 283
   },
   "error": "",
   "import_file": "",

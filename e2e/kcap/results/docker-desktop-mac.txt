@@ -1,0 +1,204 @@
+# kcap experiment 2026-11-21T23:06:48Z on MacBook-Pro-69.local: docker 29.6.2, kernel 6.12.76-linuxkit
+# cap 500 pps -> kernel limit 550/s burst 55; freeze 15 s; ports 1-20000; sink 192.168.231.10
+
+## phase before: cap off, freeze 15 s
+  23:07:11 SIGSTOP nmap
+  23:07:27 SIGCONT nmap
+  SYN packets per second on the scanner's interface:
+  t+000s     86
+  t+001s    500
+  t+002s    499
+  t+003s    500
+  t+004s    501
+  t+005s    499
+  t+006s    501
+  t+007s    499
+  t+008s    500
+  t+009s    500
+  t+010s    387
+  t+026s   8113
+  t+027s    500
+  t+028s    500
+  t+029s    500
+  t+030s    500
+  t+031s    501
+  t+032s    499
+  t+033s    500
+  t+034s    499
+  t+035s    501
+  t+036s    500
+  t+037s    501
+  t+038s    500
+  t+039s    498
+  t+040s    501
+  t+041s    496
+  t+042s    504
+  t+043s    381
+  max 8113 pps
+  SYN packets total: 21466
+  open ports found (30): 21 22 25 53 80 110 143 443 445 993 995 1433 1521 2049 3000 3306 3389 5000 5432 5672 5900 6379 8000 8080 8081 8443 9000 9200 11211 15672 
+  nmap: Nmap done: 1 IP address (1 host up) scanned in 43.22 seconds
+  nmap:            Raw packets sent: 21467 (944.532KB) | Rcvd: 20002 (800.188KB)
+
+## phase after: cap on, freeze 15 s
+time=2026-11-21T23:07:48.054Z level=INFO msg="kernel packet cap installed" table="inet czujka_kcap" policy_pps=500 kernel_pps=550 burst=55 exempt=1
+{"mode":"require","active":true,"pps":550,"burst":55,"policy_pps":500,"dropped":0}
+  23:08:00 SIGSTOP nmap
+  23:08:15 SIGCONT nmap
+  SYN packets per second on the scanner's interface:
+  t+000s    198
+  t+001s    499
+  t+002s    500
+  t+003s    501
+  t+004s    497
+  t+005s    503
+  t+006s    499
+  t+007s    500
+  t+008s    501
+  t+009s    496
+  t+010s    229
+  t+025s    211
+  t+026s    499
+  t+027s    501
+  t+028s    500
+  t+029s    499
+  t+030s    501
+  t+031s    500
+  t+032s    500
+  t+033s    500
+  t+034s    499
+  t+035s    501
+  t+036s    499
+  t+037s    501
+  t+038s    499
+  t+039s    500
+  t+040s    500
+  t+041s    501
+  t+042s    500
+  t+043s    500
+  t+044s    500
+  t+045s    499
+  t+046s    500
+  t+047s    500
+  t+048s    501
+  t+049s    500
+  t+050s    499
+  t+051s    501
+  t+052s    499
+  t+053s    500
+  t+054s    501
+  t+055s    367
+  max 503 pps
+  SYN packets total: 20001
+  kernel counter: {"dropped":7564}
+  open ports found (30): 21 22 25 53 80 110 143 443 445 993 995 1433 1521 2049 3000 3306 3389 5000 5432 5672 5900 6379 8000 8080 8081 8443 9000 9200 11211 15672 
+  nmap: Nmap done: 1 IP address (1 host up) scanned in 55.47 seconds
+  nmap:            Raw packets sent: 20002 (880.072KB) | Rcvd: 20002 (800.188KB)
+
+## phase normal: cap on, freeze 0 s
+time=2026-11-21T23:08:50.310Z level=INFO msg="kernel packet cap installed" table="inet czujka_kcap" policy_pps=500 kernel_pps=550 burst=55 exempt=1
+{"mode":"require","active":true,"pps":550,"burst":55,"policy_pps":500,"dropped":0}
+  SYN packets per second on the scanner's interface:
+  t+000s     52
+  t+001s    501
+  t+002s    499
+  t+003s    500
+  t+004s    500
+  t+005s    501
+  t+006s    499
+  t+007s    500
+  t+008s    500
+  t+009s    501
+  t+010s    499
+  t+011s    501
+  t+012s    499
+  t+013s    501
+  t+014s    498
+  t+015s    502
+  t+016s    499
+  t+017s    500
+  t+018s    500
+  t+019s    501
+  t+020s    499
+  t+021s    501
+  t+022s    498
+  t+023s    502
+  t+024s    499
+  t+025s    500
+  t+026s    500
+  t+027s    500
+  t+028s    500
+  t+029s    499
+  t+030s    501
+  t+031s    500
+  t+032s    500
+  t+033s    500
+  t+034s    500
+  t+035s    500
+  t+036s    500
+  t+037s    500
+  t+038s    500
+  t+039s    500
+  t+040s    448
+  max 502 pps
+  SYN packets total: 20000
+  kernel counter: {"dropped":0}
+  open ports found (30): 21 22 25 53 80 110 143 443 445 993 995 1433 1521 2049 3000 3306 3389 5000 5432 5672 5900 6379 8000 8080 8081 8443 9000 9200 11211 15672 
+  nmap: Nmap done: 1 IP address (1 host up) scanned in 40.24 seconds
+  nmap:            Raw packets sent: 20001 (880.028KB) | Rcvd: 20001 (800.148KB)
+
+## phase nocap: cap off, freeze 0 s
+  SYN packets per second on the scanner's interface:
+  t+000s    273
+  t+001s    500
+  t+002s    500
+  t+003s    500
+  t+004s    499
+  t+005s    500
+  t+006s    501
+  t+007s    500
+  t+008s    499
+  t+009s    500
+  t+010s    501
+  t+011s    499
+  t+012s    501
+  t+013s    500
+  t+014s    500
+  t+015s    500
+  t+016s    499
+  t+017s    501
+  t+018s    499
+  t+019s    501
+  t+020s    499
+  t+021s    500
+  t+022s    500
+  t+023s    501
+  t+024s    500
+  t+025s    500
+  t+026s    500
+  t+027s    499
+  t+028s    500
+  t+029s    501
+  t+030s    500
+  t+031s    499
+  t+032s    501
+  t+033s    499
+  t+034s    501
+  t+035s    500
+  t+036s    500
+  t+037s    499
+  t+038s    501
+  t+039s    500
+  t+040s    227
+  max 501 pps
+  SYN packets total: 20000
+  open ports found (30): 21 22 25 53 80 110 143 443 445 993 995 1433 1521 2049 3000 3306 3389 5000 5432 5672 5900 6379 8000 8080 8081 8443 9000 9200 11211 15672 
+  nmap: Nmap done: 1 IP address (1 host up) scanned in 40.16 seconds
+  nmap:            Raw packets sent: 20001 (880.028KB) | Rcvd: 20001 (800.148KB)
+
+## ports
+  expected: 21 22 25 53 80 110 143 443 445 993 995 1433 1521 2049 3000 3306 3389 5000 5432 5672 5900 6379 8000 8080 8081 8443 9000 9200 11211 15672 
+  before: all 30 found
+  after: all 30 found
+  normal: all 30 found
+  nocap: all 30 found

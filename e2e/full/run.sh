@@ -118,7 +118,7 @@ mem_sampler() { # samples the memory of the Czujka container every 2 s while $TM
   ( while [ -f "$TMP/mem.on" ]; do docker stats --no-stream --format '{{.MemUsage}}' "$CZ" 2>/dev/null | awk '{print $1}' >> "$TMP/mem.txt"; sleep 2; done ) &
 }
 mem_max() { # the largest sample in MiB
-  awk '{v=$1; u=v; gsub(/[0-9.]/,"",u); gsub(/[^0-9.]/,"",v); if(u=="GiB")v*=1024; if(u=="KiB")v/=1024; if(u=="B")v/=1048576; if(v>m)m=v} END{printf "%.1f", m}' "$TMP/mem.txt"
+  awk '{v=$1; u=v; gsub(/[0-9.]/,"",u); gsub(/[^0-9.]/,"",v); v=v+0; if(u=="GiB")v*=1024; if(u=="KiB")v/=1024; if(u=="B")v/=1048576; if(v>m)m=v} END{printf "%.1f", m}' "$TMP/mem.txt"
 }
 follow() { # run id: follows the SSE stream until the final event ("done" or "paused"); sets FINAL
   local id=$1 ev="" counts="" n=0 last=""

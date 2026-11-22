@@ -580,6 +580,33 @@ Sygnatura w obcym formacie działa też bez konwersji: `POST /api/v1/signatures`
 - Złożony warunek `and` w szablonie z kilkoma żądaniami albo ścieżkami, którego nie da się zapisać jedną regułą, jest odrzucany z prośbą o podział szablonu.
 - Z plików Wappalyzera używane są tylko cechy widoczne w odpowiedzi HTTP.
 
+### 14.6 Zaimportowane korpusy (`signatures/community`)
+
+Obok 398 sygnatur pisanych ręcznie binarka ma sygnatury przekonwertowane z otwartego korpusu
+[projectdiscovery/nuclei-templates](https://github.com/projectdiscovery/nuclei-templates) (MIT,
+commit `1ad25895`). Licencja i polecenie odtworzenia są w `signatures/community/LICENSES.md`.
+
+| Krok | Reguła |
+| --- | --- |
+| źródła | `http/technologies` (w tym `tech-detect`, `favicon-detect`, `fingerprinthub`), `http/exposed-panels`, `http/misconfiguration/installer` |
+| podział | szablon z nazwanymi matcherami (`tech-detect`, `favicon-detect`) daje jedną sygnaturę na technologię |
+| konwersja | konwerter z punktu 14.4 i tryb bezpieczny; odrzucone: DSL inne niż skrót ikony, `payloads`, `raw`, zmienne, niebezpieczne ścieżki |
+| koszt | w zestawie domyślnym tylko reguły na stronie głównej, przekierowaniach, ikonie i ścieżkach, które biblioteka już pobiera: zero nowych żądań |
+| opt-in | szablony z własną ścieżką i 1600 sygnatur FingerprintHub (głównie produkty regionalne; podwajały czas dopasowania) są w `signatures/community/opt-in/` (nie są wbudowane); włącza się je przez wgranie pliku jako sygnatur własnych |
+| koszt dopasowania | `BenchmarkMatch` kontra `BenchmarkMatchHandWritten`: import dodaje 30–90 % czasu na usługę (zmierzone pod obciążeniem maszyny); test przepustowości pilnuje granicy 3 ms albo 2,5 × czas samej biblioteki ręcznej |
+| pierwszeństwo | import, który nazywa technologię znaną bibliotece ręcznej, jest pomijany (nasze wygrywają) |
+| szum | pomijane: biblioteki front-endu, CDN, czcionki, analityka; sygnatury bez wzorca dłuższego niż 7 znaków |
+| samoopis | gdy żadna sygnatura nie nazywa aplikacji, silnik bierze jej własną nazwę: `meta application-name`, `og:site_name`, `generator`, tytuł „Sign in · X” / „X - Login” / „Log in to X”; technologia z pewnością 0,4 i źródłem `self-described`; słowa ogólne („Login”, „Welcome”, „Dashboard”), nazwy hostów i adresy nigdy nie stają się produktem; wersja z tytułu, generatora, nagłówka `Server`/`X-Powered-By` z tą nazwą albo z `?ver=` zgodnego w co najmniej dwóch lokalnych zasobach |
+| ocena | `-eval` uruchamia kandydatów na zapisanych wynikach laboratorium (70 hostów) i zoo; każda sygnatura, która trafia wbrew opisowi prawdy, trafia do `denylist.tsv` |
+| metadane | pole `source`: repozytorium, commit, plik, id szablonu, licencja; tag `nuclei-templates` |
+
+Liczby z ostatniego przebiegu są w `signatures/community/import-report.tsv`. Odtworzenie:
+
+```
+make sigimport NUCLEI_TEMPLATES=/ścieżka/do/nuclei-templates
+go run ./cmd/sigimport -src ... -commit ... -eval lab-export.json,e2e/zoo/out/before/01-cms/export.json,...
+```
+
 ## 15. Połączenie z bazą i API (`internal/sigwire`)
 
 `sigwire.Wire` łączy silnik z tabelą `signatures` i z API. Jeden obiekt spełnia `api.SignatureValidator` i `api.RetroHunter`, a `Engine()` zwraca ten sam `*sig.Engine`, który dostaje silnik skanowania jako `model.SignatureEngine`.

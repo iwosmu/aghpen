@@ -66,11 +66,12 @@
   technology: Joomla
   description: Instalator Joomla jest dostępny publicznie. Kto pierwszy go ukończy, przejmuje witrynę.
   interest: 70
-  classes: [admin-panel]
+  classes: [admin-panel, install-page]
   match:
     condition: all
     rules:
-      - {type: title, contains: 'Joomla Installer', weight: 0.9}
+      # Joomla 4-6: "Joomla Installer"; Joomla 3: "Joomla! Web Installer".
+      - {type: title, regex: 'Joomla!? (?:Web )?Installer', weight: 0.9}
       - {type: url, contains: '/installation/', weight: 0.6}
 
 - id: drupal
@@ -96,13 +97,13 @@
   name_en: Drupal – unfinished installation
   category: cms
   technology: Drupal
-  description: Instalator Drupala (core/install.php) jest dostępny publicznie.
+  description: Instalator Drupala (core/install.php, w Drupalu 7 install.php) jest dostępny publicznie.
   interest: 70
-  classes: [admin-panel]
+  classes: [admin-panel, install-page]
   match:
     condition: all
     rules:
-      - {type: url, contains: '/core/install.php', weight: 0.7}
+      - {type: url, regex: '/(?:core/)?install\.php', weight: 0.7}
       - {type: body, regex: 'install-page|Choose language|Drupal', weight: 0.7}
 
 - id: typo3
@@ -161,6 +162,7 @@
   technology: MediaWiki
   description: MediaWiki bez pliku LocalSettings.php. Instalator jest dostępny publicznie.
   interest: 60
+  classes: [install-page]
   match:
     rules:
       - {type: body, contains_all: ['LocalSettings.php not found', '/mw-config/'], weight: 0.95}
@@ -246,6 +248,28 @@
       - {type: cookie, name_regex: '^nc_sameSiteCookie(lax|strict)$', weight: 0.8}
       - {type: body, regex: 'apple-itunes-app" content="app-id=1125420102|/core/img/favicon(?:-touch)?\.(?:ico|png)|Nextcloud', weight: 0.5}
       - {type: favicon, mmh3: [167837543], weight: 0.9}
+      # The first-run installer is nextcloud-installer (install-page, not a login).
+      - {type: body, contains: '/dist/core-install.js', not: true}
+  version:
+    - {type: path, path: /status.php, regex: '"versionstring"\s*:\s*"([0-9.]+)'}
+
+- id: nextcloud-installer
+  name: Nextcloud – niedokończona instalacja
+  category: cms
+  technology: Nextcloud
+  description: Kreator pierwszego uruchomienia Nextcloud jest dostępny. Kto go wypełni, zakłada konto administratora i wskazuje bazę danych.
+  tags: [php, pliki, install]
+  interest: 80
+  classes: [admin-panel, install-page]
+  cpe: cpe:2.3:a:nextcloud:nextcloud_server
+  implies: [PHP]
+  match:
+    min_confidence: 0.8
+    rules:
+      # Nextcloud 25+ loads the installer bundle dist/core-install.js; older releases core/js/install.js.
+      - {type: body, regex: '/dist/core-install\.js|/core/js/install\.js', weight: 0.85}
+      - {type: title, regex: '^\s*Nextcloud\s*$', weight: 0.3}
+      - {type: path, path: /status.php, status: [200], regex: '"installed"\s*:\s*false', weight: 0.6}
   version:
     - {type: path, path: /status.php, regex: '"versionstring"\s*:\s*"([0-9.]+)'}
 
@@ -503,6 +527,27 @@
       - {type: cookie, name: MATOMO_SESSID, weight: 0.9}
       - {type: body, regex: 'piwik\.broadcast|plugins/CoreHome/images/favicon|content="Matomo', weight: 0.7}
       - {type: meta, name: generator, regex: '^(Matomo|Piwik)', weight: 0.9}
+      # The installer is matomo-installer (install-page, not a login).
+      - {type: body, contains: 'window.piwik = {installation: true}', not: true}
+
+- id: matomo-installer
+  name: Matomo – niedokończona instalacja
+  category: cms
+  technology: Matomo
+  description: Instalator Matomo jest dostępny. Kto go ukończy, zakłada superużytkownika i podaje dane bazy.
+  tags: [php, analityka, install]
+  interest: 75
+  classes: [admin-panel, install-page]
+  cpe: cpe:2.3:a:matomo:matomo
+  aliases: [Piwik]
+  implies: [PHP]
+  match:
+    min_confidence: 0.8
+    rules:
+      - {type: title, regex: '^(?:Matomo|Piwik) [0-9][0-9.]* › Installation', weight: 0.9}
+      - {type: body, contains_all: ['window.piwik = {installation: true}', 'module=Installation'], weight: 0.9}
+  version:
+    - {type: title, regex: '^(?:Matomo|Piwik) ([0-9][0-9.]*) › Installation'}
 
 - id: osticket
   name: osTicket

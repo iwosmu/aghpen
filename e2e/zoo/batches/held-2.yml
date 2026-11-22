@@ -1,0 +1,42 @@
+# Held-out batch 2: chosen after the tuning batches and never used for tuning. Scanned once, at the end.
+services:
+  activemq:
+    image: apache/activemq-classic:6.2.0
+    ports: ["8161:8161", "41616:61616"]
+  valkey:
+    image: valkey/valkey:9.2.0-alpine3.24
+    ports: ["6380:6379"]
+  emqx:
+    image: emqx/emqx:6.3.3
+    ports: ["18083:18083", "11883:1883"]
+  graphite:
+    image: graphiteapp/graphite-statsd:1.1.10-5
+    ports: ["8880:80"]
+  redmine:
+    image: redmine:7.0.3-alpine
+    ports: ["33000:3000"]
+  registry-ui:
+    image: joxit/docker-registry-ui:2.6.0
+    environment: {NGINX_PROXY_PASS_URL: "http://hregistry:5000", SINGLE_REGISTRY: "true"}
+    ports: ["8070:80"]
+    depends_on: [hregistry]
+  hregistry:
+    image: registry:3.1.2
+  openvscode:
+    image: gitpod/openvscode-server:1.105.1
+    ports: ["13300:3000"]
+  directus:
+    image: directus/directus:12.7.0
+    environment: {SECRET: zoo-test-only-secret, ADMIN_EMAIL: admin@example.org, ADMIN_PASSWORD: zoo-test-only, DB_CLIENT: sqlite3, DB_FILENAME: /directus/database/data.db}
+    ports: ["8055:8055"]
+  zookeeper:
+    image: zookeeper:3.9.7
+    ports: ["2181:2181", "28180:8080"]
+  yourls:
+    image: yourls:1.10.6-apache
+    environment: {YOURLS_DB_HOST: hdb, YOURLS_DB_USER: root, YOURLS_DB_PASS: zoo-test-only, YOURLS_SITE: "http://localhost:38080", YOURLS_USER: admin, YOURLS_PASS: zoo-test-only}
+    ports: ["38080:80"]
+    depends_on: [hdb]
+  hdb:
+    image: mariadb:11.4.13
+    environment: {MARIADB_ROOT_PASSWORD: zoo-test-only, MARIADB_DATABASE: yourls}

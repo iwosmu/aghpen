@@ -104,7 +104,8 @@
       - {type: header, name: X-Debug-Token-Link, exists: true, weight: 0.95}
       - {type: header, name: X-Debug-Token, exists: true, weight: 0.9}
       - {type: body, regex: 'class="sf-toolbar|id="sfwdt|Symfony Profiler|sf-dump', weight: 0.9}
-      - {type: path, path: /_profiler/, status: [200], regex: 'Symfony Profiler|sf-toolbar|_profiler', weight: 0.95}
+      # Not the bare word "_profiler": single-page apps (Metabase) echo the requested path into every page.
+      - {type: path, path: /_profiler/, status: [200], regex: 'Symfony Profiler|sf-toolbar', weight: 0.95}
 
 - id: phpinfo
   name: phpinfo()

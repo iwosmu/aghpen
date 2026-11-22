@@ -5,7 +5,9 @@ package signatures
 
 import "embed"
 
-// FS contains every built-in signature file (*.yaml in this directory).
+// FS contains every built-in signature file: the hand-written ones (*.yaml in
+// this directory) and the imported open corpora (community/*.yaml, generated
+// by cmd/sigimport; see community/LICENSES.md).
 //
-//go:embed *.yaml
+//go:embed *.yaml community/*.yaml
 var FS embed.FS
