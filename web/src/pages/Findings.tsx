@@ -42,7 +42,7 @@ function DetailDialog({ id, onClose }: { id: number; onClose: () => void }) {
       </>}>
       {q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : !f ? <SkeletonRows rows={6} /> : (
         <div className="space-y-4">
-          <p className="text-sm text-ink-2">{f.description || t('Brak opisu.', 'No description.')}</p>
+          <p className="text-sm text-ink-2">{f.description || t('Brak opisu', 'No description')}</p>
           <OverrideNote o={f.overrides?.title} canEdit={canEdit} onRevert={() => save.mutate({ title: null })} />
           <div className="grid gap-x-8 sm:grid-cols-2">
             <dl>
@@ -124,7 +124,7 @@ function FindingGroupList({ q, active, onOpen }: { q: ReturnType<typeof usePage<
       {[...SEVERITIES as string[], ...new Set(groups.map((g) => g.severity).filter((s) => !(SEVERITIES as string[]).includes(s)))].map((sev) => groups.filter((g) => g.severity === sev)).filter((list) => list.length).map((list) => (
         <section key={list[0].severity} className="mb-6">
           <GroupHead label={severityLabel(list[0].severity)} count={list.length} className="mb-2 px-1" />
-          <ul className="card overflow-hidden rounded-[20px]">
+          <ul className="card overflow-hidden rounded-[14px]">
         {list.map((g: FindingGroup) => {
           const isOpen = openKeys.has(g.key) || groups.length === 1;
           return (
@@ -295,7 +295,7 @@ export default function Findings() {
       <Dialog open={result !== null} onClose={() => setResult(null)} title={t('Eksport do DefectDojo', 'Export to DefectDojo')} width={480} footer={<Button variant="primary" onClick={() => setResult(null)}>{t('Gotowe', 'Done')}</Button>}>
         {result ? (
           <div className="space-y-3 text-sm" data-testid="dojo-result">
-            <p className="flex items-center gap-2"><Glyph name={result.failed ? 'delta' : 'check'} tone={result.failed ? 'changed' : 'new'} />{result.failed ? t('Eksport zakończony z błędami.', 'Export finished with errors.') : t('Eksport zakończony.', 'Export finished.')}</p>
+            <p className="flex items-center gap-2"><Glyph name={result.failed ? 'delta' : 'check'} tone={result.failed ? 'changed' : 'new'} />{result.failed ? t('Eksport zakończony z błędami', 'Export finished with errors') : t('Eksport zakończony', 'Export finished')}</p>
             <dl>
               <KV k={t('Nowe w DefectDojo', 'New in DefectDojo')}><span className="num">{result.exported}</span></KV>
               <KV k={t('Zaktualizowane', 'Updated')}><span className="num">{result.updated}</span></KV>

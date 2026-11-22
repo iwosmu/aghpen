@@ -181,7 +181,7 @@ function EmergencyStop({ policy }: { policy: SafetyPolicy | undefined }) {
   const [open, setOpen] = useState(false);
   const stop = useAction(() => post<SafetyPolicy>('/emergency-stop'), {
     invalidate: ['/settings/safety', '/runs', '/dashboard'], silent: true,
-    success: t('Stop awaryjny włączony.', 'Emergency stop is on.'),
+    success: t('Stop awaryjny włączony', 'Emergency stop is on'),
     onSuccess: () => setOpen(false),
   });
   if (!can('safety:stop') || !policy || policy.emergency_stop) return null;
@@ -215,7 +215,7 @@ function StopBanner({ policy }: { policy: SafetyPolicy | undefined }) {
   const { can } = useSession();
   const release = useAction(() => post<SafetyPolicy>('/emergency-stop/release'), {
     invalidate: ['/settings/safety', '/runs', '/dashboard'],
-    success: t('Stop awaryjny wyłączony.', 'Emergency stop is off.'),
+    success: t('Stop awaryjny wyłączony', 'Emergency stop is off'),
   });
   if (!policy?.emergency_stop) return null;
   return (

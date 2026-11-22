@@ -6,7 +6,7 @@ import type { Change, Dashboard as Dash, Finding, Host, Page, RunMap, ScanProfil
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtDec, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtSigned } from '../lib/format';
 import { useLiveRun, useNow, useWidth } from '../lib/hooks';
-import { LampLegend, NetworkField, NightStrip, PortField, networkFields } from '../viz/Night';
+import { LampLegend, NetworkField, NightStrip, PortField, networkFields, runChanges } from '../viz/Night';
 import { ErrorState, Panel, SkeletonRows } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 import { ClassChips, Glyph, InterestScore, RunStatusMark, Sev, changeKindInfo, severityLabel, type GlyphName, type Tone } from '../ui/marks';
@@ -88,7 +88,7 @@ function Handover({ d, full }: { d: Dash; full?: ScanRun | null }) {
     ? t('Pierwszy obraz sieci: ' + fmtInt(h.hosts_up) + ' ' + plural(h.hosts_up, ['aktywny host', 'aktywne hosty', 'aktywnych hostów'], ['', '']) + ', ' + fmtInt(h.services_open) + ' ' + plural(h.services_open, ['otwarta usługa', 'otwarte usługi', 'otwartych usług'], ['', '']) + '.',
       'First picture of the network: ' + fmtInt(h.hosts_up) + ' ' + (h.hosts_up === 1 ? 'host' : 'hosts') + ' up, ' + fmtInt(h.services_open) + ' open ' + (h.services_open === 1 ? 'service' : 'services') + '.')
     : quiet
-      ? t('Bez zmian od poprzedniego skanu.', 'No change since the previous scan.')
+      ? t('Bez zmian od poprzedniego skanu', 'No change since the previous scan')
       : (() => { const n = added + gone + changed + missing + s!.hosts_unstable + returned + slower + recovered + confirmedGone; return t(fmtInt(n) + ' ' + plural(n, ['zmiana', 'zmiany', 'zmian'], ['', '']) + ' od poprzedniego skanu.', fmtInt(n) + ' ' + (n === 1 ? 'change' : 'changes') + ' since the previous scan.'); })();
   return (
     <div>
@@ -158,14 +158,18 @@ function Inventory({ d, pair, runs }: { d: Dash; pair?: { full?: ScanRun; prev?:
   const deltaTitle = full && prev ? t('zmiana między pełnymi skanami #' + prev.id + ' i #' + full.id + (full.profile_name ? ' (' + full.profile_name + ')' : ''), 'change between the full scans #' + prev.id + ' and #' + full.id + (full.profile_name ? ' (' + full.profile_name + ')' : '')) : undefined;
   // the same per-scan series as the API's trend, oldest first
   void runs;
+  const lastRun = d.last_run;
+  const lastChanges = lastRun ? runChanges(lastRun) : 0;
+  const newHighQ = usePage<Finding>('/findings', { severity: 'high', status: 'new', limit: 1 });
+  const newHigh = newHighQ.data?.total;
   // the change and what it compares to, as one muted mono line
   const vs = (n: number | null) => (n === null || !prev ? undefined : (n === 0 ? '±0' : fmtSigned(n)) + ' ' + t('względem skanu', 'vs scan') + ' #' + prev.id);
   return (
     <dl className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" data-testid="dash-numbers">
       <Stat label={t('Aktywne hosty', 'Hosts up')} value={fmtInt(h.hosts_up)} note={vs(dHosts)} noteTitle={deltaTitle} to="/hosts?status=up" />
       <Stat label={t('Otwarte usługi', 'Open services')} value={fmtInt(h.services_open)} note={vs(dServices)} noteTitle={deltaTitle} to="/services?state=open" />
-      <Stat label={t('Nieprzejrzane zmiany', 'Unreviewed changes')} value={fmtInt(h.changes_unacked)} to="/changes?acked=false&expected=false" />
-      <Stat label={t('Znaleziska wysokiej wagi', 'High-severity findings')} value={fmtInt(h.findings_high)} to="/findings?severity=high&status=new,triaged" />
+      <Stat label={t('Nieprzejrzane zmiany', 'Unreviewed changes')} value={fmtInt(h.changes_unacked)} note={lastRun ? (lastChanges ? '+' + fmtInt(lastChanges) : '0') + ' ' + t('w skanie', 'in scan') + ' #' + lastRun.id : undefined} to="/changes?acked=false&expected=false" />
+      <Stat label={t('Znaleziska wysokiej wagi', 'High-severity findings')} value={fmtInt(h.findings_high)} note={newHigh === undefined ? undefined : fmtInt(newHigh) + ' ' + plural(newHigh, ['nowe', 'nowe', 'nowych'], ['new', 'new'])} to="/findings?severity=high&status=new,triaged" />
     </dl>
   );
 }
@@ -293,7 +297,7 @@ function TopFindings() {
   const rows = findingRows(q.data?.items ?? []);
   return (
     <RailList title={t('Najważniejsze znaleziska', 'Top findings')} to="/findings">
-      {q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : !q.data ? <SkeletonRows rows={4} /> : rows.length === 0 ? <p className="py-3 text-sm text-ink-2">{t('Brak otwartych znalezisk.', 'No open findings.')}</p> : null}
+      {q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : !q.data ? <SkeletonRows rows={4} /> : rows.length === 0 ? <p className="py-3 text-sm text-ink-2">{t('Brak otwartych znalezisk', 'No open findings')}</p> : null}
       <ul data-testid="top-findings">
         {rows.slice(0, 6).map(({ group: g, newest, to }) => {
           const services = g.items.every((f) => f.port);
@@ -319,7 +323,7 @@ function RecentChanges({ fallback }: { fallback: Change[] }) {
   const rows = rowsByAddress(q.data?.items ?? fallback);
   return (
     <RailList title={t('Najnowsze zmiany', 'Recent changes')} to="/changes">
-      {rows.length === 0 ? <p className="py-3 text-sm text-ink-2">{t('Brak zmian w ostatnim skanie.', 'No changes in the last scan.')}</p> : null}
+      {rows.length === 0 ? <p className="py-3 text-sm text-ink-2">{t('Brak zmian w ostatnim skanie', 'No changes in the last scan')}</p> : null}
       <ul data-testid="recent-changes">
         {rows.slice(0, 6).map(({ ip, latest: c, items, spanSec }) => {
           const many = items.length > 1;
@@ -409,7 +413,7 @@ function FirstRun({ d }: { d: Dash }) {
   const next = steps.findIndex((s) => !s.done);
   return (
     <section aria-labelledby="first-run-title" data-testid="first-run">
-      <h2 id="first-run-title" className="text-xl font-semibold tracking-[-0.015em]">{t('Czujka nie ma jeszcze danych o sieci.', 'Czujka has no data about the network yet.')}</h2>
+      <h2 id="first-run-title" className="text-xl font-semibold tracking-[-0.015em]">{t('Czujka nie ma jeszcze danych o sieci', 'Czujka has no data about the network yet')}</h2>
       {can('targets:create') && can('scans:configure') ? <p className="mt-2 text-sm"><Link to="/setup" className="link">{t('Albo użyj kreatora', 'Or use the wizard')}</Link></p> : null}
       <ol className="mt-4 border-y border-rule">
         {steps.map((s, i) => (
@@ -493,7 +497,7 @@ export default function Dashboard() {
                     <span className="mono">{s.hostname || s.ip}:{s.port}</span>
                     <ClassChips classes={s.classes} max={2} />
                   </span>
-                  {s.interest_why && s.interest_why.length ? <span className="mono mt-1 line-clamp-2 block text-[12px] text-ink-3">{s.interest_why.slice(0, 2).map((r) => '+' + r.points + ' ' + r.text).join(' · ')}</span> : null}
+                  {s.interest_why && s.interest_why.length ? <span className="mt-1 block truncate text-xs text-ink-2" title={s.interest_why.map((r) => '+' + r.points + ' ' + r.text).join('\n')}>{s.interest_why[0].text}</span> : null}
                 </span>
                 <span className="mt-0.5 flex-none"><InterestScore value={s.interest} reasons={s.interest_why} /></span>
               </Row>
@@ -523,7 +527,7 @@ export default function Dashboard() {
       <div className="grid items-start gap-4 xl:grid-cols-3">
         <div className="contents">
         <Panel title={t('Hosty niestabilne', 'Unstable hosts')} count={d.headline.hosts_unstable} flush actions={<Link to="/hosts?status=unstable" className="link">{t('Wszystkie', 'All')}</Link>}>
-          {(d.unstable_hosts ?? []).length === 0 ? <p className="px-5 pb-3 pt-1 text-sm text-ink-2">{t('Brak niestabilnych hostów.', 'No unstable hosts.')}</p> : null}
+          {(d.unstable_hosts ?? []).length === 0 ? <p className="px-5 pb-3 pt-1 text-sm text-ink-2">{t('Brak niestabilnych hostów', 'No unstable hosts')}</p> : null}
           <ul>
             {(d.unstable_hosts ?? []).slice(0, 6).map((h) => (
               <li key={h.id}>
@@ -539,7 +543,7 @@ export default function Dashboard() {
         <ReprobePanel limit={5} />
         </div>
         <Panel title={t('Wygasające certyfikaty', 'Expiring certificates')} count={(d.certs_expiring ?? []).length} flush>
-          {(d.certs_expiring ?? []).length === 0 ? <p className="px-5 pb-3 pt-1 text-sm text-ink-2">{t('Żaden certyfikat nie wygasa w ciągu 30 dni.', 'No certificates expire within 30 days.')}</p> : null}
+          {(d.certs_expiring ?? []).length === 0 ? <p className="px-5 pb-3 pt-1 text-sm text-ink-2">{t('Żaden certyfikat nie wygasa w ciągu 30 dni', 'No certificates expire within 30 days')}</p> : null}
           <ul>
             {(d.certs_expiring ?? []).slice(0, 6).map((s) => {
               const days = s.latest?.result.tls?.days_left ?? 0;

@@ -130,7 +130,7 @@ export default function Hosts() {
         </FilterField>
       </FilterBar>
 
-      <div ref={wrapRef} className="card mx-3 mb-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] sm:mx-6 lg:mx-8">
+      <div ref={wrapRef} className="card mx-3 mb-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[14px] sm:mx-6 lg:mx-8">
         {inf.error ? <ErrorState error={inf.error} retry={() => inf.refetch()} /> : inf.isPending ? <SkeletonRows rows={14} /> : rows.length === 0 ? (
           active ? <Empty icon="hosts" title={t('Żaden host nie pasuje do filtrów', 'No hosts match the filters')} action={<Button icon="x" onClick={() => u.clear(FILTERS)}>{t('Wyczyść filtry', 'Clear filters')}</Button>} />
             : hidden > 0 ? <Empty icon="hosts" title={t('Filtr „bez nieaktywnych” ukrywa wszystkie hosty', 'The "hide down" filter hides every host')} action={<Button onClick={() => u.set({ status: 'all' })} data-testid="hosts-show-all">{t('Pokaż wszystkie', 'Show all')} ({fmtInt(hidden)})</Button>} />

@@ -365,10 +365,10 @@ export function Meter({ value, max, cap, tone = 'accent', height = 6, label }: {
   const color = tone === 'danger' ? 'var(--danger)' : tone === 'changed' ? 'var(--st-changed)' : 'var(--accent)';
   return (
     <div
-      className="relative w-full overflow-visible rounded-full bg-[var(--row-hover)] shadow-[inset_0_0_0_1px_var(--rule)]" style={{ height }}
+      className="relative w-full overflow-visible rounded-[2px] bg-[var(--row-hover)] shadow-[inset_0_0_0_1px_var(--rule)]" style={{ height }}
       role="meter" aria-valuemin={0} aria-valuemax={max} aria-valuenow={value} aria-label={label}
     >
-      <div className="h-full rounded-full transition-[width] duration-500" style={{ width: pct * 100 + '%', background: color }} />
+      <div className="h-full rounded-[2px] transition-[width] duration-500 ease-[var(--ease)]" style={{ width: pct * 100 + '%', background: color }} />
       {cap !== undefined && max > 0 ? <div className="absolute -bottom-1 -top-1 w-px bg-ink" style={{ left: Math.min(100, (cap / max) * 100) + '%' }} /> : null}
     </div>
   );

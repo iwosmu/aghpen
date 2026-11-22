@@ -244,7 +244,7 @@ export default function Targets() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold">{scope.name}</h2>
-                  <p className="text-sm text-ink-2">{scope.description || t('Bez opisu.', 'No description.')}</p>
+                  <p className="text-sm text-ink-2">{scope.description || t('Bez opisu', 'No description')}</p>
                   <div className="mt-1"><Tags tags={scope.tags} max={6} /></div>
                 </div>
                 <div className="flex gap-1.5">
@@ -256,7 +256,7 @@ export default function Targets() {
               {canCreate ? <PassivePanel scope={scope} /> : null}
               <Panel title={t('Cele', 'Targets')} count={targets.data?.total} flush>
                 <DataTable inPanel rows={targets.data?.items} cols={cols} rowKey={(x) => x.id} loading={targets.isPending} error={targets.error} retry={() => targets.refetch()} dim={targets.isPlaceholderData}
-                  empty={<p className="p-3 text-sm text-ink-2">{t('Brak celów.', 'No targets yet.')}</p>}
+                  empty={<p className="p-3 text-sm text-ink-2">{t('Brak celów', 'No targets yet')}</p>}
                   mobile={(x) => (
                     <div className="flex items-center justify-between gap-2"><span><span className="mono text-sm">{x.value}</span><span className="ml-2 text-xs text-ink-3">{kindLabel(x.kind)} · {fmtInt(x.addresses)}</span></span>{canDelete ? <IconButton icon="trash" label={t('Usuń cel ', 'Delete target ') + x.value} onClick={() => setConfirm({ kind: 'target', id: x.id, label: x.value })} /> : null}</div>
                   )} />

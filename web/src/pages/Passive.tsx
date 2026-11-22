@@ -58,7 +58,7 @@ function ResultView({ res, scope, onDone }: { res: PassiveResult; scope: Scope; 
             </div>
           ) : null}
         </div>
-      ) : <p className="text-sm text-ink-2">{t('Brak nowych kandydatów.', 'No new candidates.')}</p>}
+      ) : <p className="text-sm text-ink-2">{t('Brak nowych kandydatów', 'No new candidates')}</p>}
       {hints.length ? (
         <details className="border border-rule px-3 py-1.5 text-sm">
           <summary className="cursor-pointer text-ink-2">{t('Podpowiedzi nazw dla adresów w zakresie', 'Name hints for addresses in scope')} ({hints.length})</summary>

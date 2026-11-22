@@ -237,7 +237,7 @@ export default function ProfileEdit() {
                     onClick={() => up((d) => { d.discovery.mode = m.id; })}
                     className={cx('relative bg-panel px-3 py-2 text-left outline-offset-[-2px]', on ? 'bg-raised' : 'hover:bg-raised/60')}>
                     {on ? <span className="absolute inset-x-0 top-0 h-[2px] bg-accent" aria-hidden="true" /> : null}
-                    <span className="flex items-center gap-1.5 text-sm font-medium"><span className={cx('inline-block size-2 rounded-full border', on ? 'border-accent bg-accent' : 'border-ink-3')} aria-hidden="true" />{m.label}</span>
+                    <span className="flex items-center gap-1.5 text-sm font-medium"><span className={cx('inline-block size-2 rounded-[2px] border', on ? 'border-accent bg-accent' : 'border-ink-3')} aria-hidden="true" />{m.label}</span>
                     <span className="mt-1 block text-xs text-ink-3">{m.text}</span>
                   </button>
                 );

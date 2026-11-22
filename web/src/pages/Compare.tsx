@@ -32,7 +32,7 @@ function Column({ title, glyph, tone, items, showExpected }: { title: string; gl
         <Glyph name={glyph} tone={tone} />{title}<span className="num font-normal text-ink-2">{real.length}</span>
         {expected.length ? <span className="ml-auto inline-flex items-center gap-1 text-xs font-normal text-ink-3"><Glyph name="dashring" tone="expected" size={11} />{expected.length} {t('oczekiwane', 'expected')}</span> : null}
       </h2>
-      {list.length === 0 ? <p className="p-3 text-sm text-ink-3">{expected.length ? t('Tylko zmiany oczekiwane.', 'Expected changes only.') : t('Brak.', 'None.')}</p> : (
+      {list.length === 0 ? <p className="p-3 text-sm text-ink-3">{expected.length ? t('Tylko zmiany oczekiwane', 'Expected changes only') : t('Brak', 'None')}</p> : (
         <ul className="max-h-[560px] overflow-auto">
           {list.map((c, i) => (
             <li key={c.id || 'x' + i + '-' + c.ip + ':' + (c.port ?? '')} className="border-b border-rule px-3 py-2 last:border-b-0">
@@ -100,7 +100,7 @@ export default function Compare() {
             </div>
             <StoryList changes={all} className="space-y-1 border border-rule bg-panel px-3 py-2.5" testId="compare-story" />
             <div className="flex flex-col text-sm text-ink-2">
-              {all.length === 0 ? t('Brak zmian między tymi skanami.', 'No changes between these scans.') : (
+              {all.length === 0 ? t('Brak zmian między tymi skanami', 'No changes between these scans') : (
                 <span><span className="num text-ink">{all.filter((c) => !c.expected).length}</span> {plural(all.filter((c) => !c.expected).length, ['zmiana wymaga', 'zmiany wymagają', 'zmian wymaga'], ['change needs', 'changes need'])} {t('przeglądu', 'review')}, <span className="num text-ink">{all.filter((c) => c.expected).length}</span> {t('oczekiwanych', 'expected')}. {t('Nowych znalezisk:', 'New findings:')} <span className="num text-ink">{d.summary.findings_new}</span>.</span>
               )}
               {d.summary.hosts_missing ? (

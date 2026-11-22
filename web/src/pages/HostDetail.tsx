@@ -71,12 +71,12 @@ function ModelOutput({ h, a, compact }: { h: Host; a: AvailabilityProfile; compa
           </dd>
         </div>
       </dl>
-      {compact ? null : <p className="border-l border-rule-strong pl-3 text-sm text-ink">{a.pattern || t('Za mało obserwacji, aby opisać wzorzec.', 'Too few observations to describe a pattern.')}</p>}
+      {compact ? null : <p className="border-l border-rule-strong pl-3 text-sm text-ink">{a.pattern || t('Za mało obserwacji, aby opisać wzorzec', 'Too few observations to describe a pattern')}</p>}
       {h.status === 'expected-offline' || h.status === 'unstable' || h.status === 'down' ? (
         <p className="text-xs text-ink-2">
-          {h.status === 'expected-offline' ? t('O tej porze host zwykle nie odpowiada.', 'The host usually does not respond at this hour.')
-            : h.status === 'unstable' ? t('Host odpowiada nieregularnie.', 'The host responds irregularly.')
-            : t('Braków odpowiedzi z rzędu jest więcej niż próg.', 'More misses in a row than the threshold.')}
+          {h.status === 'expected-offline' ? t('O tej porze host zwykle nie odpowiada', 'The host usually does not respond at this hour')
+            : h.status === 'unstable' ? t('Host odpowiada nieregularnie', 'The host responds irregularly')
+            : t('Braków odpowiedzi z rzędu jest więcej niż próg', 'More misses in a row than the threshold')}
         </p>
       ) : null}
       {recent.length && !compact ? (
@@ -170,7 +170,7 @@ export default function HostDetail() {
           <Panel title={t('Usługi', 'Services')} count={services.data?.length} flush>
             <DataTable inPanel rows={services.data} cols={svcCols} rowKey={(s) => s.id} rowHref={(s) => '/services/' + s.id} loading={services.isPending} error={services.error} retry={() => services.refetch()}
               rowClass={(s) => (s.state === 'gone' ? 'text-ink-3' : undefined)}
-              empty={<p className="p-3 text-sm text-ink-2">{t('Brak otwartych usług.', 'No open services.')}</p>}
+              empty={<p className="p-3 text-sm text-ink-2">{t('Brak otwartych usług', 'No open services')}</p>}
               mobile={(s) => (
                 <div>
                   <div className="flex items-center justify-between gap-2"><span className="mono text-sm">{s.port}/{s.proto} <span className="font-sans text-ink-2">{serviceName(s)}</span></span><InterestScore value={s.interest} /></div>
@@ -197,7 +197,7 @@ export default function HostDetail() {
 
           <Panel title={t('Historia zmian', 'Change history')} count={changes.data?.total} flush>
             {changes.error ? <ErrorState error={changes.error} retry={() => changes.refetch()} /> : !changes.data ? <SkeletonRows rows={4} /> : changes.data.items.length === 0 ? (
-              <p className="p-3 text-sm text-ink-2">{t('Brak zmian.', 'No changes.')}</p>
+              <p className="p-3 text-sm text-ink-2">{t('Brak zmian', 'No changes')}</p>
             ) : (
               <ol>
                 {changes.data.items.map((c) => (

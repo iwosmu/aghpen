@@ -146,7 +146,7 @@ export function AddressMap(p: Props) {
   }, [p.blocks]);
 
   if (p.blocks.length === 0) {
-    return <p className="text-sm text-ink-3">{t('Brak bloków adresowych.', 'No address blocks.')}</p>;
+    return <p className="text-sm text-ink-3">{t('Brak bloków adresowych', 'No address blocks')}</p>;
   }
   return (
     <div ref={ref} className="min-w-0">
