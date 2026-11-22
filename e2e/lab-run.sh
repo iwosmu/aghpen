@@ -63,7 +63,8 @@ mem_sampler() { # memory of the Czujka container every 2 s while $OUT/.mem.on ex
     done ) &
 }
 mem_max() {
-  awk '{v=$2; u=v; gsub(/[0-9.]/,"",u); gsub(/[^0-9.]/,"",v); if(u=="GiB")v*=1024; if(u=="KiB")v/=1024; if(u=="B")v/=1048576; if(v>m)m=v} END{printf "%.1f", m}' "$OUT/mem.txt"
+  awk '{ # v+0: compare numbers, not strings ("984.7" > "1078" as text)
+  v=$2; u=v; gsub(/[0-9.]/,"",u); gsub(/[^0-9.]/,"",v); v=v+0; if(u=="GiB")v*=1024; if(u=="KiB")v/=1024; if(u=="B")v/=1048576; if(v>m)m=v} END{printf "%.1f", m}' "$OUT/mem.txt"
 }
 txp() { docker exec "$CZ" sh -c "cat /sys/class/net/\$(ip -o -4 addr | awk '/ 10\\.66\\./ {print \$2}')/statistics/tx_packets"; }
 
