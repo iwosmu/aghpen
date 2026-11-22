@@ -61,8 +61,9 @@ jury) # e2e/jury/run.sh as dind.sh runs it, but in this machine (fresh database 
   docker exec "$N" bash /work/docs/demo/live/inner.sh reset >/dev/null || exit 1
   log "e2e/jury/run.sh on $(git rev-parse --short HEAD) inside $N; transcript: $out"
   PWJ=$(docker exec "$N" sh -c '. /work/.live; echo "$PW"')
+  if sed --version >/dev/null 2>&1; then SEDU="sed -u"; else SEDU="sed -l"; fi # line-buffered: the transcript grows while it runs
   docker exec -e CZ_URL=http://127.0.0.1:18080 -e CZ_PASSWORD="$PWJ" -e JURY_TARGET=localhost -e JURY_GUARD=0 -e JURY_HOST_IP="$HIP" -e JURY_ONLY="${JURY_ONLY:-}" "$N" \
-    bash -c 'cd /work && [ -n "$JURY_ONLY" ] || unset JURY_ONLY; bash e2e/jury/run.sh' 2>&1 | sed "s/$PWJ/<hasło>/g" | tee "$out"
+    bash -c 'cd /work && [ -n "$JURY_ONLY" ] || unset JURY_ONLY; bash e2e/jury/run.sh' 2>&1 | $SEDU "s/$PWJ/<hasło>/g" | tee "$out"
   exit "${PIPESTATUS[0]}" ;;
 pass) running && docker exec "$N" sh -c '. /work/.live; echo "admin@czujka.local $PW"' ;;
 help|-h|--help) sed -n 2,14p "$0" ;;
