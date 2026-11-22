@@ -1,0 +1,14 @@
+Ground truth state scale-2x1000 (hard cases excused)
+
+category                  TP    FP    FN  precision   recall       F1
+hosts                   2000     0     0      1.000    1.000    1.000
+ports                   4500     0     0      1.000    1.000    1.000
+service names           4500     0     0      1.000    1.000    1.000
+technologies            4500     0     0      1.000    1.000    1.000
+classes                    0     0     0      0.000    0.000    0.000
+
+check (recall only)                              right   share
+service versions                               4500/4500   1.000
+technology versions                            4500/4500   1.000
+page titles                                    2700/2700   1.000
+

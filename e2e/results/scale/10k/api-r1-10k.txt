@@ -1,0 +1,44 @@
+hosts 10000 services 22500 changes 0
+hosts first page                             200 0.038105 24316
+hosts deep page                              200 0.101115 22683
+services first page                          200 0.173969 47354
+services deep page                           200 38.200810 25801
+services of the run, first page              200 0.251371 47354
+services of the run, deep page               200 13.952195 25801
+changes first page                           200 0.007421 45
+changes deep page                            200 0.001286 45
+changes of the run                           200 0.001155 45
+findings first page                          200 0.033819 41427
+dashboard                                    200 0.086806 30754
+timeline                                     200 0.085123 427
+timeline at run                              200 0.771849 43932
+timeline at run, hosts deep page             200 0.030379 8595
+timeline at run, services deep page          200 0.817200 17020
+search q=nginx                               200 0.114131 53315
+run                                          200 0.001734 990
+run hosts                                    404 0.000894 57
+hosts first page                             200 0.030140 24316
+hosts deep page                              200 0.113087 22683
+services first page                          200 0.060574 47354
+services deep page                           200 12.939573 25801
+services of the run, first page              200 0.214469 47354
+services of the run, deep page               200 13.074238 25801
+changes first page                           200 0.001426 45
+changes deep page                            200 0.001549 45
+changes of the run                           200 0.001784 45
+findings first page                          200 0.017026 41427
+dashboard                                    200 0.073388 30754
+timeline                                     200 0.005915 426
+timeline at run                              200 0.772673 43932
+timeline at run, hosts deep page             200 0.053085 8595
+timeline at run, services deep page          200 0.805909 17020
+search q=nginx                               200 0.134201 53315
+run                                          200 0.002253 990
+run hosts                                    404 0.001226 57
+export run json                              200 3.223845 96100601
+export run csv                               200 2.740694 5288689
+export run xml                               200 2.894199 10834492
+export services csv                          200 15.221752 4287257
+export hosts json                            200 0.293552 4764147
+report html                                  200 0.453559 12947
+report md                                    200 0.513254 4293
