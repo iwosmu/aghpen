@@ -113,53 +113,56 @@ code.one { font-family: var(--mono); font-size: 72px; color: var(--ink); backgro
   <div class="foot">2 / 10</div>
 </section></div>
 
-<!-- 3. Scale. Screenshot: web/screenshots/lab/47-run-completed-pl-dark-1440.png (run #2, lab 10.66.0.0/16, before the ARP-first engine).
-     Crop: the address map only. The run time is an open slot: the old 7 min 24 s came from the engine before the change; fill it with the
-     current lab gate run of the /16 (e2e/lab-gate.sh) when the coordinator confirms it. -->
+<!-- 3. Scale. Screenshot: docs/slides/img/scale-run.png, czujka.dev on 039975a, 2026-11-22 06:48: run #170 of "Pełny przegląd /16"
+     (lab 10.66.0.0/16, finished; story lines, deep pass note, map "256 × /24"). Crop: the story lines and the top of the map.
+     65 536 addresses = 256 blocks /24. 67 of 67 lab hosts: docs/WYNIKI.md (lab gate, hosts 67, false 0). No run time on the slide:
+     the picture does not show one. -->
 <div class="frame"><section class="slide" id="s3">
   <h1>Cała sieć /16 w&nbsp;jednym przebiegu.</h1>
   <div class="body">
-    <div class="shot" style="--x:237; --y:333; --z:1.12; width:656px; height:600px;">
-      <img src="../../web/screenshots/lab/47-run-completed-pl-dark-1440.png" alt="Mapa 256 bloków /24 po pełnym przebiegu">
+    <div class="shot" style="--x:302; --y:250; --z:0.98; width:1086px; height:637px;">
+      <img src="img/scale-run.png" alt="Skan #170 sieci /16: zmiany względem poprzedniego skanu i mapa 256 bloków /24">
     </div>
-    <p class="cap">65&nbsp;535 adresów w&nbsp;17&nbsp;minut.</p>
+    <p class="cap">65&nbsp;536 adresów w&nbsp;256 blokach /24. W&nbsp;laboratorium: 67 z&nbsp;67 hostów.</p>
   </div>
   <div class="foot">3 / 10</div>
 </section></div>
 
-<!-- 4. Recognition. Signature count: 416 hand-written (signatures/*.yaml) plus 1 831 passive nuclei-templates imports (default set), per the coordinator 2026-11-22. Screenshot: web/screenshots/lab/44-service-detail-pl-dark-1440.png
-     (10.66.1.10:80 in the lab, interest 100 with seven reasons). Crop: the "Dlaczego ciekawa" panel. -->
+<!-- 4. Recognition. Signature count: 416 hand-written (signatures/*.yaml) plus 1 831 passive nuclei-templates imports (default set), per the coordinator 2026-11-22. Screenshot: docs/slides/img/service-detail.png,
+     czujka.dev 2026-11-22 06:48 (10.66.1.10:80 in the lab, interest 90 with seven reasons). Crop: the interest tab. -->
 <div class="frame"><section class="slide" id="s4">
   <h1>Czujka rozpoznaje usługę i&nbsp;podaje powody oceny.</h1>
   <div class="body">
-    <div class="shot" style="--x:1021; --y:152; --z:2.05; width:820px; height:640px;">
-      <img src="../../web/screenshots/lab/44-service-detail-pl-dark-1440.png" alt="Ocena ciekawości 100 i siedem powodów">
+    <div class="shot" style="--x:812; --y:212; --z:1.4; width:837px; height:630px;">
+      <img src="img/service-detail.png" alt="Ocena ciekawości 90 i siedem powodów">
     </div>
-    <p class="cap">Ocena 100 z&nbsp;siedmiu powodów. Sygnatury: 416 własnych, 1&nbsp;831 z&nbsp;nuclei.</p>
+    <p class="cap">Ocena 90 z&nbsp;siedmiu powodów. Sygnatury: 416 własnych, 1&nbsp;831 z&nbsp;nuclei.</p>
   </div>
   <div class="foot">4 / 10</div>
 </section></div>
 
-<!-- 5. Re-probing. Screenshot: web/screenshots/lab/97-reprobe-plan-host.png (unstable lab host 10.66.70.20: week heatmap, p_alive 0.37,
-     re-probe plan "POTWIERDZENIE 1/3"; crop: the plan and the host's life lanes). Defaults: docs/API.md re-probing, backoff_minutes [10, 30, 90], budget 200 addresses per hour. -->
+<!-- 5. Liveness. Screenshot: docs/slides/img/reprobe-host.png, czujka.dev 2026-11-22 06:48: unstable lab host 10.66.70.20, "nieaktywny",
+     tab "Dostępność": week heatmap, p_alive 0,16, threshold 2 misses in a row, 2 misses now. Crop: the availability panel.
+     The picture shows no pending re-probe ("Ten host nie czeka na ponowne sprawdzenie"), so the slide does not quote the re-probe
+     schedule; the speaker says it (docs/API.md re-probing: backoff_minutes [10, 30, 90]). -->
 <div class="frame"><section class="slide" id="s5">
-  <h1>Gdy host milczy, Czujka sprawdza tylko ten adres.</h1>
+  <h1>Czujka liczy, czy milczący host nadal istnieje.</h1>
   <div class="body">
-    <div class="shot" style="--x:631; --y:592; --z:2.02; width:1600px; height:462px;">
-      <img src="../../web/screenshots/lab/97-reprobe-plan-host.png" alt="Rytm tygodnia hosta, prawdopodobieństwo i plan ponownych sprawdzeń">
+    <div class="shot" style="--x:745; --y:245; --z:1.36; width:906px; height:642px;">
+      <img src="img/reprobe-host.png" alt="Rytm tygodnia hosta 10.66.70.20, p_alive 0,16 i dwa braki odpowiedzi z rzędu">
     </div>
-    <p class="cap">Sprawdza go po 10, 30 i&nbsp;90 minutach.</p>
+    <p class="cap">p_alive 0,16 i&nbsp;2 braki z&nbsp;rzędu: host nieaktywny.</p>
   </div>
   <div class="foot">5 / 10</div>
 </section></div>
 
-<!-- 6. Time machine. Screenshot: docs/slides/img/time-machine.png, taken by docs/demo/capture-slides.mjs (device scale 2, presentation mode,
-     960 px wide) on the local stack czpitch scanning the lab 10.66.0.0/16, 2026-11-21: run #6 (full /16) selected, 69 hosts up, 81 services.
+<!-- 6. Time machine. Screenshot: docs/slides/img/time-machine.png, taken by docs/demo/capture-slides.mjs (960 px wide) on czujka.dev,
+     2026-11-22 06:48: run #171 selected (43 of 43), 69 hosts up, 155 services; since then 4 services gone, 1 changed.
      Crop: the run scrubber and the state at that run with the difference to today. -->
 <div class="frame"><section class="slide" id="s6">
   <h1>Oś czasu pokazuje sieć po dowolnym skanie.</h1>
   <div class="body">
-    <div class="shot" style="--w:960; --x:22; --y:170; --z:1.5; width:1374px; height:640px;">
+    <div class="shot" style="--w:960; --x:24; --y:150; --z:1.15; width:1049px; height:640px;">
       <img src="img/time-machine.png" alt="Suwak przebiegów i stan sieci w wybranym przebiegu">
     </div>
     <p class="cap">Obok pokazuje, co zmieniło się od tamtej pory.</p>
@@ -167,15 +170,15 @@ code.one { font-family: var(--mono); font-size: 72px; color: var(--ink); backgro
   <div class="foot">6 / 10</div>
 </section></div>
 
-<!-- 7. Exposure rule. Screenshot: web/screenshots/lab/93-rule-dry-run.png (starter rule "Panel administracyjny poza siecią zarządzania":
-     11 violations on 76 hosts and 117 services of the lab). Rules: docs/REGULY.md (14 starter rules, dry run 55 ms on 2 000 hosts). -->
+<!-- 7. Exposure rule. Screenshot: docs/slides/img/rule-dry-run.png, czujka.dev 2026-11-22 06:48 (starter rule "Panel administracyjny
+     poza siecią zarządzania": 13 violations in the lab). Crop: the rule and its first violations. Rules: docs/REGULY.md (14 starter rules, dry run 55 ms on 2 000 hosts). -->
 <div class="frame"><section class="slide" id="s7">
   <h1>Reguła opisuje, czego w&nbsp;sieci być nie może.</h1>
   <div class="body">
-    <div class="shot" style="--x:651; --y:488; --z:2.1; width:1620px; height:440px;">
-      <img src="../../web/screenshots/lab/93-rule-dry-run.png" alt="Reguła zgłosiłaby dziś 11 naruszeń">
+    <div class="shot" style="--x:767; --y:152; --z:1.4; width:899px; height:640px;">
+      <img src="img/rule-dry-run.png" alt="Reguła ma 13 naruszeń">
     </div>
-    <p class="cap">Ta reguła znalazła 11 paneli administracyjnych poza siecią zarządzania.</p>
+    <p class="cap">Ta reguła znalazła 13 paneli administracyjnych poza siecią zarządzania.</p>
   </div>
   <div class="foot">7 / 10</div>
 </section></div>
@@ -206,14 +209,14 @@ code.one { font-family: var(--mono); font-size: 72px; color: var(--ink); backgro
   <div class="foot">9 / 10</div>
 </section></div>
 
-<!-- 10. Results. 100/100: e2e/full/transcript.txt ("PASS: 100  FAIL: 0", coordinator branch 839012d). 46 s: czujka.dev stack built and healthy on 4 vCPU / 8 GB,
-     coordinator measurement 2026-11-21. Precision: open slot until docs/WYNIKI.md. -->
+<!-- 10. Results. 100/100: e2e/full/transcript.txt ("PASS: 100  FAIL: 0", coordinator branch 839012d). 10 000 of 10 000: docs/WYNIKI.md "Skala" (10 000 live hosts, runs 1 and 2).
+     154/155: docs/WYNIKI.md (lab gate, open ports). -->
 <div class="frame"><section class="slide" id="s10">
   <h1>Czujka działa publicznie na czujka.dev.</h1>
   <div class="body">
     <div class="nums">
       <div class="num"><span class="big" style="font-size:128px;">100/100</span><span class="biglabel">kontroli end-to-end</span></div>
-      <div class="num"><span class="big" style="font-size:128px;">46&nbsp;s</span><span class="biglabel">start na serwerze</span></div>
+      <div class="num"><span class="big" style="font-size:128px;">10&nbsp;000</span><span class="biglabel">z&nbsp;10&nbsp;000 hostów</span></div>
       <div class="num"><span class="big" style="font-size:128px;">154/155</span><span class="biglabel">portów znalezionych</span></div>
     </div>
   </div>
