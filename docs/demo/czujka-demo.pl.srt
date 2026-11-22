@@ -1,27 +1,31 @@
 1
-00:00:00,000 --> 00:00:18,269
-Jedno polecenie, potem kreator
+00:00:00,500 --> 00:00:18,000
+Uruchamiamy Czujkę jednym poleceniem. Po pierwszym logowaniu kreator pyta o zakres sieci i o limit pakietów, na który zgodził się jej właściciel.
 
 2
-00:00:18,269 --> 00:00:34,153
-Skan całej sieci /16
+00:00:18,500 --> 00:00:34,000
+Skanujemy sieć, która ma ponad sześćdziesiąt pięć tysięcy adresów. Kwadrat w niebieskiej ramce to blok, który skaner sprawdza teraz. Skaner trzyma się limitu pakietów.
 
 3
-00:00:34,153 --> 00:00:44,391
-Co się zmieniło między skanami
+00:00:34,500 --> 00:00:44,000
+Tu porównujemy dwa skany. Widać cztery nowe hosty, pięć nowych usług i jedną, która zniknęła.
 
 4
-00:00:44,391 --> 00:01:01,687
-Rytm hosta i ponowne sprawdzenia
+00:00:44,500 --> 00:01:02,000
+Ten komputer bywa wyłączony. Czujka pamięta, w których godzinach tygodnia zwykle milczy, i nie zgłasza wtedy alarmu. Gdy milknie o innej porze, sprawdza ponownie tylko ten adres.
 
 5
-00:01:01,687 --> 00:01:15,453
-Oś czasu
+00:01:02,500 --> 00:01:15,000
+Na osi czasu wybieramy dowolny wcześniejszy skan. Czujka pokazuje sieć z tamtej chwili i to, co się od niej zmieniło.
 
 6
-00:01:15,453 --> 00:01:33,336
-Reguła i sygnatura z przykładu
+00:01:15,500 --> 00:01:33,000
+W regułach zapisujemy, czego w sieci być nie może. Czujka sprawdza je po każdym skanie, bez nowych pakietów. Z wybranej usługi proponuje sygnaturę i testuje ją na historii.
 
 7
-00:01:33,336 --> 00:01:42,264
-Stop awaryjny
+00:01:33,500 --> 00:01:42,000
+Naciskamy stop awaryjny. Trwający skan zatrzymuje się od razu, a nowe nie startują.
+
+8
+00:01:42,500 --> 00:01:49,000
+Czujka działa teraz pod adresem czujka.dev.

@@ -1,26 +1,26 @@
-Lektor do filmu czujka-demo.mp4 (czas filmu 1:49, 136 słów ≈ 80 s przy 1,7 słowa/s; każdy akapit ma co najmniej 1,5 s zapasu i 0,5 s na wejście).
+Lektor do filmu czujka-demo.mp4 (czas filmu 1:49, 155 słów ≈ 91 s przy 1,7 słowa/s; każdy akapit ma co najmniej 1,5 s zapasu i 0,5 s na wejście).
 Nagraj głos na film; kody czasu to początek i koniec ujęcia. Wygenerowane przez record.mjs.
 
-[0:00–0:18] install (18.3 s; 18 słów ≈ 10.6 s przy 1,7 słowa/s; zapas 7.7 s)
-Czujka staje jednym poleceniem. Kreator prowadzi od pierwszego logowania do skanu: hasło, zakresy i limity od właściciela sieci.
+[0:00–0:18] install (18.3 s; 22 słów ≈ 12.9 s przy 1,7 słowa/s; zapas 5.4 s)
+Uruchamiamy Czujkę jednym poleceniem. Po pierwszym logowaniu kreator pyta o zakres sieci i o limit pakietów, na który zgodził się jej właściciel.
 
-[0:18–0:34] scan (15.9 s; 19 słów ≈ 11.2 s przy 1,7 słowa/s; zapas 4.7 s)
-Skan całej sieci /16. Mapa pokazuje każdy blok dwustu pięćdziesięciu sześciu adresów. Tempo nigdy nie przekracza limitu z polityki.
+[0:18–0:34] scan (15.9 s; 24 słów ≈ 14.1 s przy 1,7 słowa/s; zapas 1.8 s)
+Skanujemy sieć, która ma ponad sześćdziesiąt pięć tysięcy adresów. Kwadrat w niebieskiej ramce to blok, który skaner sprawdza teraz. Skaner trzyma się limitu pakietów.
 
-[0:34–0:44] changes (10.2 s; 14 słów ≈ 8.2 s przy 1,7 słowa/s; zapas 2.0 s)
-Drugi skan porównuje się z pierwszym: nowe hosty, zniknięte usługi, zmienione wersje i tytuły.
+[0:34–0:44] changes (10.2 s; 15 słów ≈ 8.8 s przy 1,7 słowa/s; zapas 1.4 s)
+Tu porównujemy dwa skany. Widać cztery nowe hosty, pięć nowych usług i jedną, która zniknęła.
 
-[0:44–1:02] unstable (17.3 s; 26 słów ≈ 15.3 s przy 1,7 słowa/s; zapas 2.0 s)
-Ten host odpowiada nieregularnie. Czujka zna jego rytm tygodnia, więc cisza w zwykłej porze nie jest alarmem. Gdy milknie poza rytmem, sprawdza ponownie tylko ten adres.
+[0:44–1:02] unstable (17.3 s; 27 słów ≈ 15.9 s przy 1,7 słowa/s; zapas 1.4 s)
+Ten komputer bywa wyłączony. Czujka pamięta, w których godzinach tygodnia zwykle milczy, i nie zgłasza wtedy alarmu. Gdy milknie o innej porze, sprawdza ponownie tylko ten adres.
 
 [1:02–1:15] time (13.8 s; 20 słów ≈ 11.8 s przy 1,7 słowa/s; zapas 2.0 s)
-Oś czasu pokazuje sieć taką, jaka była po dowolnym skanie, i to, co od tamtej pory zniknęło albo się zmieniło.
+Na osi czasu wybieramy dowolny wcześniejszy skan. Czujka pokazuje sieć z tamtej chwili i to, co się od niej zmieniło.
 
-[1:15–1:33] rules (17.9 s; 27 słów ≈ 15.9 s przy 1,7 słowa/s; zapas 2.0 s)
-Reguła mówi, czego w sieci być nie może, i sprawdza się po każdym skanie bez pakietów. Z jednej usługi Czujka proponuje sygnaturę i testuje ją na historii.
+[1:15–1:33] rules (17.9 s; 28 słów ≈ 16.5 s przy 1,7 słowa/s; zapas 1.4 s)
+W regułach zapisujemy, czego w sieci być nie może. Czujka sprawdza je po każdym skanie, bez nowych pakietów. Z wybranej usługi proponuje sygnaturę i testuje ją na historii.
 
-[1:33–1:42] stop (8.9 s; 8 słów ≈ 4.7 s przy 1,7 słowa/s; zapas 4.2 s)
-Stop awaryjny zatrzymuje wszystkie skany w ułamku sekundy.
+[1:33–1:42] stop (8.9 s; 13 słów ≈ 7.6 s przy 1,7 słowa/s; zapas 1.3 s)
+Naciskamy stop awaryjny. Trwający skan zatrzymuje się od razu, a nowe nie startują.
 
-[1:42–1:49] end (6.2 s; 4 słów ≈ 3.8 s przy 1,7 słowa/s; zapas 2.4 s)
-Czujka. Działa na czujka.dev.
+[1:42–1:49] end (6.2 s; 6 słów ≈ 3.5 s przy 1,7 słowa/s; zapas 2.7 s)
+Czujka działa teraz pod adresem czujka.dev.
