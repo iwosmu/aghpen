@@ -56,7 +56,7 @@ export function MissingHostLines({ changes, names }: { changes: Change[]; names?
   if (!missing.length) return null;
   return (
     <>
-      {missing.map((m) => {
+      {missing.map((m, mi) => {
         const svcs = changes.filter((c) => c.kind === 'service_unreachable' && c.host_id === m.host_id).sort((a, b) => (a.port ?? 0) - (b.port ?? 0));
         const v = verdicts.get(m.host_id);
         const state = !v ? 'unconfirmed' : v.kind === 'host_gone' ? 'gone' : 'back';
@@ -66,12 +66,12 @@ export function MissingHostLines({ changes, names }: { changes: Change[]; names?
             ? t('nieaktywny (potwierdzone ' + fmtTime(v!.at) + ')', 'is down (confirmed ' + fmtTime(v!.at) + ')')
             : t('znów odpowiada (' + fmtTime(v!.at) + ')', 'responds again (' + fmtTime(v!.at) + ')');
         return (
-          <li key={m.id} className="flex items-start gap-2 text-base" data-testid="missing-host" data-state={state}>
+          <li key={'m:' + mi + ':' + m.ip + ':' + (m.id || 0)} className="flex items-start gap-2 text-base" data-testid="missing-host" data-state={state}>
             <span className="mt-[5px]">{state === 'unconfirmed' ? <Glyph name="half" tone="changed" /> : state === 'gone' ? <Glyph name="minus" tone="gone" /> : <Glyph name="back" tone="new" />}</span>
             <span className="min-w-0">
               <span className="font-medium">{t('Host ', 'Host ')}<Link to={'/hosts/' + m.host_id} className="mono link">{m.ip}</Link> {head}</span>
               {svcs.length ? <>{t(', miał ', ', it had ')}{svcs.length} {plural(svcs.length, ['usługę', 'usługi', 'usług'], ['service', 'services'])}{': '}{svcs.slice(0, 8).map((c, i) => (
-                <span key={c.id}>{i ? ', ' : ''}<Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link">:{c.port}{(names?.(c) || nameOf(c)) ? ' ' + (names?.(c) || nameOf(c)) : ''}</Link></span>
+                <span key={'s:' + i + ':' + (c.port ?? '') + ':' + (c.id || 0)}>{i ? ', ' : ''}<Link to={c.service_id ? '/services/' + c.service_id : '/hosts/' + c.host_id} className="mono link">:{c.port}{(names?.(c) || nameOf(c)) ? ' ' + (names?.(c) || nameOf(c)) : ''}</Link></span>
               ))}{svcs.length > 8 ? t(' i ' + (svcs.length - 8) + ' więcej', ' and ' + (svcs.length - 8) + ' more') : ''}</> : null}
             </span>
           </li>

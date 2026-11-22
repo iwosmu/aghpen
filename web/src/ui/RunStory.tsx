@@ -77,7 +77,7 @@ export function StoryList({ changes, runId, className, testId = 'run-story' }: {
                 const extra = st.kind === 'service_returned' ? (awayText(c) ? ', ' + awayText(c) : '')
                   : st.kind === 'response_slower' || st.kind === 'response_recovered' ? (responseDelta(c) ? ' ' + responseDelta(c) : '') : '';
                 const to = c.service_id ? '/services/' + c.service_id : svc.get(c.host_id + ':' + c.port) ? '/services/' + svc.get(c.host_id + ':' + c.port)!.id : '/hosts/' + c.host_id;
-                return <span key={c.id}>{i ? <span className="text-ink-2">,{' '}</span> : null}<Link to={to} className="mono link">{itemLabel(c, svc, showIp)}</Link>{extra ? <span className="text-ink-2">{extra}</span> : null}</span>;
+                return <span key={st.kind + ':' + i + ':' + c.ip + ':' + (c.port ?? '') + ':' + (c.id || 0)}>{i ? <span className="text-ink-2">,{' '}</span> : null}<Link to={to} className="mono link">{itemLabel(c, svc, showIp)}</Link>{extra ? <span className="text-ink-2">{extra}</span> : null}</span>;
               })}
               {n > 6 ? <span className="text-ink-2">{t(' i ' + (n - 6) + ' więcej', ' and ' + (n - 6) + ' more')}</span> : null}
             </span>
