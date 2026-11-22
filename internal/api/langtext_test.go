@@ -46,6 +46,15 @@ func TestLocalizeResponse(t *testing.T) {
 	if got.Technologies[0].Name != "Java (servlet container)" {
 		t.Errorf("technology = %q", got.Technologies[0].Name)
 	}
+	roles := []model.Role{{Slug: "viewer", Name: "Obserwator", Description: "Tylko odczyt", Builtin: true}, {Name: "Obserwator"}}
+	localizeResponse(en, roles)
+	if roles[0].Name != "Viewer" || roles[0].Description != "Read only" || roles[1].Name != "Obserwator" {
+		t.Errorf("roles = %+v", roles)
+	}
+	run := localizeResponse(en, model.ScanRun{Stats: model.RunStats{Warnings: []string{"Pełny zakres portów nie został przeskanowany (błąd nmap). Usługi spoza listy portów profilu są w tym przebiegu nieznane."}}}).(model.ScanRun)
+	if run.Stats.Warnings[0] != "The full port range was not scanned (nmap error). Services outside the profile's port list are unknown in this scan." {
+		t.Errorf("warning = %q", run.Stats.Warnings[0])
+	}
 	sig := localizeResponse(en, model.Signature{Slug: "header-version-powered-by", Name: "Wersja oprogramowania w X-Powered-By", Builtin: true}).(model.Signature)
 	if sig.Name != "Software version in X-Powered-By" {
 		t.Errorf("signature = %q", sig.Name)

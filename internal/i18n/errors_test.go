@@ -2,6 +2,24 @@ package i18n
 
 import "testing"
 
+func TestText(t *testing.T) {
+	cases := map[string]string{
+		"Host niestabilny. Zwykle aktywny śr 09:00–10:00.":                                                    "Host unstable. Usually up Wed 09:00–10:00.",
+		"Nie odpowiada od 21.11 10:05. Sprawdzenie 2 z 4. Przesunięte do okna czasowego (start 22.11 08:00).": "Not responding since 21.11 10:05. Check 2 of 4. Moved into the time window (start 22.11 08:00).",
+		"pełny zakres portów (1-65535) objął 16 z 70 aktywnych hostów; pozostałe: porty z profilu":            "the full port range (1-65535) covered 16 of 70 live hosts; the others: the profile's ports",
+		"Obserwator":                   "Viewer",
+		"Ponowne sprawdzenie: 3 hosty": "Re-probe: 3 host(s)",
+	}
+	for pl, want := range cases {
+		if got := Text(pl, "en"); got != want {
+			t.Errorf("Text(%q) = %q, want %q", pl, got, want)
+		}
+		if Text(pl, "pl") != pl {
+			t.Errorf("Polish changed: %q", pl)
+		}
+	}
+}
+
 func TestErrorMessage(t *testing.T) {
 	cases := map[string]string{
 		"Ten profil ma już skan #12. Zakończ albo anuluj go przed nowym.":                          "This profile already has scan #12. Let it finish or cancel it before a new one.",

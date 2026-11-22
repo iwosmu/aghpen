@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/iwosmu/aghpen/internal/analyze"
+	"github.com/iwosmu/aghpen/internal/i18n"
 	"github.com/iwosmu/aghpen/internal/model"
 )
 
@@ -111,6 +112,31 @@ func localizeResponse(w http.ResponseWriter, v any) any {
 		for i := range x.Items {
 			localizeProfile(&x.Items[i])
 		}
+	case model.Role:
+		localizeRole(&x)
+		return x
+	case []model.Role:
+		for i := range x {
+			localizeRole(&x[i])
+		}
+	case model.Page[model.Role]:
+		for i := range x.Items {
+			localizeRole(&x.Items[i])
+		}
+	case PassiveResult:
+		for i := range x.Candidates {
+			x.Candidates[i].Reason = i18n.Text(x.Candidates[i].Reason, en)
+		}
+		return x
+	case model.RetroHuntResult:
+		for i := range x.Notes {
+			x.Notes[i] = i18n.Text(x.Notes[i], en)
+		}
+		return x
+	case *model.RetroHuntResult:
+		for i := range x.Notes {
+			x.Notes[i] = i18n.Text(x.Notes[i], en)
+		}
 	case model.Signature:
 		localizeSignature(&x)
 		return x
@@ -178,7 +204,23 @@ const (
 	triggerManualEntryName = "manual-entry"
 )
 
+func localizeRole(r *model.Role) {
+	if r.Builtin {
+		r.Name, r.Description = i18n.Text(r.Name, "en"), i18n.Text(r.Description, "en")
+	}
+}
+
 func localizeRun(run *model.ScanRun) {
+	for i, s := range run.Stats.Warnings {
+		run.Stats.Warnings[i] = i18n.Text(s, "en")
+	}
+	for i, s := range run.Stats.Notes {
+		run.Stats.Notes[i] = i18n.Text(s, "en")
+	}
+	if run.AdHoc != nil {
+		run.AdHoc.Reason = i18n.Text(run.AdHoc.Reason, "en")
+	}
+	run.Error = i18n.ErrorMessage(run.Error, "en")
 	if run.ProfileName == manualEntryProfilePL && run.Trigger == triggerManualEntryName {
 		run.ProfileName = manualEntryProfileEN
 	}
