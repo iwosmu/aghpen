@@ -24,4 +24,4 @@ Skrypt wypisuje liczbę słów każdego slajdu i kończy się kodem 1, gdy na kt
 
 Slajd to jeden obraz z podpisem. Szczegóły, które nie mieszczą się w limicie, są w notatkach do slajdów (`docs/DEMO.md` rozdział 2) i w `docs/ZGODNOSC.md`. Źródło każdej liczby jest w komentarzu HTML przy slajdzie, nigdy na slajdzie.
 
-Prezentacja nie ma już miejsc do uzupełnienia. Slajd 3 podaje czas drugiego i kolejnych przebiegów /16 (16 min 56 s, zaokrąglone do 17 minut); pierwszy przebieg trwał 12 min 42 s. Liczby pochodzą z `docs/WYNIKI.md`.
+Prezentacja nie ma już miejsc do uzupełnienia. Zrzuty na slajdach 3–7 są w `img/`; zrobił je `docs/demo/capture-slides.mjs` na czujka.dev 22.11.2026 o 06:48. Każda liczba w podpisie jest na zrzucie albo w `docs/WYNIKI.md`.
