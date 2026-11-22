@@ -26,7 +26,7 @@ Zmierzone na czystej maszynie (`docker:dind`, 0 obrazów; zapis: [`deploy/e2e/fr
 
 | Krok | Czas |
 | --- | --- |
-| `git clone` | 1 s |
+| `git clone` | 1–2 s |
 | `docker compose up -d` do zdrowego API (pobranie obrazów i budowa) | 51–115 s, zależnie od łącza (trzy pomiary: 79 s z Docker Hub, 115 s i 51 s przez mirror.gcr.io) |
 | zamiast tego paczka offline (`make bundle`, 354 MiB): rozpakowanie i `sh install.sh` | 26–29 s, bez sieci |
 | logowanie, „Ten komputer”, „Uruchom skan” (przeglądarka sterowana skryptem) | 9 s |
@@ -99,7 +99,7 @@ Pomiary trafności, tempa i czasu startu: [`docs/WYNIKI.md`](docs/WYNIKI.md). Wy
 ## Ograniczenia
 
 - Zakresy CIDR IPv6 są odrzucane; pojedyncze adresy IPv6 działają. Nazwy domen dają tylko adresy IPv4 (rekordy A).
-- UDP: tylko 7 portów z niegroźnymi zapytaniami (53, 123, 137, 161, 500, 1900, 5353), bez wykrywania wersji.
+- UDP: tylko 7 portów z niegroźnymi zapytaniami (53, 123, 137, 161, 500, 1900, 5353). Wersję usługi UDP podaje `nmap -sU -sV` z najniższą intensywnością, tylko na otwartych portach z tej listy.
 - REST API działa z sesją i tokenem CSRF; nie ma tokenów API. Skrypt loguje się jak przeglądarka: [`docs/API.md`](docs/API.md), „API with curl”. Logowanie nie ma drugiego składnika.
 - Skala jest zmierzona na serwerze OMEN: 2 000 i 10 000 żywych adresów (2 i 10 kontenerów po 1 000 adresów) w sieci /16 ([`docs/WYNIKI.md`](docs/WYNIKI.md#skala-2-000-i-10-000-żywych-hostów)); czas dla innej liczby hostów to ekstrapolacja z tych pomiarów.
 

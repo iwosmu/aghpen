@@ -17,17 +17,17 @@ Numery zrzutów (`40`, `47` …) to pliki w `web/screenshots/lab/`. „Krok N”
 | Status | Znaczenie | Wierszy |
 | --- | --- | --- |
 | **udowodnione** | Działa w produkcie. Dowód z działającego produktu: zapis testu e2e, raport z laboratorium, zrzut na prawdziwych danych albo test integracyjny przez REST API na PostgreSQL z `pg_tde`. | 86 |
-| **gotowe** | Działa w produkcie i ma testy, ale brak zapisu przebiegu na prawdziwych danych albo dowód jest do powtórzenia. | 9 |
-| **częściowe** | Działa tylko część wymagania albo brakuje pomiaru, o który pyta wymaganie. | 1 |
+| **gotowe** | Działa w produkcie i ma testy, ale brak zapisu przebiegu na prawdziwych danych albo dowód jest do powtórzenia. | 8 |
+| **częściowe** | Działa tylko część wymagania albo brakuje pomiaru, o który pyta wymaganie. | 2 |
 | **brak** | Nie ma tego w kodzie. | 0 |
 
 Razem 96 wierszy.
 
 ## Najsłabsze miejsca
 
-1. **Skala (kryterium 30%).** Pomiar trafności i tempa dotyczy laboratorium /16 z 70 hostami (`docs/WYNIKI.md`). Czas dla większej sieci to ekstrapolacja z tego pomiaru, nie pomiar.
+1. **Skala (kryterium 30%).** Trafność mierzy laboratorium /16 z 70 hostami. Skalę mierzą dwa przebiegi na /16 z 2 000 i 10 000 żywych adresów (`docs/WYNIKI.md`, „Skala: 2 000 i 10 000 żywych hostów”). Żywe adresy to kontenery-farmy, nie osobne maszyny; czas dla innej gęstości sieci to rachunek z tych pomiarów.
 2. **Liczby pakietów: zmierzone na łączu.** `e2e/full/transcript.txt` (100 ze 100) przechwytuje ruch z filtrem źródła (`src host <adres Czujki> or arp`), który widzi pakiety wysyłane przez nmapa przez surowe gniazdo; stare liczby z przechwytywania `-Q out` są usunięte. Przebieg 1: 13 147 surowych pakietów nmapa na łączu (licznik silnika 13 246), najwięcej 641 na sekundę przy limicie 800, średnio 234,7/s. Przebieg 2: 13 125 pakietów, najwięcej 641/s, średnio 305,2/s. Wszystkie wysłane pakiety: najwięcej 643/s. Stop awaryjny: wywołanie trwało 0,09 s, po 1 s nie działał żaden proces nmap, po stopie wyszło 5 pakietów IP w ciągu 0,01 s i żaden później niż 1 s. Retro-hunt: 0 pakietów od Czujki. Pozostaje: pomiar dotyczy sieci /22 z 9 hostami; tempo na /16 opisuje `docs/WYNIKI.md`.
-3. **IPv6, UDP, tokeny API.** Zakresy CIDR IPv6 są odrzucane, a nazwy domen dają tylko adresy IPv4 (rekordy A). UDP działa bez wykrywania wersji. REST API wymaga sesji i tokenu CSRF; nie ma tokenów API (`docs/API.md`, „API with curl”).
+3. **IPv6, UDP, tokeny API.** Zakresy CIDR IPv6 są odrzucane, a nazwy domen dają tylko adresy IPv4 (rekordy A). UDP obejmuje tylko 7 portów z listy niegroźnych zapytań. REST API wymaga sesji i tokenu CSRF; nie ma tokenów API (`docs/API.md`, „API with curl”).
 
 ## 1. Wymagania z rozdziału 2 zadania
 
@@ -42,7 +42,7 @@ Razem 96 wierszy.
 | 2c | – podział adresów na optymalne podgrupy | Bloki /24 łączone w grupy robocze; rozmiar grupy idzie za zmierzonym tempem (EWMA, cel 30 s); bloki ze znanymi hostami idą pierwsze. | strona przebiegu: tabela „Podgrupy adresów”, mapa | `TestSizerFollowsMeasuredSpeed`, `TestBuildUnitsDensityFirst`; /16: 256 bloków w 108 grupach, 78 łączonych (zrzut `47`) | **udowodnione** |
 | 3 | Wykrycie aktywnych hostów | Z surowymi gniazdami: ICMP echo i timestamp, TCP SYN/ACK, ARP. Bez nich: połączenie TCP. Host bez ICMP jest wykrywany sondą TCP albo ARP. | „Hosty” | e2e: 9 z 9 hostów, także host odrzucający ICMP (krok 7); /16: 67 z 67 hostów, bez fałszywych (`docs/WYNIKI.md`). Szczegóły: wiersz 7.1 | **udowodnione** |
 | 4 | Identyfikacja podstawowych usług | `nmap -sV` na otwartych portach: usługa, produkt, wersja, CPE. | „Usługi”, szczegóły usługi | e2e: nginx 1.24.0, OpenSSH 9.7, Redis 7.4.12, MariaDB 11.8.9, Grafana (krok 7) | **udowodnione** |
-| 4a | – usługi UDP | Profil może włączyć UDP, tylko dla niegroźnych zapytań: 53, 123, 137, 161, 500, 1900, 5353. | „Profile skanów” → sekcja UDP | `TestUDPPorts`, `TestUDPArgsAreSafe`, `TestSNMPProbe` (`internal/probe/udp_test.go`); brak zapisu przebiegu UDP na laboratorium | **gotowe** |
+| 4a | – usługi UDP | Profil może włączyć UDP, tylko dla niegroźnych zapytań: 53, 123, 137, 161, 500, 1900, 5353. | „Profile skanów” → sekcja UDP | `TestUDPPorts`, `TestUDPArgsAreSafe`, `TestSNMPProbe` (`internal/probe/udp_test.go`); kontrola laboratorium: wersje usług TCP i UDP 32 z 32 (`docs/WYNIKI.md`, „Wykrywanie w sieci /16”) | **udowodnione** |
 | 5a | Informacje HTTP/HTTPS: tytuł strony | `title` z HTML | szczegóły usługi, sekcja HTTP | e2e: `title=WordPress › Installation`, `Grafana`, `Welcome to nginx!` (krok 7); zrzut `44` | **udowodnione** |
 | 5b | – kod odpowiedzi HTTP | `status` | szczegóły usługi | zrzut `44` (Status 200); e2e: zmiana kodu wykrywana jako zmiana (`internal/analyze`) | **udowodnione** |
 | 5c | – nagłówki | do 100 nagłówków, `Server`, `X-Powered-By` | szczegóły usługi, „Nagłówki odpowiedzi” | zrzut `44`; e2e: znaleziska `interesting-header` (krok 7) | **udowodnione** |
@@ -135,7 +135,7 @@ Razem 96 wierszy.
 | Prezentacja do 10 slajdów | 10 slajdów, PDF i HTML. Każdy slajd to jeden obraz z podpisem: tytuł do 8 słów i najwyżej 12 słów poza nim; `docs/slides/build.mjs` pilnuje limitu i wypisuje liczbę słów. Szczegóły są w notatkach do slajdów (`docs/DEMO.md` rozdz. 2). Każda liczba na slajdach pochodzi z `docs/WYNIKI.md`; nie ma miejsc do uzupełnienia. | `docs/slides/czujka.pdf` | **udowodnione** |
 | Działające demo, lokalnie lub w środowisku testowym | Stos startuje jednym poleceniem; laboratorium 70 hostów lokalnie; publiczna instancja `https://czujka.dev` z laboratorium i zaplanowanym skanem. Film 2:09 nagrany skryptem z prawdziwego interfejsu (`docs/demo/record.mjs`): kreator na świeżej instalacji, skan /16 na żywo (fragment w ×8, oznaczony), porównanie dwóch skanów, host niestabilny, oś czasu, reguła, sygnatura z przykładu, stop awaryjny. Pierwsza wersja z lokalnego stosu (21.11.2026); wersja końcowa 22.11 rano na danych z nocy, tym samym poleceniem. Głos lektora nagrywa się osobno (`docs/demo/lektor.txt`). | `docs/demo/czujka-demo.mp4`; `docs/DEMO.md`; `https://czujka.dev` | **udowodnione** |
 | Technologie bezpłatne i open-source | Go, PostgreSQL (Percona z `pg_tde`), nmap, chi, pgx, React, Vite. Bez płatnych API. | `go.mod`, `web/package.json` | **udowodnione** |
-| Język o niskim zużyciu zasobów | Go; obraz 107 MB (`docker images`, 2026-11-21). Pamięć kontenera w skanie /16 laboratorium: 200–400 MiB, chwilowo do 1,2 GiB (około minuty po starcie przebiegu; przyczyny nie zbadaliśmy). Wcześniejsza liczba 90,7 MiB pochodziła z podsumowania, które porównywało próbki jako tekst, więc jej nie podajemy | `docs/WYNIKI.md` „Tempo i bezpieczeństwo skanowania” | **częściowo**: obraz mały, pamięć zmierzona, szczyt niewyjaśniony |
+| Język o niskim zużyciu zasobów | Go; obraz 124 MB (`docker images`, 2026-11-22, z pakietem `nftables`). Pamięć kontenera w skanie /16 laboratorium: 200–400 MiB, chwilowo do 1,2 GiB (około minuty po starcie przebiegu; przyczyny nie zbadaliśmy). Wcześniejsza liczba 90,7 MiB pochodziła z podsumowania, które porównywało próbki jako tekst, więc jej nie podajemy | `docs/WYNIKI.md` „Tempo i bezpieczeństwo skanowania” | **częściowe**: obraz mały, pamięć zmierzona, szczyt niewyjaśniony |
 
 ## 7. Dwanaście punktów weryfikowanych przez jury (rozdz. 6)
 
