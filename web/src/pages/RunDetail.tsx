@@ -7,13 +7,14 @@ import { serviceName, isSelf } from '../lib/serviceName';
 import { ServiceStateMark } from '../ui/marks';
 import { t, plural } from '../i18n';
 import { cx, fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelative, fmtTime } from '../lib/format';
-import { Button, Dialog, ErrorState, Field, InlineError, PageHeader, Panel, SkeletonRows } from '../ui/kit';
+import { MenuButton } from '../ui/edit';
+import { Button, Dialog, ErrorState, Field, InlineError, PageHeader, Panel, SkeletonRows, Tabs } from '../ui/kit';
 import { triggerLabel } from './Runs';
 import { Icon } from '../ui/Icon';
 import { ChunkStatusMark, Glyph, RunStatusMark } from '../ui/marks';
 import { AddressMap } from '../viz/AddressMap';
 import { NetworkField, networkFields } from '../viz/Night';
-import { useLiveRun, useWidth } from '../lib/hooks';
+import { useLiveRun, useUrlState, useWidth } from '../lib/hooks';
 import { PacketCount, ProgressBar, RateGauge } from '../viz/charts';
 import { useCan } from '../session';
 import { RunStory } from '../ui/RunStory';
@@ -51,8 +52,7 @@ function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: nu
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="run-services">
             <thead><tr className="border-b border-rule-strong text-left text-xs text-ink-3">
-              {hosts.length > 1 ? <th className="h-[30px] px-3 font-medium">IP</th> : null}
-              <th className="h-[30px] px-3 font-medium">{t('Port', 'Port')}</th>
+              <th className="h-[30px] px-3 font-medium">{hosts.length > 1 ? t('Adres', 'Address') : t('Port', 'Port')}</th>
               <th className="px-3 font-medium">{live ? t('Stan', 'Status') : t('Stan dziś', 'Status today')}</th>
               <th className="px-3 font-medium">{t('Usługa', 'Service')}</th>
               <th className="px-3 font-medium">{t('Produkt', 'Product')}</th>
@@ -62,8 +62,7 @@ function RunServices({ run, live, cap }: { run: ScanRun; live: boolean; cap?: nu
             <tbody>
               {items.map((s) => (
                 <tr key={s.id} className={cx('border-b border-rule last:border-b-0', s.carried && 'text-ink-3 [&_.link]:text-ink-2')} data-carried={s.carried ? 'true' : undefined} title={s.carried ? notScannedHint() : undefined} style={fresh.has(s.id) && !s.carried ? { animation: 'rise-in 240ms var(--ease-out-expo)' } : undefined}>
-                  {hosts.length > 1 ? <td className="mono h-[30px] whitespace-nowrap px-3">{s.ip}</td> : null}
-                  <td className="h-[30px] whitespace-nowrap px-3"><Link to={'/services/' + s.id} className="mono link">{s.port}/{s.proto}</Link></td>
+                  <td className="h-[30px] whitespace-nowrap px-3"><Link to={'/services/' + s.id} className="mono link">{hosts.length > 1 ? s.ip + ':' + s.port : s.port + '/' + s.proto}</Link></td>
                   <td className="whitespace-nowrap px-3">{s.carried ? <NotScanned /> : <ServiceStateMark state={live ? 'open' : s.state} />}</td>
                   <td className="whitespace-nowrap px-3">{serviceName(s)}{isSelf(s) ? <SelfTag /> : null}</td>
                   <td className={cx('whitespace-nowrap px-3', !s.carried && 'text-ink-2')}><ProductValue s={s} /></td>
@@ -104,12 +103,7 @@ function Fact({ label, children, wide }: { label: string; children: React.ReactN
 }
 
 function ReportButtons({ onOpen }: { onOpen: (print: boolean) => void }) {
-  return (
-    <>
-      <Button icon="external" onClick={() => onOpen(false)} data-testid="run-report">{t('Raport', 'Report')}</Button>
-      <Button icon="print" onClick={() => onOpen(true)}>{t('Drukuj', 'Print')}</Button>
-    </>
-  );
+  return <MenuButton label={t('Raport', 'Report')} icon="external" testId="run-report-menu" items={[{ label: t('Otwórz', 'Open'), onSelect: () => onOpen(false), testId: 'run-report' }, { label: t('Drukuj', 'Print'), onSelect: () => onOpen(true) }]} />;
 }
 
 function specLabel(c: Chunk): string {
@@ -135,6 +129,7 @@ function RunAddressField({ runId, cidr, live, fallback }: { runId: number; cidr:
 }
 
 export default function RunDetail() {
+  const u = useUrlState();
   const id = Number(useParams().id);
   const navigate = useNavigate();
   const canRun = useCan('scans:run');
@@ -174,6 +169,8 @@ export default function RunDetail() {
   const s = run.stats;
   const pct = s.addresses_total ? s.addresses_done / s.addresses_total : 0;
   const isLive = run.status === 'running' || run.status === 'analyzing';
+  const defaultTab = isLive || run.status === 'paused' || run.status === 'queued' ? 'progress' : 'services';
+  const tab = u.get('tab', defaultTab);
   const policyCap = safety.data?.max_pps ?? 0;
   const cap = Math.min(profile.data?.rate.max_pps ?? policyCap, policyCap || Infinity) || policyCap;
   const maxSize = Math.max(1, ...(chunks.data ?? []).map((c) => c.size));
@@ -266,9 +263,31 @@ export default function RunDetail() {
           </div>
         ) : null}
 
-        {small ? <RunServices run={run} live={isLive} /> : null}
-        {small ? null : <div className="grid items-start gap-4 xl:grid-cols-2">
-          <Panel title={t('Mapa przestrzeni adresowej', 'Address-space map')} count={(map.data?.blocks.length ?? 0) + ' × /24'}>
+        <Tabs value={tab} onChange={(v) => u.set({ tab: v === defaultTab ? null : v })} tabs={[
+          { id: 'services', label: t('Usługi', 'Services') },
+          ...(run.summary ? [{ id: 'changes', label: t('Zmiany', 'Changes') }] : []),
+          ...(small ? [] : [{ id: 'map', label: t('Mapa', 'Map') }, { id: 'chunks', label: t('Podgrupy', 'Chunks') }]),
+          { id: 'progress', label: t('Przebieg', 'Progress') },
+        ]} />
+        {tab === 'services' ? <RunServices run={run} live={isLive} cap={small ? undefined : RUN_SERVICES_CAP} /> : null}
+        {tab === 'changes' ? (run.summary ? (
+            <Panel title={t('Zmiany w tym skanie', 'Changes in this scan')} actions={<Link className="link" to={'/changes?run_id=' + run.id}>{t('Wszystkie', 'All')}</Link>}>
+              <dl className="grid grid-cols-2 gap-x-6 sm:grid-cols-3">
+                {([
+                  ['plus', 'new', t('nowe hosty', 'new hosts'), run.summary.hosts_new], ['plus', 'new', t('nowe usługi', 'new services'), run.summary.services_new], ['back', 'new', t('hosty wróciły', 'hosts back'), run.summary.hosts_back], ['returned', 'new', t('usługi wróciły', 'services back'), run.summary.services_returned ?? 0], ['slow', 'changed', t('usługi odpowiadają wolniej', 'services respond slower'), run.summary.responses_slower ?? 0],
+                  ['minus', 'gone', t('hosty nieaktywne', 'hosts down'), run.summary.hosts_gone], ['minus', 'gone', t('usługi zniknęły', 'services gone'), run.summary.services_gone], ['wave', 'unstable', t('hosty niestabilne', 'hosts unstable'), run.summary.hosts_unstable],
+                  ['delta', 'changed', t('zmienione usługi', 'changed services'), run.summary.services_changed], ['dot', 'accent', t('nowe znaleziska', 'new findings'), run.summary.findings_new],
+                  ['half', 'changed', t('hosty nie odpowiadają (niepotwierdzone)', 'hosts not responding (unconfirmed)'), run.summary.hosts_missing ?? 0], ['half', 'changed', t('usługi nie odpowiadają (niepotwierdzone)', 'services not responding (unconfirmed)'), run.summary.services_unreachable ?? 0],
+                ] as const).map(([g, tone, label, n]) => (
+                  <div key={label} className={cx('flex min-h-[40px] items-center justify-between gap-2 border-b border-rule py-1.5', !n && 'opacity-55')}>
+                    <dt className="flex items-center gap-1.5 text-sm text-ink-2"><Glyph name={g} tone={n ? tone : 'expected'} />{label}</dt>
+                    <dd className={cx('num text-sm font-medium', n ? 'text-ink' : 'text-ink-3')}>{n}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Panel>
+          ) : null) : null}
+        {tab === 'map' && !small ? <Panel title={t('Mapa przestrzeni adresowej', 'Address-space map')} count={(map.data?.blocks.length ?? 0) + ' × /24'}>
             {map.error ? <ErrorState error={map.error} retry={() => map.refetch()} /> : !map.data ? <div className="skeleton h-[260px]" /> : map.data.blocks.length === 1 ? (
               <RunAddressField runId={run.id} cidr={map.data.blocks[0].cidr} live={isLive} fallback={
                 <AddressMap blocks={map.data.blocks} highlight={highlight} onHover={setHoverCidr} onSelect={(b: MapBlock) => navigate('/hosts?cidr=' + encodeURIComponent(b.cidr))} />
@@ -280,9 +299,8 @@ export default function RunDetail() {
                 describe={(b) => { const c = chunkOf.get(b.cidr); return c ? t('podgrupa', 'chunk') + ' #' + c.seq : null; }}
               />
             )}
-          </Panel>
-
-          <Panel title={t('Podgrupy adresów', 'Address chunks')} count={sortedChunks.length} flush>
+          </Panel> : null}
+        {tab === 'chunks' && !small ? <Panel title={t('Podgrupy adresów', 'Address chunks')} count={sortedChunks.length} flush>
             {chunks.error ? <ErrorState error={chunks.error} retry={() => chunks.refetch()} /> : !chunks.data ? <SkeletonRows rows={8} /> : sortedChunks.length === 0 ? (
               <p className="p-3 text-sm text-ink-2">{run.trigger === 'import' ? t('Import nie ma podgrup', 'An import has no chunks') : t('Plan podgrup pojawi się po starcie skanu', 'The chunk plan appears when the scan starts')}</p>
             ) : (
@@ -320,10 +338,8 @@ export default function RunDetail() {
                 </table>
               </div>
             )}
-          </Panel>
-        </div>}
-        {small ? null : <RunServices run={run} live={isLive} cap={RUN_SERVICES_CAP} />}
-
+          </Panel> : null}
+        {tab === 'progress' ? <>
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <section className="card p-5">
             <div className="flex items-baseline justify-between gap-3">
@@ -360,10 +376,7 @@ export default function RunDetail() {
             <p className="mt-2 text-xs text-ink-2">{t('Średnio', 'Average')} <span className="num text-ink">{fmtInt(s.avg_pps)}</span> pps. {profile.data && profile.data.rate.max_pps > policyCap ? t('Polityka bezpieczeństwa ogranicza tempo do ' + fmtInt(policyCap) + ' pps.', 'The safety policy limits the rate to ' + fmtInt(policyCap) + ' pps.') : null}</p>
           </section>
         </div>
-
-
-        <div className="grid gap-4 xl:grid-cols-2">
-          {!small && (isLive || recent.length > 0) ? (
+        {!small && (isLive || recent.length > 0) ? (
             <Panel title={t('Ostatnio wykryte hosty', 'Hosts just found')} flush>
               {recent.length === 0 ? <p className="p-3 text-sm text-ink-2">{t('Oczekiwanie na odpowiedzi…', 'Waiting for responses…')}</p> : (
                 <ul>
@@ -378,24 +391,7 @@ export default function RunDetail() {
               )}
             </Panel>
           ) : null}
-          {run.summary ? (
-            <Panel title={t('Zmiany w tym skanie', 'Changes in this scan')} actions={<Link className="link" to={'/changes?run_id=' + run.id}>{t('Wszystkie', 'All')}</Link>}>
-              <dl className="grid grid-cols-2 gap-x-6 sm:grid-cols-3">
-                {([
-                  ['plus', 'new', t('nowe hosty', 'new hosts'), run.summary.hosts_new], ['plus', 'new', t('nowe usługi', 'new services'), run.summary.services_new], ['back', 'new', t('hosty wróciły', 'hosts back'), run.summary.hosts_back], ['returned', 'new', t('usługi wróciły', 'services back'), run.summary.services_returned ?? 0], ['slow', 'changed', t('usługi odpowiadają wolniej', 'services respond slower'), run.summary.responses_slower ?? 0],
-                  ['minus', 'gone', t('hosty nieaktywne', 'hosts down'), run.summary.hosts_gone], ['minus', 'gone', t('usługi zniknęły', 'services gone'), run.summary.services_gone], ['wave', 'unstable', t('hosty niestabilne', 'hosts unstable'), run.summary.hosts_unstable],
-                  ['delta', 'changed', t('zmienione usługi', 'changed services'), run.summary.services_changed], ['dot', 'accent', t('nowe znaleziska', 'new findings'), run.summary.findings_new],
-                  ['half', 'changed', t('hosty nie odpowiadają (niepotwierdzone)', 'hosts not responding (unconfirmed)'), run.summary.hosts_missing ?? 0], ['half', 'changed', t('usługi nie odpowiadają (niepotwierdzone)', 'services not responding (unconfirmed)'), run.summary.services_unreachable ?? 0],
-                ] as const).map(([g, tone, label, n]) => (
-                  <div key={label} className={cx('flex min-h-[40px] items-center justify-between gap-2 border-b border-rule py-1.5', !n && 'opacity-55')}>
-                    <dt className="flex items-center gap-1.5 text-sm text-ink-2"><Glyph name={g} tone={n ? tone : 'expected'} />{label}</dt>
-                    <dd className={cx('num text-sm font-medium', n ? 'text-ink' : 'text-ink-3')}>{n}</dd>
-                  </div>
-                ))}
-              </dl>
-            </Panel>
-          ) : null}
-        </div>
+        </> : null}
       </div>
 
       <Dialog
